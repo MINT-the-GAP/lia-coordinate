@@ -1,18 +1,18 @@
 <!--
 author:   MINT-the-GAP
 version:  0.0.1
-language: de
+language: en
 edit: true
-narrator: Deutsch Female
+narrator: US English Female
 comment:  Interactive coordinate system plugin for LiaScript, powered by JSXGraph. Provides macros for coordinate planes, points, function plots, and value tables.
 
 import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   ./dist/index.js
 
-@Koordinatensystem: @Koordinatensystem_(@0)
+@CoordinateSystem: @CoordinateSystem_(@0)
 
-@Koordinatensystem_
+@CoordinateSystem_
 ``` javascript @JSX.Graph
 (function () {
   JXG.Options.text.useMathJax = true;
@@ -241,9 +241,9 @@ script:   ./dist/index.js
     callIfFunction(window.__bootstrapAxisTitles);
     callIfFunction(window.__bootstrapPlotFunctions);
     callIfFunction(window.__bootstrapPlotInputs);
-    callIfFunction(window.__bootstrapErzeugePunkte);
-    callIfFunction(window.__bootstrapKoordPunkte);
-    callIfFunction(window.__bootstrapPunktGraphs);
+    callIfFunction(window.__bootstrapCreatePoints);
+    callIfFunction(window.__bootstrapStaticPoints);
+    callIfFunction(window.__bootstrapPointOnGraphs);
   }
 
   function applyBoardFrame(board) {
@@ -1107,9 +1107,9 @@ script:   ./dist/index.js
 
 
 
-@AchsenBeschriftung: @AchsenBeschriftung_(@uid,@0)
+@AxisLabel: @AxisLabel_(@uid,@0)
 
-@AchsenBeschriftung_
+@AxisLabel_
 <span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
@@ -1121,9 +1121,9 @@ script:   ./dist/index.js
 
 
 
-@ErzeugePunkt: @ErzeugePunkt_(@uid,@0,@1)
+@CreatePoint: @CreatePoint_(@uid,@0,@1)
 
-@ErzeugePunkt_
+@CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
   <div id="point-task-@0" class="lia-point-task"></div>
 
@@ -1150,10 +1150,10 @@ script:   ./dist/index.js
 
 
 
-@Punkt: @Punkt_(@uid,@0)
+@Point: @Point_(@uid,@0)
 
-@Punkt_
-<span id="punkt-spec-@0" data-spec="@1" style="display:none;"></span>
+@Point_
+<span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 
@@ -1163,9 +1163,9 @@ script:   ./dist/index.js
 
 
 
-@PlotFunktion: @PlotFunktion_(@uid,@0)
+@PlotFunction: @PlotFunction_(@uid,@0)
 
-@PlotFunktion_
+@PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
@@ -1175,10 +1175,10 @@ script:   ./dist/index.js
 
 
 
-@PlotEingabeLatex: @PlotEingabeLatex_(@uid,@0)
+@PlotInput: @PlotInput_(@uid,@0)
 
-@PlotEingabeLatex_
-<div id="lia-plot-eingabe-@0" data-spec="@1"></div>
+@PlotInput_
+<div id="lia-plot-input-@0" data-spec="@1"></div>
 @end
 
 
@@ -1187,9 +1187,9 @@ script:   ./dist/index.js
 
 
 
-@PunktGraph: @PunktGraph_(@uid,@0)
+@PointOnGraph: @PointOnGraph_(@uid,@0)
 
-@PunktGraph_
+@PointOnGraph_
 <div id="graph-ui-@0">
   <div id="graph-task-@0" class="lia-graph-task"></div>
 
@@ -1219,9 +1219,9 @@ script:   ./dist/index.js
 
 
 
-@PunkteAufGraph: @PunkteAufGraph_(@uid,@0)
+@PointsOnGraph: @PointsOnGraph_(@uid,@0)
 
-@PunkteAufGraph_
+@PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
   <div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
 
@@ -1233,8 +1233,8 @@ script:   ./dist/index.js
         const spec = root ? (root.dataset.spec || '') : String.raw`@1`;
         const uid  = '@0';
 
-        if (typeof window.__checkPunkteAufGraphFromSpec === 'function') {
-          return window.__checkPunkteAufGraphFromSpec(uid, spec);
+        if (typeof window.__checkPointsOnGraphFromSpec === 'function') {
+          return window.__checkPointsOnGraphFromSpec(uid, spec);
         }
         return false;
       })()
@@ -1268,9 +1268,9 @@ script:   ./dist/index.js
 @end
 
 
-@Tabelle: @Tabelle_(@uid,@0)
+@Table: @Table_(@uid,@0)
 
-@Tabelle_
+@Table_
 <div id="lia-table-@0" data-spec="@1"></div>
 
 <div id="lia-table-pool-@0" class="lia-dyn-table-pool" aria-hidden="true">
@@ -1369,7 +1369,7 @@ https://github.com/MINT-the-GAP/lia-coordinate
 
    `import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md`
 
-## `@Koordinatensystem`
+## `@CoordinateSystem`
 
           --{{0}}--
 Renders an interactive JSXGraph coordinate plane. Supports panning, zooming, and a resize handle.
@@ -1380,34 +1380,34 @@ Parameters (semicolon-separated key=value pairs):
 - `id` — board identifier used to connect other macros to this board
 
 ``` markdown
-@Koordinatensystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
 
-## `@AchsenBeschriftung`
+## `@AxisLabel`
 
           --{{0}}--
 Adds axis labels (supporting LaTeX math) to a coordinate board.
-Place it directly after `@Koordinatensystem` with the same `id`.
+Place it directly after `@CoordinateSystem` with the same `id`.
 
 Parameters: `id=<boardId>;xlabel=<label>;ylabel=<label>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_axis`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_axis`)
 
-@AchsenBeschriftung(`id=ex_axis;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_axis;xlabel=$x$;ylabel=$y$`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_axis`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_axis`)
 
-@AchsenBeschriftung(`id=ex_axis;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_axis;xlabel=$x$;ylabel=$y$`)
 
-## `@ErzeugePunkt`
+## `@CreatePoint`
 
           --{{0}}--
 Creates a draggable point exercise. The student drags a point to a target coordinate and checks their answer.
@@ -1418,50 +1418,50 @@ Parameters: `<boardId>;<pointName>;<targetX>;<targetY>`
 The second argument must always be provided. Pass `` ` ` `` (a space) to use the default check button.
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_punkt_ez`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point_ez`)
 
-@AchsenBeschriftung(`id=ex_punkt_ez;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_point_ez;xlabel=$x$;ylabel=$y$`)
 
 Drag point $A$ to the coordinates $(2 | 3)$.
 
-@ErzeugePunkt(`ex_punkt_ez;A;2;3`,` `)
+@CreatePoint(`ex_point_ez;A;2;3`,` `)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_punkt_ez`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point_ez`)
 
-@AchsenBeschriftung(`id=ex_punkt_ez;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_point_ez;xlabel=$x$;ylabel=$y$`)
 
 Drag point $A$ to the coordinates $(2 | 3)$.
 
-@ErzeugePunkt(`ex_punkt_ez;A;2;3`,` `)
+@CreatePoint(`ex_point_ez;A;2;3`,` `)
 
-## `@Punkt`
+## `@Point`
 
           --{{0}}--
 Places a pre-defined point on the board. Add `fix` as a fifth parameter to make it immovable.
 Useful for showing given points in a task without requiring student interaction.
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_punkt`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point`)
 
-@AchsenBeschriftung(`id=ex_punkt;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
-@Punkt(`ex_punkt;A;2;3`)
-@Punkt(`ex_punkt;B;-3;-1;fix`)
+@Point(`ex_point;A;2;3`)
+@Point(`ex_point;B;-3;-1;fix`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_punkt`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point`)
 
-@AchsenBeschriftung(`id=ex_punkt;xlabel=$x$;ylabel=$y$`)
+@AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
-@Punkt(`ex_punkt;A;2;3`)
-@Punkt(`ex_punkt;B;-3;-1;fix`)
+@Point(`ex_point;A;2;3`)
+@Point(`ex_point;B;-3;-1;fix`)
 
-## `@PlotFunktion`
+## `@PlotFunction`
 
           --{{0}}--
 Plots a function curve on the board using a formula. The formula uses standard math syntax.
@@ -1469,22 +1469,22 @@ Plots a function curve on the board using a formula. The formula uses standard m
 Parameters: `<boardId>;<funcName>;<formula>;<color>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AchsenBeschriftung(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
 
-@PlotFunktion(`ex_plot;f;0.5*x^2-2;#b41f65`)
+@PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AchsenBeschriftung(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
 
-@PlotFunktion(`ex_plot;f;0.5*x^2-2;#b41f65`)
+@PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 
-## `@PlotEingabeLatex`
+## `@PlotInput`
 
           --{{0}}--
 Renders a LaTeX input field where students can type a function and see it plotted live.
@@ -1492,22 +1492,22 @@ Renders a LaTeX input field where students can type a function and see it plotte
 Parameters: `<boardId>;<funcName>;<color>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_eingabe`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AchsenBeschriftung(`id=ex_eingabe;xlabel=$x$;ylabel=$g(x)$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
 
-@PlotEingabeLatex(`ex_eingabe;g;#0055cc`)
+@PlotInput(`ex_input;g;#0055cc`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_eingabe`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AchsenBeschriftung(`id=ex_eingabe;xlabel=$x$;ylabel=$g(x)$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
 
-@PlotEingabeLatex(`ex_eingabe;g;#0055cc`)
+@PlotInput(`ex_input;g;#0055cc`)
 
-## `@PunktGraph`
+## `@PointOnGraph`
 
           --{{0}}--
 Point-on-graph exercise: the student drags a point onto the graph of a given function.
@@ -1516,26 +1516,26 @@ The check validates whether the point lies on the curve within the given toleran
 Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AchsenBeschriftung(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
-@PunktGraph(`ex_pg;A;f;2*x-1;0.05`)
+@PointOnGraph(`ex_pg;A;f;2*x-1;0.05`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AchsenBeschriftung(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
-@PunktGraph(`ex_pg;A;f;2*x-1;0.05`)
+@PointOnGraph(`ex_pg;A;f;2*x-1;0.05`)
 
-## `@PunkteAufGraph`
+## `@PointsOnGraph`
 
           --{{0}}--
 Multi-point-on-graph exercise: places several draggable points that must all land on the graph.
@@ -1543,26 +1543,26 @@ Multi-point-on-graph exercise: places several draggable points that must all lan
 Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tolerance>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pag`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AchsenBeschriftung(`id=ex_pag;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
-@PunkteAufGraph(`ex_pag;n=3;d=2;A;f;x-1;0.05`)
+@PointsOnGraph(`ex_points_on_graph;n=3;d=2;A;f;x-1;0.05`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pag`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AchsenBeschriftung(`id=ex_pag;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
-@PunkteAufGraph(`ex_pag;n=3;d=2;A;f;x-1;0.05`)
+@PointsOnGraph(`ex_points_on_graph;n=3;d=2;A;f;x-1;0.05`)
 
-## `@Tabelle`
+## `@Table`
 
           --{{0}}--
 Renders a value table connected to a coordinate board. Students fill in x/y values and the corresponding points appear on the graph.
@@ -1570,20 +1570,20 @@ Renders a value table connected to a coordinate board. Students fill in x/y valu
 Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 ``` markdown
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AchsenBeschriftung(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
 
-@Tabelle(`n=3;x;f;P;id=ex_tab`)
+@Table(`n=3;x;f;P;id=ex_tab`)
 ```
 
 ---
 
-@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AchsenBeschriftung(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
 
-@Tabelle(`n=3;x;f;P;id=ex_tab`)
+@Table(`n=3;x;f;P;id=ex_tab`)
 
 ## Implementation
 
@@ -1595,9 +1595,9 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/index.js
 
-@Koordinatensystem: @Koordinatensystem_(@0)
+@CoordinateSystem: @CoordinateSystem_(@0)
 
-@Koordinatensystem_
+@CoordinateSystem_
 ` ` ` javascript @JSX.Graph
 ... (see README header for full definition)
 ` ` `

@@ -14,7 +14,7 @@ interface Window {
   __coordBoardStates: Record<string, any>;
 
   // Axis title subsystem
-  __liaAxisTitlesReady: boolean | undefined;
+  __axisTitlesReady: boolean | undefined;
   __liaAxisTitleSpecs: Record<string, any>;
   __bootstrapAxisTitles: (() => void) | undefined;
   __refreshAllAxisTitles: (() => void) | undefined;
@@ -24,32 +24,62 @@ interface Window {
   __liaThemeSync: { listeners: Set<() => void>; check: () => void } | undefined;
   __registerLiaThemeListener: ((fn: () => void) => void) | undefined;
 
-  // ErzeugePunkt subsystem
-  __erzeugePunktReady: boolean | undefined;
-  __erzeugePunktInstances: Record<string, any>;
-  __bootstrapErzeugePunkte: (() => void) | undefined;
-  __bootstrapErzeugePunkteRAF: number | undefined;
-  __scheduleBootstrapErzeugePunkte: (() => void) | undefined;
+  // CreatePoint subsystem (@CreatePoint)
+  __createPointReady: boolean | undefined;
+  __createPointInstances: Record<string, any>;
+  __bootstrapCreatePoints: (() => void) | undefined;
+  __bootstrapCreatePointsRAF: number | undefined;
+  __scheduleBootstrapCreatePoints: (() => void) | undefined;
 
-  // Koord point subsystem
+  // Static point subsystem (@Point)
+  __bootstrapStaticPoints: (() => void) | undefined;
+  __bootstrapStaticPointsRAF: number | undefined;
+  __scheduleBootstrapStaticPoints: (() => void) | undefined;
+  placeStaticPointFromSpec: ((spec: string) => boolean) | undefined;
+  renderStaticPointFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Shared point state
   __points: Record<string, Record<string, any>>;
   __pointStates: Record<string, Record<string, any>>;
   __pointNeutralColor: (() => string) | undefined;
-  __bootstrapKoordPunkte: (() => void) | undefined;
-  __bootstrapKoordPunkteRAF: number | undefined;
-  __scheduleBootstrapKoordPunkte: (() => void) | undefined;
 
   // Public point API
   restorePointFromSpec: ((spec: string) => any) | undefined;
   getPointFromSpec: ((spec: string) => any) | undefined;
   ensurePointFromSpec: ((spec: string) => boolean) | undefined;
   finalizePointFromSpec: ((spec: string) => boolean) | undefined;
-  placeKoordPointFromSpec: ((spec: string) => boolean) | undefined;
-  renderKoordPunktFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-  renderErzeugePunktFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderCreatePointFromSpec: ((uid: string, spec: string) => boolean) | undefined;
   __checkPointFromSpec: ((spec: string) => boolean) | undefined;
 
-  // PunktGraph public API
+  // PlotFunction subsystem (@PlotFunction)
+  __plotFunctionReady: boolean | undefined;
+  __plotFunctionEntries: Record<string, any>;
+  __bootstrapPlotFunctions: (() => void) | undefined;
+  renderPlotFunctionFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // PlotInput subsystem (@PlotInput)
+  __plotInputReady: boolean | undefined;
+  __plotInput: Record<string, any>;
+  __plotInputInstances: Record<string, any>;
+  __plotInputStates: Record<string, any>;
+  __plotInputNeutralColor: (() => string) | undefined;
+  __plotInputThemeSync: any;
+  __registerPlotInputThemeListener: ((fn: () => void) => void) | undefined;
+  __bootstrapPlotInputs: (() => void) | undefined;
+  __bootstrapPlotInputsRAF: number | undefined;
+  __scheduleBootstrapPlotInputs: (() => void) | undefined;
+  renderPlotInputFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // PointOnGraph subsystem (@PointOnGraph)
+  __pointOnGraphReady: boolean | undefined;
+  __pointGraphs: Record<string, any>;
+  __pointGraphStates: Record<string, any>;
+  __pointOnGraphInstances: Record<string, any>;
+  __pointOnGraphLocks: Record<string, any>;
+  __bootstrapPointOnGraphs: (() => void) | undefined;
+  __bootstrapPointOnGraphsRAF: number | undefined;
+  __scheduleBootstrapPointOnGraphs: (() => void) | undefined;
+  __checkPointGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
   restorePointGraphFromSpec: ((spec: string) => any) | undefined;
   getPointGraphFromSpec: ((spec: string) => any) | undefined;
   ensurePointGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
@@ -57,72 +87,35 @@ interface Window {
   checkPointGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
   showGraphFromPointGraphSpec: ((spec: string) => void) | undefined;
   restorePointGraphVisualState: ((uid: string) => void) | undefined;
-  renderPunktGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderPointOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
-  // PunkteAufGraph public API
-  getPunkteAufGraphFromSpec: ((uid: string, spec: string) => any) | undefined;
-  ensurePunkteAufGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-  renderPunkteAufGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-  checkPunkteAufGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-  showGraphFromPunkteAufGraphSpec: ((spec: string) => void) | undefined;
-  restorePunkteAufGraphVisualState: ((uid: string) => void) | undefined;
-  restorePunkteAufGraphFromSpec: ((spec: string) => any) | undefined;
-  finalizePunkteAufGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  // PointsOnGraph subsystem (@PointsOnGraph)
+  __pointsOnGraphReady: boolean | undefined;
+  __pointsOnGraphInstances: Record<string, any>;
+  __pointsOnGraphLocks: Record<string, any>;
+  __bootstrapPointsOnGraph: (() => void) | undefined;
+  __bootstrapPointsOnGraphRAF: number | undefined;
+  __scheduleBootstrapPointsOnGraph: (() => void) | undefined;
+  __checkPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  checkPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  getPointsOnGraphFromSpec: ((uid: string, spec: string) => any) | undefined;
+  ensurePointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  finalizePointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  restorePointsOnGraphFromSpec: ((spec: string) => any) | undefined;
+  restorePointsOnGraphVisualState: ((uid: string) => void) | undefined;
+  showGraphFromPointsOnGraphSpec: ((spec: string) => void) | undefined;
+  renderPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
-  // Tabelle public API
-  renderTabelleFromSpec: ((uid: string, spec: string, force?: boolean) => boolean) | undefined;
-  getTabelleWerte: ((uid: string) => any) | undefined;
-  getTabelleDaten: ((uid: string) => any) | undefined;
-  setTabelleWerte: ((uid: string, werte: any) => void) | undefined;
-
-  // Plot function subsystem
-  __plotFunktionReady: boolean | undefined;
-  __plotFunctionEntries: Record<string, any>;
-  __bootstrapPlotFunctions: (() => void) | undefined;
-  renderPlotFunctionFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-
-  // LaTeX student plot (graph-drawing) subsystem
-  __liaLatexStudentPlotReady: boolean | undefined;
-  __liaLatexStudentPlot: Record<string, any>;
-  __liaLatexStudentPlotInstances: Record<string, any>;
-  __liaLatexStudentPlotStates: Record<string, any>;
-  __liaLatexStudentPlotNeutralColor: (() => string) | undefined;
-  __liaLatexStudentPlotThemeSync: any;
-  __registerLiaLatexStudentPlotThemeListener: ((fn: () => void) => void) | undefined;
-  __bootstrapPlotInputs: (() => void) | undefined;
-  __bootstrapPlotInputsRAF: number | undefined;
-  __scheduleBootstrapPlotInputs: (() => void) | undefined;
-  renderPlotEingabeLatexFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-
-  // PunktGraph subsystem
-  __punktGraphReady: boolean | undefined;
-  __pointGraphs: Record<string, any>;
-  __pointGraphStates: Record<string, any>;
-  __punktGraphInstances: Record<string, any>;
-  __punktGraphLocks: Record<string, any>;
-  __bootstrapPunktGraphs: (() => void) | undefined;
-  __bootstrapPunktGraphsRAF: number | undefined;
-  __scheduleBootstrapPunktGraphs: (() => void) | undefined;
-  __checkPointGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-
-  // PunkteAufGraph subsystem
-  __punkteAufGraphReady: boolean | undefined;
-  __punkteAufGraphInstances: Record<string, any>;
-  __punkteAufGraphLocks: Record<string, any>;
-  __bootstrapPunkteAufGraph: (() => void) | undefined;
-  __bootstrapPunkteAufGraphRAF: number | undefined;
-  __scheduleBootstrapPunkteAufGraph: (() => void) | undefined;
-  __checkPunkteAufGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
-
-  // Tabelle subsystem
-  __liaTabelleReadyV2: boolean | undefined;
-  __liaTableStates: Record<string, any>;
-  __liaTableMounted: Record<string, any>;
-  __liaTableLastSpec: Record<string, any>;
-  __bootstrapTabellen: (() => void) | undefined;
-  __bootstrapTabellenRAF: number | undefined;
-  __scheduleBootstrapTabellen: (() => void) | undefined;
-
+  // Table subsystem (@Table)
+  __tableReady: boolean | undefined;
+  __tableStates: Record<string, any>;
+  __bootstrapTables: (() => void) | undefined;
+  __bootstrapTablesRAF: number | undefined;
+  __scheduleBootstrapTables: (() => void) | undefined;
+  renderTableFromSpec: ((uid: string, spec: string, force?: boolean) => boolean) | undefined;
+  getTableValues: ((uid: string) => any) | undefined;
+  getTableData: ((uid: string) => any) | undefined;
+  setTableValues: ((uid: string, values: any) => boolean) | undefined;
 }
 
 // Custom properties attached directly to DOM element instances
