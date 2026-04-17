@@ -1,6 +1,10 @@
 // Axis title subsystem (@AxisLabel macro).
 // Renders LaTeX axis labels as overlays on a JSXGraph board.
 
+import { splitTopLevel, unquote } from '../shared/parser';
+import { getNeutralColor } from '../shared/theme';
+import { scheduleBootstrap } from '../shared/bootstrap';
+
 export function init(): void {
   if (window.__axisTitlesReady) {
     try {
@@ -11,64 +15,6 @@ export function init(): void {
   window.__axisTitlesReady = true;
 
   window.__liaAxisTitleSpecs = window.__liaAxisTitleSpecs || {};
-
-  function splitTopLevel(str) {
-    const out = [];
-    let cur = '';
-    let quote = '';
-    let esc = false;
-
-    for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-
-      if (esc) {
-        cur += ch;
-        esc = false;
-        continue;
-      }
-
-      if (ch === '\\') {
-        cur += ch;
-        esc = true;
-        continue;
-      }
-
-      if (quote) {
-        cur += ch;
-        if (ch === quote) quote = '';
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') {
-        cur += ch;
-        quote = ch;
-        continue;
-      }
-
-      if (ch === ';' || ch === ',') {
-        if (cur.trim()) out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-
-      cur += ch;
-    }
-
-    if (cur.trim()) out.push(cur.trim());
-    return out;
-  }
-
-  function unquote(v) {
-    v = String(v || '').trim();
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'")) ||
-      (v.startsWith('`') && v.endsWith('`'))
-    ) {
-      return v.slice(1, -1);
-    }
-    return v;
-  }
 
   function normalizeAxisLabelMath(s) {
     let out = String(s || '').trim();
@@ -86,26 +32,6 @@ export function init(): void {
     return out;
   }
 
-  function parseSpec(spec) {
-    const raw = unquote(String(spec || '').trim());
-    const obj: Record<string, string> = {};
-
-    splitTopLevel(raw).forEach(function(part) {
-      const eq = part.indexOf('=');
-      if (eq < 0) return;
-
-      const key = part.slice(0, eq).trim().toLowerCase();
-      const val = unquote(part.slice(eq + 1).trim());
-      obj[key] = val;
-    });
-
-    return {
-      id: obj.id != null ? obj.id : '',
-      xlabel: obj.xlabel != null ? obj.xlabel : '',
-      ylabel: obj.ylabel != null ? obj.ylabel : ''
-    };
-  }
-
   function getMathJaxEngine() {
     try {
       if (window.MathJax) return window.MathJax;
@@ -116,26 +42,6 @@ export function init(): void {
     } catch (e) {}
 
     return null;
-  }
-
-  function neutralColor() {
-    try {
-      const doc = (window.parent && window.parent.document) ? window.parent.document : document;
-      const win = (window.parent && window.parent.getComputedStyle) ? window.parent : window;
-      const el  = doc.body || doc.documentElement;
-      const bg  = win.getComputedStyle(el).backgroundColor;
-      const m   = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return '#000';
-
-      const r = parseInt(m[1], 10);
-      const g = parseInt(m[2], 10);
-      const b = parseInt(m[3], 10);
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-      return lum < 128 ? '#fff' : '#000';
-    } catch (e) {
-      return '#000';
-    }
   }
 
   function getSafeBBox(board) {
@@ -211,6 +117,26 @@ export function init(): void {
     }
   }
 
+  function parseSpec(spec) {
+    const raw = unquote(String(spec || '').trim());
+    const obj: Record<string, string> = {};
+
+    splitTopLevel(raw).forEach(function(part) {
+      const eq = part.indexOf('=');
+      if (eq < 0) return;
+
+      const key = part.slice(0, eq).trim().toLowerCase();
+      const val = unquote(part.slice(eq + 1).trim());
+      obj[key] = val;
+    });
+
+    return {
+      id: obj.id != null ? obj.id : '',
+      xlabel: obj.xlabel != null ? obj.xlabel : '',
+      ylabel: obj.ylabel != null ? obj.ylabel : ''
+    };
+  }
+
   function applyAxisTitles(boardId) {
     const specs = window.__liaAxisTitleSpecs || {};
     const cfg = specs[boardId];
@@ -224,7 +150,7 @@ export function init(): void {
     const xEl = board.__xTitleOverlay;
     const yEl = board.__yTitleOverlay;
 
-    const col = neutralColor();
+    const col = getNeutralColor();
     if (xEl) xEl.style.color = col;
     if (yEl) yEl.style.color = col;
 
@@ -350,7 +276,7 @@ export function init(): void {
     };
 
     if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', handler);
-    else if (mq && typeof mq.addListener === 'function') mq.addListener(handler);
+    else if (mq && typeof (mq as any).addListener === 'function') (mq as any).addListener(handler);
   } catch (e) {}
 
   window.addEventListener('resize', function() {
@@ -379,5 +305,5 @@ export function init(): void {
     kickAxisTitles();
   }, 400);
 
-  kickAxisTitles();
+  scheduleBootstrap(kickAxisTitles);
 }

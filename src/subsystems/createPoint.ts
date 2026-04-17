@@ -1,6 +1,10 @@
 // Create-point subsystem (@CreatePoint and @Point macros).
 // Handles draggable student points and pre-placed static points on a JSXGraph board.
 
+import { unquote } from '../shared/parser';
+import { getNeutralColor, initThemeSync } from '../shared/theme';
+import { scheduleBootstrap } from '../shared/bootstrap';
+
 export function init(): void {
   if (window.__createPointReady) {
     try {
@@ -16,148 +20,12 @@ export function init(): void {
     }
   } catch (e) {}
 
-  function themeDoc() {
-    return (window.parent && window.parent.document) ? window.parent.document : document;
-  }
-
-  function themeWin() {
-    return (window.parent && window.parent.getComputedStyle) ? window.parent : window;
-  }
-
-  function currentNeutralColor() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const el  = doc.body || doc.documentElement;
-      const bg  = win.getComputedStyle(el).backgroundColor;
-      const m   = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return '#000';
-
-      const r = parseInt(m[1], 10);
-      const g = parseInt(m[2], 10);
-      const b = parseInt(m[3], 10);
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-      return lum < 128 ? '#fff' : '#000';
-    } catch (e) {
-      return '#000';
-    }
-  }
-
-  function currentAccentColor() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const btn = doc.querySelector('.lia-btn');
-
-      if (btn) {
-        const cs = win.getComputedStyle(btn);
-
-        const bg = cs.backgroundColor;
-        if (bg && bg !== 'rgba(0, 0, 0, 0)') return bg;
-
-        const br = cs.borderTopColor;
-        if (br && br !== 'rgba(0, 0, 0, 0)') return br;
-
-        if (cs.color) return cs.color;
-      }
-    } catch (e) {}
-
-    return currentNeutralColor();
-  }
-
-  function themeSignature() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const root = doc.documentElement || doc.body;
-      const body = doc.body || doc.documentElement;
-      const rootCls = root ? root.className : '';
-      const bodyCls = body ? body.className : '';
-      const bg = win.getComputedStyle(body).backgroundColor;
-      const fg = win.getComputedStyle(body).color;
-      return [String(rootCls), String(bodyCls), String(bg), String(fg)].join('|');
-    } catch (e) {
-      return String(Date.now());
-    }
-  }
-
   window.__points = window.__points || {};
   window.__pointStates = window.__pointStates || {};
-  window.__pointNeutralColor = currentNeutralColor;
+  window.__pointNeutralColor = getNeutralColor;
   window.__createPointInstances = window.__createPointInstances || {};
 
-  if (!window.__liaThemeSync) {
-    const listeners = new Set<() => void>();
-    let lastSig = themeSignature();
-
-    function notify() {
-      listeners.forEach(function(fn) {
-        try { fn(); } catch (e) {}
-      });
-    }
-
-    function check() {
-      const sig = themeSignature();
-      if (sig !== lastSig) {
-        lastSig = sig;
-        window.__pointNeutralColor = currentNeutralColor;
-        notify();
-      }
-    }
-
-    window.__liaThemeSync = {
-      listeners,
-      check
-    };
-
-    try {
-      const doc = themeDoc();
-      const obs = new MutationObserver(check);
-
-      if (doc.documentElement) {
-        obs.observe(doc.documentElement, {
-          attributes: true,
-          attributeFilter: ['class', 'style', 'data-theme']
-        });
-      }
-
-      if (doc.body) {
-        obs.observe(doc.body, {
-          attributes: true,
-          attributeFilter: ['class', 'style', 'data-theme']
-        });
-      }
-    } catch (e) {}
-
-    try {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', check);
-      else if (mq && typeof mq.addListener === 'function') mq.addListener(check);
-    } catch (e) {}
-
-    setInterval(check, 300);
-  }
-
-  if (typeof window.__registerLiaThemeListener !== 'function') {
-    window.__registerLiaThemeListener = function(fn) {
-      if (!window.__liaThemeSync || !fn) return;
-      window.__liaThemeSync.listeners.add(fn);
-      try { fn(); } catch (e) {}
-    };
-  }
-
-  function unquote(v) {
-    v = String(v || '').trim();
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'")) ||
-      (v.startsWith('`') && v.endsWith('`'))
-    ) {
-      return v.slice(1, -1);
-    }
-    return v;
-  }
+  initThemeSync();
 
   function splitSpec(spec) {
     return unquote(spec)
@@ -202,7 +70,7 @@ export function init(): void {
   function stylePointLabel(pt) {
     if (!pt || typeof pt.setAttribute !== 'function') return;
 
-    const c = currentNeutralColor();
+    const c = getNeutralColor();
 
     try {
       pt.setAttribute({
@@ -317,8 +185,8 @@ export function init(): void {
         face: 'x',
         size: 7,
         label: {
-          strokeColor: currentNeutralColor(),
-          fillColor: currentNeutralColor(),
+          strokeColor: getNeutralColor(),
+          fillColor: getNeutralColor(),
           fontSize: 24,
           parse: false,
           useMathJax: true
@@ -548,7 +416,6 @@ export function init(): void {
         } catch (e) {}
       });
     };
-
   }
 
   try {
@@ -601,15 +468,9 @@ export function init(): void {
     }
   } catch (e) {}
 
-  try {
+  scheduleBootstrap(function() {
     if (window.__scheduleBootstrapStaticPoints) window.__scheduleBootstrapStaticPoints();
-    setTimeout(function() {
-      if (window.__scheduleBootstrapStaticPoints) window.__scheduleBootstrapStaticPoints();
-    }, 80);
-    setTimeout(function() {
-      if (window.__scheduleBootstrapStaticPoints) window.__scheduleBootstrapStaticPoints();
-    }, 220);
-  } catch (e) {}
+  });
 
   window.__checkPointFromSpec = function(spec) {
     const target = getPointTargetFromSpec(spec);
@@ -700,7 +561,7 @@ export function init(): void {
       try { hel.style.margin = '0'; } catch (e) {}
     });
 
-    const c = (window.__pointNeutralColor ? window.__pointNeutralColor() : '#000');
+    const c = getNeutralColor();
     btn.style.color = c;
 
     const checkBtn = findCheckButton(checkRoot);
@@ -933,13 +794,7 @@ export function init(): void {
 
   window.__registerLiaThemeListener(refreshAllPointLabels);
 
-  try {
+  scheduleBootstrap(function() {
     if (window.__scheduleBootstrapCreatePoints) window.__scheduleBootstrapCreatePoints();
-    setTimeout(function() {
-      if (window.__scheduleBootstrapCreatePoints) window.__scheduleBootstrapCreatePoints();
-    }, 80);
-    setTimeout(function() {
-      if (window.__scheduleBootstrapCreatePoints) window.__scheduleBootstrapCreatePoints();
-    }, 220);
-  } catch (e) {}
+  });
 }

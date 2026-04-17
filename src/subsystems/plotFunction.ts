@@ -1,6 +1,8 @@
 // Plot function subsystem (@PlotFunction macro).
 // Renders a function graph from a mathematical expression onto a JSXGraph board.
 
+import { splitTopLevel, unquote } from '../shared/parser';
+
 export function init(): void {
   if (window.__plotFunctionReady) {
     try {
@@ -11,77 +13,6 @@ export function init(): void {
   window.__plotFunctionReady = true;
 
   window.__plotFunctionEntries = window.__plotFunctionEntries || {};
-
-  function unquote(v) {
-    v = String(v || '').trim();
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'")) ||
-      (v.startsWith('`') && v.endsWith('`'))
-    ) {
-      return v.slice(1, -1);
-    }
-    return v;
-  }
-
-  function splitTopLevel(str, sep) {
-    const out = [];
-    let cur = '';
-    let quote = '';
-    let esc = false;
-    let depth = 0;
-
-    for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-
-      if (esc) {
-        cur += ch;
-        esc = false;
-        continue;
-      }
-
-      if (ch === '\\') {
-        cur += ch;
-        esc = true;
-        continue;
-      }
-
-      if (quote) {
-        cur += ch;
-        if (ch === quote) quote = '';
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') {
-        cur += ch;
-        quote = ch;
-        continue;
-      }
-
-      if (ch === '(' || ch === '[' || ch === '{') {
-        depth++;
-        cur += ch;
-        continue;
-      }
-
-      if (ch === ')' || ch === ']' || ch === '}') {
-        depth = Math.max(0, depth - 1);
-        cur += ch;
-        continue;
-      }
-
-      if (ch === sep && depth === 0) {
-        out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-
-      cur += ch;
-    }
-
-    if (cur.trim()) out.push(cur.trim());
-    return out;
-  }
 
   function decodeExprPlaceholders(s) {
     return String(s || '')

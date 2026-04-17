@@ -1,6 +1,10 @@
 // Plot input subsystem (@PlotInput macro).
 // Allows students to type a LaTeX formula and see it plotted live on a JSXGraph board.
 
+import { splitTopLevel as sharedSplitTopLevel } from '../shared/parser';
+import { getNeutralColor, themeDoc, themeWin, initThemeSync } from '../shared/theme';
+import { scheduleBootstrap } from '../shared/bootstrap';
+
 export function init(): void {
   if (window.__plotInputReady) {
     try {
@@ -23,56 +27,6 @@ export function init(): void {
     'sqrt','exp','ln','log','abs'
   ]);
 
-  H.splitTopLevel = function(str) {
-    const out = [];
-    let cur = '';
-    let quote = '';
-    let esc = false;
-    let round = 0;
-    let square = 0;
-    let curly = 0;
-
-    for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-
-      if (esc) {
-        cur += ch;
-        esc = false;
-        continue;
-      }
-
-      if (quote) {
-        cur += ch;
-        if (ch === '\\') esc = true;
-        else if (ch === quote) quote = '';
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') {
-        quote = ch;
-        cur += ch;
-        continue;
-      }
-
-      if (ch === '(') round++;
-      else if (ch === ')') round = Math.max(0, round - 1);
-      else if (ch === '[') square++;
-      else if (ch === ']') square = Math.max(0, square - 1);
-      else if (ch === '{') curly++;
-      else if (ch === '}') curly = Math.max(0, curly - 1);
-
-      if (ch === ';' && round === 0 && square === 0 && curly === 0) {
-        out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-
-      cur += ch;
-    }
-
-    out.push(cur.trim());
-    return out;
-  };
 
   H.numOr = function(parts, idx, fallback){
     const v = parseFloat(parts[idx]);
@@ -80,7 +34,7 @@ export function init(): void {
   };
 
   H.parseInputSpec = function(spec){
-    const parts = H.splitTopLevel(String(spec || '').trim());
+    const parts = sharedSplitTopLevel(String(spec || '').trim(), ';');
 
     return {
       boardId: parts[0] || 'A1',
@@ -698,106 +652,13 @@ export function init(): void {
     return compiled;
   };
 
-  function themeDoc() {
-    return (window.parent && window.parent.document) ? window.parent.document : document;
-  }
+  window.__plotInputNeutralColor = getNeutralColor;
 
-  function themeWin() {
-    return (window.parent && window.parent.getComputedStyle) ? window.parent : window;
-  }
+  initThemeSync();
 
-  function currentNeutralColor() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const el  = doc.body || doc.documentElement;
-      const bg  = win.getComputedStyle(el).backgroundColor;
-      const m   = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return '#000';
-
-      const r = parseInt(m[1], 10);
-      const g = parseInt(m[2], 10);
-      const b = parseInt(m[3], 10);
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-      return lum < 128 ? '#fff' : '#000';
-    } catch (e) {
-      return '#000';
-    }
-  }
-
-  function themeSignature() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const root = doc.documentElement || doc.body;
-      const body = doc.body || doc.documentElement;
-      const rootCls = root ? root.className : '';
-      const bodyCls = body ? body.className : '';
-      const bg = win.getComputedStyle(body).backgroundColor;
-      const fg = win.getComputedStyle(body).color;
-      return [String(rootCls), String(bodyCls), String(bg), String(fg)].join('|');
-    } catch (e) {
-      return String(Date.now());
-    }
-  }
-
-  window.__plotInputNeutralColor = currentNeutralColor;
-
-  if (!window.__plotInputThemeSync) {
-    const listeners = new Set<() => void>();
-    let lastSig = themeSignature();
-
-    function notify() {
-      listeners.forEach(function(fn) {
-        try { fn(); } catch (e) {}
-      });
-    }
-
-    function check() {
-      const sig = themeSignature();
-      if (sig !== lastSig) {
-        lastSig = sig;
-        window.__plotInputNeutralColor = currentNeutralColor;
-        notify();
-      }
-    }
-
-    window.__plotInputThemeSync = {
-      listeners,
-      check
-    };
-
-    try {
-      const doc = themeDoc();
-      const obs = new MutationObserver(check);
-
-      if (doc.documentElement) {
-        obs.observe(doc.documentElement, {
-          attributes: true,
-          attributeFilter: ['class', 'style', 'data-theme']
-        });
-      }
-
-      if (doc.body) {
-        obs.observe(doc.body, {
-          attributes: true,
-          attributeFilter: ['class', 'style', 'data-theme']
-        });
-      }
-    } catch (e) {}
-
-    try {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', check);
-      else if (mq && typeof mq.addListener === 'function') mq.addListener(check);
-    } catch (e) {}
-  }
-
+  // Alias so existing macro calls to __registerPlotInputThemeListener still work.
   window.__registerPlotInputThemeListener = function(fn) {
-    if (!window.__plotInputThemeSync || !fn) return;
-    window.__plotInputThemeSync.listeners.add(fn);
-    try { fn(); } catch (e) {}
+    if (window.__registerLiaThemeListener) window.__registerLiaThemeListener(fn);
   };
 
   window.renderPlotInputFromSpec = function(uid, spec) {
@@ -986,7 +847,7 @@ export function init(): void {
     }
 
     function applyInputTheme() {
-      const neutral = currentNeutralColor();
+      const neutral = getNeutralColor();
       const doc = themeDoc();
       const win = themeWin();
       const el = (doc && (doc.body || doc.documentElement)) || document.body || document.documentElement;
@@ -1026,7 +887,7 @@ export function init(): void {
     }
 
     function applyButtonTheme(btn) {
-      const c = currentNeutralColor();
+      const c = getNeutralColor();
       const cs = window.getComputedStyle(btn);
       const h = btn.offsetHeight;
       const inner = ensureBtnInner(btn);
@@ -1197,13 +1058,7 @@ export function init(): void {
     }, true);
   } catch (e) {}
 
-  try {
+  scheduleBootstrap(function() {
     if (window.__scheduleBootstrapPlotInputs) window.__scheduleBootstrapPlotInputs();
-    setTimeout(function() {
-      if (window.__scheduleBootstrapPlotInputs) window.__scheduleBootstrapPlotInputs();
-    }, 80);
-    setTimeout(function() {
-      if (window.__scheduleBootstrapPlotInputs) window.__scheduleBootstrapPlotInputs();
-    }, 220);
-  } catch (e) {}
+  });
 }

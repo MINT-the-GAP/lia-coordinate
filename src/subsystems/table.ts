@@ -1,6 +1,10 @@
 // Table subsystem (@Table macro).
 // Renders interactive value tables connected to a JSXGraph board.
 
+import { splitTopLevel, unquote } from '../shared/parser';
+import { getNeutralColor, getAccentColor, initThemeSync } from '../shared/theme';
+import { scheduleBootstrap } from '../shared/bootstrap';
+
 export function init(): void {
 if (window.__tableReady) {
   try {
@@ -20,55 +24,6 @@ const MAX_CELL_PX = 900;
 
   window.__tableStates = window.__tableStates || {};
 
-  function themeDoc() {
-    return (window.parent && window.parent.document) ? window.parent.document : document;
-  }
-
-  function themeWin() {
-    return (window.parent && window.parent.getComputedStyle) ? window.parent : window;
-  }
-
-  function currentNeutralColor() {
-    try {
-      const doc = themeDoc();
-      const win = themeWin();
-      const el  = doc.body || doc.documentElement;
-      const bg  = win.getComputedStyle(el).backgroundColor;
-      const m   = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if (!m) return '#000';
-
-      const r = parseInt(m[1], 10);
-      const g = parseInt(m[2], 10);
-      const b = parseInt(m[3], 10);
-      const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-      return lum < 128 ? '#fff' : '#000';
-    } catch (e) {
-      return '#000';
-    }
-  }
-
-function currentAccentColor() {
-  try {
-    const doc = themeDoc();
-    const win = themeWin();
-    const btn = doc.querySelector('.lia-btn');
-
-    if (btn) {
-      const cs = win.getComputedStyle(btn);
-
-      const bg = cs.backgroundColor;
-      if (bg && bg !== 'rgba(0, 0, 0, 0)') return bg;
-
-      const br = cs.borderTopColor;
-      if (br && br !== 'rgba(0, 0, 0, 0)') return br;
-
-      if (cs.color) return cs.color;
-    }
-  } catch (e) {}
-
-  return currentNeutralColor();
-}
 
   function getMathJaxEngine() {
     try {
@@ -89,64 +44,6 @@ function currentAccentColor() {
     try {
       MJ.typesetPromise([node]).catch(function(){});
     } catch (e) {}
-  }
-
-  function splitTopLevel(str) {
-    const out = [];
-    let cur = '';
-    let quote = '';
-    let esc = false;
-
-    for (let i = 0; i < str.length; i++) {
-      const ch = str[i];
-
-      if (esc) {
-        cur += ch;
-        esc = false;
-        continue;
-      }
-
-      if (ch === '\\') {
-        cur += ch;
-        esc = true;
-        continue;
-      }
-
-      if (quote) {
-        cur += ch;
-        if (ch === quote) quote = '';
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') {
-        cur += ch;
-        quote = ch;
-        continue;
-      }
-
-      if (ch === ';' || ch === ',') {
-        if (cur.trim()) out.push(cur.trim());
-        cur = '';
-        continue;
-      }
-
-      cur += ch;
-    }
-
-    if (cur.trim()) out.push(cur.trim());
-    return out;
-  }
-
-  function unquote(v) {
-    v = String(v || '').trim();
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'")) ||
-      (v.startsWith('`') && v.endsWith('`'))
-    ) {
-      return v.slice(1, -1);
-    }
-    return v;
   }
 
   function toPositiveInt(v, fallback) {
@@ -675,8 +572,8 @@ function ensureCss() {
 function applyThemeToRoot(root) {
   if (!root) return;
 
-  const c = currentNeutralColor();
-  const a = currentAccentColor();
+  const c = getNeutralColor();
+  const a = getAccentColor();
 
   root.style.setProperty('--lia-table-fg', c);
   root.style.setProperty('--lia-table-border', c);
@@ -1614,29 +1511,10 @@ window.getTableData = function(uid) {
     }, true);
   } catch (e) {}
 
-  try {
-    if (window.__registerLiaThemeListener) {
-      window.__registerLiaThemeListener(function() {
-        refreshAllTableThemes();
-      });
-    } else {
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = function() {
-        refreshAllTableThemes();
-      };
+  initThemeSync();
+  window.__registerLiaThemeListener(refreshAllTableThemes);
 
-      if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', handler);
-      else if (mq && typeof mq.addListener === 'function') mq.addListener(handler);
-    }
-  } catch (e) {}
-
-  try {
+  scheduleBootstrap(function() {
     if (window.__scheduleBootstrapTables) window.__scheduleBootstrapTables();
-    setTimeout(function() {
-      if (window.__scheduleBootstrapTables) window.__scheduleBootstrapTables();
-    }, 80);
-    setTimeout(function() {
-      if (window.__scheduleBootstrapTables) window.__scheduleBootstrapTables();
-    }, 220);
-  } catch (e) {}
+  });
 }
