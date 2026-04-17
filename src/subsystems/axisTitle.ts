@@ -301,9 +301,11 @@ export function init(): void {
     }
   } catch (e) {}
 
-  setInterval(function() {
-    kickAxisTitles();
-  }, 400);
+  if (!window.__axisTitlesInterval) {
+    window.__axisTitlesInterval = setInterval(function() {
+      kickAxisTitles();
+    }, 400);
+  }
 
   scheduleBootstrap(kickAxisTitles);
 }

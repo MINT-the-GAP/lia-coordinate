@@ -15,6 +15,7 @@ interface Window {
 
   // Axis title subsystem
   __axisTitlesReady: boolean | undefined;
+  __axisTitlesInterval: ReturnType<typeof setInterval> | undefined;
   __liaAxisTitleSpecs: Record<string, any>;
   __bootstrapAxisTitles: (() => void) | undefined;
   __refreshAllAxisTitles: (() => void) | undefined;

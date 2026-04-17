@@ -320,8 +320,42 @@ export function init(): void {
   };
 
   try {
-    const mo = new MutationObserver(function() {
-      if (window.__bootstrapPlotFunctions) window.__bootstrapPlotFunctions();
+    const mo = new MutationObserver(function(mutations) {
+      let needsBootstrap = false;
+
+      for (let i = 0; i < mutations.length; i++) {
+        const m = mutations[i];
+
+        if (m.type === 'attributes') {
+          const target = m.target as HTMLElement;
+          if (target && target.id && /^plot-spec-/.test(target.id)) {
+            needsBootstrap = true;
+            break;
+          }
+        }
+
+        if (m.type !== 'childList') continue;
+
+        const added = Array.from(m.addedNodes || []);
+        for (let j = 0; j < added.length; j++) {
+          const n = added[j] as HTMLElement;
+          if (!n || n.nodeType !== 1) continue;
+
+          if (
+            (n.id && /^plot-spec-/.test(n.id)) ||
+            (n.querySelector && n.querySelector('[id^="plot-spec-"][data-spec]'))
+          ) {
+            needsBootstrap = true;
+            break;
+          }
+        }
+
+        if (needsBootstrap) break;
+      }
+
+      if (needsBootstrap && window.__bootstrapPlotFunctions) {
+        window.__bootstrapPlotFunctions();
+      }
     });
 
     const root = document.body || document.documentElement;
