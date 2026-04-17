@@ -10,8 +10,39 @@ interface Window {
   MathJax: any;
 
   // Coord hook bootstrap
+  __liaCoordHooks: Record<string, () => void> | undefined;
   __liaRunCoordHooks: (() => void) | undefined;
   __coordBoardStates: Record<string, any>;
+
+  // Board helpers namespace exposed for inline macro code
+  __coord: {
+    parseCoordSpec: (spec: string) => any;
+    getSafeBBox: (board: any, fallback: number[]) => number[];
+    isValidBBox: (bb: any) => boolean;
+    loadStoredBoardState: (id: string) => any;
+    saveBoardState: (board: any, id: string, initialBBox: number[]) => void;
+    getBoardStateStore: () => Record<string, any>;
+    getConstrainedAncestorWidth: (el: HTMLElement | null) => number;
+    clampWidth: (board: any, w: number) => number;
+    clampHeight: (h: number) => number;
+    solveAspectFittedSize: (board: any, preferredWidth: number, ratio: number) => { width: number; height: number };
+    applyBoardSize: (board: any, w: number, h: number, useInitial: boolean, anchorBBox: number[], initialBBox: number[], boardId: string) => any;
+    fitBoardSize: (board: any, initialBBox: number[], initialWidth: number | null, initialRatio: number, boardId: string) => void;
+    restoreSavedBoardState: (board: any, initialBBox: number[], boardId: string) => boolean;
+    applyBoardFrame: (board: any) => void;
+    applyNavColors: (board: any) => void;
+    applyGridColor: (board: any, color: string) => void;
+    applyAxisColors: (board: any) => void;
+    applyAdaptiveTicks: (board: any) => void;
+    updateStickyTickLabelPositions: (board: any) => void;
+    ensureResizeHandle: (board: any, initialBBox: number[], boardId: string, onResize: () => void) => void;
+    runExternalBootstraps: () => void;
+    buildStickyAxes: (board: any, axisCol: string) => void;
+    createGrid: (board: any, gridCol: string) => void;
+    wireBoard: (board: any, cfg: any, initialBBox: number[], initialRatio: number) => void;
+    getAccentColor: () => string;
+    getNeutralColor: () => string;
+  } | undefined;
 
   // Axis title subsystem
   __axisTitlesReady: boolean | undefined;
