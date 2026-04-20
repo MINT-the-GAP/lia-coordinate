@@ -718,11 +718,6 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   window.__liaCoordHooks = window.__liaCoordHooks || {};
   window.__liaCoordHooks[cfg.id] = applyAll;
 
-  window.__liaRunCoordHooks = function(): void {
-    const hooks = window.__liaCoordHooks || {};
-    Object.keys(hooks).forEach(function(id) { try { hooks[id]!(); } catch (e) {} });
-    runExternalBootstraps();
-  };
 
   // Initial sizing.
   const hadSavedState = restoreSavedBoardState(board, initialBBox, cfg.id);

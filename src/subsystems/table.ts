@@ -620,6 +620,33 @@ function setStoredCellWidth(uid, colIndex, key, width) {
     Math.max(MIN_CELL_PX, Math.min(MAX_CELL_PX, Math.round(width || MIN_CELL_PX)));
 }
 
+const POOL_SIZE = 60;
+
+function ensurePool(uid: string) {
+  const id = 'lia-table-pool-' + uid;
+  if (document.getElementById(id)) return;
+
+  const pool = document.createElement('div');
+  pool.id = id;
+  pool.className = 'lia-dyn-table-pool';
+  pool.setAttribute('aria-hidden', 'true');
+
+  for (let i = 0; i < POOL_SIZE; i++) {
+    const item = document.createElement('div');
+    item.className = 'lia-dyn-table-pool-item';
+    item.dataset.table = uid;
+    item.dataset.index = String(i);
+    pool.appendChild(item);
+  }
+
+  const root = getRoot(uid);
+  if (root && root.parentNode) {
+    root.parentNode.insertBefore(pool, root.nextSibling);
+  } else {
+    (document.body || document.documentElement).appendChild(pool);
+  }
+}
+
 function getPoolRoot(uid) {
   return document.getElementById('lia-table-pool-' + uid);
 }
@@ -629,6 +656,7 @@ function getPoolIndex(colIndex, key) {
 }
 
 function reclaimPoolItems(uid) {
+  ensurePool(uid);
   const root = getRoot(uid);
   const pool = getPoolRoot(uid);
   if (!root || !pool) return;

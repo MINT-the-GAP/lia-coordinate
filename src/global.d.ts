@@ -11,7 +11,7 @@ interface Window {
 
   // Coord hook bootstrap
   __liaCoordHooks: Record<string, () => void> | undefined;
-  __liaRunCoordHooks: (() => void) | undefined;
+  __liaRunCoordHooks: Array<() => void> | { push(fn: () => void): void } | undefined;
   __coordBoardStates: Record<string, any>;
 
   // Board helpers namespace exposed for inline macro code

@@ -65,19 +65,20 @@ window.__coord = {
   getAccentColor,
 };
 
-// Run any pending coord hooks registered by the @CoordinateSystem macro.
-if (window.__liaRunCoordHooks) {
-  window.__liaRunCoordHooks();
-  requestAnimationFrame(() => {
-    if (window.__liaRunCoordHooks) window.__liaRunCoordHooks();
-  });
-  setTimeout(() => {
-    if (window.__liaRunCoordHooks) window.__liaRunCoordHooks();
-  }, 0);
-  setTimeout(() => {
-    if (window.__liaRunCoordHooks) window.__liaRunCoordHooks();
-  }, 120);
-}
+// Drain any board-init callbacks queued by @CoordinateSystem macros that ran
+// before this script loaded.
+(function () {
+  const pending: Array<() => void> = Array.isArray(window.__liaRunCoordHooks)
+    ? (window.__liaRunCoordHooks as unknown as Array<() => void>)
+    : [];
+
+  pending.forEach(fn => { try { fn(); } catch (e) {} });
+
+  // Future macros call push() — fire immediately since __coord is now ready.
+  (window.__liaRunCoordHooks as unknown) = {
+    push(fn: () => void) { try { fn(); } catch (e) {} }
+  };
+})();
 
 initAxisTitle();
 initCreatePoint();

@@ -15,37 +15,47 @@ script:   ./dist/index.js
 @CoordinateSystem_
 ``` javascript @JSX.Graph
 (function () {
-  JXG.Options.text.useMathJax = true;
+  function run() {
+    JXG.Options.text.useMathJax = true;
 
-  const C = window.__coord;
-  const cfg         = C.parseCoordSpec(String.raw`@0`);
-  const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
-  const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
+    const C = window.__coord;
+    const cfg         = C.parseCoordSpec(String.raw`@0`);
+    const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
+    const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
 
-  // Pre-size from stored state before initBoard so it sees the right dimensions.
-  const presetState = C.loadStoredBoardState(cfg.id);
-  if (presetState) {
-    try {
-      jxgbox.style.width  = Math.round(presetState.width)  + 'px';
-      jxgbox.style.height = Math.round(presetState.height) + 'px';
-    } catch (e) {}
+    // Pre-size from stored state before initBoard so it sees the right dimensions.
+    const presetState = C.loadStoredBoardState(cfg.id);
+    if (presetState) {
+      try {
+        jxgbox.style.width  = Math.round(presetState.width)  + 'px';
+        jxgbox.style.height = Math.round(presetState.height) + 'px';
+      } catch (e) {}
+    }
+    try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
+
+    // board.create() calls must be inline — jxgbox is only available in this fence.
+    const board = JXG.JSXGraph.initBoard(jxgbox, {
+      axis: false, showNavigation: true, showCopyright: false,
+      boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
+      keepaspectratio: true,
+      zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
+      pan:  { enabled: true, needShift: false, needTwoFingers: false }
+    });
+
+    C.buildStickyAxes(board, C.getNeutralColor());
+    C.createGrid(board, C.getAccentColor());
+
+    // Wire all hooks, event listeners, and sizing logic.
+    C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
   }
-  try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
 
-  // board.create() calls must be inline — jxgbox is only available in this fence.
-  const board = JXG.JSXGraph.initBoard(jxgbox, {
-    axis: false, showNavigation: true, showCopyright: false,
-    boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
-    keepaspectratio: true,
-    zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
-    pan:  { enabled: true, needShift: false, needTwoFingers: false }
-  });
-
-  C.buildStickyAxes(board, C.getNeutralColor());
-  C.createGrid(board, C.getAccentColor());
-
-  // Wire all hooks, event listeners, and sizing logic.
-  C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
+  // Defer until dist/index.js has set window.__coord.
+  if (window.__coord) {
+    run();
+  } else {
+    window.__liaRunCoordHooks = window.__liaRunCoordHooks || [];
+    window.__liaRunCoordHooks.push(run);
+  }
 })();
 ```
 @end
@@ -66,15 +76,7 @@ script:   ./dist/index.js
     @2
     [[!]]
     <script modify="false">
-      (() => {
-        const root = document.getElementById('point-ui-@0');
-        const spec = root ? (root.dataset.spec || '') : String.raw`@1`;
-
-        if (typeof window.__checkPointFromSpec === 'function') {
-          return window.__checkPointFromSpec(spec);
-        }
-        return false;
-      })()
+      window.__checkPointFromSpec && window.__checkPointFromSpec(document.getElementById('point-ui-@0')?.dataset.spec || '')
     </script>
   </div>
 </div>
@@ -107,15 +109,7 @@ script:   ./dist/index.js
   <div id="graph-check-@0">
     [[!]]
     <script modify="false">
-      (() => {
-        const holder = document.getElementById('graph-spec-@0');
-        const spec = holder ? String(holder.textContent || '') : String.raw`@1`;
-
-        if (typeof window.__checkPointGraphFromSpec === 'function') {
-          return window.__checkPointGraphFromSpec('@0', spec);
-        }
-        return false;
-      })()
+      window.__checkPointGraphFromSpec && window.__checkPointGraphFromSpec('@0', document.getElementById('graph-spec-@0')?.textContent || '')
     </script>
   </div>
 </div>
@@ -132,96 +126,17 @@ script:   ./dist/index.js
   <div id="multi-graph-check-@0">
     [[!]]
     <script modify="false">
-      (() => {
-        const root = document.getElementById('multi-graph-ui-@0');
-        const spec = root ? (root.dataset.spec || '') : String.raw`@1`;
-        const uid  = '@0';
-
-        if (typeof window.__checkPointsOnGraphFromSpec === 'function') {
-          return window.__checkPointsOnGraphFromSpec(uid, spec);
-        }
-        return false;
-      })()
+      window.__checkPointsOnGraphFromSpec && window.__checkPointsOnGraphFromSpec('@0', document.getElementById('multi-graph-ui-@0')?.dataset.spec || '')
     </script>
   </div>
 </div>
 
 @end
 
-@TableCanvasItem: @TableCanvasItem_(@uid,@0,@1)
-
-@TableCanvasItem_
-<div class="lia-dyn-table-pool-item" data-table="@1" data-index="@2">
-  @canvas
-</div>
-@end
-
 @Table: @Table_(@uid,@0)
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
-<div id="lia-table-pool-@0" class="lia-dyn-table-pool" aria-hidden="true">
-  @TableCanvasItem(@0,0)
-  @TableCanvasItem(@0,1)
-  @TableCanvasItem(@0,2)
-  @TableCanvasItem(@0,3)
-  @TableCanvasItem(@0,4)
-  @TableCanvasItem(@0,5)
-  @TableCanvasItem(@0,6)
-  @TableCanvasItem(@0,7)
-  @TableCanvasItem(@0,8)
-  @TableCanvasItem(@0,9)
-  @TableCanvasItem(@0,10)
-  @TableCanvasItem(@0,11)
-  @TableCanvasItem(@0,12)
-  @TableCanvasItem(@0,13)
-  @TableCanvasItem(@0,14)
-  @TableCanvasItem(@0,15)
-  @TableCanvasItem(@0,16)
-  @TableCanvasItem(@0,17)
-  @TableCanvasItem(@0,18)
-  @TableCanvasItem(@0,19)
-  @TableCanvasItem(@0,20)
-  @TableCanvasItem(@0,21)
-  @TableCanvasItem(@0,22)
-  @TableCanvasItem(@0,23)
-  @TableCanvasItem(@0,24)
-  @TableCanvasItem(@0,25)
-  @TableCanvasItem(@0,26)
-  @TableCanvasItem(@0,27)
-  @TableCanvasItem(@0,28)
-  @TableCanvasItem(@0,29)
-  @TableCanvasItem(@0,30)
-  @TableCanvasItem(@0,31)
-  @TableCanvasItem(@0,32)
-  @TableCanvasItem(@0,33)
-  @TableCanvasItem(@0,34)
-  @TableCanvasItem(@0,35)
-  @TableCanvasItem(@0,36)
-  @TableCanvasItem(@0,37)
-  @TableCanvasItem(@0,38)
-  @TableCanvasItem(@0,39)
-  @TableCanvasItem(@0,40)
-  @TableCanvasItem(@0,41)
-  @TableCanvasItem(@0,42)
-  @TableCanvasItem(@0,43)
-  @TableCanvasItem(@0,44)
-  @TableCanvasItem(@0,45)
-  @TableCanvasItem(@0,46)
-  @TableCanvasItem(@0,47)
-  @TableCanvasItem(@0,48)
-  @TableCanvasItem(@0,49)
-  @TableCanvasItem(@0,50)
-  @TableCanvasItem(@0,51)
-  @TableCanvasItem(@0,52)
-  @TableCanvasItem(@0,53)
-  @TableCanvasItem(@0,54)
-  @TableCanvasItem(@0,55)
-  @TableCanvasItem(@0,56)
-  @TableCanvasItem(@0,57)
-  @TableCanvasItem(@0,58)
-  @TableCanvasItem(@0,59)
-</div>
 @end
 
 -->
@@ -298,7 +213,7 @@ A "Create point" button appears — clicking it places the draggable point. The 
 
 Parameters: `<boardId>;<pointName>;<targetX>;<targetY>`
 
-The second argument must always be provided. Pass `` ` ` `` (a space) to use the default check button.
+The second argument must always be provided. Pass an empty string (with a space) to use the default check button.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point_ez`)
