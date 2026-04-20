@@ -388,7 +388,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
           --{{0}}--
 If you prefer not to use `import:`, copy the following block directly into the header of your LiaScript document.
 
-``` markdown
+```` markdown
 import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/index.js
@@ -396,8 +396,121 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @CoordinateSystem: @CoordinateSystem_(@0)
 
 @CoordinateSystem_
-` ` ` javascript @JSX.Graph
-... (see README header for full definition)
-` ` `
-@end
+``` javascript @JSX.Graph
+(function () {
+  function run() {
+    JXG.Options.text.useMathJax = true;
+
+    const C = window.__coord;
+    const cfg         = C.parseCoordSpec(String.raw`@0`);
+    const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
+    const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
+
+    const presetState = C.loadStoredBoardState(cfg.id);
+    if (presetState) {
+      try {
+        jxgbox.style.width  = Math.round(presetState.width)  + 'px';
+        jxgbox.style.height = Math.round(presetState.height) + 'px';
+      } catch (e) {}
+    }
+    try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
+
+    const board = JXG.JSXGraph.initBoard(jxgbox, {
+      axis: false, showNavigation: true, showCopyright: false,
+      boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
+      keepaspectratio: true,
+      zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
+      pan:  { enabled: true, needShift: false, needTwoFingers: false }
+    });
+
+    C.buildStickyAxes(board, C.getNeutralColor());
+    C.createGrid(board, C.getAccentColor());
+    C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
+  }
+
+  if (window.__coord) {
+    run();
+  } else {
+    window.__liaRunCoordHooks = window.__liaRunCoordHooks || [];
+    window.__liaRunCoordHooks.push(run);
+  }
+})();
 ```
+@end
+
+@AxisLabel: @AxisLabel_(@uid,@0)
+
+@AxisLabel_
+<span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@CreatePoint: @CreatePoint_(@uid,@0,@1)
+
+@CreatePoint_
+<div id="point-ui-@0" data-spec="@1">
+  <div id="point-task-@0" class="lia-point-task"></div>
+
+  <div id="point-check-@0">
+    @2
+    [[!]]
+    <script modify="false">
+      window.__checkPointFromSpec && window.__checkPointFromSpec(document.getElementById('point-ui-@0')?.dataset.spec || '')
+    </script>
+  </div>
+</div>
+@end
+
+@Point: @Point_(@uid,@0)
+
+@Point_
+<span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@PlotFunction: @PlotFunction_(@uid,@0)
+
+@PlotFunction_
+<span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@PlotInput: @PlotInput_(@uid,@0)
+
+@PlotInput_
+<div id="lia-plot-input-@0" data-spec="@1"></div>
+@end
+
+@PointOnGraph: @PointOnGraph_(@uid,@0)
+
+@PointOnGraph_
+<div id="graph-ui-@0">
+  <div id="graph-task-@0" class="lia-graph-task"></div>
+  <div id="graph-check-@0">
+    [[!]]
+    <script modify="false">
+      window.__checkPointGraphFromSpec && window.__checkPointGraphFromSpec('@0', document.getElementById('graph-spec-@0')?.textContent || '')
+    </script>
+  </div>
+</div>
+<span id="graph-spec-@0" style="display:none;">@1</span>
+@end
+
+@PointsOnGraph: @PointsOnGraph_(@uid,@0)
+
+@PointsOnGraph_
+<div id="multi-graph-ui-@0" data-spec="@1">
+  <div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
+
+  <div id="multi-graph-check-@0">
+    [[!]]
+    <script modify="false">
+      window.__checkPointsOnGraphFromSpec && window.__checkPointsOnGraphFromSpec('@0', document.getElementById('multi-graph-ui-@0')?.dataset.spec || '')
+    </script>
+  </div>
+</div>
+@end
+
+@Table: @Table_(@uid,@0)
+
+@Table_
+<div id="lia-table-@0" data-spec="@1"></div>
+@end
+````
