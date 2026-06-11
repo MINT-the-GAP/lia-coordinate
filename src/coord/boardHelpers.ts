@@ -227,6 +227,9 @@ export function applyBoardFrame(board: any): void {
   board.containerObj.style.marginLeft = '0';
   board.containerObj.style.marginRight = 'auto';
   board.containerObj.style.touchAction = 'none';
+
+  const nav = board.containerObj.querySelector('.JXG_navigation') as HTMLElement | null;
+  if (nav) nav.style.display = 'none';
 }
 
 export function applyNavColors(board: any): void {
@@ -419,24 +422,24 @@ export function updateStickyTickLabelPositions(board: any): void {
 // Resize handle
 // ---------------------------------------------------------------------------
 
-function styleResizeHandle(handle: HTMLElement, neutralCol: string): void {
+function styleResizeHandle(handle: HTMLElement, accentCol: string): void {
   handle.style.position = 'absolute';
   handle.style.right = '0';
   handle.style.bottom = '0';
   handle.style.left = 'auto';
-  handle.style.width = '22px';
-  handle.style.height = '22px';
+  handle.style.width = '24px';
+  handle.style.height = '24px';
   handle.style.cursor = 'nwse-resize';
   handle.style.zIndex = '50';
   handle.style.touchAction = 'none';
   handle.style.userSelect = 'none';
   handle.style.background = 'transparent';
-  handle.style.borderRight = '2px solid ' + neutralCol;
-  handle.style.borderBottom = '2px solid ' + neutralCol;
   handle.style.borderLeft = '0';
+  handle.style.borderBottom = '5px solid ' + accentCol;
+  handle.style.borderRight = '5px solid ' + accentCol;
   handle.style.borderTop = '0';
-  handle.style.borderBottomRightRadius = '8px';
   handle.style.borderBottomLeftRadius = '0';
+  handle.style.borderBottomRightRadius = '8px';
   handle.style.boxSizing = 'border-box';
 }
 
@@ -465,7 +468,7 @@ export function ensureResizeHandle(
     board.containerObj.appendChild(handle);
   }
 
-  const col = getNeutralColor();
+  const col = getAccentColor();
   styleResizeHandle(handle, col);
 
   if (resizeDragState.has(handle)) return; // already bound
@@ -504,7 +507,7 @@ export function ensureResizeHandle(
 
     applyBoardSize(board, mw, mh, false, drag.anchorBBox, initialBBox, boardId);
     onResize();
-    styleResizeHandle(handle!, getNeutralColor());
+    styleResizeHandle(handle!, getAccentColor());
   });
 
   window.addEventListener('pointerup', (e: PointerEvent) => {

@@ -20,6 +20,10 @@ export function init(): void {
     let out = String(s || '').trim();
     if (!out) return '';
 
+    // Keep compatibility with legacy Koord authoring where parentheses were
+    // written as {{...}} inside macro specs.
+    out = out.replace(/\{\{/g, '(').replace(/\}\}/g, ')');
+
     out = out.replace(/\\\$/g, '__LIA_ESC_DOLLAR__');
     out = out.replace(/\$\$([\s\S]+?)\$\$/g, function (_, inner) {
       return '\\[' + inner + '\\]';

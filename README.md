@@ -35,7 +35,7 @@ script:   ./dist/index.js
 
     // board.create() calls must be inline — jxgbox is only available in this fence.
     const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, showNavigation: true, showCopyright: false,
+      axis: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
       zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
@@ -269,7 +269,7 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f{{x}}$`)
 
 @PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 ```
@@ -278,7 +278,7 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f{{x}}$`)
 
 @PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 
@@ -292,7 +292,7 @@ Parameters: `<boardId>;<funcName>;<color>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g{{x}}$`)
 
 @PlotInput(`ex_input;g;#0055cc`)
 ```
@@ -301,7 +301,7 @@ Parameters: `<boardId>;<funcName>;<color>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g{{x}}$`)
 
 @PlotInput(`ex_input;g;#0055cc`)
 
@@ -316,7 +316,7 @@ Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f{{x}}$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
@@ -327,7 +327,7 @@ Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f{{x}}$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
@@ -343,7 +343,7 @@ Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tole
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f{{x}}$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
@@ -354,7 +354,7 @@ Drag all 3 points onto the graph of $f(x) = x - 1$.
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f{{x}}$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
@@ -370,7 +370,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f{{x}}$`)
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 ```
@@ -379,7 +379,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f{{x}}$`)
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 
@@ -416,7 +416,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
     try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
 
     const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, showNavigation: true, showCopyright: false,
+      axis: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
       zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
