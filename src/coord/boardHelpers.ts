@@ -587,11 +587,13 @@ export function runExternalBootstraps(): void {
   }
 
   call(window.__bootstrapAxisTitles);
+  call(window.__bootstrapScharen);
   call(window.__bootstrapPlotFunctions);
   call(window.__bootstrapPlotInputs);
   call(window.__bootstrapCreatePoints);
   call(window.__bootstrapStaticPoints);
   call(window.__bootstrapPointOnGraphs);
+  call(window.__bootstrapRekonstruktion);
 }
 
 // ---------------------------------------------------------------------------

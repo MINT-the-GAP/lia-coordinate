@@ -6,7 +6,9 @@ import { init as initPlotFunction } from './subsystems/plotFunction';
 import { init as initPlotInput } from './subsystems/plotInput';
 import { init as initPointOnGraph } from './subsystems/pointOnGraph';
 import { init as initPointsOnGraph } from './subsystems/pointsOnGraph';
+import { init as initSchar } from './subsystems/schar';
 import { init as initTable } from './subsystems/table';
+import { init as initReconstruction } from './subsystems/reconstruction';
 import {
   parseCoordSpec,
   getSafeBBox,
@@ -86,4 +88,6 @@ initPlotFunction();
 initPlotInput();
 initPointOnGraph();
 initPointsOnGraph();
+initSchar();
 initTable();
+initReconstruction();

@@ -101,6 +101,48 @@ script:   ./dist/index.js
 <div id="lia-plot-input-@0" data-spec="@1"></div>
 @end
 
+@Schar: @Schar_(@uid,@0)
+
+@Schar_
+<span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Rekonstruktion: @Rekonstruktion_(@uid,@0)
+
+@Rekonstruktion_
+<span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
+
+<div id="rek-check-@0">
+[[!]]
+<script modify="false">
+  (() => {
+    const node = document.getElementById('rek-spec-@0');
+    const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+
+    if (typeof window.__checkRekonstruktionQuiz === 'function') {
+      return window.__checkRekonstruktionQuiz('@0', spec);
+    }
+
+    if (typeof window.__checkRekonstruktionFromSpec === 'function') {
+      return window.__checkRekonstruktionFromSpec(spec);
+    }
+
+    return false;
+  })()
+</script>
+</div>
+
+<script modify="false">
+(function(){
+  const node = document.getElementById('rek-spec-@0');
+  const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+  if (typeof window.__setupRekonstruktionQuiz === 'function') {
+    window.__setupRekonstruktionQuiz('@0', spec);
+  }
+})();
+</script>
+@end
+
 @PointOnGraph: @PointOnGraph_(@uid,@0)
 
 @PointOnGraph_
@@ -383,6 +425,156 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 
+## `@Schar`
+
+          --{{0}}--
+Creates an adjustable function family with sliders directly on the board.
+
+Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>`
+
+``` markdown
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=ex_schar`)
+
+@AxisLabel(`id=ex_schar;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;mx+n;ex_schar;term=1;#00ffff`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=ex_schar`)
+
+@AxisLabel(`id=ex_schar;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;mx+n;ex_schar;term=1;#00ffff`)
+
+## Sliding Function Family 2
+
+          --{{0}}--
+Legacy-style multi-family setup with quadratic, cubic, and quartic parameterized functions.
+
+``` markdown
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A3`)
+
+@AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`g;x;d{{x+b}}^2+c;A3;term=1;#ff00ff`)
+
+@Schar(`p;x;ax^3+bx^2+cx+d;A3;term=1;#ff0000`)
+
+@Schar(`r;x;ax^4+bx^3+cx^2+dx+f;A3;term=1;#55ff55`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A3`)
+
+@AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`g;x;d{{x+b}}^2+c;A3;term=1;#ff00ff`)
+
+@Schar(`p;x;ax^3+bx^2+cx+d;A3;term=1;#ff0000`)
+
+@Schar(`r;x;ax^4+bx^3+cx^2+dx+f;A3;term=1;#55ff55`)
+
+## Sliding Function Family 3
+
+          --{{0}}--
+Legacy-style multi-family setup with sinus, exponential, and logarithmic parameterized functions.
+
+``` markdown
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A11`)
+
+@AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;A sin{{b{{x+c}}}}+d;A11;term=1;#0077ff`)
+
+@Schar(`h;x;A e^{{b{{x+c}}}}+d;A11;term=1;#00ff00`)
+
+@Schar(`l;x;A ln{{b{{x+c}}}}+d;A11;term=1;#22aa66`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A11`)
+
+@AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;A sin{{b{{x+c}}}}+d;A11;term=1;#0077ff`)
+
+@Schar(`h;x;A e^{{b{{x+c}}}}+d;A11;term=1;#00ff00`)
+
+@Schar(`l;x;A ln{{b{{x+c}}}}+d;A11;term=1;#22aa66`)
+
+## Sliding Function Family 4
+
+          --{{0}}--
+Legacy-style multi-family setup with square-root and reciprocal parameterized functions.
+
+``` markdown
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A11`)
+
+@AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`k;x;A sqrt{{b{{x+c}}}}+d;A11;term=1;#ff9900`)
+
+@Schar(`q;x;A/{{b{{x+c}}}}+d;A11;term=1;#ffff00`)
+
+@Schar(`g;x;A/{{b{{x+c}}^2}}+d;A11;term=1;#0066ff`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A11`)
+
+@AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`k;x;A sqrt{{b{{x+c}}}}+d;A11;term=1;#ff9900`)
+
+@Schar(`q;x;A/{{b{{x+c}}}}+d;A11;term=1;#ffff00`)
+
+@Schar(`g;x;A/{{b{{x+c}}^2}}+d;A11;term=1;#0066ff`)
+
+## `@Rekonstruktion`
+
+          --{{0}}--
+Checks whether the currently adjusted graph matches a target function on a board.
+
+Parameters: `<boardId>;<targetExpr>;<tolerance>`
+
+``` markdown
+@Rekonstruktion(`ex_schar;2x-1;0.1`)
+```
+
+## Sliding Function Quiz
+
+          --{{0}}--
+This is the requested legacy-style quiz example.
+
+``` markdown
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A3`)
+
+@AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;mx+n;A3;term=1;#00ffff`)
+
+Passe die Funktion so an, dass $f(x) = 2x -1$ dargestellt ist.
+
+@Rekonstruktion(`A3;2x-1;0.1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A3`)
+
+@AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
+
+@Schar(`f;x;mx+n;A3;term=1;#00ffff`)
+
+Passe die Funktion so an, dass $f(x) = 2x -1$ dargestellt ist.
+
+@Rekonstruktion(`A3;2x-1;0.1`)
+
 ## Implementation
 
           --{{0}}--
@@ -476,6 +668,48 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @PlotInput_
 <div id="lia-plot-input-@0" data-spec="@1"></div>
+@end
+
+@Schar: @Schar_(@uid,@0)
+
+@Schar_
+<span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Rekonstruktion: @Rekonstruktion_(@uid,@0)
+
+@Rekonstruktion_
+<span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
+
+<div id="rek-check-@0">
+[[!]]
+<script modify="false">
+  (() => {
+    const node = document.getElementById('rek-spec-@0');
+    const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+
+    if (typeof window.__checkRekonstruktionQuiz === 'function') {
+      return window.__checkRekonstruktionQuiz('@0', spec);
+    }
+
+    if (typeof window.__checkRekonstruktionFromSpec === 'function') {
+      return window.__checkRekonstruktionFromSpec(spec);
+    }
+
+    return false;
+  })()
+</script>
+</div>
+
+<script modify="false">
+(function(){
+  const node = document.getElementById('rek-spec-@0');
+  const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+  if (typeof window.__setupRekonstruktionQuiz === 'function') {
+    window.__setupRekonstruktionQuiz('@0', spec);
+  }
+})();
+</script>
 @end
 
 @PointOnGraph: @PointOnGraph_(@uid,@0)

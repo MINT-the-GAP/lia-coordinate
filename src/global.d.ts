@@ -138,6 +138,20 @@ interface Window {
   showGraphFromPointsOnGraphSpec: ((spec: string) => void) | undefined;
   renderPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
+  // Schar subsystem (@Schar)
+  __scharReady: boolean | undefined;
+  __scharEntries: Record<string, any>;
+  __liaScharStateStore: Record<string, any>;
+  __bootstrapScharen: (() => void) | undefined;
+  renderScharFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Rekonstruktion subsystem (@Rekonstruktion)
+  __rekonstruktionReady: boolean | undefined;
+  __bootstrapRekonstruktion: (() => void) | undefined;
+  __setupRekonstruktionQuiz: ((uid: string, spec: string) => void) | undefined;
+  __checkRekonstruktionFromSpec: ((spec: string) => boolean) | undefined;
+  __checkRekonstruktionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;
   __tableStates: Record<string, any>;
