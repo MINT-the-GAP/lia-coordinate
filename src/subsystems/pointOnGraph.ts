@@ -550,7 +550,11 @@ export function init(): void {
         strokeColor: graphColor,
         highlightStrokeColor: graphColor,
         strokeWidth: 3,
-        fixed: true
+        fixed: true,
+        withLabel: false,
+        resolution: 3,
+        vectorContent: 2,
+        plotpoints: false
       });
 
       const labelPack = createFunctionLabel(board, f, graphName, graphColor);

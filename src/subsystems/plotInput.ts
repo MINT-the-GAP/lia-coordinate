@@ -640,7 +640,10 @@ export function init(): void {
       highlightStrokeColor: state.color,
       strokeWidth: state.strokeWidth,
       fixed: true,
-      withLabel: false
+      withLabel: false,
+      resolution: 3,
+      vectorContent: 2,
+      plotpoints: false
     });
 
     const labelPack = H.createFunctionLabel(board, fn, state);

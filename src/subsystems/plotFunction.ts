@@ -283,6 +283,9 @@ export function init(): void {
         strokeColor: color,
         highlightStrokeColor: color,
         strokeWidth: 3,
+        resolution: 3,
+        vectorContent: 2,
+        plotpoints: false,
         fixed: true,
         withLabel: false
       });

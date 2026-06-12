@@ -1180,6 +1180,16 @@ function relayoutPanelsForBoard(boardId: string, board: any): void {
   } catch (e) {}
 }
 
+function syncSliderUiFromValues(entry: ScharEntry): void {
+  entry.params.forEach((name) => {
+    const slider = entry.slidersByParam[name];
+    if (!slider) return;
+    ensureSliderRangeForValue(slider, Number(entry.values[name]));
+    slider.value = String(entry.values[name]);
+    updateSliderFill(slider);
+  });
+}
+
 function refreshEntry(entry: ScharEntry): void {
   const scheduleRelayout = () => {
     relayoutPanelsForBoard(entry.boardId, entry.board);
@@ -1208,7 +1218,10 @@ function refreshEntry(entry: ScharEntry): void {
       highlightStrokeColor: entry.cfg.color,
       strokeWidth: 3,
       fixed: true,
-      withLabel: false
+      withLabel: false,
+      resolution: 3,
+      vectorContent: 2,
+      plotpoints: false
     });
   } else {
     try {
@@ -1243,7 +1256,10 @@ function refreshEntry(entry: ScharEntry): void {
         strokeOpacity: 0.01,
         highlightStrokeOpacity: 0.01,
         fixed: true,
-        withLabel: false
+        withLabel: false,
+        resolution: 2,
+        vectorContent: 1,
+        plotpoints: false
       });
     } else {
       try {
@@ -1281,13 +1297,7 @@ function refreshEntry(entry: ScharEntry): void {
 
   bindGraphDrag(entry);
 
-  entry.params.forEach((name) => {
-    const slider = entry.slidersByParam[name];
-    if (!slider) return;
-    ensureSliderRangeForValue(slider, Number(entry.values[name]));
-    slider.value = String(entry.values[name]);
-    updateSliderFill(slider);
-  });
+  syncSliderUiFromValues(entry);
 
   entry.minBtnEl.style.color = entry.cfg.color;
 
@@ -1375,6 +1385,7 @@ function bindGraphDrag(entry: ScharEntry): void {
     const startShiftD = entry.shiftCD ? Number(entry.values[entry.shiftCD.d] ?? 0) : 0;
     const startShiftX = Number(entry.dragShiftX || 0);
     const startShiftY = Number(entry.dragShiftY || 0);
+    let moveRaf = 0;
     const startPolyParams: Record<string, number> = {};
     if (entry.polyCoeffDrag) {
       Object.keys(entry.polyCoeffDrag.degreeToParam).forEach((degKey) => {
@@ -1429,8 +1440,13 @@ function bindGraphDrag(entry: ScharEntry): void {
         }
       }
 
-      refreshEntry(entry);
-      persistScharEntryState(entry);
+      if (!moveRaf) {
+        moveRaf = window.requestAnimationFrame(() => {
+          moveRaf = 0;
+          syncSliderUiFromValues(entry);
+          try { entry.board.update(); } catch (e) {}
+        });
+      }
     };
 
     const onUp = (upEvt: PointerEvent) => {
@@ -1440,6 +1456,12 @@ function bindGraphDrag(entry: ScharEntry): void {
       targets.forEach((target) => {
         try { target.style.cursor = 'grab'; } catch (e) {}
       });
+      if (moveRaf) {
+        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
+        moveRaf = 0;
+      }
+      refreshEntry(entry);
+      persistScharEntryState(entry);
       try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
       try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
       try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}

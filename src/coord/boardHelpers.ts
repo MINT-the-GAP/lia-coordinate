@@ -776,11 +776,27 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     bboxRAF = requestAnimationFrame(function() {
       bboxRAF = 0;
       saveBoardState(board, cfg.id, initialBBox);
-      applyAdaptiveTicks(board);
-      applyAxisColors(board);
-      updateStickyTickLabelPositions(board);
-      ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
-      runExternalBootstraps();
+
+      // Suspend all internal updates during pan/zoom for massive performance boost
+      try {
+        if (typeof board.suspendUpdate === 'function') board.suspendUpdate();
+      } catch (e) {}
+
+      try {
+        applyAdaptiveTicks(board);
+        applyAxisColors(board);
+        updateStickyTickLabelPositions(board);
+        ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
+
+        // Keep pan/zoom lightweight: avoid full DOM bootstrap scans on each move.
+        // Axis titles need positional refresh on bounding-box changes.
+        if (window.__refreshAllAxisTitles) window.__refreshAllAxisTitles();
+      } catch (e) {}
+
+      // Resume updates at the very end
+      try {
+        if (typeof board.unsuspendUpdate === 'function') board.unsuspendUpdate();
+      } catch (e) {}
     });
   });
 
