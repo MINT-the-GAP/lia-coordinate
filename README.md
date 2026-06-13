@@ -108,6 +108,7 @@ script:   ./dist/index.js
 @end
 
 @Rekonstruktion: @Rekonstruktion_(@uid,@0)
+@Reconstruction: @Rekonstruktion_(@uid,@0)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
@@ -119,8 +120,16 @@ script:   ./dist/index.js
     const node = document.getElementById('rek-spec-@0');
     const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
 
+    if (typeof window.__checkReconstructionQuiz === 'function') {
+      return window.__checkReconstructionQuiz('@0', spec);
+    }
+
     if (typeof window.__checkRekonstruktionQuiz === 'function') {
       return window.__checkRekonstruktionQuiz('@0', spec);
+    }
+
+    if (typeof window.__checkReconstructionFromSpec === 'function') {
+      return window.__checkReconstructionFromSpec(spec);
     }
 
     if (typeof window.__checkRekonstruktionFromSpec === 'function') {
@@ -136,6 +145,11 @@ script:   ./dist/index.js
 (function(){
   const node = document.getElementById('rek-spec-@0');
   const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+  if (typeof window.__setupReconstructionQuiz === 'function') {
+    window.__setupReconstructionQuiz('@0', spec);
+    return;
+  }
+
   if (typeof window.__setupRekonstruktionQuiz === 'function') {
     window.__setupRekonstruktionQuiz('@0', spec);
   }
@@ -179,6 +193,21 @@ script:   ./dist/index.js
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
+@end
+
+@Regression: @Regression_(@uid,@0)
+
+@Regression_
+<span id="regression-ui-@0" data-spec="@1" style="display:none;"></span>
+
+<script modify="false">
+(function(){
+  const spec = '@1';
+  if (typeof window.__setupRegressionUI === 'function') {
+    window.__setupRegressionUI('@0', spec);
+  }
+})();
+</script>
 @end
 
 -->
@@ -425,6 +454,58 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 
+
+
+## `@Regression`
+
+          --{{0}}--
+Creates a regression analysis interface where students can reconstruct or draw a target function.
+Provides buttons for clearing, hints, and solution display.
+
+Parameters: `<boardId>`
+
+``` markdown
+@Regression(`A9`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A9`)
+
+@AxisLabel(`id=A9;xlabel=$x$;ylabel=$y$`)
+
+@Regression(`A9`)
+
+
+@Point(`A9;A;2;3`)
+@Point(`A9;B;0;-1`)
+@Point(`A9;C;-3;2`)
+
+
+## `@Reconstruction`
+
+          --{{0}}--
+Checks whether the currently adjusted graph matches a target function on a board.
+
+Parameters: `<boardId>;<targetExpr>;<tolerance>`
+
+``` markdown
+@Reconstruction(`ex_schar;2x-1;0.1`)
+```
+
+
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=recon`)
+
+@AxisLabel(`id=recon;xlabel=$x$;ylabel=$y$`)
+
+Reconstruct or draw the function $f(x) = 2x -1$.
+
+@Point(`recon;A;1;1`)
+@Point(`recon;B;0;-1`)
+
+@Reconstruction(`recon;2x-1;0.1`)
+
+
 ## `@Schar`
 
           --{{0}}--
@@ -535,16 +616,7 @@ Legacy-style multi-family setup with square-root and reciprocal parameterized fu
 
 @Schar(`g;x;A/{{b{{x+c}}^2}}+d;A11;term=1;#0066ff`)
 
-## `@Rekonstruktion`
 
-          --{{0}}--
-Checks whether the currently adjusted graph matches a target function on a board.
-
-Parameters: `<boardId>;<targetExpr>;<tolerance>`
-
-``` markdown
-@Rekonstruktion(`ex_schar;2x-1;0.1`)
-```
 
 ## Sliding Function Quiz
 
@@ -677,6 +749,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @Rekonstruktion: @Rekonstruktion_(@uid,@0)
+@Reconstruction: @Rekonstruktion_(@uid,@0)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
@@ -688,8 +761,16 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
     const node = document.getElementById('rek-spec-@0');
     const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
 
+    if (typeof window.__checkReconstructionQuiz === 'function') {
+      return window.__checkReconstructionQuiz('@0', spec);
+    }
+
     if (typeof window.__checkRekonstruktionQuiz === 'function') {
       return window.__checkRekonstruktionQuiz('@0', spec);
+    }
+
+    if (typeof window.__checkReconstructionFromSpec === 'function') {
+      return window.__checkReconstructionFromSpec(spec);
     }
 
     if (typeof window.__checkRekonstruktionFromSpec === 'function') {
@@ -705,6 +786,11 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 (function(){
   const node = document.getElementById('rek-spec-@0');
   const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
+  if (typeof window.__setupReconstructionQuiz === 'function') {
+    window.__setupReconstructionQuiz('@0', spec);
+    return;
+  }
+
   if (typeof window.__setupRekonstruktionQuiz === 'function') {
     window.__setupRekonstruktionQuiz('@0', spec);
   }

@@ -148,9 +148,21 @@ interface Window {
   // Rekonstruktion subsystem (@Rekonstruktion)
   __rekonstruktionReady: boolean | undefined;
   __bootstrapRekonstruktion: (() => void) | undefined;
+  __bootstrapReconstruction: (() => void) | undefined;
   __setupRekonstruktionQuiz: ((uid: string, spec: string) => void) | undefined;
+  __setupReconstructionQuiz: ((uid: string, spec: string) => void) | undefined;
   __checkRekonstruktionFromSpec: ((spec: string) => boolean) | undefined;
+  __checkReconstructionFromSpec: ((spec: string) => boolean) | undefined;
   __checkRekonstruktionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+  __checkReconstructionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Regression subsystem (@Regression)
+  __regressionReady: boolean | undefined;
+  __bootstrapRegression: (() => void) | undefined;
+  __setupRegressionUI: ((uid: string, spec: string) => void) | undefined;
+  __liaRegressionStates: Record<string, any>;
+  __checkRegressionFromSpec: ((spec: string) => boolean) | undefined;
+  __checkRegressionQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;

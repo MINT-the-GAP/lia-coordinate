@@ -9,6 +9,7 @@ import { init as initPointsOnGraph } from './subsystems/pointsOnGraph';
 import { init as initSchar } from './subsystems/schar';
 import { init as initTable } from './subsystems/table';
 import { init as initReconstruction } from './subsystems/reconstruction';
+import { init as initRegression } from './subsystems/regression';
 import {
   parseCoordSpec,
   getSafeBBox,
@@ -91,3 +92,4 @@ initPointsOnGraph();
 initSchar();
 initTable();
 initReconstruction();
+initRegression();
