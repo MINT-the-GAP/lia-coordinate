@@ -2156,1182 +2156,118 @@ function renderLinearGraph(state: RegressionState, m: number, n: number, color: 
   }
 }
 
-function removeAnalysisEntryGraph(entry: LinearAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
+type AnyAnalysisEntry = AnalysisEntry<any>;
 
-  if (graph.__liaLinearDragDetach && typeof graph.__liaLinearDragDetach === 'function') {
-    try { graph.__liaLinearDragDetach(); } catch (e) {}
-  }
+type GraphModelDescriptor = {
+  // Plotted curve y = basis(model)(x).
+  basis: (model: any) => (x: number) => number;
+  // Mutates `model` in place from the snapshot taken at pointer-down plus the
+  // pointer delta (dx, dy) in user coordinates.
+  drag: (model: any, snap: any, dx: number, dy: number) => void;
+};
 
-  try {
-    graph.board.removeObject(graph);
-  } catch (e) {}
-  entry.graph = null;
-}
-
-function renderAnalysisEntryGraph(state: RegressionState, entry: LinearAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-
-  removeAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.m * x + entry.model.n;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindLinearAnalysisGraphDrag(state: RegressionState, entry: LinearAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaLinearDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startM = Number(entry.model.m || 0);
-    const startN = Number(entry.model.n || 0);
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-
-      // Pan line while preserving slope m: y = m*x + n => n' = n + dy - m*dx
-      entry.model.n = startN + dy - (startM * dx);
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-
-      if (entry.syncUi) entry.syncUi(false);
-      updateAnalysisGraph(state, entry);
-      redrawCanvas(state);
-
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaLinearDragBound = true;
-  graph.__liaLinearDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function removeQuadraticAnalysisEntryGraph(entry: QuadraticAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaQuadraticDragDetach && typeof graph.__liaQuadraticDragDetach === 'function') {
-    try { graph.__liaQuadraticDragDetach(); } catch (e) {}
-  }
-
-  try {
-    graph.board.removeObject(graph);
-  } catch (e) {}
-  entry.graph = null;
-}
-
-function renderQuadraticAnalysisEntryGraph(state: RegressionState, entry: QuadraticAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-
-  removeQuadraticAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.a * (x + entry.model.c) * (x + entry.model.c) + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindQuadraticAnalysisGraphDrag(state: RegressionState, entry: QuadraticAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaQuadraticDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startD = Number(entry.model.d || 0);
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dy = now.y - start.y;
-
-      // Pan parabola by shifting d only (keep a and c constant)
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateQuadraticAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-
-      if (entry.syncUi) entry.syncUi(false);
-      updateQuadraticAnalysisGraph(state, entry);
-      redrawCanvas(state);
-
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaQuadraticDragBound = true;
-  graph.__liaQuadraticDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateQuadraticAnalysisGraph(state: RegressionState, entry: QuadraticAnalysisEntry): void {
-  const ok = renderQuadraticAnalysisEntryGraph(state, entry);
-  if (ok) bindQuadraticAnalysisGraphDrag(state, entry);
-}
-
-function removeCubicAnalysisEntryGraph(entry: CubicAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-  if (graph.__liaCubicDragDetach && typeof graph.__liaCubicDragDetach === 'function') {
-    try { graph.__liaCubicDragDetach(); } catch (e) {}
-  }
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderCubicAnalysisEntryGraph(state: RegressionState, entry: CubicAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeCubicAnalysisEntryGraph(entry);
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.a * x * x * x + entry.model.b * x * x + entry.model.c * x + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindCubicAnalysisGraphDrag(state: RegressionState, entry: CubicAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaCubicDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startA = entry.model.a, startB = entry.model.b, startC = entry.model.c, startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      // vertical: shift d
-      entry.model.d = startD + dy;
-      // horizontal: p(x - dx) shifts graph rightward when dragging right
-      // negate dx so dragging left moves graph left
+const GRAPH_MODELS: Record<string, GraphModelDescriptor> = {
+  linear: {
+    basis: (m) => (x) => m.m * x + m.n,
+    // Pan line while preserving slope m: y = m*x + n => n' = n + dy - m*dx
+    drag: (m, s, dx, dy) => { m.n = s.n + dy - (s.m * dx); }
+  },
+  quadratic: {
+    basis: (m) => (x) => m.a * (x + m.c) * (x + m.c) + m.d,
+    // Pan parabola by shifting d only (keep a and c constant)
+    drag: (m, s, _dx, dy) => { m.d = s.d + dy; }
+  },
+  cubic: {
+    basis: (m) => (x) => m.a * x * x * x + m.b * x * x + m.c * x + m.d,
+    drag: (m, s, dx, dy) => {
+      m.d = s.d + dy;
       const n = -dx;
-      entry.model.b = startB + 3 * startA * n;
-      entry.model.c = startC + 2 * startB * n + 3 * startA * n * n;
-      entry.model.d = entry.model.d + startC * n + startB * n * n + startA * n * n * n;
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateCubicAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateCubicAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaCubicDragBound = true;
-  graph.__liaCubicDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateCubicAnalysisGraph(state: RegressionState, entry: CubicAnalysisEntry): void {
-  const ok = renderCubicAnalysisEntryGraph(state, entry);
-  if (ok) bindCubicAnalysisGraphDrag(state, entry);
-}
-
-function removeQuarticAnalysisEntryGraph(entry: QuarticAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-  if (graph.__liaQuarticDragDetach && typeof graph.__liaQuarticDragDetach === 'function') {
-    try { graph.__liaQuarticDragDetach(); } catch (e) {}
-  }
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderQuarticAnalysisEntryGraph(state: RegressionState, entry: QuarticAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeQuarticAnalysisEntryGraph(entry);
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.a * x * x * x * x + entry.model.b * x * x * x + entry.model.c * x * x + entry.model.d * x + entry.model.f;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindQuarticAnalysisGraphDrag(state: RegressionState, entry: QuarticAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaQuarticDragBound) return;
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startA = entry.model.a, startB = entry.model.b, startC = entry.model.c, startD = entry.model.d, startF = entry.model.f;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      // vertical: shift f (constant term)
-      entry.model.f = startF + dy;
-      // horizontal: p(x - dx) shifts graph rightward when dragging right
-      // negate dx so dragging left moves graph left
+      m.b = s.b + 3 * s.a * n;
+      m.c = s.c + 2 * s.b * n + 3 * s.a * n * n;
+      m.d = m.d + s.c * n + s.b * n * n + s.a * n * n * n;
+    }
+  },
+  quartic: {
+    basis: (m) => (x) => m.a * x * x * x * x + m.b * x * x * x + m.c * x * x + m.d * x + m.f,
+    drag: (m, s, dx, dy) => {
+      m.f = s.f + dy;
       const n = -dx;
       const n2 = n * n, n3 = n2 * n, n4 = n3 * n;
-      entry.model.b = startB + 4 * startA * n;
-      entry.model.c = startC + 3 * startB * n + 6 * startA * n2;
-      entry.model.d = startD + 2 * startC * n + 3 * startB * n2 + 4 * startA * n3;
-      entry.model.f = entry.model.f + startD * n + startC * n2 + startB * n3 + startA * n4;
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateQuarticAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateQuarticAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaQuarticDragBound = true;
-  graph.__liaQuarticDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateQuarticAnalysisGraph(state: RegressionState, entry: QuarticAnalysisEntry): void {
-  const ok = renderQuarticAnalysisEntryGraph(state, entry);
-  if (ok) bindQuarticAnalysisGraphDrag(state, entry);
-}
-
-function removeSinAnalysisEntryGraph(entry: SinAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaSinDragDetach && typeof graph.__liaSinDragDetach === 'function') {
-    try { graph.__liaSinDragDetach(); } catch (e) {}
-  }
-
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderSinAnalysisEntryGraph(state: RegressionState, entry: SinAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeSinAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.A * Math.sin(entry.model.b * (x + entry.model.c)) + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindSinAnalysisGraphDrag(state: RegressionState, entry: SinAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaSinDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startC = entry.model.c;
-    const startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      entry.model.c = startC - dx;
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateSinAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateSinAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaSinDragBound = true;
-  graph.__liaSinDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateSinAnalysisGraph(state: RegressionState, entry: SinAnalysisEntry): void {
-  const ok = renderSinAnalysisEntryGraph(state, entry);
-  if (ok) bindSinAnalysisGraphDrag(state, entry);
-}
-
-function removeExpAnalysisEntryGraph(entry: ExpAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaExpDragDetach && typeof graph.__liaExpDragDetach === 'function') {
-    try { graph.__liaExpDragDetach(); } catch (e) {}
-  }
-
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderExpAnalysisEntryGraph(state: RegressionState, entry: ExpAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeExpAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      return entry.model.A * Math.exp(entry.model.b * (x + entry.model.c)) + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindExpAnalysisGraphDrag(state: RegressionState, entry: ExpAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaExpDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startC = entry.model.c;
-    const startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      entry.model.c = startC - dx;
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateExpAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateExpAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaExpDragBound = true;
-  graph.__liaExpDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateExpAnalysisGraph(state: RegressionState, entry: ExpAnalysisEntry): void {
-  const ok = renderExpAnalysisEntryGraph(state, entry);
-  if (ok) bindExpAnalysisGraphDrag(state, entry);
-}
-
-function removeLogAnalysisEntryGraph(entry: LogAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaLogDragDetach && typeof graph.__liaLogDragDetach === 'function') {
-    try { graph.__liaLogDragDetach(); } catch (e) {}
-  }
-
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderLogAnalysisEntryGraph(state: RegressionState, entry: LogAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeLogAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      const arg = Math.abs(entry.model.b) * (x + entry.model.c);
+      m.b = s.b + 4 * s.a * n;
+      m.c = s.c + 3 * s.b * n + 6 * s.a * n2;
+      m.d = s.d + 2 * s.c * n + 3 * s.b * n2 + 4 * s.a * n3;
+      m.f = m.f + s.d * n + s.c * n2 + s.b * n3 + s.a * n4;
+    }
+  },
+  sin: {
+    basis: (m) => (x) => m.A * Math.sin(m.b * (x + m.c)) + m.d,
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
+  },
+  exp: {
+    basis: (m) => (x) => m.A * Math.exp(m.b * (x + m.c)) + m.d,
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
+  },
+  log: {
+    basis: (m) => (x) => {
+      const arg = Math.abs(m.b) * (x + m.c);
       if (!Number.isFinite(arg) || arg <= 0) return NaN;
-      return entry.model.A * Math.log(arg) + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindLogAnalysisGraphDrag(state: RegressionState, entry: LogAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaLogDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startC = entry.model.c;
-    const startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      entry.model.c = startC - dx;
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateLogAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateLogAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaLogDragBound = true;
-  graph.__liaLogDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateLogAnalysisGraph(state: RegressionState, entry: LogAnalysisEntry): void {
-  const ok = renderLogAnalysisEntryGraph(state, entry);
-  if (ok) bindLogAnalysisGraphDrag(state, entry);
-}
-
-function removeSqrtAnalysisEntryGraph(entry: SqrtAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaSqrtDragDetach && typeof graph.__liaSqrtDragDetach === 'function') {
-    try { graph.__liaSqrtDragDetach(); } catch (e) {}
-  }
-
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderSqrtAnalysisEntryGraph(state: RegressionState, entry: SqrtAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeSqrtAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      const arg = Math.abs(entry.model.b) * (x + entry.model.c);
+      return m.A * Math.log(arg) + m.d;
+    },
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
+  },
+  sqrt: {
+    basis: (m) => (x) => {
+      const arg = Math.abs(m.b) * (x + m.c);
       if (!Number.isFinite(arg) || arg < 0) return NaN;
-      return entry.model.A * Math.sqrt(arg) + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function bindSqrtAnalysisGraphDrag(state: RegressionState, entry: SqrtAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaSqrtDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startC = entry.model.c;
-    const startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      entry.model.c = startC - dx;
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateSqrtAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateSqrtAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaSqrtDragBound = true;
-  graph.__liaSqrtDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateSqrtAnalysisGraph(state: RegressionState, entry: SqrtAnalysisEntry): void {
-  const ok = renderSqrtAnalysisEntryGraph(state, entry);
-  if (ok) bindSqrtAnalysisGraphDrag(state, entry);
-}
-
-function removeHyperbolaAnalysisEntryGraph(entry: HyperbolaAnalysisEntry): void {
-  const graph = entry.graph;
-  if (!graph || !graph.board) {
-    entry.graph = null;
-    return;
-  }
-
-  if (graph.__liaHyperbolaDragDetach && typeof graph.__liaHyperbolaDragDetach === 'function') {
-    try { graph.__liaHyperbolaDragDetach(); } catch (e) {}
-  }
-
-  try { graph.board.removeObject(graph); } catch (e) {}
-  entry.graph = null;
-}
-
-function renderHyperbolaAnalysisEntryGraph(state: RegressionState, entry: HyperbolaAnalysisEntry): boolean {
-  const board = state.board;
-  if (!board) return false;
-  removeHyperbolaAnalysisEntryGraph(entry);
-
-  try {
-    const graph = board.create('functiongraph', [function(x: number) {
-      const denom = entry.model.b * (x + entry.model.c);
+      return m.A * Math.sqrt(arg) + m.d;
+    },
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
+  },
+  hyperbola: {
+    basis: (m) => (x) => {
+      const denom = m.b * (x + m.c);
       if (!Number.isFinite(denom) || Math.abs(denom) < 1e-6) return NaN;
-      return entry.model.A / denom + entry.model.d;
-    }], {
-      strokeColor: entry.color,
-      highlightStrokeColor: entry.color,
-      strokeWidth: 3,
-      fixed: true,
-      withLabel: false
-    });
-    entry.graph = graph;
-    try { board.update(); } catch (e) {}
-    return true;
-  } catch (e) {
-    return false;
+      return m.A / denom + m.d;
+    },
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
+  },
+  hyperbola2: {
+    basis: (m) => (x) => {
+      const t = m.b * x - m.c;
+      if (!Number.isFinite(t) || Math.abs(t) < 1e-6) return NaN;
+      return m.A / (t * t) + m.d;
+    },
+    drag: (m, s, dx, dy) => { m.c = s.c + s.b * dx; m.d = s.d + dy; }
   }
-}
+};
 
-function bindHyperbolaAnalysisGraphDrag(state: RegressionState, entry: HyperbolaAnalysisEntry): void {
-  const graph = entry.graph;
-  const board = state.board;
-  if (!graph || !board) return;
-  if (graph.__liaHyperbolaDragBound) return;
-
-  const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
-  if (!targets.length) return;
-
-  const onPointerDown = (evt: PointerEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    targets.forEach((target: any) => {
-      try { target.style.cursor = 'grabbing'; } catch (e) {}
-    });
-
-    const pointerId = evt.pointerId;
-    const start = eventToUser(board, evt);
-    const startC = entry.model.c;
-    const startD = entry.model.d;
-    let moveRaf = 0;
-
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-      entry.model.c = startC - dx;
-      entry.model.d = startD + dy;
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          updateHyperbolaAnalysisGraph(state, entry);
-          if (entry.syncUi) entry.syncUi(true);
-          redrawCanvas(state);
-        });
-      }
-    };
-
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
-      targets.forEach((target: any) => {
-        try { target.style.cursor = 'grab'; } catch (e) {}
-      });
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
-      if (entry.syncUi) entry.syncUi(false);
-      updateHyperbolaAnalysisGraph(state, entry);
-      redrawCanvas(state);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
-    };
-
-    window.addEventListener('pointermove', onMove, true);
-    window.addEventListener('pointerup', onUp, true);
-    window.addEventListener('pointercancel', onUp, true);
-  };
-
-  targets.forEach((target: any) => {
-    try {
-      target.style.cursor = 'grab';
-      target.style.touchAction = 'none';
-      target.addEventListener('pointerdown', onPointerDown, true);
-    } catch (e) {}
-  });
-
-  graph.__liaHyperbolaDragBound = true;
-  graph.__liaHyperbolaDragDetach = () => {
-    targets.forEach((target: any) => {
-      try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
-    });
-  };
-}
-
-function updateHyperbolaAnalysisGraph(state: RegressionState, entry: HyperbolaAnalysisEntry): void {
-  const ok = renderHyperbolaAnalysisEntryGraph(state, entry);
-  if (ok) bindHyperbolaAnalysisGraphDrag(state, entry);
-}
-
-function removeHyperbola2AnalysisEntryGraph(entry: Hyperbola2AnalysisEntry): void {
+function removeEntryGraph(entry: AnyAnalysisEntry): void {
   const graph = entry.graph;
   if (!graph || !graph.board) {
     entry.graph = null;
     return;
   }
 
-  if (graph.__liaHyperbola2DragDetach && typeof graph.__liaHyperbola2DragDetach === 'function') {
-    try { graph.__liaHyperbola2DragDetach(); } catch (e) {}
+  if (graph.__liaAnalysisDragDetach && typeof graph.__liaAnalysisDragDetach === 'function') {
+    try { graph.__liaAnalysisDragDetach(); } catch (e) {}
   }
 
-  try { graph.board.removeObject(graph); } catch (e) {}
+  try {
+    graph.board.removeObject(graph);
+  } catch (e) {}
   entry.graph = null;
 }
 
-function renderHyperbola2AnalysisEntryGraph(state: RegressionState, entry: Hyperbola2AnalysisEntry): boolean {
+function renderEntryGraph(state: RegressionState, entry: AnyAnalysisEntry, descriptor: GraphModelDescriptor): boolean {
   const board = state.board;
   if (!board) return false;
-  removeHyperbola2AnalysisEntryGraph(entry);
+
+  removeEntryGraph(entry);
 
   try {
+    const fn = descriptor.basis(entry.model);
     const graph = board.create('functiongraph', [function(x: number) {
-      const t = entry.model.b * x - entry.model.c;
-      if (!Number.isFinite(t) || Math.abs(t) < 1e-6) return NaN;
-      return entry.model.A / (t * t) + entry.model.d;
+      return fn(x);
     }], {
       strokeColor: entry.color,
       highlightStrokeColor: entry.color,
@@ -3347,11 +2283,11 @@ function renderHyperbola2AnalysisEntryGraph(state: RegressionState, entry: Hyper
   }
 }
 
-function bindHyperbola2AnalysisGraphDrag(state: RegressionState, entry: Hyperbola2AnalysisEntry): void {
+function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descriptor: GraphModelDescriptor): void {
   const graph = entry.graph;
   const board = state.board;
   if (!graph || !board) return;
-  if (graph.__liaHyperbola2DragBound) return;
+  if (graph.__liaAnalysisDragBound) return;
 
   const targets = [graph.rendNode, graph.rendNodeStroke].filter(Boolean);
   if (!targets.length) return;
@@ -3359,15 +2295,14 @@ function bindHyperbola2AnalysisGraphDrag(state: RegressionState, entry: Hyperbol
   const onPointerDown = (evt: PointerEvent) => {
     evt.preventDefault();
     evt.stopPropagation();
+
     targets.forEach((target: any) => {
       try { target.style.cursor = 'grabbing'; } catch (e) {}
     });
 
     const pointerId = evt.pointerId;
     const start = eventToUser(board, evt);
-    const startB = entry.model.b;
-    const startC = entry.model.c;
-    const startD = entry.model.d;
+    const snap = { ...entry.model };
     let moveRaf = 0;
 
     const onMove = (moveEvt: PointerEvent) => {
@@ -3378,13 +2313,13 @@ function bindHyperbola2AnalysisGraphDrag(state: RegressionState, entry: Hyperbol
       const now = eventToUser(board, moveEvt);
       const dx = now.x - start.x;
       const dy = now.y - start.y;
-      entry.model.c = startC + startB * dx;
-      entry.model.d = startD + dy;
+
+      descriptor.drag(entry.model, snap, dx, dy);
 
       if (!moveRaf) {
         moveRaf = window.requestAnimationFrame(() => {
           moveRaf = 0;
-          updateHyperbola2AnalysisGraph(state, entry);
+          updateEntryGraph(state, entry, descriptor);
           if (entry.syncUi) entry.syncUi(true);
           redrawCanvas(state);
         });
@@ -3395,16 +2330,20 @@ function bindHyperbola2AnalysisGraphDrag(state: RegressionState, entry: Hyperbol
       if (upEvt.pointerId !== pointerId) return;
       upEvt.preventDefault();
       upEvt.stopPropagation();
+
       targets.forEach((target: any) => {
         try { target.style.cursor = 'grab'; } catch (e) {}
       });
+
       if (moveRaf) {
         try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
         moveRaf = 0;
       }
+
       if (entry.syncUi) entry.syncUi(false);
-      updateHyperbola2AnalysisGraph(state, entry);
+      updateEntryGraph(state, entry, descriptor);
       redrawCanvas(state);
+
       try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
       try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
       try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
@@ -3423,18 +2362,41 @@ function bindHyperbola2AnalysisGraphDrag(state: RegressionState, entry: Hyperbol
     } catch (e) {}
   });
 
-  graph.__liaHyperbola2DragBound = true;
-  graph.__liaHyperbola2DragDetach = () => {
+  graph.__liaAnalysisDragBound = true;
+  graph.__liaAnalysisDragDetach = () => {
     targets.forEach((target: any) => {
       try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
     });
   };
 }
 
-function updateHyperbola2AnalysisGraph(state: RegressionState, entry: Hyperbola2AnalysisEntry): void {
-  const ok = renderHyperbola2AnalysisEntryGraph(state, entry);
-  if (ok) bindHyperbola2AnalysisGraphDrag(state, entry);
+function updateEntryGraph(state: RegressionState, entry: AnyAnalysisEntry, descriptor: GraphModelDescriptor): void {
+  const ok = renderEntryGraph(state, entry, descriptor);
+  if (ok) bindEntryDrag(state, entry, descriptor);
 }
+
+// Public per-model wrappers (existing call sites depend on these names).
+function removeAnalysisEntryGraph(entry: LinearAnalysisEntry): void { removeEntryGraph(entry); }
+function removeQuadraticAnalysisEntryGraph(entry: QuadraticAnalysisEntry): void { removeEntryGraph(entry); }
+function removeCubicAnalysisEntryGraph(entry: CubicAnalysisEntry): void { removeEntryGraph(entry); }
+function removeQuarticAnalysisEntryGraph(entry: QuarticAnalysisEntry): void { removeEntryGraph(entry); }
+function removeSinAnalysisEntryGraph(entry: SinAnalysisEntry): void { removeEntryGraph(entry); }
+function removeExpAnalysisEntryGraph(entry: ExpAnalysisEntry): void { removeEntryGraph(entry); }
+function removeLogAnalysisEntryGraph(entry: LogAnalysisEntry): void { removeEntryGraph(entry); }
+function removeSqrtAnalysisEntryGraph(entry: SqrtAnalysisEntry): void { removeEntryGraph(entry); }
+function removeHyperbolaAnalysisEntryGraph(entry: HyperbolaAnalysisEntry): void { removeEntryGraph(entry); }
+function removeHyperbola2AnalysisEntryGraph(entry: Hyperbola2AnalysisEntry): void { removeEntryGraph(entry); }
+
+function updateAnalysisGraph(state: RegressionState, entry: LinearAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.linear); }
+function updateQuadraticAnalysisGraph(state: RegressionState, entry: QuadraticAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.quadratic); }
+function updateCubicAnalysisGraph(state: RegressionState, entry: CubicAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.cubic); }
+function updateQuarticAnalysisGraph(state: RegressionState, entry: QuarticAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.quartic); }
+function updateSinAnalysisGraph(state: RegressionState, entry: SinAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.sin); }
+function updateExpAnalysisGraph(state: RegressionState, entry: ExpAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.exp); }
+function updateLogAnalysisGraph(state: RegressionState, entry: LogAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.log); }
+function updateSqrtAnalysisGraph(state: RegressionState, entry: SqrtAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.sqrt); }
+function updateHyperbolaAnalysisGraph(state: RegressionState, entry: HyperbolaAnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.hyperbola); }
+function updateHyperbola2AnalysisGraph(state: RegressionState, entry: Hyperbola2AnalysisEntry): void { updateEntryGraph(state, entry, GRAPH_MODELS.hyperbola2); }
 
 function recognizeQuadraticFromStroke(state: RegressionState, stroke: DrawStroke): boolean {
   const fitted = fitQuadratic(collectStrokePoints(stroke));
@@ -4117,8 +3079,17 @@ function toggleRegressionPoint(state: RegressionState, point: AutoPointData): vo
   state.regressionPoints.push({ key: point.key, x: point.x, y: point.y });
 }
 
-function removeAnalysisEntry(state: RegressionState, entry: LinearAnalysisEntry): void {
-  removeAnalysisEntryGraph(entry);
+// Removing an overlay is identical across models apart from which state list
+// holds its entries; listKey selects that list. Public per-model wrappers below
+// keep existing call sites unchanged.
+type AnalysisListKey =
+  | 'analysisEntries' | 'quadraticAnalysisEntries' | 'cubicAnalysisEntries'
+  | 'quarticAnalysisEntries' | 'sinAnalysisEntries' | 'expAnalysisEntries'
+  | 'logAnalysisEntries' | 'sqrtAnalysisEntries' | 'hyperbolaAnalysisEntries'
+  | 'hyperbola2AnalysisEntries';
+
+function removeEntryFromList(state: RegressionState, entry: AnyAnalysisEntry, listKey: AnalysisListKey): void {
+  removeEntryGraph(entry);
   if (entry.disposeUi) {
     try { entry.disposeUi(); } catch (e) {}
     entry.disposeUi = undefined;
@@ -4129,203 +3100,36 @@ function removeAnalysisEntry(state: RegressionState, entry: LinearAnalysisEntry)
     entry.panel = null;
   }
   entry.syncUi = undefined;
-  state.analysisEntries = state.analysisEntries.filter((item) => item !== entry);
+  (state as any)[listKey] = (state as any)[listKey].filter((item: AnyAnalysisEntry) => item !== entry);
   relayoutAnalysisPanels(state);
 }
 
-function removeAllAnalysisOverlays(state: RegressionState): void {
-  const entries = state.analysisEntries.slice();
-  entries.forEach((entry) => removeAnalysisEntry(state, entry));
+function removeAllFromList(state: RegressionState, listKey: AnalysisListKey): void {
+  const entries = ((state as any)[listKey] as AnyAnalysisEntry[]).slice();
+  entries.forEach((entry) => removeEntryFromList(state, entry, listKey));
 }
 
-function removeQuadraticAnalysisEntry(state: RegressionState, entry: QuadraticAnalysisEntry): void {
-  removeQuadraticAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.quadraticAnalysisEntries = state.quadraticAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
+function removeAnalysisEntry(state: RegressionState, entry: LinearAnalysisEntry): void { removeEntryFromList(state, entry, 'analysisEntries'); }
+function removeQuadraticAnalysisEntry(state: RegressionState, entry: QuadraticAnalysisEntry): void { removeEntryFromList(state, entry, 'quadraticAnalysisEntries'); }
+function removeCubicAnalysisEntry(state: RegressionState, entry: CubicAnalysisEntry): void { removeEntryFromList(state, entry, 'cubicAnalysisEntries'); }
+function removeQuarticAnalysisEntry(state: RegressionState, entry: QuarticAnalysisEntry): void { removeEntryFromList(state, entry, 'quarticAnalysisEntries'); }
+function removeSinAnalysisEntry(state: RegressionState, entry: SinAnalysisEntry): void { removeEntryFromList(state, entry, 'sinAnalysisEntries'); }
+function removeExpAnalysisEntry(state: RegressionState, entry: ExpAnalysisEntry): void { removeEntryFromList(state, entry, 'expAnalysisEntries'); }
+function removeLogAnalysisEntry(state: RegressionState, entry: LogAnalysisEntry): void { removeEntryFromList(state, entry, 'logAnalysisEntries'); }
+function removeSqrtAnalysisEntry(state: RegressionState, entry: SqrtAnalysisEntry): void { removeEntryFromList(state, entry, 'sqrtAnalysisEntries'); }
+function removeHyperbolaAnalysisEntry(state: RegressionState, entry: HyperbolaAnalysisEntry): void { removeEntryFromList(state, entry, 'hyperbolaAnalysisEntries'); }
+function removeHyperbola2AnalysisEntry(state: RegressionState, entry: Hyperbola2AnalysisEntry): void { removeEntryFromList(state, entry, 'hyperbola2AnalysisEntries'); }
 
-function removeAllQuadraticAnalysisOverlays(state: RegressionState): void {
-  const entries = state.quadraticAnalysisEntries.slice();
-  entries.forEach((entry) => removeQuadraticAnalysisEntry(state, entry));
-}
-
-function removeCubicAnalysisEntry(state: RegressionState, entry: CubicAnalysisEntry): void {
-  removeCubicAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.cubicAnalysisEntries = state.cubicAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllCubicAnalysisOverlays(state: RegressionState): void {
-  const entries = state.cubicAnalysisEntries.slice();
-  entries.forEach((entry) => removeCubicAnalysisEntry(state, entry));
-}
-
-function removeQuarticAnalysisEntry(state: RegressionState, entry: QuarticAnalysisEntry): void {
-  removeQuarticAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.quarticAnalysisEntries = state.quarticAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllQuarticAnalysisOverlays(state: RegressionState): void {
-  const entries = state.quarticAnalysisEntries.slice();
-  entries.forEach((entry) => removeQuarticAnalysisEntry(state, entry));
-}
-
-function removeSinAnalysisEntry(state: RegressionState, entry: SinAnalysisEntry): void {
-  removeSinAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.sinAnalysisEntries = state.sinAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllSinAnalysisOverlays(state: RegressionState): void {
-  const entries = state.sinAnalysisEntries.slice();
-  entries.forEach((entry) => removeSinAnalysisEntry(state, entry));
-}
-
-function removeExpAnalysisEntry(state: RegressionState, entry: ExpAnalysisEntry): void {
-  removeExpAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.expAnalysisEntries = state.expAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllExpAnalysisOverlays(state: RegressionState): void {
-  const entries = state.expAnalysisEntries.slice();
-  entries.forEach((entry) => removeExpAnalysisEntry(state, entry));
-}
-
-function removeLogAnalysisEntry(state: RegressionState, entry: LogAnalysisEntry): void {
-  removeLogAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.logAnalysisEntries = state.logAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllLogAnalysisOverlays(state: RegressionState): void {
-  const entries = state.logAnalysisEntries.slice();
-  entries.forEach((entry) => removeLogAnalysisEntry(state, entry));
-}
-
-function removeSqrtAnalysisEntry(state: RegressionState, entry: SqrtAnalysisEntry): void {
-  removeSqrtAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.sqrtAnalysisEntries = state.sqrtAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllSqrtAnalysisOverlays(state: RegressionState): void {
-  const entries = state.sqrtAnalysisEntries.slice();
-  entries.forEach((entry) => removeSqrtAnalysisEntry(state, entry));
-}
-
-function removeHyperbolaAnalysisEntry(state: RegressionState, entry: HyperbolaAnalysisEntry): void {
-  removeHyperbolaAnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.hyperbolaAnalysisEntries = state.hyperbolaAnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllHyperbolaAnalysisOverlays(state: RegressionState): void {
-  const entries = state.hyperbolaAnalysisEntries.slice();
-  entries.forEach((entry) => removeHyperbolaAnalysisEntry(state, entry));
-}
-
-function removeHyperbola2AnalysisEntry(state: RegressionState, entry: Hyperbola2AnalysisEntry): void {
-  removeHyperbola2AnalysisEntryGraph(entry);
-  if (entry.disposeUi) {
-    try { entry.disposeUi(); } catch (e) {}
-    entry.disposeUi = undefined;
-  }
-  if (entry.panel) {
-    captureOverlayScaleCarry(state, entry.panel);
-    try { entry.panel.remove(); } catch (e) {}
-    entry.panel = null;
-  }
-  entry.syncUi = undefined;
-  state.hyperbola2AnalysisEntries = state.hyperbola2AnalysisEntries.filter((item) => item !== entry);
-  relayoutAnalysisPanels(state);
-}
-
-function removeAllHyperbola2AnalysisOverlays(state: RegressionState): void {
-  const entries = state.hyperbola2AnalysisEntries.slice();
-  entries.forEach((entry) => removeHyperbola2AnalysisEntry(state, entry));
-}
+function removeAllAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'analysisEntries'); }
+function removeAllQuadraticAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'quadraticAnalysisEntries'); }
+function removeAllCubicAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'cubicAnalysisEntries'); }
+function removeAllQuarticAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'quarticAnalysisEntries'); }
+function removeAllSinAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'sinAnalysisEntries'); }
+function removeAllExpAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'expAnalysisEntries'); }
+function removeAllLogAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'logAnalysisEntries'); }
+function removeAllSqrtAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'sqrtAnalysisEntries'); }
+function removeAllHyperbolaAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbolaAnalysisEntries'); }
+function removeAllHyperbola2AnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbola2AnalysisEntries'); }
 
 function relayoutAnalysisPanels(state: RegressionState): void {
   let nextTop = 8;
@@ -4366,11 +3170,6 @@ function miniWrapIsVisible(panel: HTMLElement): boolean {
   const miniWrap = panel.querySelector('.lia-plot-analysis-mini-wrap') as HTMLElement | null;
   if (!miniWrap) return false;
   return miniWrap.style.display === 'inline-flex';
-}
-
-function updateAnalysisGraph(state: RegressionState, entry: LinearAnalysisEntry): void {
-  const ok = renderAnalysisEntryGraph(state, entry);
-  if (ok) bindLinearAnalysisGraphDrag(state, entry);
 }
 
 function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number, title: string, options?: AnalysisOverlayOptions): boolean {
