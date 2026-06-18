@@ -56,115 +56,29 @@ type AnalysisOverlayOptions = {
   overlayScale?: number;
 };
 
-type LinearAnalysisEntry = {
+// All analysis entries share the same shape and differ only in their `model`
+// parameter object. AnalysisEntry<M> captures the common fields.
+type AnalysisEntry<M> = {
   id: string;
   title: string;
   color: string;
   panel: HTMLElement | null;
   graph: any;
-  model: { m: number; n: number };
+  model: M;
   syncUi?: (lightweight?: boolean) => void;
   disposeUi?: () => void;
 };
 
-type QuadraticAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { a: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type CubicAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { a: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type QuarticAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { a: number; b: number; c: number; d: number; f: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type SinAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type ExpAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type LogAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type SqrtAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type HyperbolaAnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
-
-type Hyperbola2AnalysisEntry = {
-  id: string;
-  title: string;
-  color: string;
-  panel: HTMLElement | null;
-  graph: any;
-  model: { A: number; b: number; c: number; d: number };
-  syncUi?: (lightweight?: boolean) => void;
-  disposeUi?: () => void;
-};
+type LinearAnalysisEntry = AnalysisEntry<{ m: number; n: number }>;
+type QuadraticAnalysisEntry = AnalysisEntry<{ a: number; c: number; d: number }>;
+type CubicAnalysisEntry = AnalysisEntry<{ a: number; b: number; c: number; d: number }>;
+type QuarticAnalysisEntry = AnalysisEntry<{ a: number; b: number; c: number; d: number; f: number }>;
+type SinAnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
+type ExpAnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
+type LogAnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
+type SqrtAnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
+type HyperbolaAnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
+type Hyperbola2AnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; d: number }>;
 
 type RegressionState = {
   uid: string;
