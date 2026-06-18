@@ -792,8 +792,8 @@ function updateAnalysisSliderFill(slider: HTMLInputElement): void {
   slider.style.setProperty('--lia-analysis-fill', (ratio * 100).toFixed(2) + '%');
 }
 
-function renderLinearAnalysisFormula(host: HTMLElement, m: number, n: number): void {
-  host.innerHTML = buildLinearFormulaTex(m, n);
+function renderAnalysisFormula(host: HTMLElement, tex: string): void {
+  host.innerHTML = tex;
   typesetOverlayMath(host);
 }
 
@@ -836,11 +836,6 @@ function buildQuadraticFormulaTex(a: number, c: number, d: number): string {
   return '\\(f(x) = ' + rhs + '\\)';
 }
 
-function renderQuadraticAnalysisFormula(host: HTMLElement, a: number, c: number, d: number): void {
-  host.innerHTML = buildQuadraticFormulaTex(a, c, d);
-  typesetOverlayMath(host);
-}
-
 function buildCubicFormulaTex(a: number, b: number, c: number, d: number): string {
   const terms: string[] = [];
   const pushTerm = (coef: number, power: number) => {
@@ -858,11 +853,6 @@ function buildCubicFormulaTex(a: number, b: number, c: number, d: number): strin
   pushTerm(c, 1);
   pushTerm(d, 0);
   return '\\(f(x) = ' + (terms.length ? terms.join(' ') : '0') + '\\)';
-}
-
-function renderCubicAnalysisFormula(host: HTMLElement, a: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildCubicFormulaTex(a, b, c, d);
-  typesetOverlayMath(host);
 }
 
 function buildQuarticFormulaTex(a: number, b: number, c: number, d: number, f: number): string {
@@ -885,11 +875,6 @@ function buildQuarticFormulaTex(a: number, b: number, c: number, d: number, f: n
   return '\\(f(x) = ' + (terms.length ? terms.join(' ') : '0') + '\\)';
 }
 
-function renderQuarticAnalysisFormula(host: HTMLElement, a: number, b: number, c: number, d: number, f: number): void {
-  host.innerHTML = buildQuarticFormulaTex(a, b, c, d, f);
-  typesetOverlayMath(host);
-}
-
 function buildSinFormulaTex(A: number, b: number, c: number, d: number): string {
   const amp = toOverlayTexNumber(A);
   const freq = toOverlayTexNumber(b);
@@ -898,11 +883,6 @@ function buildSinFormulaTex(A: number, b: number, c: number, d: number): string 
   const rhs = `${amp} \\sin\\left(${freq} \\cdot (x${shiftSign}${shiftAbs})\\right)`;
   const tail = Math.abs(d) < 1e-12 ? '' : (d >= 0 ? ' + ' : ' - ') + toOverlayTexNumber(Math.abs(d));
   return `\\(f(x) = ${rhs}${tail}\\)`;
-}
-
-function renderSinAnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildSinFormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
 }
 
 function buildExpFormulaTex(A: number, b: number, c: number, d: number): string {
@@ -915,11 +895,6 @@ function buildExpFormulaTex(A: number, b: number, c: number, d: number): string 
   return `\\(f(x) = ${rhs}${tail}\\)`;
 }
 
-function renderExpAnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildExpFormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
-}
-
 function buildLogFormulaTex(A: number, b: number, c: number, d: number): string {
   const amp = toOverlayTexNumber(A);
   const freq = toOverlayTexNumber(Math.abs(b));
@@ -930,11 +905,6 @@ function buildLogFormulaTex(A: number, b: number, c: number, d: number): string 
   return `\\(f(x) = ${rhs}${tail}\\)`;
 }
 
-function renderLogAnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildLogFormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
-}
-
 function buildSqrtFormulaTex(A: number, b: number, c: number, d: number): string {
   const amp = toOverlayTexNumber(A);
   const freq = toOverlayTexNumber(Math.abs(b));
@@ -943,11 +913,6 @@ function buildSqrtFormulaTex(A: number, b: number, c: number, d: number): string
   const rhs = `${amp} \\cdot \\sqrt{${freq} \\cdot (x${shiftSign}${shiftAbs})}`;
   const tail = Math.abs(d) < 1e-12 ? '' : (d >= 0 ? ' + ' : ' - ') + toOverlayTexNumber(Math.abs(d));
   return `\\(f(x) = ${rhs}${tail}\\)`;
-}
-
-function renderSqrtAnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildSqrtFormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
 }
 
 function buildHyperbolaFormulaTex(A: number, b: number, c: number, d: number): string {
@@ -970,16 +935,6 @@ function buildHyperbola2FormulaTex(A: number, b: number, c: number, d: number): 
   const rhs = `\\frac{${amp}}{${denom}}`;
   const tail = Math.abs(d) < 1e-12 ? '' : (d >= 0 ? ' + ' : ' - ') + toOverlayTexNumber(Math.abs(d));
   return `\\(f(x) = ${rhs}${tail}\\)`;
-}
-
-function renderHyperbolaAnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildHyperbolaFormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
-}
-
-function renderHyperbola2AnalysisFormula(host: HTMLElement, A: number, b: number, c: number, d: number): void {
-  host.innerHTML = buildHyperbola2FormulaTex(A, b, c, d);
-  typesetOverlayMath(host);
 }
 
 function getQuadraticOverlayCandidate(a: number, c: number, d: number): { name: string; probability: number } {
@@ -4615,7 +4570,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
     });
     linkedModels.linear.m = entry.model.m;
     linkedModels.linear.n = entry.model.n;
-    renderLinearAnalysisFormula(formula, entry.model.m, entry.model.n);
+    renderAnalysisFormula(formula, buildLinearFormulaTex(entry.model.m, entry.model.n));
   };
 
   const syncGraph = (lightweight: boolean = false) => {
@@ -5138,7 +5093,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
     linkedModels.quadratic.a = entry.model.a;
     linkedModels.quadratic.c = entry.model.c;
     linkedModels.quadratic.d = entry.model.d;
-    renderQuadraticAnalysisFormula(formula, entry.model.a, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildQuadraticFormulaTex(entry.model.a, entry.model.c, entry.model.d));
   };
 
   const syncGraph = (lightweight: boolean = false) => {
@@ -5653,7 +5608,7 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
     linkedModels.cubic.b = entry.model.b;
     linkedModels.cubic.c = entry.model.c;
     linkedModels.cubic.d = entry.model.d;
-    renderCubicAnalysisFormula(formula, entry.model.a, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildCubicFormulaTex(entry.model.a, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -5995,7 +5950,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
     linkedModels.quartic.c = entry.model.c;
     linkedModels.quartic.d = entry.model.d;
     linkedModels.quartic.f = entry.model.f;
-    renderQuarticAnalysisFormula(formula, entry.model.a, entry.model.b, entry.model.c, entry.model.d, entry.model.f);
+    renderAnalysisFormula(formula, buildQuarticFormulaTex(entry.model.a, entry.model.b, entry.model.c, entry.model.d, entry.model.f));
   };
 
   const syncGraph = () => {
@@ -6193,7 +6148,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
       linkedModels.sin.b = entry.model.b;
       linkedModels.sin.c = entry.model.c;
       linkedModels.sin.d = entry.model.d;
-      renderSinAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+      renderAnalysisFormula(formula, buildSinFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
     };
 
     const syncGraph = () => {
@@ -6657,7 +6612,7 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     linkedModels.sin.b = entry.model.b;
     linkedModels.sin.c = entry.model.c;
     linkedModels.sin.d = entry.model.d;
-    renderSinAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildSinFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -6983,7 +6938,7 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     linkedModels.exp.b = entry.model.b;
     linkedModels.exp.c = entry.model.c;
     linkedModels.exp.d = entry.model.d;
-    renderExpAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildExpFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -7311,7 +7266,7 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     linkedModels.log.b = entry.model.b;
     linkedModels.log.c = entry.model.c;
     linkedModels.log.d = entry.model.d;
-    renderLogAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildLogFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -7640,7 +7595,7 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
     linkedModels.sqrt.b = entry.model.b;
     linkedModels.sqrt.c = entry.model.c;
     linkedModels.sqrt.d = entry.model.d;
-    renderSqrtAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildSqrtFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -7974,7 +7929,7 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
     linkedModels.hyperbola.b = entry.model.b;
     linkedModels.hyperbola.c = entry.model.c;
     linkedModels.hyperbola.d = entry.model.d;
-    renderHyperbolaAnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildHyperbolaFormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
@@ -8282,7 +8237,7 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
     linkedModels.hyperbola2.b = entry.model.b;
     linkedModels.hyperbola2.c = entry.model.c;
     linkedModels.hyperbola2.d = entry.model.d;
-    renderHyperbola2AnalysisFormula(formula, entry.model.A, entry.model.b, entry.model.c, entry.model.d);
+    renderAnalysisFormula(formula, buildHyperbola2FormulaTex(entry.model.A, entry.model.b, entry.model.c, entry.model.d));
   };
 
   const syncGraph = () => {
