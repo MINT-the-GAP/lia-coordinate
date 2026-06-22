@@ -163,6 +163,8 @@ interface Window {
   __liaRegressionStates: Record<string, any>;
   __checkRegressionFromSpec: ((spec: string) => boolean) | undefined;
   __checkRegressionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+  undoAction: ((boardId: string) => void) | undefined;
+  redoAction: ((boardId: string) => void) | undefined;
 
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;

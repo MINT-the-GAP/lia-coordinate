@@ -713,19 +713,23 @@ function getExpandedTexForEntry(entry: ScharEntry): string {
   return toTexExpr(rhs);
 }
 
+// Read the current per-degree coefficient values from an entry's poly-drag
+// param mapping into a { degree: value } record.
+function readPolyCoeffsByDegree(entry: ScharEntry, degreeToParam: Record<number, string>): Record<number, number> {
+  const coeffs: Record<number, number> = {};
+  Object.keys(degreeToParam).forEach((degKey) => {
+    const deg = Number(degKey);
+    coeffs[deg] = Number(entry.values[degreeToParam[deg]] ?? 0);
+  });
+  return coeffs;
+}
+
 function refreshPolyBaseFromCurrent(entry: ScharEntry): void {
   if (!entry.polyCoeffDrag) {
     entry.polyBaseByDegree = null;
     return;
   }
-
-  const base: Record<number, number> = {};
-  Object.keys(entry.polyCoeffDrag.degreeToParam).forEach((degKey) => {
-    const deg = Number(degKey);
-    const pname = entry.polyCoeffDrag!.degreeToParam[deg];
-    base[deg] = Number(entry.values[pname] ?? 0);
-  });
-  entry.polyBaseByDegree = base;
+  entry.polyBaseByDegree = readPolyCoeffsByDegree(entry, entry.polyCoeffDrag.degreeToParam);
 }
 
 function buildShiftedPolyTex(entry: ScharEntry): string | null {
@@ -760,13 +764,7 @@ function buildExpandedShiftedPolyTex(entry: ScharEntry): string | null {
   const maxN = entry.polyCoeffDrag.maxDegree;
   const xVar = String(entry.cfg.variableName || 'x').trim() || 'x';
   const n = -Number(entry.dragShiftX || 0);
-  const coeffs: Record<number, number> = {};
-
-  Object.keys(entry.polyCoeffDrag.degreeToParam).forEach((degKey) => {
-    const deg = Number(degKey);
-    const pname = entry.polyCoeffDrag!.degreeToParam[deg];
-    coeffs[deg] = Number(entry.values[pname] ?? 0);
-  });
+  const coeffs = readPolyCoeffsByDegree(entry, entry.polyCoeffDrag.degreeToParam);
 
   const expanded: Record<number, number> = {};
   for (let j = 0; j <= maxN; j += 1) {
@@ -1020,36 +1018,33 @@ function detectLinearMN(cfg: ScharCfg, params: string[]): { m: string; n: string
   return null;
 }
 
-function detectShiftBC(cfg: ScharCfg, params: string[]): { b: string; c: string } | null {
-  const b = params.find((p) => String(p).toLowerCase() === 'b');
-  const c = params.find((p) => String(p).toLowerCase() === 'c');
-  if (!b || !c) return null;
+// Detect a shifted family of the form ...(x+<inner>)...[+-]<outer>$, where the
+// inner param drives a horizontal shift and the outer param a vertical offset.
+function detectShiftPair(cfg: ScharCfg, params: string[], inner: string, outer: string): { inner: string; outer: string } | null {
+  const innerParam = params.find((p) => String(p).toLowerCase() === inner);
+  const outerParam = params.find((p) => String(p).toLowerCase() === outer);
+  if (!innerParam || !outerParam) return null;
 
   const rawExpr = String(cfg.expr || '').replace(/\s+/g, '').toLowerCase();
   const varLower = String(cfg.variableName || 'x').trim().toLowerCase();
 
-  // Enable direct 2D dragging for legacy shifted families like d(x+b)^2+c.
-  if (rawExpr.includes('(' + varLower + '+b)') && /[+\-]c$/.test(rawExpr)) {
-    return { b, c };
+  if (rawExpr.includes('(' + varLower + '+' + inner + ')') && new RegExp('[+\\-]' + outer + '$').test(rawExpr)) {
+    return { inner: innerParam, outer: outerParam };
   }
 
   return null;
 }
 
+// Enable direct 2D dragging for legacy shifted families like d(x+b)^2+c.
+function detectShiftBC(cfg: ScharCfg, params: string[]): { b: string; c: string } | null {
+  const hit = detectShiftPair(cfg, params, 'b', 'c');
+  return hit ? { b: hit.inner, c: hit.outer } : null;
+}
+
+// Families 3/4: inner horizontal shift by c and outer vertical offset by d.
 function detectShiftCD(cfg: ScharCfg, params: string[]): { c: string; d: string } | null {
-  const c = params.find((p) => String(p).toLowerCase() === 'c');
-  const d = params.find((p) => String(p).toLowerCase() === 'd');
-  if (!c || !d) return null;
-
-  const rawExpr = String(cfg.expr || '').replace(/\s+/g, '').toLowerCase();
-  const varLower = String(cfg.variableName || 'x').trim().toLowerCase();
-
-  // Families 3/4: inner horizontal shift by c and outer vertical offset by d.
-  if (rawExpr.includes('(' + varLower + '+c)') && /[+\-]d$/.test(rawExpr)) {
-    return { c, d };
-  }
-
-  return null;
+  const hit = detectShiftPair(cfg, params, 'c', 'd');
+  return hit ? { c: hit.inner, d: hit.outer } : null;
 }
 
 function detectPolyCoeffDrag(cfg: ScharCfg, params: string[]): { degreeToParam: Record<number, string>; maxDegree: number } | null {

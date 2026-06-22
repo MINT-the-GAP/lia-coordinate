@@ -2408,7 +2408,7 @@ function recognizeQuadraticFromStroke(state: RegressionState, stroke: DrawStroke
     { a: 0.1, b: 0, c: 0, d: fitted.d },
     { a: 0.1, b: 0.1, c: 0, d: 0, f: fitted.d }
   );
-  const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, 'quadratic');
+  const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, null, 'quadratic');
   return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
 }
 
@@ -2422,16 +2422,16 @@ function computeQuadraticRegression(state: RegressionState): boolean {
     { a: 0.1, b: 0, c: 0, d: fitted.d },
     { a: 0.1, b: 0.1, c: 0, d: 0, f: fitted.d }
   );
-  const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, 'quadratic');
+  const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, null, 'quadratic');
   return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, 'Regression', { classProbabilities, linkedModels });
 }
 
 function analyzeStrokeStructure(
   points: DrawPoint[],
-  quadraticFit: { a: number; c: number; d: number } | null,
-  linearFit: { m: number; n: number } | null,
-  cubicFit: { a: number; b: number; c: number; d: number } | null,
-  quarticFit: { a: number; b: number; c: number; d: number; f: number } | null,
+  quadraticFit: { a: number; c: number; d: number; error: number } | null,
+  linearFit: { m: number; n: number; error: number } | null,
+  cubicFit: { a: number; b: number; c: number; d: number; error: number } | null,
+  quarticFit: { a: number; b: number; c: number; d: number; f: number; error: number } | null,
   yMin: number,
   yMax: number,
   xMin: number,
@@ -3134,7 +3134,8 @@ function removeAllHyperbola2AnalysisOverlays(state: RegressionState): void { rem
 function relayoutAnalysisPanels(state: RegressionState): void {
   let nextTop = 8;
 
-  const allEntries: Array<LinearAnalysisEntry | QuadraticAnalysisEntry | CubicAnalysisEntry | QuarticAnalysisEntry | SinAnalysisEntry | ExpAnalysisEntry | LogAnalysisEntry | SqrtAnalysisEntry | HyperbolaAnalysisEntry> = state.analysisEntries
+  const allEntries: AnyAnalysisEntry[] = ([] as AnyAnalysisEntry[])
+    .concat(state.analysisEntries)
     .concat(state.quadraticAnalysisEntries)
     .concat(state.cubicAnalysisEntries)
     .concat(state.quarticAnalysisEntries)
@@ -3144,7 +3145,6 @@ function relayoutAnalysisPanels(state: RegressionState): void {
     .concat(state.sqrtAnalysisEntries)
     .concat(state.hyperbolaAnalysisEntries)
     .concat(state.hyperbola2AnalysisEntries)
-    .slice()
     .sort((a, b) => {
       const ai = Number(String(a.id).split('-').pop() || '0');
       const bi = Number(String(b.id).split('-').pop() || '0');
@@ -4927,10 +4927,6 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
         openQuarticAnalysisOverlay(state, linkedModels.quartic.a, linkedModels.quartic.b, linkedModels.quartic.c, linkedModels.quartic.d, linkedModels.quartic.f, entry.title, { classProbabilities, linkedModels });
         return;
       }
-      if (selected === 'sin') {
-        syncUiFromModel();
-        return;
-      }
       if (selected === 'exp') {
         openExpAnalysisOverlay(state, linkedModels.exp.A, linkedModels.exp.b, linkedModels.exp.c, linkedModels.exp.d, entry.title, { classProbabilities, linkedModels });
         return;
@@ -6384,10 +6380,6 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
     }
     if (selected === 'log') {
       openLogAnalysisOverlay(state, linkedModels.log.A, linkedModels.log.b, linkedModels.log.c, linkedModels.log.d, entry.title, { classProbabilities, linkedModels });
-      return;
-    }
-    if (selected === 'sqrt') {
-      openSqrtAnalysisOverlay(state, linkedModels.sqrt.A, linkedModels.sqrt.b, linkedModels.sqrt.c, linkedModels.sqrt.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
     if (selected === 'hyperbola') {
