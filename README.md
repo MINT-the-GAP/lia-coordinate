@@ -106,6 +106,13 @@ script:   ./dist/index.js
 <span id="area-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@angle: @Angle_(@uid,@0,en)
+@Winkel: @Angle_(@uid,@0,de)
+
+@Angle_
+<span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @PlotFunction: @PlotFunction_(@uid,@0)
 @PlotFunktion: @PlotFunction_(@uid,@0)
 
@@ -427,6 +434,47 @@ Parameters: `<boardId>;[<point1>;<point2>;...];<color>;<opacity>;inhalt=1;umfang
 @Point(`ex_area;D;0;3;#e63946;0`)
 
 @Flaeche(`ex_area;[A;B;C;D];#e63946;0.25;inhalt=1;umfang=1`)
+
+## `@angle` / `@Winkel`
+
+          --{{0}}--
+Draws the directed angle defined by three existing named points. The middle
+point is the vertex, so `[A;B;C]` means the counterclockwise angle from `BA` to
+`BC`. Reversing the outer points produces the complementary angle up to 360 degrees.
+The name and optional value use the selected color and opacity. Add exactly
+`Wert=1` or `value=1` to show the live angle measure rounded to two decimal
+places. `@Winkel` uses a decimal comma; `@angle` uses a decimal point. Common
+Greek names such as `alpha` may be written with or without the leading TeX
+backslash.
+
+Parameters: `<boardId>;<name>;[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1`
+
+``` markdown
+@CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
+
+@Point(`ex_angle;A;4;0`)
+@Point(`ex_angle;B;0;0`)
+@Point(`ex_angle;C;3;3`)
+
+@Winkel(`ex_angle;alpha;[A;B;C];#e63946;0.85;Wert=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
+
+@Point(`ex_angle;A;4;0;#e63946;0`)
+@Point(`ex_angle;B;0;0;#e63946;0`)
+@Point(`ex_angle;C;3;3;#e63946;0`)
+
+
+@Flaeche(`ex_angle;[A;B;C];#00ff00;0.15;inhalt=0;umfang=0`)
+
+@Winkel(`ex_angle;alpha;[C;A;B];#ff0000;0.95;Wert=1`)
+
+@Winkel(`ex_angle;beta;[A;B;C];#ff0000;0.95;Wert=1`)
+
+@Winkel(`ex_angle;gamma;[A;C;B];#ff0000;0.95;Wert=1`)
 
 ## `@PlotFunction`
 
@@ -843,6 +891,13 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @Area_
 <span id="area-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@angle: @Angle_(@uid,@0,en)
+@Winkel: @Angle_(@uid,@0,de)
+
+@Angle_
+<span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @PlotFunction: @PlotFunction_(@uid,@0)

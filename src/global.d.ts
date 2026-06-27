@@ -157,6 +157,15 @@ interface Window {
   __scheduleBootstrapAreas: (() => void) | undefined;
   renderAreaFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
+  // Angle subsystem (@angle / @Winkel)
+  __angleReady: boolean | undefined;
+  __angleEntries: Record<string, any>;
+  __angleRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapAngles: (() => void) | undefined;
+  __bootstrapAnglesRAF: number | undefined;
+  __scheduleBootstrapAngles: (() => void) | undefined;
+  renderAngleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
   // Schar subsystem (@Schar)
   __scharReady: boolean | undefined;
   __scharEntries: Record<string, any>;
