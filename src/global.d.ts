@@ -145,7 +145,16 @@ interface Window {
   __bootstrapDistances: (() => void) | undefined;
   __bootstrapDistancesRAF: number | undefined;
   __scheduleBootstrapDistances: (() => void) | undefined;
-  renderDistanceFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderDistanceFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
+  // Area subsystem (@Area / @Fläche)
+  __areaReady: boolean | undefined;
+  __areaEntries: Record<string, any>;
+  __areaRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapAreas: (() => void) | undefined;
+  __bootstrapAreasRAF: number | undefined;
+  __scheduleBootstrapAreas: (() => void) | undefined;
+  renderAreaFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
   // Schar subsystem (@Schar)
   __scharReady: boolean | undefined;

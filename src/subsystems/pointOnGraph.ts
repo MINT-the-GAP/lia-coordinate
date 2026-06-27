@@ -274,6 +274,7 @@ export function init(): void {
       ensureBuckets(boardId);
       window.__points[boardId][name] = pt;
       if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances();
+      if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas();
 
       applyPointVisual(pt, pCol);
       stylePointLabel(pt);

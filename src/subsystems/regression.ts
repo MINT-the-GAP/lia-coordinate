@@ -1327,6 +1327,7 @@ function createAutoPoint(state: RegressionState, x: number, y: number, key?: str
     ensurePointBuckets(state.boardId);
     window.__points[state.boardId][pointKey] = pt;
     if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances();
+    if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas();
   } catch (e) {
     return null;
   }
@@ -1364,6 +1365,7 @@ function removeAutoPoint(state: RegressionState, key: string): AutoPointData | n
     }
     delete window.__points[state.boardId][pointKey];
     if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances();
+    if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas();
   } catch (e) {}
 
   state.autoCreatedPointsData = state.autoCreatedPointsData.filter((p) => p.key !== pointKey);
