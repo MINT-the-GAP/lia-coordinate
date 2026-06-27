@@ -663,22 +663,28 @@ export interface BoardConfig {
   ymax: number;
   width: number | null;
   id: string;
+  axes: boolean;
+  grid: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // JSXGraph object creation — called with a live board reference
 // ---------------------------------------------------------------------------
 
-export function buildStickyAxes(board: any, axisCol: string): void {
+export function buildStickyAxes(board: any, axisCol: string, visible = true): void {
   const tickBase = {
     insertTicks: false,
     ticksDistance: 1,
     strokeWidth: 1.75,
+    majorHeight: 10,
+    minorHeight: 4,
     minorTicks: 1,
-    drawLabels: true
+    drawLabels: visible,
+    visible: visible
   };
 
   const xAxis = board.create('axis', [[0, 0], [1, 0]], {
+    visible: visible,
     strokeColor: axisCol, highlightStrokeColor: axisCol, strokeWidth: 2.5,
     name: '', withLabel: false, fixed: true,
     position: 'sticky', anchor: 'left right', anchorDist: '24px', ticksAutoPos: false,
@@ -686,6 +692,7 @@ export function buildStickyAxes(board: any, axisCol: string): void {
   });
 
   const yAxis = board.create('axis', [[0, 0], [0, 1]], {
+    visible: visible,
     strokeColor: axisCol, highlightStrokeColor: axisCol, strokeWidth: 2.5,
     name: '', withLabel: false, fixed: true,
     position: 'sticky', anchor: 'left right', anchorDist: '24px', ticksAutoPos: false,
@@ -696,11 +703,27 @@ export function buildStickyAxes(board: any, axisCol: string): void {
 }
 
 export function createGrid(board: any, gridCol: string): void {
-  board.create('grid', [board.defaultAxes.x, board.defaultAxes.y], {
+  const parents = board && board.defaultAxes && board.defaultAxes.x && board.defaultAxes.y
+    ? [board.defaultAxes.x, board.defaultAxes.y]
+    : [];
+
+  board.create('grid', parents, {
     majorStep: 'auto', minorElements: 'auto', includeBoundaries: true, forceSquare: true,
     major: { face: 'line', strokeColor: gridCol, strokeWidth: 0.5, dash: 0, drawZero: true  },
     minor: { face: 'line', strokeColor: gridCol, strokeWidth: 1.5, dash: 1, drawZero: false }
   });
+}
+
+export function createBoardDecorations(
+  board: any,
+  cfg: BoardConfig,
+  axisCol: string,
+  gridCol: string
+): void {
+  // An auto-spaced grid needs axis ticks as its metric. In grid-only mode the
+  // same axes are created as invisible parents, preserving the normal spacing.
+  if (cfg.axes || cfg.grid) buildStickyAxes(board, axisCol, cfg.axes);
+  if (cfg.grid) createGrid(board, gridCol);
 }
 
 /**
@@ -715,10 +738,12 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   function applyAll(): void {
     applyBoardFrame(board);
     applyNavColors(board);
-    applyGridColor(board, getAccentColor());
-    applyAxisColors(board);
-    applyAdaptiveTicks(board);
-    updateStickyTickLabelPositions(board);
+    if (cfg.grid) applyGridColor(board, getAccentColor());
+    if (cfg.axes) {
+      applyAxisColors(board);
+      applyAdaptiveTicks(board);
+      updateStickyTickLabelPositions(board);
+    }
     ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
     runExternalBootstraps();
   }
@@ -786,9 +811,11 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       } catch (e) {}
 
       try {
-        applyAdaptiveTicks(board);
-        applyAxisColors(board);
-        updateStickyTickLabelPositions(board);
+        if (cfg.axes) {
+          applyAdaptiveTicks(board);
+          applyAxisColors(board);
+          updateStickyTickLabelPositions(board);
+        }
         ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
 
         // Keep pan/zoom lightweight: avoid full DOM bootstrap scans on each move.
@@ -806,6 +833,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   // Theme color polling (accent color for grid).
   let lastGridColor = '';
   setInterval(function() {
+    if (!cfg.grid) return;
     const c = getAccentColor();
     if (!c || c === lastGridColor) return;
     lastGridColor = c;
@@ -820,10 +848,15 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 export function parseCoordSpec(spec: string): BoardConfig {
   const raw = unquoteLocal(String(spec || '').trim());
   const obj: Record<string, string> = {};
+  const positional: string[] = [];
 
   splitTopLevelLocal(raw).forEach(part => {
     const eq = part.indexOf('=');
-    if (eq < 0) return;
+    if (eq < 0) {
+      const value = unquoteLocal(part).trim();
+      if (value) positional.push(value);
+      return;
+    }
     const key = part.slice(0, eq).trim().toLowerCase();
     const val = unquoteLocal(part.slice(eq + 1).trim());
     obj[key] = val;
@@ -835,8 +868,20 @@ export function parseCoordSpec(spec: string): BoardConfig {
     ymin:  toNum(obj.ymin, -3),
     ymax:  toNum(obj.ymax,  3),
     width: null,
-    id:    obj.id != null ? obj.id : 'A1'
+    id:    obj.id != null ? obj.id : 'A1',
+    axes:  true,
+    grid:  true
   };
+
+  function flag(value: string | undefined, fallback: boolean): boolean {
+    const normalized = String(value == null ? '' : value).trim().toLowerCase();
+    if (normalized === '0' || normalized === 'false' || normalized === 'nein' || normalized === 'no' || normalized === 'off') return false;
+    if (normalized === '1' || normalized === 'true' || normalized === 'ja' || normalized === 'yes' || normalized === 'on') return true;
+    return fallback;
+  }
+
+  cfg.axes = flag(obj.achsen != null ? obj.achsen : (obj.axes != null ? obj.axes : positional[0]), true);
+  cfg.grid = flag(obj.grid != null ? obj.grid : positional[1], true);
 
   if (!(cfg.xmax > cfg.xmin)) cfg.xmax = cfg.xmin + 1;
   if (!(cfg.ymax > cfg.ymin)) cfg.ymax = cfg.ymin + 1;

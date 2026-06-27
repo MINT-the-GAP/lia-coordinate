@@ -57,26 +57,45 @@ export function init(): void {
 
   function getPointTargetFromSpec(spec) {
     const parts = splitSpec(spec);
+    const colorToken = String(parts[4] || '').trim();
+    const hasExplicitColor = !!colorToken && !parseFixToken(colorToken);
+    const opacityToken = String(parts[5] || '').trim();
+    const parsedOpacity = parseFloat(opacityToken.replace(',', '.'));
 
     return {
       boardId: parts[0] || '',
       name: parts[1] || 'A',
       tx: parseFloat((parts[2] || '').replace(',', '.')),
       ty: parseFloat((parts[3] || '').replace(',', '.')),
-      fixed: parseFixToken(parts[4] || '')
+      color: hasExplicitColor ? colorToken : '#ff00ff',
+      hasExplicitColor: hasExplicitColor,
+      opacity: Number.isFinite(parsedOpacity)
+        ? Math.max(0, Math.min(1, parsedOpacity))
+        : 1,
+      fixed: parts.slice(4).some(parseFixToken)
     };
   }
 
   function stylePointLabel(pt) {
     if (!pt || typeof pt.setAttribute !== 'function') return;
 
-    const c = getNeutralColor();
+    const visual = pt.__liaPointVisual || null;
+    const c = visual && visual.hasExplicitColor
+      ? String(visual.color || '#ff00ff')
+      : getNeutralColor();
+    const opacity = visual && Number.isFinite(Number(visual.opacity))
+      ? Math.max(0, Math.min(1, Number(visual.opacity)))
+      : 1;
 
     try {
       pt.setAttribute({
         label: {
           strokeColor: c,
           fillColor: c,
+          strokeOpacity: opacity,
+          fillOpacity: opacity,
+          highlightStrokeOpacity: opacity,
+          highlightFillOpacity: opacity,
           fontSize: 24,
           parse: false,
           useMathJax: true
@@ -89,12 +108,52 @@ export function init(): void {
         pt.label.setAttribute({
           strokeColor: c,
           fillColor: c,
+          strokeOpacity: opacity,
+          fillOpacity: opacity,
+          highlightStrokeOpacity: opacity,
+          highlightFillOpacity: opacity,
           fontSize: 24,
           parse: false,
           useMathJax: true
         });
       }
     } catch (e) {}
+
+    try {
+      if (pt.label && pt.label.rendNode && pt.label.rendNode.style) {
+        pt.label.rendNode.style.opacity = String(opacity);
+      }
+    } catch (e) {}
+  }
+
+  function applyStaticPointVisual(pt, target) {
+    if (!pt || typeof pt.setAttribute !== 'function') return;
+
+    const color = String(target.color || '#ff00ff').trim() || '#ff00ff';
+    const opacity = Number.isFinite(Number(target.opacity))
+      ? Math.max(0, Math.min(1, Number(target.opacity)))
+      : 1;
+
+    pt.__liaPointVisual = {
+      color: color,
+      opacity: opacity,
+      hasExplicitColor: !!target.hasExplicitColor
+    };
+
+    try {
+      pt.setAttribute({
+        strokeColor: color,
+        fillColor: color,
+        highlightStrokeColor: color,
+        highlightFillColor: color,
+        strokeOpacity: opacity,
+        fillOpacity: opacity,
+        highlightStrokeOpacity: opacity,
+        highlightFillOpacity: opacity
+      });
+    } catch (e) {}
+
+    stylePointLabel(pt);
   }
 
   function refreshAllPointLabels() {
@@ -372,7 +431,7 @@ export function init(): void {
       pt.setAttribute({ fixed: isFixed });
     } catch (e) {}
 
-    stylePointLabel(pt);
+    applyStaticPointVisual(pt, target);
     bindPointPersistence(boardId, name, pt);
     savePointState(boardId, name, pt);
 

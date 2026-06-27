@@ -36,15 +36,14 @@ script:   ./dist/index.js
 
     // board.create() calls must be inline — jxgbox is only available in this fence.
     const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, showNavigation: false, showCopyright: false,
+      axis: false, grid: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
       zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
       pan:  { enabled: true, needShift: false, needTwoFingers: false }
     });
 
-    C.buildStickyAxes(board, C.getNeutralColor());
-    C.createGrid(board, C.getAccentColor());
+    C.createBoardDecorations(board, cfg, C.getNeutralColor(), C.getAccentColor());
 
     // Wire all hooks, event listeners, and sizing logic.
     C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
@@ -272,9 +271,15 @@ Parameters (semicolon-separated key=value pairs):
 - `xmin`, `xmax`, `ymin`, `ymax` — axis bounds (defaults: -4, 4, -3, 3)
 - `width` — initial width in pixels
 - `id` — board identifier used to connect other macros to this board
+- final positional flags `axes;grid` — `0` hides and `1` shows each element
+  (when omitted, both remain visible)
+
+The four combinations are `0;0` (neither), `0;1` (grid only), `1;0`
+(axes only), and `1;1` (both). Named forms such as `achsen=0;grid=1` are
+also accepted.
 
 ``` markdown
-@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1;1;1`)
 ```
 
 ---
@@ -334,8 +339,12 @@ Drag point $A$ to the coordinates $(2 | 3)$.
 ## `@Point`
 
           --{{0}}--
-Places a pre-defined point on the board. Add `fix` as a fifth parameter to make it immovable.
-Useful for showing given points in a task without requiring student interaction.
+Places a pre-defined point on the board. Color and opacity apply to both the
+X marker and its label. Opacity is clamped to `0` through `1`; add `fix` to make
+the point immovable. The legacy form with `fix` directly after the coordinates
+remains supported.
+
+Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point`)
@@ -343,7 +352,7 @@ Useful for showing given points in a task without requiring student interaction.
 @AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
 @Point(`ex_point;A;2;3`)
-@Point(`ex_point;B;-3;-1;fix`)
+@Point(`ex_point;B;-3;-1;#e63946;0.65;fix`)
 ```
 
 ---
@@ -353,7 +362,7 @@ Useful for showing given points in a task without requiring student interaction.
 @AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
 @Point(`ex_point;A;2;3`)
-@Point(`ex_point;B;-3;-1;fix`)
+@Point(`ex_point;B;-3;-1;#e63946;0.65;fix`)
 
 ## `@Strecke` / `@distance`
 
@@ -410,12 +419,12 @@ Parameters: `<boardId>;[<point1>;<point2>;...];<color>;<opacity>;inhalt=1;umfang
 
 ---
 
-@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area`)
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area;1;0`)
 
-@Point(`ex_area;A;0;0`)
-@Point(`ex_area;B;4;0`)
-@Point(`ex_area;C;4;3`)
-@Point(`ex_area;D;0;3`)
+@Point(`ex_area;A;0;0;#e63946;0`)
+@Point(`ex_area;B;4;0;#e63946;0`)
+@Point(`ex_area;C;4;3;#e63946;0`)
+@Point(`ex_area;D;0;3;#e63946;0`)
 
 @Flaeche(`ex_area;[A;B;C;D];#e63946;0.25;inhalt=1;umfang=1`)
 
@@ -770,15 +779,14 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
     try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
 
     const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, showNavigation: false, showCopyright: false,
+      axis: false, grid: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
       zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
       pan:  { enabled: true, needShift: false, needTwoFingers: false }
     });
 
-    C.buildStickyAxes(board, C.getNeutralColor());
-    C.createGrid(board, C.getAccentColor());
+    C.createBoardDecorations(board, cfg, C.getNeutralColor(), C.getAccentColor());
     C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
   }
 

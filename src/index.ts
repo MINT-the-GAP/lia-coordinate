@@ -36,6 +36,7 @@ import {
   runExternalBootstraps,
   buildStickyAxes,
   createGrid,
+  createBoardDecorations,
   wireBoard,
 } from './coord/boardHelpers';
 import { getNeutralColor, getAccentColor } from './shared/theme';
@@ -65,6 +66,7 @@ window.__coord = {
   runExternalBootstraps,
   buildStickyAxes,
   createGrid,
+  createBoardDecorations,
   wireBoard,
   getNeutralColor,
   getAccentColor,

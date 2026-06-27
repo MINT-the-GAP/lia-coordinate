@@ -37,8 +37,9 @@ interface Window {
     updateStickyTickLabelPositions: (board: any) => void;
     ensureResizeHandle: (board: any, initialBBox: number[], boardId: string, onResize: () => void) => void;
     runExternalBootstraps: () => void;
-    buildStickyAxes: (board: any, axisCol: string) => void;
+    buildStickyAxes: (board: any, axisCol: string, visible?: boolean) => void;
     createGrid: (board: any, gridCol: string) => void;
+    createBoardDecorations: (board: any, cfg: any, axisCol: string, gridCol: string) => void;
     wireBoard: (board: any, cfg: any, initialBBox: number[], initialRatio: number) => void;
     getAccentColor: () => string;
     getNeutralColor: () => string;
