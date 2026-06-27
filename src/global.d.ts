@@ -166,6 +166,15 @@ interface Window {
   __scheduleBootstrapAngles: (() => void) | undefined;
   renderAngleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
+  // Circle subsystem (@Circle / @Kreis)
+  __circleReady: boolean | undefined;
+  __circleEntries: Record<string, any>;
+  __circleRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapCircles: (() => void) | undefined;
+  __bootstrapCirclesRAF: number | undefined;
+  __scheduleBootstrapCircles: (() => void) | undefined;
+  renderCircleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
   // Schar subsystem (@Schar)
   __scharReady: boolean | undefined;
   __scharEntries: Record<string, any>;

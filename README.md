@@ -113,6 +113,13 @@ script:   ./dist/index.js
 <span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@Circle: @Circle_(@uid,@0,en)
+@Kreis: @Circle_(@uid,@0,de)
+
+@Circle_
+<span id="circle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @PlotFunction: @PlotFunction_(@uid,@0)
 @PlotFunktion: @PlotFunction_(@uid,@0)
 
@@ -461,7 +468,7 @@ Parameters: `<boardId>;<name>;[<point1>;<vertex>;<point3>];<color>;<opacity>;Wer
 
 ---
 
-@CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
+@CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle;0;0`)
 
 @Point(`ex_angle;A;4;0;#e63946;0`)
 @Point(`ex_angle;B;0;0;#e63946;0`)
@@ -475,6 +482,43 @@ Parameters: `<boardId>;<name>;[<point1>;<vertex>;<point3>];<color>;<opacity>;Wer
 @Winkel(`ex_angle;beta;[A;B;C];#ff0000;0.95;Wert=1`)
 
 @Winkel(`ex_angle;gamma;[A;C;B];#ff0000;0.95;Wert=1`)
+
+## `@Circle` / `@Kreis`
+
+          --{{0}}--
+Creates a circle around an existing named point. `radius=<number>` sets a fixed
+radius and defaults to `1`; decimal commas are accepted. With `radius=P`, the
+named point `P` lies on the circumference and moving either point updates the
+circle. The fill opacity is clamped from `0` to `1`, while the outline and circle name remain clearly
+visible. Add `inhalt=1` and/or `umfang=1` to display live measurements at the
+center, rounded to three decimal places. German output uses `FE` and `LE`;
+English output uses `AU` and `LU`. The aliases `area=1`, `circumference=1`, and
+`perimeter=1` are also accepted.
+
+Parameters: `<boardId>;<name>;<centerPoint>;<color>;<opacity>;radius=<number|point>;inhalt=1;umfang=1`
+
+``` markdown
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_circle`)
+
+@Point(`ex_circle;M;0;0`)
+@Point(`ex_circle;P;2;0`)
+
+@Kreis(`ex_circle;k;M;#e63946;0.2;radius=P;inhalt=1;umfang=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_circle;0;1`)
+
+@Point(`ex_circle;M;-1;0`)
+@Point(`ex_circle;N;2;2`)
+@Point(`ex_circle;P;1;0`)
+
+@Kreis(`ex_circle;k_2;M;#e63946;0.2;radius=P;inhalt=1;umfang=1`)
+
+@Kreis(`ex_circle;k_1;N;#00ff00;0.2;radius=1;inhalt=1;umfang=1`)
+
+
 
 ## `@PlotFunction`
 
@@ -898,6 +942,13 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @Angle_
 <span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@Circle: @Circle_(@uid,@0,en)
+@Kreis: @Circle_(@uid,@0,de)
+
+@Circle_
+<span id="circle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @PlotFunction: @PlotFunction_(@uid,@0)
