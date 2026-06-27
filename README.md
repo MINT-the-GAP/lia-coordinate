@@ -93,6 +93,13 @@ script:   ./dist/index.js
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
+@Strecke: @Distance_(@uid,@0)
+@distance: @Distance_(@uid,@0)
+
+@Distance_
+<span id="distance-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
 @PlotFunction: @PlotFunction_(@uid,@0)
 @PlotFunktion: @PlotFunction_(@uid,@0)
 
@@ -340,6 +347,33 @@ Useful for showing given points in a task without requiring student interaction.
 
 @Point(`ex_point;A;2;3`)
 @Point(`ex_point;B;-3;-1;fix`)
+
+## `@Strecke` / `@distance`
+
+          --{{0}}--
+Connects two existing named points with a segment. The segment remains attached
+when either point is moved. Point names are case-sensitive; the color is optional
+and defaults to the current theme accent color.
+
+Parameters: `<boardId>;<pointName1>;<pointName2>;<color>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
+
+@Point(`ex_distance;A;-2;-1`)
+@Point(`ex_distance;B;3;2`)
+
+@Strecke(`ex_distance;A;B;#e63946`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
+
+@Point(`ex_distance;A;-2;-1`)
+@Point(`ex_distance;B;3;2`)
+
+@Strecke(`ex_distance;A;B;#e63946`)
 
 ## `@PlotFunction`
 
@@ -743,6 +777,13 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @Point_
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Strecke: @Distance_(@uid,@0)
+@distance: @Distance_(@uid,@0)
+
+@Distance_
+<span id="distance-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @PlotFunction: @PlotFunction_(@uid,@0)

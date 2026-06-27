@@ -593,6 +593,8 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapCreatePoints);
   call(window.__bootstrapStaticPoints);
   call(window.__bootstrapPointOnGraphs);
+  call(window.__bootstrapPointsOnGraph);
+  call(window.__bootstrapDistances);
   call(window.__bootstrapRekonstruktion);
 }
 

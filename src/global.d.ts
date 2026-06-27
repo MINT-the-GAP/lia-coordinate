@@ -138,6 +138,15 @@ interface Window {
   showGraphFromPointsOnGraphSpec: ((spec: string) => void) | undefined;
   renderPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
+  // Segment subsystem (@Strecke / @distance)
+  __distanceReady: boolean | undefined;
+  __distanceEntries: Record<string, any>;
+  __distanceRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapDistances: (() => void) | undefined;
+  __bootstrapDistancesRAF: number | undefined;
+  __scheduleBootstrapDistances: (() => void) | undefined;
+  renderDistanceFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
   // Schar subsystem (@Schar)
   __scharReady: boolean | undefined;
   __scharEntries: Record<string, any>;
