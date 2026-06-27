@@ -525,7 +525,7 @@ export function init(): void {
     const text = String(targetBtn.textContent || targetBtn.value || '').trim().toLowerCase();
 
     if (idx >= 1) return true;
-    if (/solution|show/.test(text)) return true;
+    if (/solution|show|loesung|losung|anzeig|zeigen/.test(text)) return true;
 
     return false;
   }
@@ -651,7 +651,7 @@ export function init(): void {
       btn.id = 'btn-' + uid;
       btn.className = 'lia-btn';
       btn.type = 'button';
-      btn.textContent = 'Place point';
+      btn.textContent = 'Punkt setzen';
       taskRoot.appendChild(btn);
     }
 

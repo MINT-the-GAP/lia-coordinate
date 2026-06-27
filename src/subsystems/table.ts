@@ -232,7 +232,7 @@ function updatePointButtonState(uid, colIndex, btn) {
 
   btn.disabled = !ready;
   btn.style.opacity = ready ? '' : '0.55';
-  btn.title = ready ? '' : 'Please enter numeric values for x and f(x) first.';
+  btn.title = ready ? '' : 'Bitte zuerst numerische Werte fuer x und f(x) eintragen.';
 }
 
 function refreshPointButtons(uid) {
@@ -255,7 +255,7 @@ function buildPointButton(uid, colIndex, state) {
   btn.dataset.colIndex = String(colIndex);
 
   const pointName = getPointName(state.pointPrefix, colIndex);
-  btn.innerHTML = 'Place&nbsp;' + normalizeLabelMath(pointName, false);
+  btn.innerHTML = 'Punkt&nbsp;' + normalizeLabelMath(pointName, false) + '&nbsp;setzen';
 
   btn.addEventListener('click', function() {
     const st = window.__tableStates[uid];

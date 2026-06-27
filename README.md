@@ -11,6 +11,7 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 script:   ./dist/index.js
 
 @CoordinateSystem: @CoordinateSystem_(@0)
+@Koordinatensystem: @CoordinateSystem_(@0)
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
@@ -61,12 +62,14 @@ script:   ./dist/index.js
 @end
 
 @AxisLabel: @AxisLabel_(@uid,@0)
+@AchsenBeschriftung: @AxisLabel_(@uid,@0)
 
 @AxisLabel_
 <span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @CreatePoint: @CreatePoint_(@uid,@0,@1)
+@ErzeugePunkt: @CreatePoint_(@uid,@0,@1)
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
@@ -84,18 +87,21 @@ script:   ./dist/index.js
 @end
 
 @Point: @Point_(@uid,@0)
+@Punkt: @Point_(@uid,@0)
 
 @Point_
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @PlotFunction: @PlotFunction_(@uid,@0)
+@PlotFunktion: @PlotFunction_(@uid,@0)
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @PlotInput: @PlotInput_(@uid,@0)
+@PlotEingabeLatex: @PlotInput_(@uid,@0)
 
 @PlotInput_
 <div id="lia-plot-input-@0" data-spec="@1"></div>
@@ -158,6 +164,7 @@ script:   ./dist/index.js
 @end
 
 @PointOnGraph: @PointOnGraph_(@uid,@0)
+@PunktGraph: @PointOnGraph_(@uid,@0)
 
 @PointOnGraph_
 <div id="graph-ui-@0">
@@ -174,6 +181,7 @@ script:   ./dist/index.js
 @end
 
 @PointsOnGraph: @PointsOnGraph_(@uid,@0)
+@PunkteAufGraph: @PointsOnGraph_(@uid,@0)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
@@ -190,12 +198,15 @@ script:   ./dist/index.js
 @end
 
 @Table: @Table_(@uid,@0)
+@Tabelle: @Table_(@uid,@0)
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
 @end
 
 @Regression: @Regression_(@uid,@0)
+@Regession: @Regression_(@uid,@0)
+@PlotZeichnen: @Regression_(@uid,@0)
 
 @Regression_
 <span id="regression-ui-@0" data-spec="@1" style="display:none;"></span>
@@ -658,6 +669,7 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/index.js
 
 @CoordinateSystem: @CoordinateSystem_(@0)
+@Koordinatensystem: @CoordinateSystem_(@0)
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
@@ -703,12 +715,14 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @AxisLabel: @AxisLabel_(@uid,@0)
+@AchsenBeschriftung: @AxisLabel_(@uid,@0)
 
 @AxisLabel_
 <span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @CreatePoint: @CreatePoint_(@uid,@0,@1)
+@ErzeugePunkt: @CreatePoint_(@uid,@0,@1)
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
@@ -725,18 +739,21 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @Point: @Point_(@uid,@0)
+@Punkt: @Point_(@uid,@0)
 
 @Point_
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @PlotFunction: @PlotFunction_(@uid,@0)
+@PlotFunktion: @PlotFunction_(@uid,@0)
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 @PlotInput: @PlotInput_(@uid,@0)
+@PlotEingabeLatex: @PlotInput_(@uid,@0)
 
 @PlotInput_
 <div id="lia-plot-input-@0" data-spec="@1"></div>
@@ -799,6 +816,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @PointOnGraph: @PointOnGraph_(@uid,@0)
+@PunktGraph: @PointOnGraph_(@uid,@0)
 
 @PointOnGraph_
 <div id="graph-ui-@0">
@@ -814,6 +832,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @PointsOnGraph: @PointsOnGraph_(@uid,@0)
+@PunkteAufGraph: @PointsOnGraph_(@uid,@0)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
@@ -829,6 +848,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 @end
 
 @Table: @Table_(@uid,@0)
+@Tabelle: @Table_(@uid,@0)
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
