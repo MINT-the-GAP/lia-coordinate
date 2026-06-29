@@ -3135,8 +3135,26 @@ function removeAllSqrtAnalysisOverlays(state: RegressionState): void { removeAll
 function removeAllHyperbolaAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbolaAnalysisEntries'); }
 function removeAllHyperbola2AnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbola2AnalysisEntries'); }
 
+function analysisPanelsStartTop(state: RegressionState): number {
+  const dgsMenu = state.boardContainer.querySelector<HTMLElement>('.lia-dgs-top-menu');
+  if (!dgsMenu) return 8;
+
+  const fallbackTop = 120;
+  try {
+    const boardRect = state.boardContainer.getBoundingClientRect();
+    const controlsBottom = Math.max(
+      state.undoButton.getBoundingClientRect().bottom,
+      state.redoButton.getBoundingClientRect().bottom
+    );
+    const anchoredTop = Math.ceil(controlsBottom - boardRect.top) + 8;
+    return Number.isFinite(anchoredTop) ? Math.max(fallbackTop, anchoredTop) : fallbackTop;
+  } catch (e) {
+    return fallbackTop;
+  }
+}
+
 function relayoutAnalysisPanels(state: RegressionState): void {
-  let nextTop = 8;
+  let nextTop = analysisPanelsStartTop(state);
 
   const allEntries: AnyAnalysisEntry[] = ([] as AnyAnalysisEntry[])
     .concat(state.analysisEntries)
@@ -7479,35 +7497,66 @@ function applyLayout(state: RegressionState): void {
   const tone = neutralColor();
   const menuFill = tone === '#fff' ? 'rgba(0,0,0,.82)' : 'rgba(255,255,255,.94)';
   const menuBorder = tone === '#fff' ? 'rgba(255,255,255,.62)' : 'rgba(0,0,0,.46)';
+  const dgsMenu = state.boardContainer.querySelector<HTMLElement>('.lia-dgs-top-menu');
+  const usesDgsLayout = !!dgsMenu;
+  const dgsDivider = dgsMenu && dgsMenu.querySelector<HTMLElement>('.lia-dgs-regression-divider');
+  if (dgsDivider) dgsDivider.dataset.visible = '1';
+
+  if (usesDgsLayout) {
+    const dgsMenuOpen = dgsMenu!.dataset.open === '1';
+    [state.drawButton, state.eraseButton, state.toolsButton].forEach((button) => {
+      if (button.parentElement !== dgsMenu) dgsMenu!.appendChild(button);
+      button.tabIndex = dgsMenuOpen ? 0 : -1;
+    });
+  } else {
+    [state.drawButton, state.eraseButton, state.toolsButton].forEach((button) => {
+      if (button.parentElement !== state.boardContainer) state.boardContainer.appendChild(button);
+      button.tabIndex = 0;
+    });
+  }
+
+  [state.undoButton, state.redoButton, state.drawColorMenu, state.toolsMenu].forEach((element) => {
+    if (element.parentElement !== state.boardContainer) state.boardContainer.appendChild(element);
+  });
 
   state.undoButton.style.position = 'absolute';
   state.undoButton.style.left = '10px';
-  state.undoButton.style.bottom = '10px';
+  state.undoButton.style.top = usesDgsLayout ? '48px' : 'auto';
+  state.undoButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
+  state.undoButton.style.zIndex = usesDgsLayout ? '50' : '';
   state.undoButton.style.color = tone;
 
   state.redoButton.style.position = 'absolute';
-  state.redoButton.style.left = '46px';
-  state.redoButton.style.bottom = '10px';
+  state.redoButton.style.left = usesDgsLayout ? '10px' : '46px';
+  state.redoButton.style.top = usesDgsLayout ? '84px' : 'auto';
+  state.redoButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
+  state.redoButton.style.zIndex = usesDgsLayout ? '50' : '';
   state.redoButton.style.color = tone;
 
   state.drawButton.style.position = 'absolute';
-  state.drawButton.style.left = '82px';
-  state.drawButton.style.bottom = '10px';
+  state.drawButton.style.left = usesDgsLayout ? '134px' : '82px';
+  state.drawButton.style.top = usesDgsLayout ? '10px' : 'auto';
+  state.drawButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.drawButton.style.color = tone;
   state.drawButton.style.setProperty('--draw-color', state.drawColor);
 
   state.eraseButton.style.position = 'absolute';
-  state.eraseButton.style.left = '118px';
-  state.eraseButton.style.bottom = '10px';
+  state.eraseButton.style.left = usesDgsLayout ? '170px' : '118px';
+  state.eraseButton.style.top = usesDgsLayout ? '10px' : 'auto';
+  state.eraseButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.eraseButton.style.color = tone;
 
   state.toolsButton.style.position = 'absolute';
-  state.toolsButton.style.left = '154px';
-  state.toolsButton.style.bottom = '10px';
+  state.toolsButton.style.left = usesDgsLayout ? '206px' : '154px';
+  state.toolsButton.style.top = usesDgsLayout ? '10px' : 'auto';
+  state.toolsButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsButton.style.color = tone;
 
-  state.drawColorMenu.style.left = '10px';
-  state.drawColorMenu.style.bottom = '56px';
+  const boardWidth = Math.max(0, state.boardContainer.clientWidth || 0);
+  const popupMaxLeft = Math.max(4, boardWidth - 196);
+  state.drawColorMenu.style.left = usesDgsLayout ? Math.min(134, popupMaxLeft) + 'px' : '10px';
+  state.drawColorMenu.style.top = usesDgsLayout ? '56px' : 'auto';
+  state.drawColorMenu.style.bottom = usesDgsLayout ? 'auto' : '56px';
   state.drawColorMenu.style.background = menuFill;
   state.drawColorMenu.style.color = tone;
   state.drawColorMenu.style.borderColor = menuBorder;
@@ -7515,8 +7564,9 @@ function applyLayout(state: RegressionState): void {
   state.drawColorMenu.style.borderWidth = '1px';
   state.drawColorMenu.style.boxShadow = '0 6px 18px rgba(0,0,0,.18)';
 
-  state.toolsMenu.style.left = '184px';
-  state.toolsMenu.style.bottom = '10px';
+  state.toolsMenu.style.left = usesDgsLayout ? Math.min(206, popupMaxLeft) + 'px' : '184px';
+  state.toolsMenu.style.top = usesDgsLayout ? '56px' : 'auto';
+  state.toolsMenu.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsMenu.style.background = menuFill;
   state.toolsMenu.style.color = tone;
   state.toolsMenu.style.borderColor = menuBorder;
@@ -7535,7 +7585,26 @@ function applyLayout(state: RegressionState): void {
 
   updateButtonStates(state);
   redrawCanvas(state);
+  relayoutAnalysisPanels(state);
 }
+
+window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boolean): void {
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    if (!state || state.boardId !== boardId) return;
+
+    if (dgsOpen === false) {
+      state.drawColorMenuOpen = false;
+      state.toolsMenuOpen = false;
+      state.activeTool = '';
+      state.regressionMode = '';
+      setMenuOpen(state.drawColorMenu, false);
+      setMenuOpen(state.toolsMenu, false);
+    }
+
+    applyLayout(state);
+  });
+};
 
 function setupRegressionUI(uid: string, boardId: string): void {
   if (!uid || !boardId) return;

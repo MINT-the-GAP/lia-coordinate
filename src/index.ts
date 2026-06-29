@@ -14,6 +14,7 @@ import { init as initSchar } from './subsystems/schar';
 import { init as initTable } from './subsystems/table';
 import { init as initReconstruction } from './subsystems/reconstruction';
 import { init as initRegression } from './subsystems/regression';
+import { init as initDGS } from './subsystems/dgs';
 import {
   parseCoordSpec,
   getSafeBBox,
@@ -103,3 +104,4 @@ initSchar();
 initTable();
 initReconstruction();
 initRegression();
+initDGS();

@@ -74,7 +74,7 @@ export function getConstrainedAncestorWidth(el: HTMLElement | null): number {
       const cs = window.getComputedStyle(node);
       if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
       const w = Math.round(node.getBoundingClientRect().width || 0);
-      return w > 250 ? w : 0;
+      return w > 1 ? w : 0;
     } catch (e) {
       return 0;
     }
@@ -120,19 +120,33 @@ export function getConstrainedAncestorWidth(el: HTMLElement | null): number {
     if (w) return w;
   } catch (e) {}
 
-  return 900;
+  try {
+    const bodyWidth = usableWidth(document.body);
+    if (bodyWidth) return bodyWidth;
+  } catch (e) {}
+
+  const viewportWidth = Math.round(
+    (document.documentElement && document.documentElement.clientWidth) ||
+    window.innerWidth ||
+    900
+  );
+  return Math.max(1, viewportWidth);
 }
 
 export function maxBoardHeight(): number {
-  return Math.min(Math.round(window.innerHeight * 0.82), 900);
+  return Math.max(1, Math.min(Math.round(window.innerHeight * 0.82), 900));
 }
 
 export function clampWidth(board: any, w: number): number {
-  return Math.max(260, Math.min(getConstrainedAncestorWidth(board.containerObj), w));
+  const maxWidth = Math.max(1, getConstrainedAncestorWidth(board.containerObj));
+  const desiredWidth = Number.isFinite(w) ? w : maxWidth;
+  return Math.max(1, Math.min(maxWidth, desiredWidth));
 }
 
 export function clampHeight(h: number): number {
-  return Math.max(220, Math.min(maxBoardHeight(), h));
+  const maxHeight = maxBoardHeight();
+  const desiredHeight = Number.isFinite(h) ? h : maxHeight;
+  return Math.max(1, Math.min(maxHeight, desiredHeight));
 }
 
 function roundPx(v: number): number {
@@ -144,30 +158,34 @@ export function solveAspectFittedSize(
   preferredWidth: number,
   ratio: number
 ): { width: number; height: number } {
-  const minW = 260;
-  const minH = 220;
-  const maxW = getConstrainedAncestorWidth(board.containerObj);
-  const maxH = maxBoardHeight();
-
+  const maxW = Math.max(1, getConstrainedAncestorWidth(board.containerObj));
+  const maxH = Math.max(1, maxBoardHeight());
   const safeRatio = Math.max(1e-9, ratio);
-
-  const lowerW = Math.max(minW, minH / safeRatio);
-  const upperW = Math.min(maxW, maxH / safeRatio);
-
-  let width: number;
-
-  if (upperW >= lowerW) {
-    width = Math.min(preferredWidth, upperW);
-    if (width < lowerW) width = lowerW;
-  } else {
-    width = Math.min(preferredWidth, maxW, maxH / safeRatio);
-    if (!(width > 0)) width = Math.min(maxW, preferredWidth, 600);
-    width = Math.max(1, width);
-  }
+  const requestedMax = Number.isFinite(preferredWidth) && preferredWidth > 0
+    ? preferredWidth
+    : maxW;
+  const width = Math.max(1, Math.min(requestedMax, maxW, maxH / safeRatio));
 
   return {
     width: roundPx(width),
     height: roundPx(width * safeRatio)
+  };
+}
+
+function fitDimensionsWithinBounds(
+  board: any,
+  preferredWidth: number,
+  preferredHeight: number
+): { width: number; height: number } {
+  const width = Math.max(1, Number(preferredWidth) || 1);
+  const height = Math.max(1, Number(preferredHeight) || 1);
+  const maxWidth = Math.max(1, getConstrainedAncestorWidth(board.containerObj));
+  const maxHeight = Math.max(1, maxBoardHeight());
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+
+  return {
+    width: roundPx(width * scale),
+    height: roundPx(height * scale)
   };
 }
 
@@ -498,8 +516,10 @@ export function ensureResizeHandle(
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
 
-    const mw = clampWidth(board, drag.startW + dx);
-    const mh = clampHeight(drag.startH + dy);
+    const minWidth = Math.min(260, drag.startW, getConstrainedAncestorWidth(board.containerObj));
+    const minHeight = Math.min(220, drag.startH, maxBoardHeight());
+    const mw = Math.max(minWidth, clampWidth(board, drag.startW + dx));
+    const mh = Math.max(minHeight, clampHeight(drag.startH + dy));
 
     // Store manual dimensions on the board so fitBoardSize can read them.
     board.__manualWidth  = mw;
@@ -540,12 +560,13 @@ export function fitBoardSize(
   const manualHeight = board.__manualHeight ?? null;
 
   if (manualWidth == null || manualHeight == null) {
-    const autoWidth = getConstrainedAncestorWidth(board.containerObj.parentElement);
+    const autoWidth = getConstrainedAncestorWidth(board.containerObj);
     const preferredWidth = initialWidth != null ? initialWidth : autoWidth;
     const size = solveAspectFittedSize(board, preferredWidth, initialRatio);
     applyBoardSize(board, size.width, size.height, true, initialBBox, initialBBox, boardId);
   } else {
-    applyBoardSize(board, manualWidth, manualHeight, false, getSafeBBox(board, initialBBox), initialBBox, boardId);
+    const size = fitDimensionsWithinBounds(board, manualWidth, manualHeight);
+    applyBoardSize(board, size.width, size.height, false, getSafeBBox(board, initialBBox), initialBBox, boardId);
   }
 }
 
@@ -562,8 +583,9 @@ export function restoreSavedBoardState(
   board.__manualWidth  = st.width;
   board.__manualHeight = st.height;
 
-  const width  = clampWidth(board, st.width);
-  const height = clampHeight(st.height);
+  const size = fitDimensionsWithinBounds(board, st.width, st.height);
+  const width = size.width;
+  const height = size.height;
 
   board.__restoreLockUntil = Date.now() + 500;
   board.containerObj.style.width  = width + 'px';
@@ -599,6 +621,7 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapAngles);
   call(window.__bootstrapCircles);
   call(window.__bootstrapRekonstruktion);
+  call(window.__bootstrapDGS);
 }
 
 // ---------------------------------------------------------------------------
@@ -788,16 +811,38 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     else if (mq && typeof (mq as any).addListener === 'function') (mq as any).addListener(handler);
   } catch (e) {}
 
-  // Window resize.
-  let resizeRAF = 0;
-  window.addEventListener('resize', function() {
-    if (resizeRAF) return;
-    resizeRAF = requestAnimationFrame(function() {
-      resizeRAF = 0;
+  // Keep the board inside the available content width. Besides real window
+  // resizes, this also covers layout changes such as sidebars or slide panels.
+  let layoutResizeRAF = 0;
+  let lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
+
+  function scheduleLayoutRefit(): void {
+    if (layoutResizeRAF) return;
+    layoutResizeRAF = requestAnimationFrame(function() {
+      layoutResizeRAF = 0;
+      lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
       fitBoardSize(board, initialBBox, cfg.width, initialRatio, cfg.id);
       applyAll();
     });
-  });
+  }
+
+  window.addEventListener('resize', scheduleLayoutRefit);
+
+  try {
+    if (board.__coordContentResizeObserver) board.__coordContentResizeObserver.disconnect();
+    const observedContainer = board.containerObj.parentElement;
+    if (observedContainer && typeof ResizeObserver === 'function') {
+      board.__coordContentResizeObserver = new ResizeObserver(function() {
+        const availableWidth = getConstrainedAncestorWidth(board.containerObj);
+        if (Math.abs(availableWidth - lastAvailableWidth) < 1) return;
+        lastAvailableWidth = availableWidth;
+        scheduleLayoutRefit();
+      });
+      board.__coordContentResizeObserver.observe(observedContainer);
+    }
+  } catch (e) {
+    board.__coordContentResizeObserver = null;
+  }
 
   // Bounding-box change (pan/zoom).
   let bboxRAF = 0;

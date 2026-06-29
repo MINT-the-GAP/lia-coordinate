@@ -28,8 +28,15 @@ script:   ./dist/index.js
     const presetState = C.loadStoredBoardState(cfg.id);
     if (presetState) {
       try {
-        jxgbox.style.width  = Math.round(presetState.width)  + 'px';
-        jxgbox.style.height = Math.round(presetState.height) + 'px';
+        const maxPresetWidth = C.getConstrainedAncestorWidth(jxgbox);
+        const maxPresetHeight = C.clampHeight(presetState.height);
+        const presetScale = Math.min(
+          1,
+          maxPresetWidth / presetState.width,
+          maxPresetHeight / presetState.height
+        );
+        jxgbox.style.width  = Math.round(presetState.width * presetScale)  + 'px';
+        jxgbox.style.height = Math.round(presetState.height * presetScale) + 'px';
       } catch (e) {}
     }
     try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
@@ -231,6 +238,20 @@ script:   ./dist/index.js
 <div id="lia-table-@0" data-spec="@1"></div>
 @end
 
+@DGS: @DGS_(@uid,@0)
+
+@DGS_
+<span id="dgs-ui-@0" data-spec="@1" style="display:none;"></span>
+
+<script modify="false">
+(function(){
+  if (typeof window.__setupDGS === 'function') {
+    window.__setupDGS('@0', '@1');
+  }
+})();
+</script>
+@end
+
 @Regression: @Regression_(@uid,@0)
 @Regession: @Regression_(@uid,@0)
 @PlotZeichnen: @Regression_(@uid,@0)
@@ -283,7 +304,8 @@ Renders an interactive JSXGraph coordinate plane. Supports panning, zooming, and
 
 Parameters (semicolon-separated key=value pairs):
 - `xmin`, `xmax`, `ymin`, `ymax` — axis bounds (defaults: -4, 4, -3, 3)
-- `width` — initial width in pixels
+- `width` — maximum initial width in pixels; on narrower screens the board
+  automatically scales down to the available content width
 - `id` — board identifier used to connect other macros to this board
 - final positional flags `axes;grid` — `0` hides and `1` shows each element
   (when omitted, both remain visible)
@@ -645,6 +667,42 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 @Table(`n=3;x;f;P;id=ex_tab`)
 
 
+## `@DGS`
+
+          --{{0}}--
+Adds a DGS menu button to the top-left corner of a coordinate board.
+Clicking the hamburger button slides a tool bar into the board from above.
+The point tool places freely movable points by clicking the coordinate board and names them
+alphabetically (`A` to `Z`, then `A'` to `Z'`, `A''`, and so on), skipping names already in use.
+The segment tool connects two successively selected points, labels the magenta segment with
+lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
+Right-clicking a DGS point or segment opens an object menu from the right. It can lock the
+object and independently show or hide its name and visual representation; an open top menu
+pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
+inline color palette with hue and hexadecimal controls recolors DGS points and segments.
+When `@Regression` targets the same board, its drawing tools appear inside this menu;
+undo and redo remain permanently stacked below the hamburger button.
+Regression analysis panels are stacked below these permanent controls.
+
+Parameters: `<boardId>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
+
+@DGS(`ex_dgs`)
+
+@Regression(`ex_dgs`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
+
+@DGS(`ex_dgs`)
+
+@Regression(`ex_dgs`)
+
+
 
 ## `@Regression`
 
@@ -864,8 +922,15 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
     const presetState = C.loadStoredBoardState(cfg.id);
     if (presetState) {
       try {
-        jxgbox.style.width  = Math.round(presetState.width)  + 'px';
-        jxgbox.style.height = Math.round(presetState.height) + 'px';
+        const maxPresetWidth = C.getConstrainedAncestorWidth(jxgbox);
+        const maxPresetHeight = C.clampHeight(presetState.height);
+        const presetScale = Math.min(
+          1,
+          maxPresetWidth / presetState.width,
+          maxPresetHeight / presetState.height
+        );
+        jxgbox.style.width  = Math.round(presetState.width * presetScale)  + 'px';
+        jxgbox.style.height = Math.round(presetState.height * presetScale) + 'px';
       } catch (e) {}
     }
     try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
