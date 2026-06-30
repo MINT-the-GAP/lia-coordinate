@@ -207,7 +207,7 @@ interface Window {
   // DGS subsystem (@DGS)
   __dgsReady: boolean | undefined;
   __bootstrapDGS: (() => void) | undefined;
-  __setupDGS: ((uid: string, spec: string) => void) | undefined;
+  __setupDGS: ((uid: string, spec: string, language?: string) => void) | undefined;
 
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;

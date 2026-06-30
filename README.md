@@ -238,15 +238,15 @@ script:   ./dist/index.js
 <div id="lia-table-@0" data-spec="@1"></div>
 @end
 
-@DGS: @DGS_(@uid,@0)
+@DGS: @DGS_(@uid,@0,@language)
 
 @DGS_
-<span id="dgs-ui-@0" data-spec="@1" style="display:none;"></span>
+<span id="dgs-ui-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 
 <script modify="false">
 (function(){
   if (typeof window.__setupDGS === 'function') {
-    window.__setupDGS('@0', '@1');
+    window.__setupDGS('@0', '@1', '@2');
   }
 })();
 </script>
@@ -676,12 +676,16 @@ The point tool places freely movable points by clicking the coordinate board and
 alphabetically (`A` to `Z`, then `A'` to `Z'`, `A''`, and so on), skipping names already in use.
 The segment tool connects two successively selected points, labels the magenta segment with
 lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
-Right-clicking a DGS point or segment opens an object menu from the right. It can lock the
+The polygon tool selects existing points in sequence. Selecting the first point again after at
+least three distinct points closes the sequence and creates a movable polygon (for example,
+`A → B → C → A` or `B → C → A → B`).
+Right-clicking a DGS point, segment, line, or polygon opens an object menu from the right. It can lock the
 object and independently show or hide its name and visual representation; an open top menu
 pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
 inline color palette with hue and hexadecimal controls recolors DGS points and segments.
-When `@Regression` targets the same board, its drawing tools appear inside this menu;
-undo and redo remain permanently stacked below the hamburger button.
+`@DGS` automatically adds the regression drawing tools to the same board;
+undo and redo remain permanently stacked below the hamburger button, so no additional
+`@Regression` macro is required.
 Regression analysis panels are stacked below these permanent controls.
 
 Parameters: `<boardId>`
@@ -690,8 +694,6 @@ Parameters: `<boardId>`
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
-
-@Regression(`ex_dgs`)
 ```
 
 ---
@@ -699,8 +701,6 @@ Parameters: `<boardId>`
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
-
-@Regression(`ex_dgs`)
 
 
 

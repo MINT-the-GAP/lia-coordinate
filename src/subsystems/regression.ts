@@ -221,7 +221,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       height: 28px;
       min-width: 28px;
       min-height: 28px;
-      border-radius: 999px;
+      border-radius: 7px;
       border: 2px solid currentColor;
       background: transparent;
       color: inherit;
@@ -7534,27 +7534,27 @@ function applyLayout(state: RegressionState): void {
   state.redoButton.style.color = tone;
 
   state.drawButton.style.position = 'absolute';
-  state.drawButton.style.left = usesDgsLayout ? '134px' : '82px';
+  state.drawButton.style.left = usesDgsLayout ? '170px' : '82px';
   state.drawButton.style.top = usesDgsLayout ? '10px' : 'auto';
   state.drawButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.drawButton.style.color = tone;
   state.drawButton.style.setProperty('--draw-color', state.drawColor);
 
   state.eraseButton.style.position = 'absolute';
-  state.eraseButton.style.left = usesDgsLayout ? '170px' : '118px';
+  state.eraseButton.style.left = usesDgsLayout ? '206px' : '118px';
   state.eraseButton.style.top = usesDgsLayout ? '10px' : 'auto';
   state.eraseButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.eraseButton.style.color = tone;
 
   state.toolsButton.style.position = 'absolute';
-  state.toolsButton.style.left = usesDgsLayout ? '206px' : '154px';
+  state.toolsButton.style.left = usesDgsLayout ? '242px' : '154px';
   state.toolsButton.style.top = usesDgsLayout ? '10px' : 'auto';
   state.toolsButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsButton.style.color = tone;
 
   const boardWidth = Math.max(0, state.boardContainer.clientWidth || 0);
   const popupMaxLeft = Math.max(4, boardWidth - 196);
-  state.drawColorMenu.style.left = usesDgsLayout ? Math.min(134, popupMaxLeft) + 'px' : '10px';
+  state.drawColorMenu.style.left = usesDgsLayout ? Math.min(170, popupMaxLeft) + 'px' : '10px';
   state.drawColorMenu.style.top = usesDgsLayout ? '56px' : 'auto';
   state.drawColorMenu.style.bottom = usesDgsLayout ? 'auto' : '56px';
   state.drawColorMenu.style.background = menuFill;
@@ -7564,7 +7564,7 @@ function applyLayout(state: RegressionState): void {
   state.drawColorMenu.style.borderWidth = '1px';
   state.drawColorMenu.style.boxShadow = '0 6px 18px rgba(0,0,0,.18)';
 
-  state.toolsMenu.style.left = usesDgsLayout ? Math.min(206, popupMaxLeft) + 'px' : '184px';
+  state.toolsMenu.style.left = usesDgsLayout ? Math.min(242, popupMaxLeft) + 'px' : '184px';
   state.toolsMenu.style.top = usesDgsLayout ? '56px' : 'auto';
   state.toolsMenu.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsMenu.style.background = menuFill;
@@ -7629,6 +7629,24 @@ function setupRegressionUI(uid: string, boardId: string): void {
   if (anchor) {
     anchor.style.display = 'none';
     anchor.setAttribute('aria-hidden', 'true');
+  }
+
+  // @DGS creates an automatic regression instance for its board. If an
+  // explicit @Regression macro targets the same board (or vice versa), keep
+  // the first live instance instead of rendering a duplicate toolbar.
+  const boardInstance = Object.keys(states)
+    .map((stateUid) => states[stateUid])
+    .find((state) =>
+      !!state &&
+      state.boardId === boardId &&
+      state.boardContainer === boardContainer &&
+      state.drawLayer?.isConnected &&
+      state.drawButton?.isConnected &&
+      state.toolsButton?.isConnected
+    );
+  if (boardInstance && boardInstance !== states[uid]) {
+    applyLayout(boardInstance);
+    return;
   }
 
   const rootNode = (boardContainer.getRootNode && boardContainer.getRootNode()) || document;
