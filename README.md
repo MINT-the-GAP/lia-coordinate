@@ -1,5 +1,5 @@
 <!--
-author:   MINT-the-GAP
+author:   MINT-the-GAP, Martin Lommatzsch, Jihad Hyadi
 version:  0.0.1
 language: en
 edit: true

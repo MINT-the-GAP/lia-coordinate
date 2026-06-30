@@ -6,6 +6,7 @@ import { unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 
 type DgsState = {
+  uid: string;
   boardId: string;
   language: 'de' | 'en';
   board: any;
@@ -47,6 +48,7 @@ type DgsState = {
   opacityValue: HTMLSpanElement;
   colorPopupOpen: boolean;
   activeColorKind: 'text' | 'line' | 'fill';
+  layerInput: HTMLInputElement;
   deleteButton: HTMLButtonElement;
   deleteArmed: boolean;
   colorHue: number;
@@ -56,9 +58,13 @@ type DgsState = {
   pointButton: HTMLButtonElement;
   segmentButton: HTMLButtonElement;
   polygonButton: HTMLButtonElement;
+  angleButton: HTMLButtonElement;
   geometrySubmenu: HTMLDivElement;
   segmentToolButton: HTMLButtonElement;
   lineToolButton: HTMLButtonElement;
+  shapeSubmenu: HTMLDivElement;
+  polygonToolButton: HTMLButtonElement;
+  circleToolButton: HTMLButtonElement;
   regressionDivider: HTMLSpanElement;
   xAxis: any;
   xAxisOriginalPoint2: number[] | null;
@@ -71,13 +77,20 @@ type DgsState = {
   axisSyncing: boolean;
   open: boolean;
   geometrySubmenuOpen: boolean;
+  shapeSubmenuOpen: boolean;
   sideMenuOpen: boolean;
   contextObject: any | null;
-  activeTool: '' | 'point' | 'segment' | 'line' | 'polygon';
+  activeTool: '' | 'point' | 'segment' | 'line' | 'polygon' | 'circle' | 'angle';
   selectedSegmentPoint: any | null;
   selectedPolygonPoints: any[];
+  selectedAnglePoints: any[];
+  selectedCircleCenter: any | null;
+  circlePreview: any | null;
+  circlePreviewPosition: { x: number; y: number } | null;
+  restoring: boolean;
   onBoardViewportChange?: () => void;
   onBoardPointerDown?: (evt: PointerEvent) => void;
+  onBoardPointerMove?: (evt: PointerEvent) => void;
   onBoardContextMenu?: (evt: MouseEvent) => void;
   onDocumentPointerDown?: (evt: PointerEvent) => void;
   resizeObserver?: ResizeObserver;
@@ -89,32 +102,41 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
-    point: 'Punkt', line: 'Gerade', polygon: 'Vieleck', segment: 'Strecke',
+    point: 'Punkt', line: 'Gerade', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis',
     coordinates: 'Koordinaten', fixed: 'Fixieren', showName: 'Name anzeigen',
-    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showPolygon: 'Vieleck anzeigen',
+    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showAngleObject: 'Winkel anzeigen',
     showSegment: 'Strecke anzeigen', showEquation: 'Geradengleichung anzeigen',
     showDistance: 'Distanzwert anzeigen', showArea: 'Flächeninhalt anzeigen',
-    showPerimeter: 'Umfang anzeigen', textColor: 'Schriftfarbe', lineColor: 'Linienfarbe',
+    showPerimeter: 'Umfang anzeigen', showAngle: 'Winkelwert anzeigen', textColor: 'Schriftfarbe', lineColor: 'Linienfarbe',
     fillColor: 'Inhaltsfarbe', opacity: 'Deckkraft', delete: 'Löschen',
     confirmDelete: 'Löschen bestätigen', setPoint: 'Punkt setzen', stopPoint: 'Punktmodus beenden',
-    straightLine: 'Gerade', distance: 'Strecke'
+    straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', shapes: 'Flächenwerkzeuge', layer: 'Ebene'
   },
   en: {
-    point: 'Point', line: 'Straight Line', polygon: 'Polygon', segment: 'Distance',
+    point: 'Point', line: 'Straight Line', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle',
     coordinates: 'Coordinates', fixed: 'Lock', showName: 'Show name',
-    showPoint: 'Show point', showLine: 'Show straight line', showPolygon: 'Show polygon',
+    showPoint: 'Show point', showLine: 'Show straight line', showPolygon: 'Show polygon', showCircle: 'Show circle', showAngleObject: 'Show angle',
     showSegment: 'Show distance', showEquation: 'Show line equation',
     showDistance: 'Show distance value', showArea: 'Show area',
-    showPerimeter: 'Show perimeter', textColor: 'Text color', lineColor: 'Line color',
+    showPerimeter: 'Show perimeter', showAngle: 'Show angle value', textColor: 'Text color', lineColor: 'Line color',
     fillColor: 'Fill color', opacity: 'Opacity', delete: 'Delete',
     confirmDelete: 'Confirm delete', setPoint: 'Place point', stopPoint: 'Exit point mode',
-    straightLine: 'Straight Line', distance: 'Distance'
+    straightLine: 'Straight Line', distance: 'Distance', createAngle: 'Mark angle', shapes: 'Shape tools', layer: 'Layer'
   }
 } as const;
 
 function dgsText(language: 'de' | 'en') { return DGS_TEXT[language]; }
 
 const states: Record<string, DgsState> = {};
+const dgsConstructionStates: Record<string, any> =
+  ((window as any).__dgsConstructionStates = (window as any).__dgsConstructionStates || {});
+let dgsPersistentIdCounter = 0;
+const dgsHistoryApplying = new Set<string>();
+const dgsPendingHistoryBefore: Record<string, any> = {};
+
+function cloneDgsSnapshot(value: any): any {
+  try { return JSON.parse(JSON.stringify(value)); } catch (e) { return { records: [] }; }
+}
 const pendingRetries: Record<string, number> = {};
 const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
@@ -405,6 +427,29 @@ function ensureStyles(root: Document | ShadowRoot): void {
       box-shadow: 0 0 0 2px var(--lia-dgs-theme-color, currentColor);
     }
 
+    .lia-dgs-layer-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 58px;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      margin-top: 7px;
+      font-size: 14px;
+    }
+
+    .lia-dgs-layer-input {
+      width: 58px;
+      height: 27px;
+      box-sizing: border-box;
+      border: 1px solid currentColor;
+      border-radius: 5px;
+      background: transparent;
+      color: inherit;
+      padding: 2px 4px;
+      font: inherit;
+      text-align: center;
+    }
+
     .lia-dgs-color-popup {
       position: absolute;
       right: ${SIDE_MENU_WIDTH_PX + 10}px;
@@ -553,7 +598,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-regression-divider {
-      left: 160px;
+      left: 196px;
       display: none;
     }
 
@@ -601,7 +646,20 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 126px;
     }
 
+    .lia-dgs-angle-button {
+      left: 162px;
+    }
+
+    .lia-dgs-angle-button svg {
+      width: 25px;
+      height: 25px;
+    }
+
     .lia-dgs-polygon-fill {
+      fill: rgba(255, 255, 255, 0.60) !important;
+    }
+
+    .lia-dgs-angle-fill {
       fill: rgba(255, 255, 255, 0.60) !important;
     }
 
@@ -633,6 +691,10 @@ function ensureStyles(root: Document | ShadowRoot): void {
       transform: translateY(0);
       transition-delay: 0s;
       pointer-events: auto;
+    }
+
+    .lia-dgs-shape-submenu {
+      left: 118px;
     }
 
     .lia-dgs-geometry-tool {
@@ -742,7 +804,15 @@ function ensureStyles(root: Document | ShadowRoot): void {
         drop-shadow(0 0 3px var(--lia-dgs-theme-color, #00a8b5));
     }
 
-    .lia-dgs-polygon-vertex {
+    .lia-dgs-geometry-button circle,
+    .lia-dgs-geometry-tool circle {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+    }
+
+    .lia-dgs-polygon-vertex,
+    .lia-dgs-angle-point {
       filter:
         drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5))
         drop-shadow(0 0 4px var(--lia-dgs-theme-color, #00a8b5));
@@ -957,18 +1027,20 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
     window.__pointStates[state.boardId] = window.__pointStates[state.boardId] || {};
     window.__points[state.boardId][name] = point;
 
-    const savePosition = () => {
+    const savePosition = (recordHistory = true) => {
       try {
-        window.__pointStates[state.boardId][name] = {
+        const currentName = String(point.__liaDgsPointName || name);
+        window.__pointStates[state.boardId][currentName] = {
           x: point.X(),
           y: point.Y(),
           fixed: getDgsObjectFixed(point)
         };
       } catch (e) {}
       refreshSideMenusForObject(point);
+      persistDgsConstruction(state, recordHistory);
     };
-    try { point.on('drag', savePosition); } catch (e) {}
-    try { point.on('up', savePosition); } catch (e) {}
+    try { point.on('drag', () => savePosition(false)); } catch (e) {}
+    try { point.on('up', () => savePosition(true)); } catch (e) {}
     savePosition();
 
     try { if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances(); } catch (e) {}
@@ -1081,6 +1153,19 @@ function setSelectedPolygonPoints(state: DgsState, points: any[]): void {
   state.selectedPolygonPoints.forEach((point) => {
     const node = point && point.rendNode;
     try { if (node && node.classList) node.classList.add('lia-dgs-polygon-vertex'); } catch (e) {}
+  });
+}
+
+function setSelectedAnglePoints(state: DgsState, points: any[]): void {
+  state.selectedAnglePoints.forEach((point) => {
+    const node = point && point.rendNode;
+    try { if (node && node.classList) node.classList.remove('lia-dgs-angle-point'); } catch (e) {}
+  });
+
+  state.selectedAnglePoints = Array.isArray(points) ? points.slice() : [];
+  state.selectedAnglePoints.forEach((point) => {
+    const node = point && point.rendNode;
+    try { if (node && node.classList) node.classList.add('lia-dgs-angle-point'); } catch (e) {}
   });
 }
 
@@ -1232,6 +1317,481 @@ function createDgsPolygon(state: DgsState, points: any[]): any | null {
   }
 }
 
+function getNextCircleName(state: DgsState): string {
+  const used = new Set<string>();
+  getDgsBoardObjects(state.board).forEach((object) => {
+    if (object && object.__liaDgsCircle) used.add(String(object.__liaDgsCircleName || ''));
+  });
+  for (let index = 0; ; index += 1) {
+    const name = 'k' + (index ? "'".repeat(index) : '');
+    if (!used.has(name)) return name;
+  }
+}
+
+function getDgsCircleLabelPosition(circle: any): { x: number; y: number } {
+  const center = circle && circle.__liaDgsCircleCenter;
+  const radiusPoint = circle && circle.__liaDgsCircleRadiusPoint;
+  if (!center || !radiusPoint) return { x: 0, y: 0 };
+  try {
+    const centerX = Number(center.X());
+    const centerY = Number(center.Y());
+    const dx = Number(radiusPoint.X()) - centerX;
+    const dy = Number(radiusPoint.Y()) - centerY;
+    const radius = Math.hypot(dx, dy);
+    if (radius <= 1e-12) return { x: centerX, y: centerY };
+    const inwardPosition = 0.68;
+    return {
+      x: centerX - dx * inwardPosition,
+      y: centerY - dy * inwardPosition
+    };
+  } catch (e) { return { x: 0, y: 0 }; }
+}
+
+function createDgsCircle(state: DgsState, center: any, radiusPoint: any): any | null {
+  if (!state.board || !center || !radiusPoint || center === radiusPoint) return null;
+  const name = getNextCircleName(state);
+  try {
+    const circle = state.board.create('circle', [center, radiusPoint], {
+      name: '\\(' + name + '\\)',
+      withLabel: false,
+      fixed: false,
+      hasInnerPoints: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      fillColor: '#ff00ff',
+      highlightFillColor: '#ff00ff',
+      fillOpacity: 0.2,
+      highlightFillOpacity: 0.3,
+    });
+    circle.__liaDgsCircle = true;
+    circle.__liaDgsCircleName = name;
+    circle.__liaDgsCircleCenter = center;
+    circle.__liaDgsCircleRadiusPoint = radiusPoint;
+    circle.__liaDgsLanguage = state.language;
+    circle.__liaDgsColor = '#ff00ff';
+    circle.__liaDgsShowName = true;
+    circle.__liaDgsShowObject = true;
+    circle.__liaDgsOpacity = 0.2;
+    circle.__liaDgsShowArea = false;
+    circle.__liaDgsShowPerimeter = false;
+    const label = state.board.create('text', [
+      function() { return getDgsCircleLabelPosition(circle).x; },
+      function() { return getDgsCircleLabelPosition(circle).y; },
+      function() { return dgsObjectLabelText(circle); }
+    ], {
+      fixed: true,
+      highlight: false,
+      parse: false,
+      useMathJax: true,
+      display: 'html',
+      anchorX: 'middle',
+      anchorY: 'middle',
+      strokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      fontSize: 15
+    });
+    circle.label = label;
+    circle.__liaDgsCircleLabel = label;
+    const saveCircle = (recordHistory = true) => {
+      refreshDgsObjectLabel(circle);
+      persistDgsConstruction(state, recordHistory);
+    };
+    try { circle.on('drag', () => saveCircle(false)); } catch (e) {}
+    try { circle.on('up', () => saveCircle(true)); } catch (e) {}
+    refreshDgsObjectLabel(circle);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return circle;
+  } catch (e) { return null; }
+}
+
+function clearDgsCirclePreview(state: DgsState): void {
+  if (state.selectedCircleCenter) {
+    const node = state.selectedCircleCenter.rendNode;
+    try { if (node && node.classList) node.classList.remove('lia-dgs-angle-point'); } catch (e) {}
+  }
+  if (state.circlePreview) {
+    try { state.board.removeObject(state.circlePreview); } catch (e) {}
+  }
+  state.selectedCircleCenter = null;
+  state.circlePreview = null;
+  state.circlePreviewPosition = null;
+}
+
+function startDgsCirclePreview(state: DgsState, center: any): void {
+  clearDgsCirclePreview(state);
+  state.selectedCircleCenter = center;
+  state.circlePreviewPosition = { x: Number(center.X()), y: Number(center.Y()) };
+  const node = center && center.rendNode;
+  try { if (node && node.classList) node.classList.add('lia-dgs-angle-point'); } catch (e) {}
+  try {
+    state.circlePreview = state.board.create('circle', [center, function() {
+      const position = state.circlePreviewPosition;
+      if (!position) return 0;
+      return Math.hypot(position.x - Number(center.X()), position.y - Number(center.Y()));
+    }], {
+      name: '',
+      withLabel: false,
+      fixed: true,
+      highlight: false,
+      strokeColor: '#ff00ff',
+      strokeOpacity: 0.75,
+      strokeWidth: 2,
+      dash: 2,
+      fillOpacity: 0,
+      highlightFillOpacity: 0
+    });
+  } catch (e) { state.circlePreview = null; }
+}
+
+function getDgsAngleRadians(angle: any): number {
+  const points = angle && Array.isArray(angle.__liaDgsAnglePoints) ? angle.__liaDgsAnglePoints : [];
+  if (points.length !== 3) return NaN;
+  try {
+    const ux = Number(points[0].X()) - Number(points[1].X());
+    const uy = Number(points[0].Y()) - Number(points[1].Y());
+    const vx = Number(points[2].X()) - Number(points[1].X());
+    const vy = Number(points[2].Y()) - Number(points[1].Y());
+    if (Math.hypot(ux, uy) <= 1e-12 || Math.hypot(vx, vy) <= 1e-12) return NaN;
+    let radians = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    if (radians < 0) radians += Math.PI * 2;
+    return radians;
+  } catch (e) { return NaN; }
+}
+
+function getDgsAngleRadius(points: any[]): number {
+  try {
+    const firstArm = Math.hypot(points[0].X() - points[1].X(), points[0].Y() - points[1].Y());
+    const secondArm = Math.hypot(points[2].X() - points[1].X(), points[2].Y() - points[1].Y());
+    return Math.max(0.05, Math.min(0.8, Math.min(firstArm, secondArm) * 0.35));
+  } catch (e) { return 0.6; }
+}
+
+function getDgsAngleLabelPosition(angle: any): { x: number; y: number } {
+  const points = angle && angle.__liaDgsAnglePoints;
+  if (!Array.isArray(points) || points.length !== 3) return { x: 0, y: 0 };
+  try {
+    const vertexX = Number(points[1].X());
+    const vertexY = Number(points[1].Y());
+    const startX = Number(points[0].X()) - vertexX;
+    const startY = Number(points[0].Y()) - vertexY;
+    const startLength = Math.hypot(startX, startY);
+    const radians = getDgsAngleRadians(angle);
+    if (startLength <= 1e-12 || !Number.isFinite(radians)) return { x: vertexX, y: vertexY };
+
+    const direction = Math.atan2(startY, startX) + radians / 2;
+    const dx = Math.cos(direction);
+    const dy = Math.sin(direction);
+    const board = angle.board;
+    const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
+    const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
+    const pixelsPerUnit = Math.max(1e-9, Math.hypot(dx * unitX, dy * unitY));
+    const distance = getDgsAngleRadius(points) * 1.35 + 10 / pixelsPerUnit;
+    return { x: vertexX + dx * distance, y: vertexY + dy * distance };
+  } catch (e) { return { x: 0, y: 0 }; }
+}
+
+function createDgsAngle(state: DgsState, points: any[]): any | null {
+  if (!state.board || !Array.isArray(points) || points.length !== 3 || new Set(points).size !== 3) return null;
+  const pointNames = points.map((point) => String(point.__liaDgsPointName || ''));
+  const name = '\\angle ' + pointNames.join('');
+  try {
+    const angle = state.board.create('angle', points, {
+      name: '\\(' + name + '\\)',
+      withLabel: false,
+      fixed: true,
+      highlight: false,
+      type: 'sector',
+      orientation: 'counterclockwise',
+      selection: 'auto',
+      radius: function() { return getDgsAngleRadius(points); },
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 2.5,
+      highlightStrokeWidth: 2.5,
+      fillColor: '#ff00ff',
+      highlightFillColor: '#ff00ff',
+      fillOpacity: 0.22,
+      highlightFillOpacity: 0.22,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 18,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    angle.__liaDgsAngle = true;
+    angle.__liaDgsAngleName = name;
+    angle.__liaDgsAngleAutoName = true;
+    angle.__liaDgsAnglePoints = points.slice();
+    angle.__liaDgsLanguage = state.language;
+    angle.__liaDgsColor = '#ff00ff';
+    angle.__liaDgsShowName = true;
+    angle.__liaDgsShowObject = true;
+    angle.__liaDgsOpacity = 0.22;
+    angle.__liaDgsShowAngle = false;
+    const label = state.board.create('text', [
+      function() { return getDgsAngleLabelPosition(angle).x; },
+      function() { return getDgsAngleLabelPosition(angle).y; },
+      function() { return dgsObjectLabelText(angle); }
+    ], {
+      fixed: true,
+      highlight: false,
+      parse: false,
+      useMathJax: true,
+      display: 'html',
+      anchorX: 'middle',
+      anchorY: 'middle',
+      strokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      fontSize: 18
+    });
+    angle.label = label;
+    angle.__liaDgsAngleLabel = label;
+    refreshDgsObjectLabel(angle);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return angle;
+  } catch (e) { return null; }
+}
+
+function ensureDgsPersistentId(object: any, prefix: string): string {
+  if (!object.__liaDgsPersistentId) {
+    dgsPersistentIdCounter += 1;
+    object.__liaDgsPersistentId = prefix + '-' + Date.now().toString(36) + '-' + dgsPersistentIdCounter.toString(36);
+  }
+  return String(object.__liaDgsPersistentId);
+}
+
+function getDgsBoardObjects(board: any): any[] {
+  const objects: any[] = [];
+  const seen = new Set<any>();
+  const add = (object: any) => {
+    if (!object || typeof object !== 'object' || seen.has(object)) return;
+    seen.add(object);
+    objects.push(object);
+  };
+  if (board && Array.isArray(board.objectsList)) board.objectsList.forEach(add);
+  if (board && board.objects && typeof board.objects === 'object') {
+    Object.keys(board.objects).forEach((key) => add(board.objects[key]));
+  }
+  return objects;
+}
+
+function dgsPointReference(point: any): any {
+  return {
+    id: point && point.__liaDgsPointName ? ensureDgsPersistentId(point, 'point') : '',
+    name: String((point && (point.__liaDgsPointName || point.name)) || '')
+  };
+}
+
+function persistDgsConstruction(state: DgsState, recordHistory = true): void {
+  if (!state || state.restoring || !state.board) return;
+  const records: any[] = [];
+  getDgsBoardObjects(state.board).forEach((object) => {
+    let type = '';
+    if (isDgsPoint(object)) type = 'point';
+    else if (object.__liaDgsSegment) type = 'segment';
+    else if (isDgsLine(object)) type = 'line';
+    else if (isDgsPolygon(object)) type = 'polygon';
+    else if (isDgsCircle(object)) type = 'circle';
+    else if (isDgsAngle(object)) type = 'angle';
+    if (!type) return;
+
+    const record: any = {
+      id: ensureDgsPersistentId(object, type),
+      type,
+      name: getDgsObjectName(object),
+      language: object.__liaDgsLanguage || state.language,
+      fixed: getDgsObjectFixed(object),
+      layer: getDgsObjectLayer(object),
+      showName: object.__liaDgsShowName !== false,
+      showObject: object.__liaDgsShowObject !== false,
+      opacity: getDgsObjectOpacity(object),
+      textColor: getDgsObjectColor(object, 'text'),
+      lineColor: getDgsObjectColor(object, 'line'),
+      fillColor: getDgsObjectColor(object, 'fill'),
+      showLength: !!object.__liaDgsShowLength,
+      showEquation: !!object.__liaDgsShowEquation,
+      showArea: !!object.__liaDgsShowArea,
+      showPerimeter: !!object.__liaDgsShowPerimeter,
+      showAngle: !!object.__liaDgsShowAngle,
+      autoName: object.__liaDgsPolygonAutoName !== false && object.__liaDgsAngleAutoName !== false
+    };
+    if (type === 'point') {
+      try { record.x = Number(object.X()); record.y = Number(object.Y()); } catch (e) {}
+    } else if (type === 'segment' || type === 'line') {
+      record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
+    } else if (type === 'polygon') {
+      record.points = (object.vertices || []).map(dgsPointReference);
+    } else if (type === 'circle') {
+      record.points = [dgsPointReference(object.__liaDgsCircleCenter), dgsPointReference(object.__liaDgsCircleRadiusPoint)];
+    } else if (type === 'angle') {
+      record.points = (object.__liaDgsAnglePoints || []).map(dgsPointReference);
+    }
+    records.push(record);
+  });
+  const next = { boardId: state.boardId, language: state.language, records };
+  const previous = dgsConstructionStates[state.boardId] || {
+    boardId: state.boardId,
+    language: state.language,
+    records: []
+  };
+  const changed = JSON.stringify(previous) !== JSON.stringify(next);
+  dgsConstructionStates[state.boardId] = next;
+  if (changed && !recordHistory && !dgsPendingHistoryBefore[state.boardId]) {
+    dgsPendingHistoryBefore[state.boardId] = cloneDgsSnapshot(previous);
+  }
+  const historyBefore = dgsPendingHistoryBefore[state.boardId] || previous;
+  if (recordHistory) delete dgsPendingHistoryBefore[state.boardId];
+  if (recordHistory && JSON.stringify(historyBefore) !== JSON.stringify(next) && !dgsHistoryApplying.has(state.boardId)) {
+    try {
+      if (window.__recordDgsHistory) {
+        window.__recordDgsHistory(state.boardId, cloneDgsSnapshot(historyBefore), cloneDgsSnapshot(next));
+      }
+    } catch (e) {}
+  }
+}
+
+function findDgsPointForRestore(state: DgsState, reference: any, byId: Map<string, any>): any | null {
+  if (reference && reference.id && byId.has(reference.id)) return byId.get(reference.id);
+  const name = String(reference && reference.name || '');
+  const registered = window.__points && window.__points[state.boardId] && window.__points[state.boardId][name];
+  try { if (registered && registered.board === state.board) return registered; } catch (e) {}
+  return getDgsBoardObjects(state.board).find((point) => {
+    if (!point || (String(point.elType || '').toLowerCase() !== 'point' && String(point.elType || '').toLowerCase() !== 'glider')) return false;
+    return String(point.__liaDgsPointName || point.name || '') === name;
+  }) || null;
+}
+
+function applyRestoredDgsProperties(state: DgsState, object: any, record: any): void {
+  object.__liaDgsPersistentId = record.id;
+  object.__liaDgsLanguage = record.language || state.language;
+  if (record.name) setDgsObjectName(state, object, record.name);
+  setDgsObjectFixed(object, !!record.fixed);
+  setDgsObjectLayer(object, Number.isFinite(record.layer) ? record.layer : getDgsObjectLayer(object));
+  object.__liaDgsShowName = record.showName !== false;
+  object.__liaDgsShowObject = record.showObject !== false;
+  object.__liaDgsShowLength = !!record.showLength;
+  object.__liaDgsShowEquation = !!record.showEquation;
+  object.__liaDgsShowArea = !!record.showArea;
+  object.__liaDgsShowPerimeter = !!record.showPerimeter;
+  object.__liaDgsShowAngle = !!record.showAngle;
+  if (isDgsPolygon(object)) object.__liaDgsPolygonAutoName = !!record.autoName;
+  if (isDgsAngle(object)) object.__liaDgsAngleAutoName = !!record.autoName;
+  setDgsObjectColor(object, 'text', record.textColor || '#ff00ff');
+  setDgsObjectColor(object, 'line', record.lineColor || '#ff00ff');
+  setDgsObjectColor(object, 'fill', record.fillColor || '#ff00ff');
+  setDgsObjectOpacity(object, Number.isFinite(record.opacity) ? record.opacity : 1);
+  setDgsObjectVisible(object, record.showObject !== false);
+  setDgsObjectNameVisible(object, record.showName !== false);
+  if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
+  else refreshDgsObjectLabel(object);
+}
+
+function restoreDgsConstruction(state: DgsState): void {
+  const saved = dgsConstructionStates[state.boardId];
+  if (!saved || saved.boardId !== state.boardId || !Array.isArray(saved.records)) return;
+  const registered = window.__points && window.__points[state.boardId];
+  if (registered && typeof registered === 'object') {
+    Object.keys(registered).forEach((name) => {
+      try { if (!registered[name] || registered[name].board !== state.board) delete registered[name]; } catch (e) {}
+    });
+  }
+  const existingById = new Map<string, any>();
+  getDgsBoardObjects(state.board).forEach((object) => {
+    if (object && object.__liaDgsPersistentId) existingById.set(String(object.__liaDgsPersistentId), object);
+  });
+
+  state.restoring = true;
+  try {
+    saved.records.filter((record: any) => record.type === 'point').forEach((record: any) => {
+      let point = existingById.get(record.id);
+      if (!point) point = createDgsPoint(state, Number(record.x), Number(record.y));
+      if (!point) return;
+      applyRestoredDgsProperties(state, point, record);
+      existingById.set(record.id, point);
+    });
+
+    saved.records.filter((record: any) => record.type !== 'point').forEach((record: any) => {
+      if (existingById.has(record.id)) return;
+      const points = (record.points || []).map((reference: any) => findDgsPointForRestore(state, reference, existingById));
+      if (!points.length || points.some((point: any) => !point)) return;
+      let object: any = null;
+      if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
+      else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
+      else if (record.type === 'polygon') object = createDgsPolygon(state, points);
+      else if (record.type === 'circle') object = createDgsCircle(state, points[0], points[1]);
+      else if (record.type === 'angle') object = createDgsAngle(state, points);
+      if (!object) return;
+      applyRestoredDgsProperties(state, object, record);
+      existingById.set(record.id, object);
+    });
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+  } finally {
+    state.restoring = false;
+  }
+}
+
+function clearDgsConstructionFromBoard(state: DgsState): void {
+  clearDgsCirclePreview(state);
+  setSelectedSegmentPoint(state, null);
+  setSelectedPolygonPoints(state, []);
+  setSelectedAnglePoints(state, []);
+  if (state.sideMenuOpen) setSideMenuOpen(state, false);
+
+  const objects = getDgsBoardObjects(state.board);
+  objects.forEach((object) => {
+    if (object && object.__liaDgsPolygon && object.__liaDgsMeasurementLabel) {
+      try { state.board.removeObject(object.__liaDgsMeasurementLabel); } catch (e) {}
+    }
+    if (object && object.__liaDgsAngle && object.__liaDgsAngleLabel) {
+      try { state.board.removeObject(object.__liaDgsAngleLabel); } catch (e) {}
+    }
+    if (object && object.__liaDgsCircle && object.__liaDgsCircleLabel) {
+      try { state.board.removeObject(object.__liaDgsCircleLabel); } catch (e) {}
+    }
+  });
+  objects.filter((object) => object && !isDgsPoint(object) && (
+    object.__liaDgsSegment || object.__liaDgsLine || object.__liaDgsPolygon ||
+    object.__liaDgsCircle || object.__liaDgsAngle
+  )).forEach((object) => {
+    try { state.board.removeObject(object); } catch (e) {}
+  });
+  objects.filter(isDgsPoint).forEach((point) => {
+    const name = String(point.__liaDgsPointName || '');
+    try {
+      if (window.__points && window.__points[state.boardId] && window.__points[state.boardId][name] === point) {
+        delete window.__points[state.boardId][name];
+      }
+      if (window.__pointStates && window.__pointStates[state.boardId]) delete window.__pointStates[state.boardId][name];
+    } catch (e) {}
+    try { state.board.removeObject(point); } catch (e) {}
+  });
+}
+
+window.__applyDgsHistory = function(boardId: string, snapshot: any): void {
+  const state = Object.keys(states).map((uid) => states[uid]).find((candidate) =>
+    !!candidate && candidate.boardId === boardId && candidate.board === (window.__boards && window.__boards[boardId])
+  );
+  if (!state) return;
+  dgsHistoryApplying.add(boardId);
+  delete dgsPendingHistoryBefore[boardId];
+  try {
+    clearDgsConstructionFromBoard(state);
+    dgsConstructionStates[boardId] = cloneDgsSnapshot(snapshot || {
+      boardId,
+      language: state.language,
+      records: []
+    });
+    restoreDgsConstruction(state);
+    try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+  } finally {
+    dgsHistoryApplying.delete(boardId);
+  }
+};
+
 function getDgsPolygonCoordinates(polygon: any): Array<{ x: number; y: number }> {
   if (!polygon || !Array.isArray(polygon.vertices)) return [];
   const coordinates: Array<{ x: number; y: number }> = [];
@@ -1334,23 +1894,78 @@ function refreshDgsPolygonMeasurementLabel(polygon: any): void {
   try { if (typeof polygon.board.update === 'function') polygon.board.update(); } catch (e) {}
 }
 
-function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
-  const point = findNearestBoardPoint(
-    state,
-    evt,
-    18,
-    (candidate) => !!candidate.__liaDgsPointName
-  );
-  if (point) return point;
+function dgsAngleContainsPointer(state: DgsState, angle: any, localX: number, localY: number): boolean {
+  const points = angle && angle.__liaDgsAnglePoints;
+  const board = state.board;
+  if (!Array.isArray(points) || points.length !== 3 || !board || !board.origin) return false;
+  try {
+    const unitX = Number(board.unitX);
+    const unitY = Number(board.unitY);
+    if (!Number.isFinite(unitX) || !Number.isFinite(unitY) || Math.abs(unitX) < 1e-12 || Math.abs(unitY) < 1e-12) return false;
+    const x = (localX - Number(board.origin.scrCoords[1])) / unitX;
+    const y = (Number(board.origin.scrCoords[2]) - localY) / unitY;
+    const vertexX = Number(points[1].X());
+    const vertexY = Number(points[1].Y());
+    const startX = Number(points[0].X()) - vertexX;
+    const startY = Number(points[0].Y()) - vertexY;
+    const targetX = x - vertexX;
+    const targetY = y - vertexY;
+    const targetDistance = Math.hypot(targetX, targetY);
+    const tolerance = 10 / Math.max(1e-9, Math.min(Math.abs(unitX), Math.abs(unitY)));
+    if (targetDistance > getDgsAngleRadius(points) + tolerance) return false;
+    if (targetDistance <= tolerance) return true;
 
+    let targetAngle = Math.atan2(startX * targetY - startY * targetX, startX * targetX + startY * targetY);
+    if (targetAngle < 0) targetAngle += Math.PI * 2;
+    const totalAngle = getDgsAngleRadians(angle);
+    return Number.isFinite(totalAngle) && targetAngle <= totalAngle + 1e-8;
+  } catch (e) { return false; }
+}
+
+function dgsCircleContainsPointer(state: DgsState, circle: any, localX: number, localY: number): boolean {
+  const board = state.board;
+  const center = circle && circle.__liaDgsCircleCenter;
+  const radiusPoint = circle && circle.__liaDgsCircleRadiusPoint;
+  if (!board || !board.origin || !center || !radiusPoint) return false;
+  try {
+    const unitX = Number(board.unitX);
+    const unitY = Number(board.unitY);
+    if (!Number.isFinite(unitX) || !Number.isFinite(unitY) || Math.abs(unitX) < 1e-12 || Math.abs(unitY) < 1e-12) return false;
+    const x = (localX - Number(board.origin.scrCoords[1])) / unitX;
+    const y = (Number(board.origin.scrCoords[2]) - localY) / unitY;
+    const centerX = Number(center.X());
+    const centerY = Number(center.Y());
+    const radius = Math.hypot(Number(radiusPoint.X()) - centerX, Number(radiusPoint.Y()) - centerY);
+    return Math.hypot(x - centerX, y - centerY) <= radius;
+  } catch (e) { return false; }
+}
+
+function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   const rect = state.boardContainer.getBoundingClientRect();
   const localX = evt.clientX - rect.left;
   const localY = evt.clientY - rect.top;
+  let point: any | null = null;
+  let pointLayer = -1;
+  let pointDistance = Infinity;
+  getSelectableBoardPoints(state).forEach((candidate) => {
+    if (!candidate.__liaDgsPointName) return;
+    try {
+      const screenX = Number(state.board.origin.scrCoords[1]) + Number(candidate.X()) * Number(state.board.unitX);
+      const screenY = Number(state.board.origin.scrCoords[2]) - Number(candidate.Y()) * Number(state.board.unitY);
+      const distance = Math.hypot(localX - screenX, localY - screenY);
+      const layer = getDgsObjectLayer(candidate);
+      if (distance <= 18 && (layer > pointLayer || (layer === pointLayer && distance < pointDistance))) {
+        point = candidate;
+        pointLayer = layer;
+        pointDistance = distance;
+      }
+    } catch (e) {}
+  });
   const candidates: any[] = [];
   const seen = new Set<any>();
   const add = (segment: any) => {
     if (!segment || typeof segment !== 'object' || seen.has(segment) ||
-        (!segment.__liaDgsSegment && !segment.__liaDgsLine && !segment.__liaDgsPolygon)) return;
+        (!segment.__liaDgsSegment && !segment.__liaDgsLine && !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsAngle)) return;
     seen.add(segment);
     candidates.push(segment);
   };
@@ -1359,13 +1974,34 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
     Object.keys(state.board.objects).forEach((key) => add(state.board.objects[key]));
   }
 
-  let nearest: any | null = null;
-  let nearestDistance = 10;
+  let nearest: any | null = point;
+  let nearestDistance = point ? 0 : 10;
+  let nearestLayer = point ? pointLayer : -1;
   candidates.forEach((segment) => {
-    try {
-      if (typeof segment.hasPoint === 'function' && segment.hasPoint(localX, localY)) {
+    const layer = getDgsObjectLayer(segment);
+    if (isDgsCircle(segment) && dgsCircleContainsPointer(state, segment, localX, localY)) {
+      if (layer > nearestLayer) {
         nearest = segment;
         nearestDistance = 0;
+        nearestLayer = layer;
+      }
+      return;
+    }
+    if (isDgsAngle(segment) && dgsAngleContainsPointer(state, segment, localX, localY)) {
+      if (layer > nearestLayer) {
+        nearest = segment;
+        nearestDistance = 0;
+        nearestLayer = layer;
+      }
+      return;
+    }
+    try {
+      if (typeof segment.hasPoint === 'function' && segment.hasPoint(localX, localY)) {
+        if (layer > nearestLayer) {
+          nearest = segment;
+          nearestDistance = 0;
+          nearestLayer = layer;
+        }
         return;
       }
     } catch (e) {}
@@ -1388,9 +2024,10 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
     const px = x1 + ratio * dx;
     const py = y1 + ratio * dy;
     const distance = Math.hypot(localX - px, localY - py);
-    if (distance <= nearestDistance) {
+    if (distance <= 10 && (layer > nearestLayer || (layer === nearestLayer && distance < nearestDistance))) {
       nearest = segment;
       nearestDistance = distance;
+      nearestLayer = layer;
     }
   });
   return nearest;
@@ -1408,13 +2045,25 @@ function isDgsPolygon(object: any): boolean {
   return !!object && !!object.__liaDgsPolygon;
 }
 
+function isDgsAngle(object: any): boolean {
+  return !!object && !!object.__liaDgsAngle;
+}
+
+function isDgsCircle(object: any): boolean {
+  return !!object && !!object.__liaDgsCircle;
+}
+
 function getDgsObjectName(object: any): string {
   return String(
     (isDgsPoint(object)
       ? object.__liaDgsPointName
       : (isDgsLine(object)
         ? object.__liaDgsLineName
-        : (isDgsPolygon(object) ? object.__liaDgsPolygonName : object && object.__liaDgsSegmentName))) || ''
+        : (isDgsPolygon(object)
+          ? object.__liaDgsPolygonName
+          : (isDgsCircle(object)
+            ? object.__liaDgsCircleName
+            : (isDgsAngle(object) ? object.__liaDgsAngleName : object && object.__liaDgsSegmentName))))) || ''
   );
 }
 
@@ -1460,6 +2109,18 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
     if (state.board && state.board.objects && typeof state.board.objects === 'object') {
       Object.keys(state.board.objects).forEach((key) => updatePolygonName(state.board.objects[key]));
     }
+    const updateAngleName = (candidate: any) => {
+      if (!isDgsAngle(candidate) || !candidate.__liaDgsAngleAutoName ||
+          !Array.isArray(candidate.__liaDgsAnglePoints) || !candidate.__liaDgsAnglePoints.includes(object)) return;
+      candidate.__liaDgsAngleName = '\\angle ' + candidate.__liaDgsAnglePoints
+        .map((point: any) => String(point.__liaDgsPointName || ''))
+        .join('');
+      refreshDgsObjectLabel(candidate);
+    };
+    if (state.board && Array.isArray(state.board.objectsList)) state.board.objectsList.forEach(updateAngleName);
+    if (state.board && state.board.objects && typeof state.board.objects === 'object') {
+      Object.keys(state.board.objects).forEach((key) => updateAngleName(state.board.objects[key]));
+    }
     try { if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances(); } catch (e) {}
     try { if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas(); } catch (e) {}
   } else if (isDgsLine(object)) {
@@ -1467,6 +2128,11 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
   } else if (isDgsPolygon(object)) {
     object.__liaDgsPolygonName = name;
     object.__liaDgsPolygonAutoName = false;
+  } else if (isDgsAngle(object)) {
+    object.__liaDgsAngleName = name;
+    object.__liaDgsAngleAutoName = false;
+  } else if (isDgsCircle(object)) {
+    object.__liaDgsCircleName = name;
   } else if (object.__liaDgsSegment) {
     object.__liaDgsSegmentName = name;
   } else {
@@ -1477,6 +2143,7 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
   if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
   else refreshDgsObjectLabel(object);
   try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+  persistDgsConstruction(state);
   return true;
 }
 
@@ -1535,9 +2202,42 @@ function dgsObjectLabelText(object: any): string {
   const name = getDgsObjectName(object);
   const showName = object && object.__liaDgsShowName !== false;
 
+  if (isDgsCircle(object)) {
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    let radius = NaN;
+    try {
+      radius = Math.hypot(
+        Number(object.__liaDgsCircleRadiusPoint.X()) - Number(object.__liaDgsCircleCenter.X()),
+        Number(object.__liaDgsCircleRadiusPoint.Y()) - Number(object.__liaDgsCircleCenter.Y())
+      );
+    } catch (e) {}
+    const lines: string[] = [];
+    if (showName && name) lines.push('\\mathrm{' + name + '}');
+    if (object.__liaDgsShowArea) {
+      const area = Math.PI * radius * radius;
+      lines.push('A ' + dgsMeasurementRelation(area) + ' ' + formatDgsMeasurement(area, language) +
+        '\\,\\mathrm{' + (language === 'de' ? 'FE' : 'AU') + '}');
+    }
+    if (object.__liaDgsShowPerimeter) {
+      const perimeter = 2 * Math.PI * radius;
+      lines.push('u ' + dgsMeasurementRelation(perimeter) + ' ' + formatDgsMeasurement(perimeter, language) +
+        '\\,\\mathrm{' + (language === 'de' ? 'LE' : 'LU') + '}');
+    }
+    if (!lines.length) return '';
+    if (lines.length === 1) return '\\(' + lines[0] + '\\)';
+    return '\\(\\begin{gathered}' + lines.join('\\\\[2pt]') + '\\end{gathered}\\)';
+  }
+
   if (isDgsLine(object) && object.__liaDgsShowEquation) {
     const equation = getDgsLineEquation(object);
     return '\\(' + (showName && name ? name + ': ' : '') + equation + '\\)';
+  }
+
+  if (isDgsAngle(object) && object.__liaDgsShowAngle) {
+    const degrees = getDgsAngleRadians(object) * 180 / Math.PI;
+    const prefix = showName && name ? name + ' ' + dgsMeasurementRelation(degrees) + ' ' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    return '\\(' + prefix + formatDgsMeasurement(degrees, language) + '^{\\circ}\\)';
   }
 
   if (object && object.__liaDgsSegment && object.__liaDgsShowLength) {
@@ -1556,7 +2256,9 @@ function refreshDgsObjectLabel(object: any): void {
   if (!object || !object.label) return;
   const measurementVisible = !!(
     (object.__liaDgsSegment && object.__liaDgsShowLength) ||
-    (object.__liaDgsLine && object.__liaDgsShowEquation)
+    (object.__liaDgsLine && object.__liaDgsShowEquation) ||
+    (object.__liaDgsAngle && object.__liaDgsShowAngle) ||
+    (object.__liaDgsCircle && (object.__liaDgsShowArea || object.__liaDgsShowPerimeter))
   );
   const visible = object.__liaDgsShowName !== false || measurementVisible;
 
@@ -1583,6 +2285,45 @@ function setDgsObjectFixed(object: any, fixed: boolean): void {
   try { if (object && typeof object.setAttribute === 'function') object.setAttribute({ fixed }); } catch (e) {}
 }
 
+function getDgsObjectLayer(object: any): number {
+  const stored = Number(object && object.__liaDgsLayer);
+  if (Number.isFinite(stored)) return Math.max(0, Math.min(20, Math.round(stored)));
+  try {
+    const value = Number(typeof object.getAttribute === 'function' ? object.getAttribute('layer') : object.visProp && object.visProp.layer);
+    if (Number.isFinite(value)) return Math.max(0, Math.min(20, Math.round(value)));
+  } catch (e) {}
+  return 5;
+}
+
+function setDgsObjectLayer(object: any, value: number): number {
+  const layer = Math.max(0, Math.min(20, Math.round(Number(value) || 0)));
+  if (!object) return layer;
+  object.__liaDgsLayer = layer;
+  const apply = (candidate: any) => {
+    try {
+      if (!candidate) return;
+      if (typeof candidate.setAttribute === 'function') candidate.setAttribute({ layer });
+      if (candidate.visProp) candidate.visProp.layer = layer;
+      if (candidate.visPropCalc) candidate.visPropCalc.layer = layer;
+      const board = candidate.board || object.board;
+      if (board && board.renderer && typeof board.renderer.setLayer === 'function') {
+        board.renderer.setLayer(candidate, layer);
+      }
+    } catch (e) {}
+  };
+  apply(object);
+  apply(object.label);
+  apply(object.arc);
+  apply(object.__liaDgsMeasurementLabel);
+  apply(object.__liaDgsAngleLabel);
+  apply(object.__liaDgsCircleLabel);
+  if (isDgsPolygon(object) && Array.isArray(object.borders)) object.borders.forEach(apply);
+  try { if (object.board && typeof object.board.fullUpdate === 'function') object.board.fullUpdate(); } catch (e) {
+    try { if (object.board && typeof object.board.update === 'function') object.board.update(); } catch (e2) {}
+  }
+  return layer;
+}
+
 function setDgsObjectNameVisible(object: any, visible: boolean): void {
   if (!object) return;
   object.__liaDgsShowName = visible;
@@ -1591,7 +2332,7 @@ function setDgsObjectNameVisible(object: any, visible: boolean): void {
 }
 
 function getDgsObjectOpacity(object: any): number {
-  const fallback = isDgsPolygon(object) ? 0.22 : 1;
+  const fallback = isDgsPolygon(object) ? 0.22 : (isDgsCircle(object) ? 0.2 : 1);
   const value = Number(object && object.__liaDgsOpacity);
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 }
@@ -1601,18 +2342,20 @@ function applyDgsObjectOpacity(object: any): void {
   const visible = object.__liaDgsShowObject !== false;
   const opacity = visible ? getDgsObjectOpacity(object) : 0;
   const polygon = isDgsPolygon(object);
+  const outlinedShape = polygon || isDgsCircle(object);
 
   try {
     object.setAttribute({
-      strokeOpacity: polygon && visible ? 1 : opacity,
+      strokeOpacity: outlinedShape && visible ? 1 : opacity,
       fillOpacity: opacity,
-      highlightStrokeOpacity: polygon && visible ? 1 : opacity,
+      highlightStrokeOpacity: outlinedShape && visible ? 1 : opacity,
       highlightFillOpacity: opacity
     });
   } catch (e) {}
   try {
     if (object.label && typeof object.label.setAttribute === 'function') {
-      object.label.setAttribute({ strokeOpacity: opacity, fillOpacity: opacity });
+      const labelOpacity = outlinedShape && visible ? 1 : opacity;
+      object.label.setAttribute({ strokeOpacity: labelOpacity, fillOpacity: labelOpacity });
     }
   } catch (e) {}
   if (polygon && Array.isArray(object.borders)) {
@@ -1705,7 +2448,7 @@ function syncColorPicker(state: DgsState, colorValue: unknown): void {
   state.colorHexInput.setAttribute('aria-invalid', 'false');
 }
 
-function applyPickerColor(state: DgsState): string | null {
+function applyPickerColor(state: DgsState, recordHistory = true): string | null {
   if (!state.contextObject) return null;
   const color = hsvToHex(state.colorHue, state.colorSaturation, state.colorValue);
   const applied = setDgsObjectColor(state.contextObject, state.activeColorKind, color);
@@ -1719,6 +2462,7 @@ function applyPickerColor(state: DgsState): string | null {
   state.colorHexInput.value = applied;
   state.colorHexInput.setAttribute('aria-invalid', 'false');
   try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+  persistDgsConstruction(state, recordHistory);
   return applied;
 }
 
@@ -1743,6 +2487,13 @@ function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill', colorVal
       if (object.label && typeof object.label.setAttribute === 'function') {
         object.label.setAttribute({ strokeColor: color, fillColor: color });
       }
+    } catch (e) {}
+  }
+  if (isDgsAngle(object) && object.arc && (kind === 'line' || kind === 'fill')) {
+    try {
+      object.arc.setAttribute(kind === 'line'
+        ? { strokeColor: color, highlightStrokeColor: color }
+        : { fillColor: color, highlightFillColor: color });
     } catch (e) {}
   }
 
@@ -1832,6 +2583,7 @@ function applyCoordinateInputs(state: DgsState): boolean {
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e2) {}
   }
   refreshSideMenuCoordinates(state);
+  persistDgsConstruction(state);
   return true;
 }
 
@@ -1855,6 +2607,14 @@ function deleteDgsObject(state: DgsState, object: any): void {
       if (candidate.__liaDgsPolygon && Array.isArray(candidate.vertices) && candidate.vertices.includes(object)) {
         toRemove.add(candidate);
       }
+      if (candidate.__liaDgsAngle && Array.isArray(candidate.__liaDgsAnglePoints) &&
+          candidate.__liaDgsAnglePoints.includes(object)) {
+        toRemove.add(candidate);
+      }
+      if (candidate.__liaDgsCircle &&
+          (candidate.__liaDgsCircleCenter === object || candidate.__liaDgsCircleRadiusPoint === object)) {
+        toRemove.add(candidate);
+      }
     };
     if (Array.isArray(state.board.objectsList)) state.board.objectsList.forEach(collectDependent);
     if (state.board.objects && typeof state.board.objects === 'object') {
@@ -1876,6 +2636,12 @@ function deleteDgsObject(state: DgsState, object: any): void {
     if (candidate && candidate.__liaDgsPolygon && candidate.__liaDgsMeasurementLabel) {
       toRemove.add(candidate.__liaDgsMeasurementLabel);
     }
+    if (candidate && candidate.__liaDgsAngle && candidate.__liaDgsAngleLabel) {
+      toRemove.add(candidate.__liaDgsAngleLabel);
+    }
+    if (candidate && candidate.__liaDgsCircle && candidate.__liaDgsCircleLabel) {
+      toRemove.add(candidate.__liaDgsCircleLabel);
+    }
   });
 
   Object.keys(states).forEach((uid) => {
@@ -1883,6 +2649,8 @@ function deleteDgsObject(state: DgsState, object: any): void {
     if (!current) return;
     if (current.selectedSegmentPoint === object) setSelectedSegmentPoint(current, null);
     if (current.selectedPolygonPoints.includes(object)) setSelectedPolygonPoints(current, []);
+    if (current.selectedAnglePoints.includes(object)) setSelectedAnglePoints(current, []);
+    if (current.selectedCircleCenter === object) clearDgsCirclePreview(current);
     if (current.contextObject && toRemove.has(current.contextObject)) setSideMenuOpen(current, false);
   });
 
@@ -1892,6 +2660,7 @@ function deleteDgsObject(state: DgsState, object: any): void {
   try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
   try { if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances(); } catch (e) {}
   try { if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas(); } catch (e) {}
+  persistDgsConstruction(state);
 }
 
 function updateSideMenuControls(state: DgsState, object: any): void {
@@ -1899,28 +2668,30 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   const point = isDgsPoint(object);
   const line = isDgsLine(object);
   const polygon = isDgsPolygon(object);
+  const angle = isDgsAngle(object);
+  const circle = isDgsCircle(object);
   const name = getDgsObjectName(object);
   setColorPopupOpen(state, false);
   state.contextObject = object;
   object.__liaDgsLanguage = state.language;
-  state.sideMenuObjectType.textContent = point ? text.point : (line ? text.line : (polygon ? text.polygon : text.segment));
+  state.sideMenuObjectType.textContent = point ? text.point : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (angle ? text.angle : text.segment))));
   state.sideMenuNameInput.value = name;
   state.sideMenuNameInput.setAttribute('aria-invalid', 'false');
   state.fixedCheckbox.checked = getDgsObjectFixed(object);
   state.nameCheckbox.checked = object.__liaDgsShowName !== false;
   state.objectCheckbox.checked = object.__liaDgsShowObject !== false;
-  state.objectCheckboxText.textContent = point ? text.showPoint : (line ? text.showLine : (polygon ? text.showPolygon : text.showSegment));
-  state.measurementOption.hidden = point || polygon;
-  state.measurementCheckbox.checked = line ? !!object.__liaDgsShowEquation : !!object.__liaDgsShowLength;
-  state.measurementCheckboxText.textContent = line ? text.showEquation : text.showDistance;
-  state.areaOption.hidden = !polygon;
-  state.areaCheckbox.checked = polygon && !!object.__liaDgsShowArea;
-  state.perimeterOption.hidden = !polygon;
-  state.perimeterCheckbox.checked = polygon && !!object.__liaDgsShowPerimeter;
+  state.objectCheckboxText.textContent = point ? text.showPoint : (line ? text.showLine : (polygon ? text.showPolygon : (circle ? text.showCircle : (angle ? text.showAngleObject : text.showSegment))));
+  state.measurementOption.hidden = point || polygon || circle;
+  state.measurementCheckbox.checked = line ? !!object.__liaDgsShowEquation : (angle ? !!object.__liaDgsShowAngle : !!object.__liaDgsShowLength);
+  state.measurementCheckboxText.textContent = line ? text.showEquation : (angle ? text.showAngle : text.showDistance);
+  state.areaOption.hidden = !polygon && !circle;
+  state.areaCheckbox.checked = (polygon || circle) && !!object.__liaDgsShowArea;
+  state.perimeterOption.hidden = !polygon && !circle;
+  state.perimeterCheckbox.checked = (polygon || circle) && !!object.__liaDgsShowPerimeter;
   state.coordinateSection.hidden = !point;
   resetDeleteButton(state);
   if (point) refreshSideMenuCoordinates(state);
-  state.fillColorButton.hidden = !polygon;
+  state.fillColorButton.hidden = !polygon && !circle && !angle;
   state.colorButtons.forEach((button, index) => {
     const kind = button.dataset.colorKind as 'text' | 'line' | 'fill';
     state.colorPreviews[index].style.background = getDgsObjectColor(object, kind);
@@ -1930,7 +2701,13 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   const opacityPercent = Math.round(getDgsObjectOpacity(object) * 100);
   state.opacityInput.value = String(opacityPercent);
   state.opacityValue.textContent = opacityPercent + '%';
-  state.colorPreviews.forEach((preview) => { preview.style.opacity = String(opacityPercent / 100); });
+  state.colorPreviews.forEach((preview, index) => {
+    const kind = state.colorButtons[index].dataset.colorKind;
+    preview.style.opacity = polygon || circle
+      ? (kind === 'fill' ? String(opacityPercent / 100) : '1')
+      : String(opacityPercent / 100);
+  });
+  state.layerInput.value = String(getDgsObjectLayer(object));
 }
 
 function notifyRegressionLayout(state: DgsState, dgsOpen?: boolean): void {
@@ -1955,6 +2732,8 @@ function renderToolState(state: DgsState): void {
   const segmentActive = state.activeTool === 'segment';
   const lineActive = state.activeTool === 'line';
   const polygonActive = state.activeTool === 'polygon';
+  const circleActive = state.activeTool === 'circle';
+  const angleActive = state.activeTool === 'angle';
   state.pointButton.classList.toggle('is-active', pointActive);
   state.pointButton.setAttribute('aria-pressed', pointActive ? 'true' : 'false');
   state.pointButton.setAttribute('aria-label', pointActive ? text.stopPoint : text.setPoint);
@@ -1964,14 +2743,20 @@ function renderToolState(state: DgsState): void {
   state.segmentToolButton.setAttribute('aria-pressed', segmentActive ? 'true' : 'false');
   state.lineToolButton.classList.toggle('is-active', lineActive);
   state.lineToolButton.setAttribute('aria-pressed', lineActive ? 'true' : 'false');
-  state.polygonButton.classList.toggle('is-active', polygonActive);
-  state.polygonButton.setAttribute('aria-pressed', polygonActive ? 'true' : 'false');
+  state.polygonButton.classList.toggle('is-active', polygonActive || circleActive);
+  state.polygonButton.setAttribute('aria-pressed', polygonActive || circleActive ? 'true' : 'false');
+  state.polygonToolButton.classList.toggle('is-active', polygonActive);
+  state.polygonToolButton.setAttribute('aria-pressed', polygonActive ? 'true' : 'false');
+  state.circleToolButton.classList.toggle('is-active', circleActive);
+  state.circleToolButton.setAttribute('aria-pressed', circleActive ? 'true' : 'false');
+  state.angleButton.classList.toggle('is-active', angleActive);
+  state.angleButton.setAttribute('aria-pressed', angleActive ? 'true' : 'false');
   refreshConstructionModeCursor(state.boardContainer);
 }
 
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'point' | 'segment' | 'line' | 'polygon',
+  tool: '' | 'point' | 'segment' | 'line' | 'polygon' | 'circle' | 'angle',
   deactivateRegression = true
 ): void {
   if (tool) {
@@ -1980,6 +2765,8 @@ function setActiveTool(
       if (!other || other === state || other.boardId !== state.boardId || !other.activeTool) return;
       setSelectedSegmentPoint(other, null);
       setSelectedPolygonPoints(other, []);
+      setSelectedAnglePoints(other, []);
+      clearDgsCirclePreview(other);
       other.activeTool = '';
       renderToolState(other);
     });
@@ -1990,6 +2777,8 @@ function setActiveTool(
     setSelectedSegmentPoint(state, null);
   }
   if (state.activeTool === 'polygon' && tool !== 'polygon') setSelectedPolygonPoints(state, []);
+  if (state.activeTool === 'angle' && tool !== 'angle') setSelectedAnglePoints(state, []);
+  if (state.activeTool === 'circle' && tool !== 'circle') clearDgsCirclePreview(state);
   state.activeTool = tool;
   renderToolState(state);
 }
@@ -2286,6 +3075,7 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   state.areaCheckbox.tabIndex = open && !state.areaOption.hidden ? 0 : -1;
   state.perimeterCheckbox.tabIndex = open && !state.perimeterOption.hidden ? 0 : -1;
   state.colorButtons.forEach((button) => { button.tabIndex = open && !button.hidden ? 0 : -1; });
+  state.layerInput.tabIndex = open ? 0 : -1;
   state.deleteButton.tabIndex = open ? 0 : -1;
   if (!open) {
     setColorPopupOpen(state, false);
@@ -2306,19 +3096,39 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.pointButton.tabIndex = open ? 0 : -1;
   state.segmentButton.tabIndex = open ? 0 : -1;
   state.polygonButton.tabIndex = open ? 0 : -1;
+  state.angleButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setGeometrySubmenuOpen(state, false);
+  if (!open) setShapeSubmenuOpen(state, false);
   if (changed) trackAxisWithMenu(state);
   if (changed) notifyRegressionLayout(state, open);
 }
 
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setShapeSubmenuOpen(state, false);
   state.geometrySubmenuOpen = open;
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.segmentButton.setAttribute('aria-expanded', open ? 'true' : 'false');
   state.segmentToolButton.tabIndex = open ? 0 : -1;
   state.lineToolButton.tabIndex = open ? 0 : -1;
+}
+
+function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open && state.geometrySubmenuOpen) {
+    state.geometrySubmenuOpen = false;
+    state.geometrySubmenu.dataset.open = '0';
+    state.geometrySubmenu.setAttribute('aria-hidden', 'true');
+    state.segmentButton.setAttribute('aria-expanded', 'false');
+    state.segmentToolButton.tabIndex = -1;
+    state.lineToolButton.tabIndex = -1;
+  }
+  state.shapeSubmenuOpen = open;
+  state.shapeSubmenu.dataset.open = open ? '1' : '0';
+  state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.polygonButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  state.polygonToolButton.tabIndex = open ? 0 : -1;
+  state.circleToolButton.tabIndex = open ? 0 : -1;
 }
 
 function getDgsGeometryLanguage(anchor: HTMLElement | null, explicitLanguage?: string): 'de' | 'en' {
@@ -2376,6 +3186,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   if (
     existing &&
     existing.language === geometryLanguage &&
+    existing.board === (window.__boards && window.__boards[boardId]) &&
     existing.boardContainer === boardContainer &&
     existing.button.isConnected &&
     !!existing.menuClip?.isConnected &&
@@ -2388,9 +3199,13 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.pointButton?.isConnected &&
     !!existing.segmentButton?.isConnected &&
     !!existing.polygonButton?.isConnected &&
+    !!existing.angleButton?.isConnected &&
     !!existing.geometrySubmenu?.isConnected &&
     !!existing.segmentToolButton?.isConnected &&
     !!existing.lineToolButton?.isConnected &&
+    !!existing.shapeSubmenu?.isConnected &&
+    !!existing.polygonToolButton?.isConnected &&
+    !!existing.circleToolButton?.isConnected &&
     !!existing.measurementOption?.isConnected &&
     !!existing.measurementCheckbox?.isConnected &&
     !!existing.areaOption?.isConnected &&
@@ -2402,12 +3217,15 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     existing.colorButtons.every((button) => button.isConnected) &&
     !!existing.colorPopup?.isConnected &&
     !!existing.opacityInput?.isConnected &&
+    !!existing.layerInput?.isConnected &&
     !!existing.deleteButton?.isConnected &&
     !!existing.regressionDivider?.isConnected &&
     typeof existing.onBoardPointerDown === 'function' &&
+    typeof existing.onBoardPointerMove === 'function' &&
     typeof existing.onBoardContextMenu === 'function' &&
     typeof existing.onDocumentPointerDown === 'function'
   ) {
+    restoreDgsConstruction(existing);
     applyLayout(existing);
     return;
   }
@@ -2426,6 +3244,9 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     }
     if (existing.onBoardPointerDown) {
       existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
+    }
+    if (existing.onBoardPointerMove) {
+      existing.boardContainer.removeEventListener('pointermove', existing.onBoardPointerMove, true);
     }
     if (existing.onBoardContextMenu) {
       existing.boardContainer.removeEventListener('contextmenu', existing.onBoardContextMenu, true);
@@ -2469,6 +3290,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const lineLabel = text.straightLine;
   const segmentIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16L18 8"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
   const lineIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19L22 5"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
+  const polygonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-polygon-fill" d="M5 18L12 5L19 18Z"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M10.5 3.5l3 3M13.5 3.5l-3 3M17.5 16.5l3 3M20.5 16.5l-3 3"></path></svg>';
+  const circleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"></circle><path class="lia-dgs-cross" d="M10.5 10.5l3 3M13.5 10.5l-3 3M17.8 10.5l3 3M20.8 10.5l-3 3"></path></svg>';
 
   const segmentButton = document.createElement('button');
   segmentButton.type = 'button';
@@ -2488,32 +3311,56 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   geometrySubmenu.setAttribute('aria-label', geometryLanguage === 'de' ? 'Linienwerkzeuge' : 'Line tools');
   segmentButton.setAttribute('aria-controls', geometrySubmenu.id);
 
-  const makeGeometryTool = (label: string, icon: string) => {
+  const makeGeometryTool = (parent: HTMLElement, label: string, icon: string) => {
     const toolButton = document.createElement('button');
     toolButton.type = 'button';
     toolButton.className = 'lia-dgs-geometry-tool';
     toolButton.setAttribute('role', 'menuitem');
     toolButton.innerHTML = icon + '<span>' + label + '</span>';
     toolButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
-    geometrySubmenu.appendChild(toolButton);
+    parent.appendChild(toolButton);
     return toolButton;
   };
 
-  const segmentToolButton = makeGeometryTool(segmentLabel, segmentIcon);
+  const segmentToolButton = makeGeometryTool(geometrySubmenu, segmentLabel, segmentIcon);
   segmentToolButton.setAttribute('aria-pressed', 'false');
-  const lineToolButton = makeGeometryTool(lineLabel, lineIcon);
+  const lineToolButton = makeGeometryTool(geometrySubmenu, lineLabel, lineIcon);
   lineToolButton.setAttribute('aria-pressed', 'false');
   menuBar.appendChild(geometrySubmenu);
 
   const polygonButton = document.createElement('button');
   polygonButton.type = 'button';
   polygonButton.className = 'lia-dgs-geometry-button lia-dgs-polygon-button';
-  polygonButton.setAttribute('aria-label', geometryLanguage === 'de' ? 'Fläche erstellen' : 'Create polygon');
+  polygonButton.setAttribute('aria-label', text.shapes);
   polygonButton.setAttribute('aria-pressed', 'false');
-  polygonButton.title = geometryLanguage === 'de' ? 'Fläche erstellen' : 'Create polygon';
-  polygonButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-polygon-fill" d="M5 18L12 5L19 18Z"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M10.5 3.5l3 3M13.5 3.5l-3 3M17.5 16.5l3 3M20.5 16.5l-3 3"></path></svg>';
+  polygonButton.title = text.shapes;
+  polygonButton.setAttribute('aria-haspopup', 'menu');
+  polygonButton.setAttribute('aria-expanded', 'false');
+  polygonButton.innerHTML = polygonIcon;
   polygonButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(polygonButton);
+
+  const shapeSubmenu = document.createElement('div');
+  shapeSubmenu.id = `dgs-shape-submenu-${uid}`;
+  shapeSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-shape-submenu';
+  shapeSubmenu.setAttribute('role', 'menu');
+  shapeSubmenu.setAttribute('aria-label', text.shapes);
+  polygonButton.setAttribute('aria-controls', shapeSubmenu.id);
+  const polygonToolButton = makeGeometryTool(shapeSubmenu, text.polygon, polygonIcon);
+  polygonToolButton.setAttribute('aria-pressed', 'false');
+  const circleToolButton = makeGeometryTool(shapeSubmenu, text.circle, circleIcon);
+  circleToolButton.setAttribute('aria-pressed', 'false');
+  menuBar.appendChild(shapeSubmenu);
+
+  const angleButton = document.createElement('button');
+  angleButton.type = 'button';
+  angleButton.className = 'lia-dgs-geometry-button lia-dgs-angle-button';
+  angleButton.setAttribute('aria-label', text.createAngle);
+  angleButton.setAttribute('aria-pressed', 'false');
+  angleButton.title = text.createAngle;
+  angleButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-angle-fill" d="M4 20L14 20A10 10 0 0 0 8.3 10.9Z"></path><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3M10.5 1.5l3 3M13.5 1.5l-3 3"></path></svg>';
+  angleButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(angleButton);
 
   const regressionDivider = document.createElement('span');
   regressionDivider.className = 'lia-dgs-regression-divider';
@@ -2634,6 +3481,22 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const colorPreview = colorPreviews[0];
   sideMenu.appendChild(colorSection);
 
+  const layerRow = document.createElement('label');
+  layerRow.className = 'lia-dgs-layer-row';
+  const layerCaption = document.createElement('span');
+  layerCaption.textContent = text.layer;
+  const layerInput = document.createElement('input');
+  layerInput.type = 'number';
+  layerInput.className = 'lia-dgs-layer-input';
+  layerInput.min = '0';
+  layerInput.max = '20';
+  layerInput.step = '1';
+  layerInput.value = '5';
+  layerInput.setAttribute('aria-label', geometryLanguage === 'de' ? 'Zeichenebene' : 'Drawing layer');
+  layerRow.appendChild(layerCaption);
+  layerRow.appendChild(layerInput);
+  sideMenu.appendChild(layerRow);
+
   const colorPopup = document.createElement('div');
   colorPopup.className = 'lia-dgs-color-popup';
   colorPopup.dataset.open = '0';
@@ -2724,6 +3587,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const xAxis = board && board.defaultAxes && board.defaultAxes.x;
   const yAxis = board && board.defaultAxes && board.defaultAxes.y;
   const state: DgsState = {
+    uid,
     boardId,
     language: geometryLanguage,
     board,
@@ -2765,6 +3629,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     opacityValue,
     colorPopupOpen: false,
     activeColorKind: 'text',
+    layerInput,
     deleteButton,
     deleteArmed: false,
     colorHue: 300,
@@ -2774,9 +3639,13 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     pointButton,
     segmentButton,
     polygonButton,
+    angleButton,
     geometrySubmenu,
     segmentToolButton,
     lineToolButton,
+    shapeSubmenu,
+    polygonToolButton,
+    circleToolButton,
     regressionDivider,
     xAxis,
     xAxisOriginalPoint2: readAxisPoint2(xAxis),
@@ -2789,15 +3658,23 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     axisSyncing: false,
     open: false,
     geometrySubmenuOpen: false,
+    shapeSubmenuOpen: false,
     sideMenuOpen: false,
     contextObject: null,
     activeTool: '',
     selectedSegmentPoint: null,
-    selectedPolygonPoints: []
+    selectedPolygonPoints: [],
+    selectedAnglePoints: [],
+    selectedCircleCenter: null,
+    circlePreview: null,
+    circlePreviewPosition: null,
+    restoring: false
   };
   states[uid] = state;
+  restoreDgsConstruction(state);
   setMenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
+  setShapeSubmenuOpen(state, false);
   setSideMenuOpen(state, false);
   applyLayout(state);
 
@@ -2805,6 +3682,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setGeometrySubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'point' ? '' : 'point');
   });
 
@@ -2834,7 +3712,31 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setGeometrySubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, !state.shapeSubmenuOpen);
+  });
+
+  polygonToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    polygonButton.innerHTML = polygonIcon;
+    setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'polygon' ? '' : 'polygon');
+  });
+
+  circleToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    polygonButton.innerHTML = circleIcon;
+    setShapeSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'circle' ? '' : 'circle');
+  });
+
+  angleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setGeometrySubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'angle' ? '' : 'angle');
   });
 
   menuBar.addEventListener('click', (evt) => {
@@ -2858,8 +3760,14 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   [xCoordinateInput, yCoordinateInput].forEach((input) => {
     input.addEventListener('blur', () => applyCoordinateInputs(state));
     input.addEventListener('keydown', (evt) => {
+      if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+          evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+        evt.stopPropagation();
+        return;
+      }
       if (evt.key !== 'Enter') return;
       evt.preventDefault();
+      evt.stopPropagation();
       applyCoordinateInputs(state);
     });
   });
@@ -2875,18 +3783,44 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       } catch (e) {}
     }
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    persistDgsConstruction(state);
+  });
+
+  const applyLayerInput = () => {
+    const object = state.contextObject;
+    if (!object) return;
+    const layer = setDgsObjectLayer(object, Number(layerInput.value));
+    layerInput.value = String(layer);
+    persistDgsConstruction(state);
+  };
+  layerInput.addEventListener('input', applyLayerInput);
+  layerInput.addEventListener('blur', applyLayerInput);
+  layerInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowUp' || evt.key === 'ArrowDown' ||
+        evt.key === 'ArrowLeft' || evt.key === 'ArrowRight') {
+      evt.stopPropagation();
+      return;
+    }
+    if (evt.key === 'Enter') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      applyLayerInput();
+      layerInput.blur();
+    }
   });
 
   nameOption.input.addEventListener('change', () => {
     if (!state.contextObject) return;
     setDgsObjectNameVisible(state.contextObject, nameOption.input.checked);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    persistDgsConstruction(state);
   });
 
   objectOption.input.addEventListener('change', () => {
     if (!state.contextObject) return;
     setDgsObjectVisible(state.contextObject, objectOption.input.checked);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    persistDgsConstruction(state);
   });
 
   const applyNameInput = () => {
@@ -2899,11 +3833,18 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   };
   sideMenuNameInput.addEventListener('blur', applyNameInput);
   sideMenuNameInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+        evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+      evt.stopPropagation();
+      return;
+    }
     if (evt.key === 'Enter') {
       evt.preventDefault();
+      evt.stopPropagation();
       if (applyNameInput()) sideMenuNameInput.blur();
     } else if (evt.key === 'Escape') {
       evt.preventDefault();
+      evt.stopPropagation();
       sideMenuNameInput.value = state.contextObject ? getDgsObjectName(state.contextObject) : '';
       sideMenuNameInput.setAttribute('aria-invalid', 'false');
       sideMenuNameInput.blur();
@@ -2914,22 +3855,28 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     const object = state.contextObject;
     if (!object || isDgsPoint(object) || isDgsPolygon(object)) return;
     if (isDgsLine(object)) object.__liaDgsShowEquation = measurementOption.input.checked;
+    else if (isDgsAngle(object)) object.__liaDgsShowAngle = measurementOption.input.checked;
     else object.__liaDgsShowLength = measurementOption.input.checked;
     refreshDgsObjectLabel(object);
+    persistDgsConstruction(state);
   });
 
   areaOption.input.addEventListener('change', () => {
-    const polygon = state.contextObject;
-    if (!isDgsPolygon(polygon)) return;
-    polygon.__liaDgsShowArea = areaOption.input.checked;
-    refreshDgsPolygonMeasurementLabel(polygon);
+    const object = state.contextObject;
+    if (!isDgsPolygon(object) && !isDgsCircle(object)) return;
+    object.__liaDgsShowArea = areaOption.input.checked;
+    if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
+    else refreshDgsObjectLabel(object);
+    persistDgsConstruction(state);
   });
 
   perimeterOption.input.addEventListener('change', () => {
-    const polygon = state.contextObject;
-    if (!isDgsPolygon(polygon)) return;
-    polygon.__liaDgsShowPerimeter = perimeterOption.input.checked;
-    refreshDgsPolygonMeasurementLabel(polygon);
+    const object = state.contextObject;
+    if (!isDgsPolygon(object) && !isDgsCircle(object)) return;
+    object.__liaDgsShowPerimeter = perimeterOption.input.checked;
+    if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
+    else refreshDgsObjectLabel(object);
+    persistDgsConstruction(state);
   });
 
   colorButtons.forEach((button) => button.addEventListener('click', (evt) => {
@@ -2964,6 +3911,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (!color) return false;
     syncColorPicker(state, color);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    persistDgsConstruction(state);
     return true;
   };
 
@@ -2973,7 +3921,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (rect.width <= 0 || rect.height <= 0) return;
     state.colorSaturation = Math.max(0, Math.min(1, (evt.clientX - rect.left) / rect.width));
     state.colorValue = 1 - Math.max(0, Math.min(1, (evt.clientY - rect.top) / rect.height));
-    applyPickerColor(state);
+    applyPickerColor(state, false);
   };
   colorPalette.addEventListener('pointerdown', (evt) => {
     if (evt.button !== 0) return;
@@ -2992,6 +3940,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (activePalettePointer !== evt.pointerId) return;
     activePalettePointer = null;
     try { colorPalette.releasePointerCapture(evt.pointerId); } catch (e) {}
+    persistDgsConstruction(state, true);
   };
   colorPalette.addEventListener('pointerup', finishPalettePointer);
   colorPalette.addEventListener('pointercancel', finishPalettePointer);
@@ -3007,23 +3956,32 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   });
   colorHueInput.addEventListener('input', () => {
     state.colorHue = Number(colorHueInput.value) || 0;
-    applyPickerColor(state);
+    applyPickerColor(state, false);
   });
+  colorHueInput.addEventListener('change', () => persistDgsConstruction(state, true));
   colorHexInput.addEventListener('change', () => applyColor(colorHexInput.value));
   colorHexInput.addEventListener('keydown', (evt) => {
     if (evt.key !== 'Enter') return;
     evt.preventDefault();
     applyColor(colorHexInput.value);
   });
-  opacityInput.addEventListener('input', () => {
+  const applyOpacity = (recordHistory: boolean) => {
     const object = state.contextObject;
     if (!object) return;
     const percent = Math.max(0, Math.min(100, Number(opacityInput.value) || 0));
     opacityValue.textContent = Math.round(percent) + '%';
-    colorPreviews.forEach((preview) => { preview.style.opacity = String(percent / 100); });
+    colorPreviews.forEach((preview, index) => {
+      const kind = colorButtons[index].dataset.colorKind;
+      preview.style.opacity = isDgsPolygon(object) || isDgsCircle(object)
+        ? (kind === 'fill' ? String(percent / 100) : '1')
+        : String(percent / 100);
+    });
     setDgsObjectOpacity(object, percent / 100);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
-  });
+    persistDgsConstruction(state, recordHistory);
+  };
+  opacityInput.addEventListener('input', () => applyOpacity(false));
+  opacityInput.addEventListener('change', () => applyOpacity(true));
 
   state.onDocumentPointerDown = (evt: PointerEvent) => {
     if (!state.colorPopupOpen) return;
@@ -3057,6 +4015,52 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (!state.activeTool) return;
     if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
 
+    if (state.activeTool === 'circle') {
+      let point = findNearestBoardPoint(state, evt);
+      if (!point) {
+        const coordinates = eventToUserCoordinates(state, evt);
+        if (!coordinates) return;
+        point = createDgsPoint(state, coordinates.x, coordinates.y);
+        if (!point) return;
+        persistDgsConstruction(state);
+      }
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      if (!state.selectedCircleCenter) {
+        startDgsCirclePreview(state, point);
+        return;
+      }
+      if (point === state.selectedCircleCenter) return;
+      const center = state.selectedCircleCenter;
+      clearDgsCirclePreview(state);
+      const circle = createDgsCircle(state, center, point);
+      if (circle) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
+
+    if (state.activeTool === 'angle') {
+      const point = findNearestBoardPoint(state, evt);
+      if (!point || state.selectedAnglePoints.includes(point)) return;
+
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      const selected = state.selectedAnglePoints.concat(point);
+      if (selected.length < 3) {
+        setSelectedAnglePoints(state, selected);
+        return;
+      }
+
+      const angle = createDgsAngle(state, selected);
+      if (angle) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
+
     if (state.activeTool === 'polygon') {
       const point = findNearestBoardPoint(state, evt);
       if (!point) return;
@@ -3072,7 +4076,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       if (point === selected[0]) {
         if (selected.length < 3) return;
         const polygon = createDgsPolygon(state, selected);
-        if (polygon) setActiveTool(state, '', false);
+        if (polygon) {
+          persistDgsConstruction(state);
+          setActiveTool(state, '', false);
+        }
         return;
       }
 
@@ -3096,7 +4103,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       const geometry = state.activeTool === 'line'
         ? createDgsLine(state, state.selectedSegmentPoint, point)
         : createDgsSegment(state, state.selectedSegmentPoint, point);
-      if (geometry) setActiveTool(state, '', false);
+      if (geometry) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
       return;
     }
 
@@ -3105,9 +4115,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 
     evt.preventDefault();
     evt.stopImmediatePropagation();
-    createDgsPoint(state, coordinates.x, coordinates.y);
+    const point = createDgsPoint(state, coordinates.x, coordinates.y);
+    if (point) persistDgsConstruction(state);
   };
   boardContainer.addEventListener('pointerdown', state.onBoardPointerDown, true);
+
+  state.onBoardPointerMove = (evt: PointerEvent) => {
+    if (state.activeTool !== 'circle' || !state.selectedCircleCenter || eventTargetsBoardUi(evt)) return;
+    const coordinates = eventToUserCoordinates(state, evt);
+    if (!coordinates) return;
+    state.circlePreviewPosition = coordinates;
+    try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+  };
+  boardContainer.addEventListener('pointermove', state.onBoardPointerMove, true);
 
   state.onBoardViewportChange = () => {
     if (!state.axisSyncing) {

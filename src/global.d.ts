@@ -203,6 +203,8 @@ interface Window {
   __checkRegressionQuiz: ((uid: string, spec: string) => boolean) | undefined;
   undoAction: ((boardId: string) => void) | undefined;
   redoAction: ((boardId: string) => void) | undefined;
+  __recordDgsHistory: ((boardId: string, before: any, after: any) => void) | undefined;
+  __applyDgsHistory: ((boardId: string, snapshot: any) => void) | undefined;
 
   // DGS subsystem (@DGS)
   __dgsReady: boolean | undefined;
