@@ -59,6 +59,10 @@ type DgsState = {
   toolsDivider: HTMLSpanElement;
   pointButton: HTMLButtonElement;
   segmentButton: HTMLButtonElement;
+  orthogonalButton: HTMLButtonElement;
+  relationSubmenu: HTMLDivElement;
+  orthogonalToolButton: HTMLButtonElement;
+  parallelToolButton: HTMLButtonElement;
   polygonButton: HTMLButtonElement;
   angleButton: HTMLButtonElement;
   angleSubmenu: HTMLDivElement;
@@ -88,13 +92,16 @@ type DgsState = {
   axisSyncing: boolean;
   open: boolean;
   geometrySubmenuOpen: boolean;
+  relationSubmenuOpen: boolean;
   shapeSubmenuOpen: boolean;
   angleSubmenuOpen: boolean;
   angleDialogOpen: boolean;
   sideMenuOpen: boolean;
   contextObject: any | null;
-  activeTool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'polygon' | 'circle' | 'angle' | 'angle-measured';
+  activeTool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'polygon' | 'circle' | 'angle' | 'angle-measured';
   selectedSegmentPoint: any | null;
+  selectedRelationLine: any | null;
+  selectedRelationPoint: any | null;
   selectedPolygonPoints: any[];
   selectedAnglePoints: any[];
   selectedCircleCenter: any | null;
@@ -115,7 +122,7 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
-    point: 'Punkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis',
+    point: 'Punkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis',
     coordinates: 'Koordinaten', fixed: 'Fixieren', showName: 'Name anzeigen',
     showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showAngleObject: 'Winkel anzeigen',
     showSegment: 'Strecke anzeigen', showEquation: 'Geradengleichung anzeigen',
@@ -126,7 +133,7 @@ const DGS_TEXT = {
     straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', createMeasuredAngle: 'Winkel nach Maß', angleMeasure: 'Winkelmaß', create: 'Erzeugen', cancel: 'Abbrechen', shapes: 'Flächenwerkzeuge', layer: 'Ebene'
   },
   en: {
-    point: 'Point', line: 'Straight Line', ray: 'Ray', vector: 'Vector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle',
+    point: 'Point', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle',
     coordinates: 'Coordinates', fixed: 'Lock', showName: 'Show name',
     showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showAngleObject: 'Show angle',
     showSegment: 'Show distance', showEquation: 'Show line equation',
@@ -641,7 +648,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-regression-divider {
-      left: 232px;
+      left: 275px;
       display: none;
     }
 
@@ -685,12 +692,16 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 103px;
     }
 
-    .lia-dgs-polygon-button {
+    .lia-dgs-orthogonal-button {
       left: 146px;
     }
 
-    .lia-dgs-angle-button {
+    .lia-dgs-polygon-button {
       left: 189px;
+    }
+
+    .lia-dgs-angle-button {
+      left: 232px;
     }
 
     .lia-dgs-geometry-button.lia-dgs-angle-button svg {
@@ -737,11 +748,15 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-shape-submenu {
+      left: 181px;
+    }
+
+    .lia-dgs-relation-submenu {
       left: 138px;
     }
 
     .lia-dgs-angle-submenu {
-      left: 181px;
+      left: 224px;
     }
 
     .lia-dgs-geometry-tool {
@@ -811,6 +826,10 @@ function ensureStyles(root: Document | ShadowRoot): void {
       stroke-width: 1.65;
     }
 
+    .lia-dgs-geometry-button .lia-dgs-reference {
+      stroke: var(--lia-dgs-neutral-color, currentColor);
+    }
+
     .lia-dgs-point-button .lia-dgs-cross {
       stroke: #ff00ff;
     }
@@ -855,6 +874,12 @@ function ensureStyles(root: Document | ShadowRoot): void {
       filter:
         drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5))
         drop-shadow(0 0 3px var(--lia-dgs-theme-color, #00a8b5));
+    }
+
+    .lia-dgs-relation-source {
+      filter:
+        drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5))
+        drop-shadow(0 0 4px var(--lia-dgs-theme-color, #00a8b5));
     }
 
     .lia-dgs-geometry-button circle,
@@ -1279,6 +1304,79 @@ function findOrCreateDgsPoint(state: DgsState, evt: PointerEvent): any | null {
   return createDgsPoint(state, coordinates.x, coordinates.y);
 }
 
+function isDgsLinearObject(object: any): boolean {
+  return !!object && !!(
+    object.__liaDgsSegment || object.__liaDgsRay || object.__liaDgsVector || object.__liaDgsLine
+  );
+}
+
+function findNearestDgsLinearObject(
+  state: DgsState,
+  evt: MouseEvent | PointerEvent,
+  maxDistancePx = 12
+): any | null {
+  const board = state.board;
+  if (!board || !board.origin || !board.origin.scrCoords) return null;
+  const rect = state.boardContainer.getBoundingClientRect();
+  const localX = evt.clientX - rect.left;
+  const localY = evt.clientY - rect.top;
+  const originX = Number(board.origin.scrCoords[1] || 0);
+  const originY = Number(board.origin.scrCoords[2] || 0);
+  const unitX = Number(board.unitX || 0);
+  const unitY = Number(board.unitY || 0);
+  if (![originX, originY, unitX, unitY].every(Number.isFinite)) return null;
+
+  let nearest: any | null = null;
+  let nearestDistance = maxDistancePx;
+  let nearestLayer = -1;
+  const seen = new Set<any>();
+  const consider = (line: any) => {
+    if (!isDgsLinearObject(line) || seen.has(line) || line.__liaDgsShowObject === false) return;
+    seen.add(line);
+    try {
+      if (typeof line.hasPoint === 'function' && line.hasPoint(localX, localY)) {
+        const layer = getDgsObjectLayer(line);
+        if (layer >= nearestLayer) {
+          nearest = line;
+          nearestDistance = 0;
+          nearestLayer = layer;
+        }
+        return;
+      }
+    } catch (e) {}
+    const point1 = line.point1;
+    const point2 = line.point2;
+    if (!point1 || !point2 || typeof point1.X !== 'function' || typeof point2.X !== 'function') return;
+    try {
+      const x1 = originX + Number(point1.X()) * unitX;
+      const y1 = originY - Number(point1.Y()) * unitY;
+      const x2 = originX + Number(point2.X()) * unitX;
+      const y2 = originY - Number(point2.Y()) * unitY;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lengthSq = dx * dx + dy * dy;
+      if (lengthSq <= 1e-12) return;
+      const rawRatio = ((localX - x1) * dx + (localY - y1) * dy) / lengthSq;
+      const ratio = isDgsLine(line)
+        ? rawRatio
+        : (isDgsRay(line) ? Math.max(0, rawRatio) : Math.max(0, Math.min(1, rawRatio)));
+      const distance = Math.hypot(localX - (x1 + ratio * dx), localY - (y1 + ratio * dy));
+      const layer = getDgsObjectLayer(line);
+      if (distance <= maxDistancePx &&
+          (layer > nearestLayer || (layer === nearestLayer && distance <= nearestDistance))) {
+        nearest = line;
+        nearestDistance = distance;
+        nearestLayer = layer;
+      }
+    } catch (e) {}
+  };
+  if (Array.isArray(board.objectsList)) board.objectsList.forEach(consider);
+  if (board.objects && typeof board.objects === 'object') {
+    Object.keys(board.objects).forEach((key) => consider(board.objects[key]));
+  }
+  return nearest;
+}
+
 function setSelectedSegmentPoint(state: DgsState, point: any | null): void {
   const previousNode = state.selectedSegmentPoint && state.selectedSegmentPoint.rendNode;
   try { if (previousNode && previousNode.classList) previousNode.classList.remove('lia-dgs-segment-endpoint'); } catch (e) {}
@@ -1286,6 +1384,19 @@ function setSelectedSegmentPoint(state: DgsState, point: any | null): void {
   state.selectedSegmentPoint = point || null;
   const nextNode = state.selectedSegmentPoint && state.selectedSegmentPoint.rendNode;
   try { if (nextNode && nextNode.classList) nextNode.classList.add('lia-dgs-segment-endpoint'); } catch (e) {}
+}
+
+function setSelectedRelationInputs(state: DgsState, line: any | null, point: any | null): void {
+  [state.selectedRelationLine, state.selectedRelationPoint].forEach((object) => {
+    const node = object && object.rendNode;
+    try { if (node && node.classList) node.classList.remove('lia-dgs-relation-source'); } catch (e) {}
+  });
+  state.selectedRelationLine = line || null;
+  state.selectedRelationPoint = point || null;
+  [state.selectedRelationLine, state.selectedRelationPoint].forEach((object) => {
+    const node = object && object.rendNode;
+    try { if (node && node.classList) node.classList.add('lia-dgs-relation-source'); } catch (e) {}
+  });
 }
 
 function setSelectedPolygonPoints(state: DgsState, points: any[]): void {
@@ -1529,6 +1640,90 @@ function createDgsLine(state: DgsState, point1: any, point2: any): any | null {
   }
 }
 
+function createDgsPerpendicular(state: DgsState, baseLine: any, throughPoint: any): any | null {
+  if (!state.board || !isDgsLinearObject(baseLine) || !throughPoint) return null;
+
+  const name = getNextSegmentName(state);
+  try {
+    const line = state.board.create('perpendicular', [baseLine, throughPoint], {
+      name: '\\(' + name + '\\)',
+      withLabel: true,
+      fixed: true,
+      straightFirst: true,
+      straightLast: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 20,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    line.__liaDgsLine = true;
+    line.__liaDgsPerpendicular = true;
+    line.__liaDgsPerpendicularBase = baseLine;
+    line.__liaDgsPerpendicularPoint = throughPoint;
+    line.__liaDgsLineName = name;
+    line.__liaDgsLanguage = state.language;
+    line.__liaDgsColor = '#ff00ff';
+    line.__liaDgsShowName = true;
+    line.__liaDgsShowObject = true;
+    line.__liaDgsOpacity = 1;
+    line.__liaDgsShowEquation = false;
+    refreshDgsObjectLabel(line);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return line;
+  } catch (e) {
+    return null;
+  }
+}
+
+function createDgsParallel(state: DgsState, baseLine: any, throughPoint: any): any | null {
+  if (!state.board || !isDgsLinearObject(baseLine) || !throughPoint) return null;
+
+  const name = getNextSegmentName(state);
+  try {
+    const line = state.board.create('parallel', [baseLine, throughPoint], {
+      name: '\\(' + name + '\\)',
+      withLabel: true,
+      fixed: true,
+      straightFirst: true,
+      straightLast: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 20,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    line.__liaDgsLine = true;
+    line.__liaDgsParallel = true;
+    line.__liaDgsParallelBase = baseLine;
+    line.__liaDgsParallelPoint = throughPoint;
+    line.__liaDgsLineName = name;
+    line.__liaDgsLanguage = state.language;
+    line.__liaDgsColor = '#ff00ff';
+    line.__liaDgsShowName = true;
+    line.__liaDgsShowObject = true;
+    line.__liaDgsOpacity = 1;
+    line.__liaDgsShowEquation = false;
+    refreshDgsObjectLabel(line);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return line;
+  } catch (e) {
+    return null;
+  }
+}
+
 function createDgsPolygon(state: DgsState, points: any[]): any | null {
   if (!state.board || !Array.isArray(points) || points.length < 3 || new Set(points).size !== points.length) {
     return null;
@@ -1714,6 +1909,40 @@ function getDgsAngleRadians(angle: any): number {
   } catch (e) { return NaN; }
 }
 
+function syncDgsRightAngleStyle(angle: any): void {
+  if (!isDgsAngle(angle)) return;
+  const german = getDgsGeometryLanguage(null, angle.__liaDgsLanguage) === 'de';
+  const orthoType = german
+    ? (angle.__liaDgsShowAngle ? 'sectordot' : 'sector')
+    : 'square';
+  const color = getDgsObjectColor(angle, 'line');
+  try {
+    angle.setAttribute({
+      orthoType,
+      dot: {
+        face: 'o',
+        size: 2.5,
+        strokeColor: color,
+        fillColor: color,
+        highlightStrokeColor: color,
+        highlightFillColor: color
+      }
+    });
+  } catch (e) {}
+  try {
+    if (angle.dot && typeof angle.dot.setAttribute === 'function') {
+      angle.dot.setAttribute({
+        face: 'o',
+        size: 2.5,
+        strokeColor: color,
+        fillColor: color,
+        highlightStrokeColor: color,
+        highlightFillColor: color
+      });
+    }
+  } catch (e) {}
+}
+
 function getDgsAngleRadius(points: any[]): number {
   try {
     const firstArm = Math.hypot(points[0].X() - points[1].X(), points[0].Y() - points[1].Y());
@@ -1757,6 +1986,8 @@ function createDgsAngle(state: DgsState, points: any[]): any | null {
       fixed: true,
       highlight: false,
       type: 'sector',
+      orthoType: state.language === 'de' ? 'sector' : 'square',
+      orthoSensitivity: 0.25,
       orientation: 'counterclockwise',
       selection: 'auto',
       radius: function() { return getDgsAngleRadius(points); },
@@ -1786,6 +2017,7 @@ function createDgsAngle(state: DgsState, points: any[]): any | null {
     angle.__liaDgsShowObject = true;
     angle.__liaDgsOpacity = 0.22;
     angle.__liaDgsShowAngle = false;
+    syncDgsRightAngleStyle(angle);
     const label = state.board.create('text', [
       function() { return getDgsAngleLabelPosition(angle).x; },
       function() { return getDgsAngleLabelPosition(angle).y; },
@@ -1933,6 +2165,8 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     else if (object.__liaDgsSegment) type = 'segment';
     else if (isDgsRay(object)) type = 'ray';
     else if (isDgsVector(object)) type = 'vector';
+    else if (isDgsPerpendicular(object)) type = 'perpendicular';
+    else if (isDgsParallel(object)) type = 'parallel';
     else if (isDgsLine(object)) type = 'line';
     else if (isDgsPolygon(object)) type = 'polygon';
     else if (isDgsCircle(object)) type = 'circle';
@@ -1965,6 +2199,12 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     };
     if (type === 'point') {
       try { record.x = Number(object.X()); record.y = Number(object.Y()); } catch (e) {}
+    } else if (type === 'perpendicular') {
+      record.baseId = ensureDgsPersistentId(object.__liaDgsPerpendicularBase, 'line');
+      record.points = [dgsPointReference(object.__liaDgsPerpendicularPoint)];
+    } else if (type === 'parallel') {
+      record.baseId = ensureDgsPersistentId(object.__liaDgsParallelBase, 'line');
+      record.points = [dgsPointReference(object.__liaDgsParallelPoint)];
     } else if (type === 'segment' || type === 'ray' || type === 'vector' || type === 'line') {
       record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
     } else if (type === 'polygon') {
@@ -2037,6 +2277,7 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   setDgsObjectColor(object, 'text', record.textColor || '#ff00ff');
   setDgsObjectColor(object, 'line', record.lineColor || '#ff00ff');
   setDgsObjectColor(object, 'fill', record.fillColor || '#ff00ff');
+  if (isDgsAngle(object)) syncDgsRightAngleStyle(object);
   setDgsObjectOpacity(object, Number.isFinite(record.opacity) ? record.opacity : 1);
   setDgsObjectVisible(object, record.showObject !== false);
   setDgsObjectNameVisible(object, record.showName !== false);
@@ -2068,22 +2309,47 @@ function restoreDgsConstruction(state: DgsState): void {
       existingById.set(record.id, point);
     });
 
-    saved.records.filter((record: any) => record.type !== 'point').forEach((record: any) => {
-      if (existingById.has(record.id)) return;
-      const points = (record.points || []).map((reference: any) => findDgsPointForRestore(state, reference, existingById));
-      if (!points.length || points.some((point: any) => !point)) return;
-      let object: any = null;
-      if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
-      else if (record.type === 'ray') object = createDgsRay(state, points[0], points[1]);
-      else if (record.type === 'vector') object = createDgsVector(state, points[0], points[1]);
-      else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
-      else if (record.type === 'polygon') object = createDgsPolygon(state, points);
-      else if (record.type === 'circle') object = createDgsCircle(state, points[0], points[1]);
-      else if (record.type === 'angle') object = createDgsAngle(state, points);
-      if (!object) return;
-      applyRestoredDgsProperties(state, object, record);
-      existingById.set(record.id, object);
-    });
+    let pending = saved.records.filter((record: any) => record.type !== 'point');
+    while (pending.length) {
+      const unresolved: any[] = [];
+      let restoredThisPass = 0;
+      pending.forEach((record: any) => {
+        if (existingById.has(record.id)) return;
+        const points = (record.points || []).map((reference: any) => findDgsPointForRestore(state, reference, existingById));
+        if (!points.length || points.some((point: any) => !point)) {
+          unresolved.push(record);
+          return;
+        }
+        let object: any = null;
+        if (record.type === 'perpendicular') {
+          const baseLine = existingById.get(String(record.baseId || ''));
+          if (!isDgsLinearObject(baseLine)) {
+            unresolved.push(record);
+            return;
+          }
+          object = createDgsPerpendicular(state, baseLine, points[0]);
+        } else if (record.type === 'parallel') {
+          const baseLine = existingById.get(String(record.baseId || ''));
+          if (!isDgsLinearObject(baseLine)) {
+            unresolved.push(record);
+            return;
+          }
+          object = createDgsParallel(state, baseLine, points[0]);
+        } else if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
+        else if (record.type === 'ray') object = createDgsRay(state, points[0], points[1]);
+        else if (record.type === 'vector') object = createDgsVector(state, points[0], points[1]);
+        else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
+        else if (record.type === 'polygon') object = createDgsPolygon(state, points);
+        else if (record.type === 'circle') object = createDgsCircle(state, points[0], points[1]);
+        else if (record.type === 'angle') object = createDgsAngle(state, points);
+        if (!object) return;
+        applyRestoredDgsProperties(state, object, record);
+        existingById.set(record.id, object);
+        restoredThisPass += 1;
+      });
+      if (!restoredThisPass) break;
+      pending = unresolved;
+    }
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
   } finally {
     state.restoring = false;
@@ -2094,6 +2360,7 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
   clearDgsCirclePreview(state);
   setAngleDialogOpen(state, false);
   setSelectedSegmentPoint(state, null);
+  setSelectedRelationInputs(state, null, null);
   setSelectedPolygonPoints(state, []);
   setSelectedAnglePoints(state, []);
   if (state.sideMenuOpen) setSideMenuOpen(state, false);
@@ -2404,6 +2671,14 @@ function isDgsLine(object: any): boolean {
   return !!object && !!object.__liaDgsLine;
 }
 
+function isDgsPerpendicular(object: any): boolean {
+  return !!object && !!object.__liaDgsPerpendicular;
+}
+
+function isDgsParallel(object: any): boolean {
+  return !!object && !!object.__liaDgsParallel;
+}
+
 function isDgsRay(object: any): boolean {
   return !!object && !!object.__liaDgsRay;
 }
@@ -2558,9 +2833,12 @@ function dgsMeasurementRelation(value: number): string {
 
 function getDgsLineEquation(line: any): string {
   const language = getDgsGeometryLanguage(null, line && line.__liaDgsLanguage);
-  const point1 = line && line.point1;
+  const relationLine = isDgsPerpendicular(line) || isDgsParallel(line);
+  const point1 = isDgsPerpendicular(line)
+    ? line.__liaDgsPerpendicularPoint
+    : (isDgsParallel(line) ? line.__liaDgsParallelPoint : line && line.point1);
   const point2 = line && line.point2;
-  if (!point1 || !point2) return '';
+  if (!point1 || (!relationLine && !point2)) return '';
 
   let x1 = NaN;
   let y1 = NaN;
@@ -2569,8 +2847,29 @@ function getDgsLineEquation(line: any): string {
   try {
     x1 = Number(point1.X());
     y1 = Number(point1.Y());
-    x2 = Number(point2.X());
-    y2 = Number(point2.Y());
+    if (relationLine) {
+      const baseLine = isDgsPerpendicular(line)
+        ? line.__liaDgsPerpendicularBase
+        : line.__liaDgsParallelBase;
+      let baseDx = NaN;
+      let baseDy = NaN;
+      if (baseLine && Array.isArray(baseLine.stdform)) {
+        baseDx = Number(baseLine.stdform[2]);
+        baseDy = -Number(baseLine.stdform[1]);
+      }
+      if (!Number.isFinite(baseDx) || !Number.isFinite(baseDy) || Math.hypot(baseDx, baseDy) < 1e-12) {
+        const basePoint1 = baseLine && baseLine.point1;
+        const basePoint2 = baseLine && baseLine.point2;
+        if (!basePoint1 || !basePoint2) return '';
+        baseDx = Number(basePoint2.X()) - Number(basePoint1.X());
+        baseDy = Number(basePoint2.Y()) - Number(basePoint1.Y());
+      }
+      x2 = isDgsPerpendicular(line) ? x1 - baseDy : x1 + baseDx;
+      y2 = isDgsPerpendicular(line) ? y1 + baseDx : y1 + baseDy;
+    } else {
+      x2 = Number(point2.X());
+      y2 = Number(point2.Y());
+    }
   } catch (e) {}
   if (![x1, y1, x2, y2].every(Number.isFinite)) return '';
 
@@ -2712,6 +3011,7 @@ function setDgsObjectLayer(object: any, value: number): number {
   apply(object);
   apply(object.label);
   apply(object.arc);
+  apply(object.dot);
   apply(object.__liaDgsMeasurementLabel);
   apply(object.__liaDgsAngleLabel);
   apply(object.__liaDgsCircleLabel);
@@ -2894,6 +3194,16 @@ function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill', colorVal
         : { fillColor: color, highlightFillColor: color });
     } catch (e) {}
   }
+  if (isDgsAngle(object) && object.dot && (kind === 'line' || kind === 'fill')) {
+    try {
+      object.dot.setAttribute({
+        strokeColor: color,
+        fillColor: color,
+        highlightStrokeColor: color,
+        highlightFillColor: color
+      });
+    } catch (e) {}
+  }
 
   if (kind === 'line' && isDgsPolygon(object) && Array.isArray(object.borders)) {
     object.borders.forEach((border: any) => {
@@ -2999,7 +3309,8 @@ function deleteDgsObject(state: DgsState, object: any): void {
     const collectDependent = (candidate: any) => {
       if (!candidate) return;
       if ((candidate.__liaDgsSegment || candidate.__liaDgsRay || candidate.__liaDgsVector || candidate.__liaDgsLine) &&
-          (candidate.point1 === object || candidate.point2 === object)) {
+          (candidate.point1 === object || candidate.point2 === object ||
+           candidate.__liaDgsPerpendicularPoint === object || candidate.__liaDgsParallelPoint === object)) {
         toRemove.add(candidate);
       }
       if (candidate.__liaDgsPolygon && Array.isArray(candidate.vertices) && candidate.vertices.includes(object)) {
@@ -3030,6 +3341,27 @@ function deleteDgsObject(state: DgsState, object: any): void {
     } catch (e) {}
   }
   toRemove.add(object);
+
+  // Perpendiculars and parallels depend on both their source line and their
+  // through-point. Resolve this transitively for chained constructions.
+  const boardObjects = getDgsBoardObjects(state.board);
+  let addedDependent = true;
+  while (addedDependent) {
+    addedDependent = false;
+    boardObjects.forEach((candidate) => {
+      if ((!isDgsPerpendicular(candidate) && !isDgsParallel(candidate)) || toRemove.has(candidate)) return;
+      const base = isDgsPerpendicular(candidate)
+        ? candidate.__liaDgsPerpendicularBase
+        : candidate.__liaDgsParallelBase;
+      const point = isDgsPerpendicular(candidate)
+        ? candidate.__liaDgsPerpendicularPoint
+        : candidate.__liaDgsParallelPoint;
+      if (toRemove.has(base) || toRemove.has(point)) {
+        toRemove.add(candidate);
+        addedDependent = true;
+      }
+    });
+  }
   Array.from(toRemove).forEach((candidate) => {
     if (candidate && candidate.__liaDgsPolygon && candidate.__liaDgsMeasurementLabel) {
       toRemove.add(candidate.__liaDgsMeasurementLabel);
@@ -3049,6 +3381,10 @@ function deleteDgsObject(state: DgsState, object: any): void {
     const current = states[uid];
     if (!current) return;
     if (current.selectedSegmentPoint === object) setSelectedSegmentPoint(current, null);
+    if ((current.selectedRelationLine && toRemove.has(current.selectedRelationLine)) ||
+        (current.selectedRelationPoint && toRemove.has(current.selectedRelationPoint))) {
+      setSelectedRelationInputs(current, null, null);
+    }
     if (current.selectedPolygonPoints.includes(object)) setSelectedPolygonPoints(current, []);
     if (current.selectedAnglePoints.includes(object)) setSelectedAnglePoints(current, []);
     if (current.selectedCircleCenter === object) clearDgsCirclePreview(current);
@@ -3077,6 +3413,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   setColorPopupOpen(state, false);
   state.contextObject = object;
   object.__liaDgsLanguage = state.language;
+  if (angle) syncDgsRightAngleStyle(object);
   state.sideMenuObjectType.textContent = point ? text.point : (ray ? text.ray : (vector ? text.vector : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (angle ? text.angle : text.segment))))));
   state.sideMenuNameInput.value = name;
   state.sideMenuNameInput.setAttribute('aria-invalid', 'false');
@@ -3144,6 +3481,8 @@ function renderToolState(state: DgsState): void {
   const rayActive = state.activeTool === 'ray';
   const lineActive = state.activeTool === 'line';
   const vectorActive = state.activeTool === 'vector';
+  const orthogonalActive = state.activeTool === 'orthogonal';
+  const parallelActive = state.activeTool === 'parallel';
   const polygonActive = state.activeTool === 'polygon';
   const circleActive = state.activeTool === 'circle';
   const angleActive = state.activeTool === 'angle';
@@ -3161,6 +3500,12 @@ function renderToolState(state: DgsState): void {
   state.lineToolButton.setAttribute('aria-pressed', lineActive ? 'true' : 'false');
   state.vectorToolButton.classList.toggle('is-active', vectorActive);
   state.vectorToolButton.setAttribute('aria-pressed', vectorActive ? 'true' : 'false');
+  state.orthogonalButton.classList.toggle('is-active', orthogonalActive || parallelActive);
+  state.orthogonalButton.setAttribute('aria-pressed', orthogonalActive || parallelActive ? 'true' : 'false');
+  state.orthogonalToolButton.classList.toggle('is-active', orthogonalActive);
+  state.orthogonalToolButton.setAttribute('aria-pressed', orthogonalActive ? 'true' : 'false');
+  state.parallelToolButton.classList.toggle('is-active', parallelActive);
+  state.parallelToolButton.setAttribute('aria-pressed', parallelActive ? 'true' : 'false');
   state.polygonButton.classList.toggle('is-active', polygonActive || circleActive);
   state.polygonButton.setAttribute('aria-pressed', polygonActive || circleActive ? 'true' : 'false');
   state.polygonToolButton.classList.toggle('is-active', polygonActive);
@@ -3178,7 +3523,7 @@ function renderToolState(state: DgsState): void {
 
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'polygon' | 'circle' | 'angle' | 'angle-measured',
+  tool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'polygon' | 'circle' | 'angle' | 'angle-measured',
   deactivateRegression = true
 ): void {
   if (tool) {
@@ -3186,6 +3531,7 @@ function setActiveTool(
       const other = states[uid];
       if (!other || other === state || other.boardId !== state.boardId || !other.activeTool) return;
       setSelectedSegmentPoint(other, null);
+      setSelectedRelationInputs(other, null, null);
       setSelectedPolygonPoints(other, []);
       setSelectedAnglePoints(other, []);
       setAngleDialogOpen(other, false);
@@ -3199,6 +3545,9 @@ function setActiveTool(
   if ((state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector') &&
       tool !== state.activeTool) {
     setSelectedSegmentPoint(state, null);
+  }
+  if ((state.activeTool === 'orthogonal' || state.activeTool === 'parallel') && tool !== state.activeTool) {
+    setSelectedRelationInputs(state, null, null);
   }
   if (state.activeTool === 'polygon' && tool !== 'polygon') setSelectedPolygonPoints(state, []);
   if ((state.activeTool === 'angle' || state.activeTool === 'angle-measured') && tool !== state.activeTool) {
@@ -3527,10 +3876,12 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.sideMenu.dataset.topOpen = open ? '1' : '0';
   state.pointButton.tabIndex = open ? 0 : -1;
   state.segmentButton.tabIndex = open ? 0 : -1;
+  state.orthogonalButton.tabIndex = open ? 0 : -1;
   state.polygonButton.tabIndex = open ? 0 : -1;
   state.angleButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setGeometrySubmenuOpen(state, false);
+  if (!open) setRelationSubmenuOpen(state, false);
   if (!open) setShapeSubmenuOpen(state, false);
   if (!open) setAngleSubmenuOpen(state, false);
   if (changed) trackAxisWithMenu(state);
@@ -3538,6 +3889,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   state.geometrySubmenuOpen = open;
@@ -3548,6 +3900,18 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   state.rayToolButton.tabIndex = open ? 0 : -1;
   state.lineToolButton.tabIndex = open ? 0 : -1;
   state.vectorToolButton.tabIndex = open ? 0 : -1;
+}
+
+function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setGeometrySubmenuOpen(state, false);
+  if (open) setShapeSubmenuOpen(state, false);
+  if (open) setAngleSubmenuOpen(state, false);
+  state.relationSubmenuOpen = open;
+  state.relationSubmenu.dataset.open = open ? '1' : '0';
+  state.relationSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.orthogonalButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  state.orthogonalToolButton.tabIndex = open ? 0 : -1;
+  state.parallelToolButton.tabIndex = open ? 0 : -1;
 }
 
 function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
@@ -3561,6 +3925,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
     state.lineToolButton.tabIndex = -1;
     state.vectorToolButton.tabIndex = -1;
   }
+  if (open) setRelationSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   state.shapeSubmenuOpen = open;
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
@@ -3572,6 +3937,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
 
 function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
+  if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
   state.angleSubmenuOpen = open;
   state.angleSubmenu.dataset.open = open ? '1' : '0';
@@ -3625,6 +3991,7 @@ function createMeasuredDgsAngleFromDialog(state: DgsState): boolean {
     angle.__liaDgsTargetAngle = degrees;
     angle.__liaDgsGeneratedPoint = generated;
     angle.__liaDgsShowAngle = true;
+    syncDgsRightAngleStyle(angle);
     configureDgsMeasuredAngle(state, angle);
     applyDgsMeasuredAngle(state, angle, degrees, false);
     persistDgsConstruction(state);
@@ -3701,6 +4068,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.toolsDivider?.isConnected &&
     !!existing.pointButton?.isConnected &&
     !!existing.segmentButton?.isConnected &&
+    !!existing.orthogonalButton?.isConnected &&
+    !!existing.relationSubmenu?.isConnected &&
+    !!existing.orthogonalToolButton?.isConnected &&
+    !!existing.parallelToolButton?.isConnected &&
     !!existing.polygonButton?.isConnected &&
     !!existing.angleButton?.isConnected &&
     !!existing.angleSubmenu?.isConnected &&
@@ -3805,6 +4176,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const rayIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18L22 5"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M11.5 10.5l3 3M14.5 10.5l-3 3"></path></svg>';
   const lineIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19L22 5"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
   const vectorIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18L19 8M14.5 7.8L19 8L17.8 12.4"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M17.5 6.5l3 3M20.5 6.5l-3 3"></path></svg>';
+  const orthogonalIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-reference" d="M3 18L21 18"></path><path d="M12 18L12 3M12 14L16 14L16 18"></path><path class="lia-dgs-cross" d="M10.5 5.5l3 3M13.5 5.5l-3 3"></path></svg>';
+  const parallelIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-reference" d="M3 17L19 9"></path><path d="M5 21L21 13"></path><path class="lia-dgs-cross" d="M11.5 15.5l3 3M14.5 15.5l-3 3"></path></svg>';
   const polygonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-polygon-fill" d="M5 18L12 5L19 18Z"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M10.5 3.5l3 3M13.5 3.5l-3 3M17.5 16.5l3 3M20.5 16.5l-3 3"></path></svg>';
   const circleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"></circle><path class="lia-dgs-cross" d="M10.5 10.5l3 3M13.5 10.5l-3 3M17.8 10.5l3 3M20.8 10.5l-3 3"></path></svg>';
   const angleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-angle-fill" d="M4 20L14 20A10 10 0 0 0 8.3 10.9Z"></path><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3M10.5 1.5l3 3M13.5 1.5l-3 3"></path></svg>';
@@ -3848,6 +4221,30 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const vectorToolButton = makeGeometryTool(geometrySubmenu, vectorLabel, vectorIcon);
   vectorToolButton.setAttribute('aria-pressed', 'false');
   menuBar.appendChild(geometrySubmenu);
+
+  const orthogonalButton = document.createElement('button');
+  orthogonalButton.type = 'button';
+  orthogonalButton.className = 'lia-dgs-geometry-button lia-dgs-orthogonal-button';
+  orthogonalButton.setAttribute('aria-label', geometryLanguage === 'de' ? 'Lagebeziehungen' : 'Line relations');
+  orthogonalButton.setAttribute('aria-pressed', 'false');
+  orthogonalButton.setAttribute('aria-haspopup', 'menu');
+  orthogonalButton.setAttribute('aria-expanded', 'false');
+  orthogonalButton.title = geometryLanguage === 'de' ? 'Lagebeziehungen' : 'Line relations';
+  orthogonalButton.innerHTML = orthogonalIcon;
+  orthogonalButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(orthogonalButton);
+
+  const relationSubmenu = document.createElement('div');
+  relationSubmenu.id = `dgs-relation-submenu-${uid}`;
+  relationSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-relation-submenu';
+  relationSubmenu.setAttribute('role', 'menu');
+  relationSubmenu.setAttribute('aria-label', geometryLanguage === 'de' ? 'Lagebeziehungen' : 'Line relations');
+  orthogonalButton.setAttribute('aria-controls', relationSubmenu.id);
+  const orthogonalToolButton = makeGeometryTool(relationSubmenu, text.orthogonal, orthogonalIcon);
+  orthogonalToolButton.setAttribute('aria-pressed', 'false');
+  const parallelToolButton = makeGeometryTool(relationSubmenu, text.parallel, parallelIcon);
+  parallelToolButton.setAttribute('aria-pressed', 'false');
+  menuBar.appendChild(relationSubmenu);
 
   const polygonButton = document.createElement('button');
   polygonButton.type = 'button';
@@ -4238,6 +4635,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     toolsDivider,
     pointButton,
     segmentButton,
+    orthogonalButton,
+    relationSubmenu,
+    orthogonalToolButton,
+    parallelToolButton,
     polygonButton,
     angleButton,
     angleSubmenu,
@@ -4267,6 +4668,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     axisSyncing: false,
     open: false,
     geometrySubmenuOpen: false,
+    relationSubmenuOpen: false,
     shapeSubmenuOpen: false,
     angleSubmenuOpen: false,
     angleDialogOpen: false,
@@ -4274,6 +4676,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     contextObject: null,
     activeTool: '',
     selectedSegmentPoint: null,
+    selectedRelationLine: null,
+    selectedRelationPoint: null,
     selectedPolygonPoints: [],
     selectedAnglePoints: [],
     selectedCircleCenter: null,
@@ -4285,6 +4689,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   restoreDgsConstruction(state);
   setMenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
+  setRelationSubmenuOpen(state, false);
   setShapeSubmenuOpen(state, false);
   setAngleSubmenuOpen(state, false);
   setAngleDialogOpen(state, false);
@@ -4295,6 +4700,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'point' ? '' : 'point');
@@ -4336,6 +4742,28 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     segmentButton.innerHTML = vectorIcon;
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'vector' ? '' : 'vector');
+  });
+
+  orthogonalButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setRelationSubmenuOpen(state, !state.relationSubmenuOpen);
+  });
+
+  orthogonalToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    orthogonalButton.innerHTML = orthogonalIcon;
+    setRelationSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'orthogonal' ? '' : 'orthogonal');
+  });
+
+  parallelToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    orthogonalButton.innerHTML = parallelIcon;
+    setRelationSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'parallel' ? '' : 'parallel');
   });
 
   polygonButton.addEventListener('click', (evt) => {
@@ -4393,6 +4821,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       target.closest('.lia-plot-draw-btn, .lia-plot-erase-toggle, .lia-plot-regression-toggle, .lia-plot-reg-item')
     ) {
       setGeometrySubmenuOpen(state, false);
+      setRelationSubmenuOpen(state, false);
       setShapeSubmenuOpen(state, false);
       setAngleSubmenuOpen(state, false);
       setActiveTool(state, '', false);
@@ -4551,7 +4980,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     const object = state.contextObject;
     if (!object || isDgsPoint(object) || isDgsRay(object) || isDgsVector(object) || isDgsPolygon(object) || isDgsCircle(object)) return;
     if (isDgsLine(object)) object.__liaDgsShowEquation = measurementOption.input.checked;
-    else if (isDgsAngle(object)) object.__liaDgsShowAngle = measurementOption.input.checked;
+    else if (isDgsAngle(object)) {
+      object.__liaDgsShowAngle = measurementOption.input.checked;
+      syncDgsRightAngleStyle(object);
+    }
     else object.__liaDgsShowLength = measurementOption.input.checked;
     refreshDgsObjectLabel(object);
     persistDgsConstruction(state);
@@ -4710,6 +5142,53 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   state.onBoardPointerDown = (evt: PointerEvent) => {
     if (!state.activeTool) return;
     if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+
+    if (state.activeTool === 'orthogonal' || state.activeTool === 'parallel') {
+      const relationTool = state.activeTool;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      let point = findNearestBoardPoint(state, evt);
+      const line = findNearestDgsLinearObject(state, evt);
+
+      if (state.selectedRelationLine) {
+        if (!point && (!line || line === state.selectedRelationLine)) {
+          const coordinates = eventToUserCoordinates(state, evt);
+          if (coordinates) point = createDgsPoint(state, coordinates.x, coordinates.y);
+        }
+        if (point) {
+          setSelectedRelationInputs(state, state.selectedRelationLine, point);
+        } else if (line) {
+          setSelectedRelationInputs(state, line, null);
+        }
+      } else if (state.selectedRelationPoint) {
+        if (line) {
+          setSelectedRelationInputs(state, line, state.selectedRelationPoint);
+        } else if (point) {
+          setSelectedRelationInputs(state, null, point);
+        }
+      } else if (point) {
+        setSelectedRelationInputs(state, null, point);
+      } else if (line) {
+        setSelectedRelationInputs(state, line, null);
+      } else {
+        const coordinates = eventToUserCoordinates(state, evt);
+        if (coordinates) {
+          point = createDgsPoint(state, coordinates.x, coordinates.y);
+          if (point) setSelectedRelationInputs(state, null, point);
+        }
+      }
+
+      if (state.selectedRelationLine && state.selectedRelationPoint) {
+        const relationLine = relationTool === 'parallel'
+          ? createDgsParallel(state, state.selectedRelationLine, state.selectedRelationPoint)
+          : createDgsPerpendicular(state, state.selectedRelationLine, state.selectedRelationPoint);
+        if (relationLine) {
+          persistDgsConstruction(state);
+          setActiveTool(state, '', false);
+        }
+      }
+      return;
+    }
 
     if (state.activeTool === 'circle') {
       const point = findOrCreateDgsPoint(state, evt);

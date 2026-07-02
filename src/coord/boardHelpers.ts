@@ -7,6 +7,9 @@
 
 import { getNeutralColor, getAccentColor } from '../shared/theme';
 
+const MAJOR_GRID_COLOR = '#808080';
+const MAJOR_GRID_OPACITY = 0.7;
+
 // ---------------------------------------------------------------------------
 // Board state persistence
 // ---------------------------------------------------------------------------
@@ -282,17 +285,32 @@ export function applyNavColors(board: any): void {
 export function applyGridColor(board: any, color: string): void {
   if (!board || !color) return;
 
+  function colorGridElement(grid: any, isMinor: boolean): void {
+    if (!grid || typeof grid.setAttribute !== 'function') return;
+    const strokeColor = isMinor ? color : MAJOR_GRID_COLOR;
+    const attributes: Record<string, any> = { strokeColor, highlightStrokeColor: strokeColor };
+    if (!isMinor) {
+      attributes.strokeOpacity = MAJOR_GRID_OPACITY;
+      attributes.highlightStrokeOpacity = MAJOR_GRID_OPACITY;
+    }
+    grid.setAttribute(attributes);
+  }
+
   try {
     if (board.options && board.options.grid) {
-      if (board.options.grid.major) board.options.grid.major.strokeColor = color;
+      if (board.options.grid.major) board.options.grid.major.strokeColor = MAJOR_GRID_COLOR;
       if (board.options.grid.minor) board.options.grid.minor.strokeColor = color;
     }
   } catch (e) {}
 
   try {
+    colorGridElement(board.__liaMajorGrid, false);
+    colorGridElement(board.__liaMinorGrid, true);
+
     if (board.grids && board.grids.length) {
       board.grids.forEach((g: any) => {
-        if (g && typeof g.setAttribute === 'function') g.setAttribute({ strokeColor: color });
+        colorGridElement(g, Boolean(g && g.majorGrid));
+        if (g && g.minorGrid) colorGridElement(g.minorGrid, true);
       });
     }
   } catch (e) {}
@@ -302,7 +320,9 @@ export function applyGridColor(board: any, color: string): void {
       board.objectsList.forEach((o: any) => {
         if (!o || typeof o.setAttribute !== 'function') return;
         if (o.elType === 'grid' || (typeof JXG !== 'undefined' && o.type === JXG.OBJECT_TYPE_GRID)) {
-          o.setAttribute({ strokeColor: color });
+          // JSXGraph represents the minor grid as a child curve with a
+          // `majorGrid` reference; the returned major curve owns `minorGrid`.
+          colorGridElement(o, Boolean(o.majorGrid));
         }
       });
     }
@@ -732,11 +752,19 @@ export function createGrid(board: any, gridCol: string): void {
     ? [board.defaultAxes.x, board.defaultAxes.y]
     : [];
 
-  board.create('grid', parents, {
+  const grid = board.create('grid', parents, {
     majorStep: 'auto', minorElements: 'auto', includeBoundaries: true, forceSquare: true,
-    major: { face: 'line', strokeColor: gridCol, strokeWidth: 0.5, dash: 0, drawZero: true  },
+    major: {
+      face: 'line', strokeColor: MAJOR_GRID_COLOR, strokeOpacity: MAJOR_GRID_OPACITY,
+      highlightStrokeOpacity: MAJOR_GRID_OPACITY, strokeWidth: 1, dash: 0, drawZero: true
+    },
     minor: { face: 'line', strokeColor: gridCol, strokeWidth: 1.5, dash: 1, drawZero: false }
   });
+
+  // Keep direct references so theme changes can recolor only the subordinate
+  // grid without accidentally turning the numbered major grid into an accent.
+  board.__liaMajorGrid = grid;
+  board.__liaMinorGrid = grid && grid.minorGrid ? grid.minorGrid : null;
 }
 
 export function createBoardDecorations(
