@@ -676,13 +676,24 @@ The point tool places freely movable points by clicking the coordinate board and
 alphabetically (`A` to `Z`, then `A'` to `Z'`, `A''`, and so on), skipping names already in use.
 The segment tool connects two successively selected points, labels the magenta segment with
 lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
-The polygon tool selects existing points in sequence. Selecting the first point again after at
+The same line-tools submenu also provides rays, straight lines, and vectors. For a ray, the first selected
+point is its endpoint and the second selected point determines its direction. A vector is drawn as
+a finite arrow from the first selected point to the second selected point. Named endpoints produce
+an automatic vector label such as `\overrightarrow{AB}`; otherwise a lowercase fallback such as
+`\overrightarrow{a}` is used. The arrow spans the complete label.
+The line, ray, vector, segment, polygon, circle, and angle tools reuse a nearby existing point or
+automatically place a new alphabetically named DGS point when clicking an empty board position.
+The polygon tool selects points in sequence. Selecting the first point again after at
 least three distinct points closes the sequence and creates a movable polygon (for example,
 `A → B → C → A` or `B → C → A → B`).
-Right-clicking a DGS point, segment, line, or polygon opens an object menu from the right. It can lock the
+The angle submenu also provides an angle-by-measure construction. Select the first arm point
+and then the vertex, enter a value between 0 and 360 degrees in the centered dialog, and DGS
+creates the third point counterclockwise with equal arm lengths. Its angle measure can later be
+changed from the right-click object menu.
+Right-clicking a DGS point, segment, ray, vector, line, or polygon opens an object menu from the right. It can lock the
 object and independently show or hide its name and visual representation; an open top menu
 pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
-inline color palette with hue and hexadecimal controls recolors DGS points and segments.
+inline color palette with hue and hexadecimal controls recolors DGS objects.
 `@DGS` automatically adds the regression drawing tools to the same board;
 undo and redo remain permanently stacked below the hamburger button, so no additional
 `@Regression` macro is required.
@@ -691,14 +702,14 @@ Regression analysis panels are stacked below these permanent controls.
 Parameters: `<boardId>`
 
 ``` markdown
-@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=;ymax=;width=;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
 ```
 
 ---
 
-@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_dgs`)
+@CoordinateSystem(`xmin=-5;xmax=5;;;;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
 

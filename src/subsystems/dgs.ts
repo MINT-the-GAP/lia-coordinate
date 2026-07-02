@@ -23,6 +23,8 @@ type DgsState = {
   coordinateSection: HTMLDivElement;
   xCoordinateInput: HTMLInputElement;
   yCoordinateInput: HTMLInputElement;
+  angleMeasureSection: HTMLDivElement;
+  angleMeasureInput: HTMLInputElement;
   fixedCheckbox: HTMLInputElement;
   nameCheckbox: HTMLInputElement;
   objectCheckbox: HTMLInputElement;
@@ -59,9 +61,18 @@ type DgsState = {
   segmentButton: HTMLButtonElement;
   polygonButton: HTMLButtonElement;
   angleButton: HTMLButtonElement;
+  angleSubmenu: HTMLDivElement;
+  angleToolButton: HTMLButtonElement;
+  measuredAngleToolButton: HTMLButtonElement;
+  angleDialog: HTMLDivElement;
+  angleDialogInput: HTMLInputElement;
+  angleDialogConfirmButton: HTMLButtonElement;
+  angleDialogCancelButton: HTMLButtonElement;
   geometrySubmenu: HTMLDivElement;
   segmentToolButton: HTMLButtonElement;
+  rayToolButton: HTMLButtonElement;
   lineToolButton: HTMLButtonElement;
+  vectorToolButton: HTMLButtonElement;
   shapeSubmenu: HTMLDivElement;
   polygonToolButton: HTMLButtonElement;
   circleToolButton: HTMLButtonElement;
@@ -78,9 +89,11 @@ type DgsState = {
   open: boolean;
   geometrySubmenuOpen: boolean;
   shapeSubmenuOpen: boolean;
+  angleSubmenuOpen: boolean;
+  angleDialogOpen: boolean;
   sideMenuOpen: boolean;
   contextObject: any | null;
-  activeTool: '' | 'point' | 'segment' | 'line' | 'polygon' | 'circle' | 'angle';
+  activeTool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'polygon' | 'circle' | 'angle' | 'angle-measured';
   selectedSegmentPoint: any | null;
   selectedPolygonPoints: any[];
   selectedAnglePoints: any[];
@@ -102,26 +115,26 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
-    point: 'Punkt', line: 'Gerade', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis',
+    point: 'Punkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis',
     coordinates: 'Koordinaten', fixed: 'Fixieren', showName: 'Name anzeigen',
-    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showAngleObject: 'Winkel anzeigen',
+    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showAngleObject: 'Winkel anzeigen',
     showSegment: 'Strecke anzeigen', showEquation: 'Geradengleichung anzeigen',
     showDistance: 'Distanzwert anzeigen', showArea: 'Flächeninhalt anzeigen',
     showPerimeter: 'Umfang anzeigen', showAngle: 'Winkelwert anzeigen', textColor: 'Schriftfarbe', lineColor: 'Linienfarbe',
     fillColor: 'Inhaltsfarbe', opacity: 'Deckkraft', delete: 'Löschen',
     confirmDelete: 'Löschen bestätigen', setPoint: 'Punkt setzen', stopPoint: 'Punktmodus beenden',
-    straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', shapes: 'Flächenwerkzeuge', layer: 'Ebene'
+    straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', createMeasuredAngle: 'Winkel nach Maß', angleMeasure: 'Winkelmaß', create: 'Erzeugen', cancel: 'Abbrechen', shapes: 'Flächenwerkzeuge', layer: 'Ebene'
   },
   en: {
-    point: 'Point', line: 'Straight Line', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle',
+    point: 'Point', line: 'Straight Line', ray: 'Ray', vector: 'Vector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle',
     coordinates: 'Coordinates', fixed: 'Lock', showName: 'Show name',
-    showPoint: 'Show point', showLine: 'Show straight line', showPolygon: 'Show polygon', showCircle: 'Show circle', showAngleObject: 'Show angle',
+    showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showAngleObject: 'Show angle',
     showSegment: 'Show distance', showEquation: 'Show line equation',
     showDistance: 'Show distance value', showArea: 'Show area',
     showPerimeter: 'Show perimeter', showAngle: 'Show angle value', textColor: 'Text color', lineColor: 'Line color',
     fillColor: 'Fill color', opacity: 'Opacity', delete: 'Delete',
     confirmDelete: 'Confirm delete', setPoint: 'Place point', stopPoint: 'Exit point mode',
-    straightLine: 'Straight Line', distance: 'Distance', createAngle: 'Mark angle', shapes: 'Shape tools', layer: 'Layer'
+    straightLine: 'Straight Line', distance: 'Distance', createAngle: 'Mark angle', createMeasuredAngle: 'Angle by measure', angleMeasure: 'Angle measure', create: 'Create', cancel: 'Cancel', shapes: 'Shape tools', layer: 'Layer'
   }
 } as const;
 
@@ -152,14 +165,14 @@ function ensureStyles(root: Document | ShadowRoot): void {
   style.textContent = `
     .lia-dgs-menu-button {
       position: absolute;
-      top: 10px;
+      top: 7.5px;
       left: 10px;
-      width: 28px;
-      height: 28px;
-      min-width: 28px;
-      min-height: 28px;
-      border-radius: 7px;
-      border: 2px solid currentColor;
+      width: 35px;
+      height: 35px;
+      min-width: 35px;
+      min-height: 35px;
+      border-radius: 8.75px;
+      border: 2.5px solid currentColor;
       background: transparent;
       color: inherit;
       display: grid;
@@ -180,8 +193,8 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-menu-button svg {
-      width: 22px;
-      height: 22px;
+      width: 27.5px;
+      height: 27.5px;
       display: block;
       overflow: visible;
     }
@@ -329,8 +342,38 @@ function ensureStyles(root: Document | ShadowRoot): void {
       outline: none;
     }
 
-    .lia-dgs-coordinate-section[hidden] {
+    .lia-dgs-coordinate-section[hidden],
+    .lia-dgs-angle-measure-section[hidden] {
       display: none;
+    }
+
+    .lia-dgs-angle-measure-section {
+      margin-bottom: 6px;
+    }
+
+    .lia-dgs-angle-measure-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lia-dgs-angle-measure-input {
+      min-width: 0;
+      width: 100%;
+      height: 28px;
+      box-sizing: border-box;
+      border: 1px solid currentColor;
+      border-radius: 5px;
+      background: transparent;
+      color: inherit;
+      padding: 3px 5px;
+      font: inherit;
+    }
+
+    .lia-dgs-angle-measure-input[aria-invalid="true"] {
+      border-color: #ff3333;
+      box-shadow: 0 0 0 1px #ff3333;
     }
 
     .lia-dgs-context-section-title {
@@ -584,9 +627,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
     .lia-dgs-tools-divider,
     .lia-dgs-regression-divider {
       position: absolute;
-      top: 7px;
+      top: 3px;
       width: 2px;
-      height: 36px;
+      height: 44px;
       border-radius: 999px;
       background: var(--lia-dgs-theme-color, currentColor);
       opacity: 1;
@@ -594,11 +637,11 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-tools-divider {
-      left: 44px;
+      left: 51px;
     }
 
     .lia-dgs-regression-divider {
-      left: 196px;
+      left: 232px;
       display: none;
     }
 
@@ -608,13 +651,13 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-geometry-button {
       position: absolute;
-      top: 10px;
-      width: 28px;
-      height: 28px;
-      min-width: 28px;
-      min-height: 28px;
-      border-radius: 7px;
-      border: 2px solid currentColor;
+      top: 7.5px;
+      width: 35px;
+      height: 35px;
+      min-width: 35px;
+      min-height: 35px;
+      border-radius: 8.75px;
+      border: 2.5px solid currentColor;
       background: transparent;
       color: inherit;
       display: grid;
@@ -635,42 +678,42 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-point-button {
-      left: 54px;
+      left: 60px;
     }
 
     .lia-dgs-segment-button {
-      left: 90px;
+      left: 103px;
     }
 
     .lia-dgs-polygon-button {
-      left: 126px;
+      left: 146px;
     }
 
     .lia-dgs-angle-button {
-      left: 162px;
+      left: 189px;
     }
 
-    .lia-dgs-angle-button svg {
-      width: 25px;
-      height: 25px;
+    .lia-dgs-geometry-button.lia-dgs-angle-button svg {
+      width: 31.25px;
+      height: 31.25px;
     }
 
     .lia-dgs-polygon-fill {
-      fill: rgba(255, 255, 255, 0.60) !important;
+      fill: rgba(255, 0, 255, 0.75) !important;
     }
 
     .lia-dgs-angle-fill {
-      fill: rgba(255, 255, 255, 0.60) !important;
+      fill: rgba(255, 0, 255, 0.28) !important;
     }
 
     .lia-dgs-geometry-submenu {
       position: absolute;
       top: 44px;
-      left: 82px;
-      min-width: 178px;
+      left: 95px;
+      min-width: 222.5px;
       display: grid;
-      gap: 3px;
-      padding: 6px;
+      gap: 3.75px;
+      padding: 7.5px;
       border: 2px solid currentColor;
       border-radius: 8px;
       background: var(--lia-dgs-menu-bg, #fff);
@@ -694,22 +737,27 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-shape-submenu {
-      left: 118px;
+      left: 138px;
+    }
+
+    .lia-dgs-angle-submenu {
+      left: 181px;
     }
 
     .lia-dgs-geometry-tool {
       min-width: 0;
-      min-height: 34px;
+      min-height: 42.5px;
       display: grid;
-      grid-template-columns: 28px minmax(0, 1fr);
+      grid-template-columns: 35px minmax(0, 1fr);
       align-items: center;
-      gap: 9px;
-      padding: 3px 9px 3px 5px;
+      gap: 11.25px;
+      padding: 3.75px 11.25px 3.75px 6.25px;
       border: 0;
-      border-radius: 6px;
+      border-radius: 7.5px;
       background: transparent;
       color: inherit;
       font: inherit;
+      font-size: 1.25em;
       text-align: left;
       cursor: pointer;
       appearance: none;
@@ -724,43 +772,47 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-geometry-tool svg {
-      width: 26px;
-      height: 26px;
+      width: 32.5px;
+      height: 32.5px;
       display: block;
       overflow: visible;
     }
 
     .lia-dgs-geometry-tool path {
       fill: none;
-      stroke: currentColor;
+      stroke: #ff00ff;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
 
     .lia-dgs-geometry-tool .lia-dgs-cross {
-      stroke: #ff00ff;
+      stroke: var(--lia-dgs-neutral-color, currentColor);
       stroke-width: 1.65;
     }
 
     .lia-dgs-geometry-button svg {
       display: block;
-      width: 22px;
-      height: 22px;
+      width: 27.5px;
+      height: 27.5px;
       overflow: visible;
     }
 
     .lia-dgs-geometry-button path {
       fill: none;
-      stroke: currentColor;
+      stroke: #ff00ff;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
 
     .lia-dgs-geometry-button .lia-dgs-cross {
-      stroke: #ff00ff;
+      stroke: var(--lia-dgs-neutral-color, currentColor);
       stroke-width: 1.65;
+    }
+
+    .lia-dgs-point-button .lia-dgs-cross {
+      stroke: #ff00ff;
     }
 
     .lia-dgs-point-symbol {
@@ -769,21 +821,22 @@ function ensureStyles(root: Document | ShadowRoot): void {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 1px;
+      gap: 1.25px;
     }
 
     .lia-dgs-point-symbol svg {
-      width: 8px;
-      height: 8px;
-      flex: 0 0 8px;
+      width: 10px;
+      height: 10px;
+      flex: 0 0 10px;
     }
 
     .lia-dgs-point-label {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 17.5px;
       line-height: 1;
+      color: var(--lia-dgs-neutral-color, currentColor);
     }
 
     .lia-dgs-point-label mjx-container {
@@ -807,8 +860,90 @@ function ensureStyles(root: Document | ShadowRoot): void {
     .lia-dgs-geometry-button circle,
     .lia-dgs-geometry-tool circle {
       fill: none;
-      stroke: currentColor;
+      stroke: #ff00ff;
       stroke-width: 2;
+    }
+
+    .lia-dgs-measure-mark {
+      fill: #ff00ff;
+      stroke: none;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-angle-dialog {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 60;
+      min-width: min(280px, calc(100% - 32px));
+      display: none;
+      gap: 10px;
+      padding: 14px;
+      box-sizing: border-box;
+      border: 2px solid var(--lia-dgs-theme-color, currentColor);
+      border-radius: 10px;
+      background: var(--lia-dgs-menu-bg, #fff);
+      color: inherit;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.30);
+      transform: translate(-50%, -50%);
+    }
+
+    .lia-dgs-angle-dialog[data-open="1"] {
+      display: grid;
+    }
+
+    .lia-dgs-angle-dialog-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-angle-dialog-field {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .lia-dgs-angle-dialog-input {
+      min-width: 0;
+      width: 100%;
+      height: 35px;
+      box-sizing: border-box;
+      border: 1.5px solid currentColor;
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      padding: 5px 8px;
+      font: inherit;
+      font-size: 16px;
+    }
+
+    .lia-dgs-angle-dialog-input[aria-invalid="true"] {
+      border-color: #ff3333;
+      box-shadow: 0 0 0 1px #ff3333;
+    }
+
+    .lia-dgs-angle-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .lia-dgs-angle-dialog-button {
+      min-height: 35px;
+      padding: 5px 11px;
+      border: 2px solid currentColor;
+      border-radius: 8px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .lia-dgs-angle-dialog-button[data-primary="1"] {
+      border-color: var(--lia-dgs-theme-color, currentColor);
+      box-shadow: inset 0 0 0 1px var(--lia-dgs-theme-color, currentColor);
     }
 
     .lia-dgs-polygon-vertex,
@@ -913,9 +1048,9 @@ function getUsedSegmentNames(state: DgsState): Set<string> {
   const visitSegment = (segment: any) => {
     if (!segment || typeof segment !== 'object') return;
     const type = String(segment.elType || '').toLowerCase();
-    if (type !== 'segment' && type !== 'line' && !segment.__liaDgsSegment && !segment.__liaDgsLine) return;
+    if (type !== 'segment' && type !== 'line' && !segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsLine && !segment.__liaDgsVector) return;
 
-    [segment.__liaDgsSegmentName, segment.__liaDgsLineName, segment.name].forEach((value) => {
+    [segment.__liaDgsSegmentName, segment.__liaDgsRayName, segment.__liaDgsLineName, segment.__liaDgsVectorName, segment.name].forEach((value) => {
       const name = unwrapAlphabeticName(value);
       if (/^[a-z]'*$/.test(name)) used.add(name);
     });
@@ -949,6 +1084,7 @@ function eventTargetsBoardUi(evt: Event): boolean {
     '.lia-dgs-menu-clip',
     '.lia-dgs-side-menu-clip',
     '.lia-dgs-color-popup',
+    '.lia-dgs-angle-dialog',
     '.lia-plot-analyze-panel',
     '.lia-plot-color-menu',
     '.lia-schar-panel',
@@ -1134,6 +1270,15 @@ function findNearestBoardPoint(
   return nearest;
 }
 
+function findOrCreateDgsPoint(state: DgsState, evt: PointerEvent): any | null {
+  const existing = findNearestBoardPoint(state, evt);
+  if (existing) return existing;
+
+  const coordinates = eventToUserCoordinates(state, evt);
+  if (!coordinates) return null;
+  return createDgsPoint(state, coordinates.x, coordinates.y);
+}
+
 function setSelectedSegmentPoint(state: DgsState, point: any | null): void {
   const previousNode = state.selectedSegmentPoint && state.selectedSegmentPoint.rendNode;
   try { if (previousNode && previousNode.classList) previousNode.classList.remove('lia-dgs-segment-endpoint'); } catch (e) {}
@@ -1172,7 +1317,8 @@ function setSelectedAnglePoints(state: DgsState, points: any[]): void {
 function styleDgsSegments(state: DgsState): void {
   const seen = new Set<any>();
   const style = (segment: any) => {
-    if (!segment || typeof segment !== 'object' || seen.has(segment) || (!segment.__liaDgsSegment && !segment.__liaDgsLine)) return;
+    if (!segment || typeof segment !== 'object' || seen.has(segment) ||
+        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsLine && !segment.__liaDgsVector)) return;
     seen.add(segment);
     const color = normalizeHexColor(segment.__liaDgsColor) || '#ff00ff';
     try {
@@ -1231,6 +1377,114 @@ function createDgsSegment(state: DgsState, point1: any, point2: any): any | null
     refreshDgsObjectLabel(segment);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return segment;
+  } catch (e) {
+    return null;
+  }
+}
+
+function createDgsRay(state: DgsState, point1: any, point2: any): any | null {
+  if (!state.board || !point1 || !point2 || point1 === point2) return null;
+
+  const name = getNextSegmentName(state);
+  try {
+    const ray = state.board.create('line', [point1, point2], {
+      name: '',
+      withLabel: false,
+      fixed: true,
+      straightFirst: false,
+      straightLast: true,
+      firstArrow: false,
+      lastArrow: false,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4
+    });
+    ray.__liaDgsRay = true;
+    ray.__liaDgsRayName = name;
+    ray.__liaDgsLanguage = state.language;
+    ray.__liaDgsColor = '#ff00ff';
+    ray.__liaDgsShowName = true;
+    ray.__liaDgsShowObject = true;
+    ray.__liaDgsOpacity = 1;
+    const label = state.board.create('text', [
+      function() { return (Number(point1.X()) + Number(point2.X())) / 2; },
+      function() { return (Number(point1.Y()) + Number(point2.Y())) / 2; },
+      function() { return dgsObjectLabelText(ray); }
+    ], {
+      fixed: true,
+      highlight: false,
+      parse: false,
+      useMathJax: true,
+      display: 'html',
+      anchorX: 'middle',
+      anchorY: 'bottom',
+      offset: [0, 8],
+      strokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      fontSize: 20
+    });
+    ray.label = label;
+    ray.__liaDgsRayLabel = label;
+    refreshDgsObjectLabel(ray);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return ray;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getDgsVectorPointName(point: any): string {
+  const dgsName = String(point && point.__liaDgsPointName || '').trim();
+  if (dgsName) return dgsName;
+  return unwrapAlphabeticName(point && point.name).trim();
+}
+
+function getAutomaticDgsVectorName(point1: any, point2: any): string {
+  const firstName = getDgsVectorPointName(point1);
+  const secondName = getDgsVectorPointName(point2);
+  return firstName && secondName ? firstName + secondName : '';
+}
+
+function formatDgsVectorTexName(name: string): string {
+  return '\\overrightarrow{' + name + '}';
+}
+
+function createDgsVector(state: DgsState, point1: any, point2: any): any | null {
+  if (!state.board || !point1 || !point2 || point1 === point2) return null;
+
+  const automaticName = getAutomaticDgsVectorName(point1, point2);
+  const name = automaticName || getNextSegmentName(state);
+  try {
+    const vector = state.board.create('segment', [point1, point2], {
+      name: '\\(' + formatDgsVectorTexName(name) + '\\)',
+      withLabel: true,
+      fixed: true,
+      firstArrow: false,
+      lastArrow: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 20,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    vector.__liaDgsVector = true;
+    vector.__liaDgsVectorName = name;
+    vector.__liaDgsVectorAutoName = !!automaticName;
+    vector.__liaDgsLanguage = state.language;
+    vector.__liaDgsColor = '#ff00ff';
+    vector.__liaDgsShowName = true;
+    vector.__liaDgsShowObject = true;
+    vector.__liaDgsOpacity = 1;
+    refreshDgsObjectLabel(vector);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return vector;
   } catch (e) {
     return null;
   }
@@ -1556,6 +1810,90 @@ function createDgsAngle(state: DgsState, points: any[]): any | null {
   } catch (e) { return null; }
 }
 
+function parseDgsAngleDegrees(value: unknown): number | null {
+  const text = String(value == null ? '' : value).trim().replace(',', '.');
+  const degrees = Number(text);
+  return text && Number.isFinite(degrees) && degrees > 0 && degrees < 360 ? degrees : null;
+}
+
+function setDgsPointPosition(point: any, x: number, y: number): boolean {
+  if (!point || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  try {
+    if (typeof point.setPositionDirectly === 'function' && typeof JXG !== 'undefined') {
+      point.setPositionDirectly(JXG.COORDS_BY_USER, [x, y]);
+      return true;
+    }
+    if (typeof point.moveTo === 'function') {
+      point.moveTo([x, y], 0);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function applyDgsMeasuredAngle(
+  state: DgsState,
+  angle: any,
+  degrees: number,
+  recordHistory = true
+): boolean {
+  if (!isDgsAngle(angle) || !angle.__liaDgsMeasuredConstruction ||
+      !Number.isFinite(degrees) || degrees <= 0 || degrees >= 360) return false;
+  const points = angle.__liaDgsAnglePoints;
+  if (!Array.isArray(points) || points.length !== 3) return false;
+  try {
+    const firstX = Number(points[0].X());
+    const firstY = Number(points[0].Y());
+    const vertexX = Number(points[1].X());
+    const vertexY = Number(points[1].Y());
+    const dx = firstX - vertexX;
+    const dy = firstY - vertexY;
+    const radius = Math.hypot(dx, dy);
+    if (!Number.isFinite(radius) || radius <= 1e-12) return false;
+    const radians = degrees * Math.PI / 180;
+    const targetX = vertexX + Math.cos(radians) * dx - Math.sin(radians) * dy;
+    const targetY = vertexY + Math.sin(radians) * dx + Math.cos(radians) * dy;
+    if (!setDgsPointPosition(points[2], targetX, targetY)) return false;
+    angle.__liaDgsTargetAngle = degrees;
+    refreshDgsObjectLabel(angle);
+    if (state.contextObject === angle && state.angleMeasureSection && !state.angleMeasureSection.hidden) {
+      state.angleMeasureInput.value = formatCoordinate(degrees);
+      state.angleMeasureInput.setAttribute('aria-invalid', 'false');
+    }
+    try { if (state.board && typeof state.board.fullUpdate === 'function') state.board.fullUpdate(); } catch (e) {
+      try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e2) {}
+    }
+    persistDgsConstruction(state, recordHistory);
+    return true;
+  } catch (e) { return false; }
+}
+
+function configureDgsMeasuredAngle(state: DgsState, angle: any): void {
+  if (!isDgsAngle(angle) || !angle.__liaDgsMeasuredConstruction || angle.__liaDgsMeasuredListenersAttached) return;
+  const points = angle.__liaDgsAnglePoints;
+  if (!Array.isArray(points) || points.length !== 3) return;
+  angle.__liaDgsMeasuredListenersAttached = true;
+  angle.__liaDgsGeneratedPoint = points[2];
+
+  const syncFromBase = (recordHistory: boolean) => {
+    const degrees = Number(angle.__liaDgsTargetAngle);
+    if (Number.isFinite(degrees)) applyDgsMeasuredAngle(state, angle, degrees, recordHistory);
+  };
+  [points[0], points[1]].forEach((point: any) => {
+    try { point.on('drag', () => syncFromBase(false)); } catch (e) {}
+    try { point.on('up', () => syncFromBase(true)); } catch (e) {}
+  });
+  try {
+    points[2].on('drag', () => {
+      const radians = getDgsAngleRadians(angle);
+      if (!Number.isFinite(radians)) return;
+      angle.__liaDgsTargetAngle = radians * 180 / Math.PI;
+      syncFromBase(false);
+    });
+  } catch (e) {}
+  try { points[2].on('up', () => syncFromBase(true)); } catch (e) {}
+}
+
 function ensureDgsPersistentId(object: any, prefix: string): string {
   if (!object.__liaDgsPersistentId) {
     dgsPersistentIdCounter += 1;
@@ -1593,6 +1931,8 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     let type = '';
     if (isDgsPoint(object)) type = 'point';
     else if (object.__liaDgsSegment) type = 'segment';
+    else if (isDgsRay(object)) type = 'ray';
+    else if (isDgsVector(object)) type = 'vector';
     else if (isDgsLine(object)) type = 'line';
     else if (isDgsPolygon(object)) type = 'polygon';
     else if (isDgsCircle(object)) type = 'circle';
@@ -1617,11 +1957,15 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       showArea: !!object.__liaDgsShowArea,
       showPerimeter: !!object.__liaDgsShowPerimeter,
       showAngle: !!object.__liaDgsShowAngle,
-      autoName: object.__liaDgsPolygonAutoName !== false && object.__liaDgsAngleAutoName !== false
+      measuredAngle: !!object.__liaDgsMeasuredConstruction,
+      targetAngle: Number.isFinite(Number(object.__liaDgsTargetAngle)) ? Number(object.__liaDgsTargetAngle) : null,
+      autoName: isDgsVector(object)
+        ? object.__liaDgsVectorAutoName !== false
+        : object.__liaDgsPolygonAutoName !== false && object.__liaDgsAngleAutoName !== false
     };
     if (type === 'point') {
       try { record.x = Number(object.X()); record.y = Number(object.Y()); } catch (e) {}
-    } else if (type === 'segment' || type === 'line') {
+    } else if (type === 'segment' || type === 'ray' || type === 'vector' || type === 'line') {
       record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
     } else if (type === 'polygon') {
       record.points = (object.vertices || []).map(dgsPointReference);
@@ -1680,6 +2024,16 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   object.__liaDgsShowAngle = !!record.showAngle;
   if (isDgsPolygon(object)) object.__liaDgsPolygonAutoName = !!record.autoName;
   if (isDgsAngle(object)) object.__liaDgsAngleAutoName = !!record.autoName;
+  if (isDgsVector(object)) object.__liaDgsVectorAutoName = !!record.autoName;
+  if (isDgsAngle(object) && record.measuredAngle) {
+    object.__liaDgsMeasuredConstruction = true;
+    object.__liaDgsTargetAngle = Number(record.targetAngle);
+    object.__liaDgsGeneratedPoint = object.__liaDgsAnglePoints && object.__liaDgsAnglePoints[2];
+    configureDgsMeasuredAngle(state, object);
+    if (Number.isFinite(object.__liaDgsTargetAngle)) {
+      applyDgsMeasuredAngle(state, object, object.__liaDgsTargetAngle, false);
+    }
+  }
   setDgsObjectColor(object, 'text', record.textColor || '#ff00ff');
   setDgsObjectColor(object, 'line', record.lineColor || '#ff00ff');
   setDgsObjectColor(object, 'fill', record.fillColor || '#ff00ff');
@@ -1720,6 +2074,8 @@ function restoreDgsConstruction(state: DgsState): void {
       if (!points.length || points.some((point: any) => !point)) return;
       let object: any = null;
       if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
+      else if (record.type === 'ray') object = createDgsRay(state, points[0], points[1]);
+      else if (record.type === 'vector') object = createDgsVector(state, points[0], points[1]);
       else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
       else if (record.type === 'polygon') object = createDgsPolygon(state, points);
       else if (record.type === 'circle') object = createDgsCircle(state, points[0], points[1]);
@@ -1736,6 +2092,7 @@ function restoreDgsConstruction(state: DgsState): void {
 
 function clearDgsConstructionFromBoard(state: DgsState): void {
   clearDgsCirclePreview(state);
+  setAngleDialogOpen(state, false);
   setSelectedSegmentPoint(state, null);
   setSelectedPolygonPoints(state, []);
   setSelectedAnglePoints(state, []);
@@ -1752,9 +2109,12 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     if (object && object.__liaDgsCircle && object.__liaDgsCircleLabel) {
       try { state.board.removeObject(object.__liaDgsCircleLabel); } catch (e) {}
     }
+    if (object && object.__liaDgsRay && object.__liaDgsRayLabel) {
+      try { state.board.removeObject(object.__liaDgsRayLabel); } catch (e) {}
+    }
   });
   objects.filter((object) => object && !isDgsPoint(object) && (
-    object.__liaDgsSegment || object.__liaDgsLine || object.__liaDgsPolygon ||
+    object.__liaDgsSegment || object.__liaDgsRay || object.__liaDgsVector || object.__liaDgsLine || object.__liaDgsPolygon ||
     object.__liaDgsCircle || object.__liaDgsAngle
   )).forEach((object) => {
     try { state.board.removeObject(object); } catch (e) {}
@@ -1965,7 +2325,8 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   const seen = new Set<any>();
   const add = (segment: any) => {
     if (!segment || typeof segment !== 'object' || seen.has(segment) ||
-        (!segment.__liaDgsSegment && !segment.__liaDgsLine && !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsAngle)) return;
+        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsVector && !segment.__liaDgsLine &&
+         !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsAngle)) return;
     seen.add(segment);
     candidates.push(segment);
   };
@@ -2020,7 +2381,9 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
     const rawRatio = lengthSq > 1e-12
       ? ((localX - x1) * dx + (localY - y1) * dy) / lengthSq
       : 0;
-    const ratio = segment.__liaDgsLine ? rawRatio : Math.max(0, Math.min(1, rawRatio));
+    const ratio = segment.__liaDgsLine
+      ? rawRatio
+      : (segment.__liaDgsRay ? Math.max(0, rawRatio) : Math.max(0, Math.min(1, rawRatio)));
     const px = x1 + ratio * dx;
     const py = y1 + ratio * dy;
     const distance = Math.hypot(localX - px, localY - py);
@@ -2041,6 +2404,14 @@ function isDgsLine(object: any): boolean {
   return !!object && !!object.__liaDgsLine;
 }
 
+function isDgsRay(object: any): boolean {
+  return !!object && !!object.__liaDgsRay;
+}
+
+function isDgsVector(object: any): boolean {
+  return !!object && !!object.__liaDgsVector;
+}
+
 function isDgsPolygon(object: any): boolean {
   return !!object && !!object.__liaDgsPolygon;
 }
@@ -2057,13 +2428,17 @@ function getDgsObjectName(object: any): string {
   return String(
     (isDgsPoint(object)
       ? object.__liaDgsPointName
-      : (isDgsLine(object)
-        ? object.__liaDgsLineName
-        : (isDgsPolygon(object)
-          ? object.__liaDgsPolygonName
-          : (isDgsCircle(object)
-            ? object.__liaDgsCircleName
-            : (isDgsAngle(object) ? object.__liaDgsAngleName : object && object.__liaDgsSegmentName))))) || ''
+      : (isDgsRay(object)
+        ? object.__liaDgsRayName
+        : (isDgsVector(object)
+          ? object.__liaDgsVectorName
+          : (isDgsLine(object)
+            ? object.__liaDgsLineName
+            : (isDgsPolygon(object)
+              ? object.__liaDgsPolygonName
+              : (isDgsCircle(object)
+                ? object.__liaDgsCircleName
+                : (isDgsAngle(object) ? object.__liaDgsAngleName : object && object.__liaDgsSegmentName))))))) || ''
   );
 }
 
@@ -2121,8 +2496,26 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
     if (state.board && state.board.objects && typeof state.board.objects === 'object') {
       Object.keys(state.board.objects).forEach((key) => updateAngleName(state.board.objects[key]));
     }
+    const updateVectorName = (candidate: any) => {
+      if (!isDgsVector(candidate) || !candidate.__liaDgsVectorAutoName ||
+          (candidate.point1 !== object && candidate.point2 !== object)) return;
+      const nextName = getAutomaticDgsVectorName(candidate.point1, candidate.point2);
+      if (!nextName) return;
+      candidate.__liaDgsVectorName = nextName;
+      try { candidate.setAttribute({ name: '\\(' + formatDgsVectorTexName(nextName) + '\\)' }); } catch (e) {}
+      refreshDgsObjectLabel(candidate);
+    };
+    if (state.board && Array.isArray(state.board.objectsList)) state.board.objectsList.forEach(updateVectorName);
+    if (state.board && state.board.objects && typeof state.board.objects === 'object') {
+      Object.keys(state.board.objects).forEach((key) => updateVectorName(state.board.objects[key]));
+    }
     try { if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances(); } catch (e) {}
     try { if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas(); } catch (e) {}
+  } else if (isDgsRay(object)) {
+    object.__liaDgsRayName = name;
+  } else if (isDgsVector(object)) {
+    object.__liaDgsVectorName = name;
+    object.__liaDgsVectorAutoName = false;
   } else if (isDgsLine(object)) {
     object.__liaDgsLineName = name;
   } else if (isDgsPolygon(object)) {
@@ -2139,7 +2532,8 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
     return false;
   }
 
-  try { if (typeof object.setAttribute === 'function') object.setAttribute({ name: '\\(' + name + '\\)' }); } catch (e) {}
+  const texName = isDgsVector(object) ? formatDgsVectorTexName(name) : name;
+  try { if (typeof object.setAttribute === 'function') object.setAttribute({ name: '\\(' + texName + '\\)' }); } catch (e) {}
   if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
   else refreshDgsObjectLabel(object);
   try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
@@ -2201,6 +2595,10 @@ function getDgsLineEquation(line: any): string {
 function dgsObjectLabelText(object: any): string {
   const name = getDgsObjectName(object);
   const showName = object && object.__liaDgsShowName !== false;
+
+  if (isDgsVector(object)) {
+    return showName && name ? '\\(' + formatDgsVectorTexName(name) + '\\)' : '';
+  }
 
   if (isDgsCircle(object)) {
     const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
@@ -2600,7 +2998,7 @@ function deleteDgsObject(state: DgsState, object: any): void {
   if (isDgsPoint(object)) {
     const collectDependent = (candidate: any) => {
       if (!candidate) return;
-      if ((candidate.__liaDgsSegment || candidate.__liaDgsLine) &&
+      if ((candidate.__liaDgsSegment || candidate.__liaDgsRay || candidate.__liaDgsVector || candidate.__liaDgsLine) &&
           (candidate.point1 === object || candidate.point2 === object)) {
         toRemove.add(candidate);
       }
@@ -2642,6 +3040,9 @@ function deleteDgsObject(state: DgsState, object: any): void {
     if (candidate && candidate.__liaDgsCircle && candidate.__liaDgsCircleLabel) {
       toRemove.add(candidate.__liaDgsCircleLabel);
     }
+    if (candidate && candidate.__liaDgsRay && candidate.__liaDgsRayLabel) {
+      toRemove.add(candidate.__liaDgsRayLabel);
+    }
   });
 
   Object.keys(states).forEach((uid) => {
@@ -2666,6 +3067,8 @@ function deleteDgsObject(state: DgsState, object: any): void {
 function updateSideMenuControls(state: DgsState, object: any): void {
   const text = dgsText(state.language);
   const point = isDgsPoint(object);
+  const ray = isDgsRay(object);
+  const vector = isDgsVector(object);
   const line = isDgsLine(object);
   const polygon = isDgsPolygon(object);
   const angle = isDgsAngle(object);
@@ -2674,14 +3077,14 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   setColorPopupOpen(state, false);
   state.contextObject = object;
   object.__liaDgsLanguage = state.language;
-  state.sideMenuObjectType.textContent = point ? text.point : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (angle ? text.angle : text.segment))));
+  state.sideMenuObjectType.textContent = point ? text.point : (ray ? text.ray : (vector ? text.vector : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (angle ? text.angle : text.segment))))));
   state.sideMenuNameInput.value = name;
   state.sideMenuNameInput.setAttribute('aria-invalid', 'false');
   state.fixedCheckbox.checked = getDgsObjectFixed(object);
   state.nameCheckbox.checked = object.__liaDgsShowName !== false;
   state.objectCheckbox.checked = object.__liaDgsShowObject !== false;
-  state.objectCheckboxText.textContent = point ? text.showPoint : (line ? text.showLine : (polygon ? text.showPolygon : (circle ? text.showCircle : (angle ? text.showAngleObject : text.showSegment))));
-  state.measurementOption.hidden = point || polygon || circle;
+  state.objectCheckboxText.textContent = point ? text.showPoint : (ray ? text.showRay : (vector ? text.showVector : (line ? text.showLine : (polygon ? text.showPolygon : (circle ? text.showCircle : (angle ? text.showAngleObject : text.showSegment))))));
+  state.measurementOption.hidden = point || ray || vector || polygon || circle;
   state.measurementCheckbox.checked = line ? !!object.__liaDgsShowEquation : (angle ? !!object.__liaDgsShowAngle : !!object.__liaDgsShowLength);
   state.measurementCheckboxText.textContent = line ? text.showEquation : (angle ? text.showAngle : text.showDistance);
   state.areaOption.hidden = !polygon && !circle;
@@ -2689,6 +3092,14 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   state.perimeterOption.hidden = !polygon && !circle;
   state.perimeterCheckbox.checked = (polygon || circle) && !!object.__liaDgsShowPerimeter;
   state.coordinateSection.hidden = !point;
+  state.angleMeasureSection.hidden = !(angle && object.__liaDgsMeasuredConstruction);
+  if (!state.angleMeasureSection.hidden) {
+    const degrees = Number.isFinite(Number(object.__liaDgsTargetAngle))
+      ? Number(object.__liaDgsTargetAngle)
+      : getDgsAngleRadians(object) * 180 / Math.PI;
+    state.angleMeasureInput.value = formatCoordinate(degrees);
+    state.angleMeasureInput.setAttribute('aria-invalid', 'false');
+  }
   resetDeleteButton(state);
   if (point) refreshSideMenuCoordinates(state);
   state.fillColorButton.hidden = !polygon && !circle && !angle;
@@ -2730,33 +3141,44 @@ function renderToolState(state: DgsState): void {
   const text = dgsText(state.language);
   const pointActive = state.activeTool === 'point';
   const segmentActive = state.activeTool === 'segment';
+  const rayActive = state.activeTool === 'ray';
   const lineActive = state.activeTool === 'line';
+  const vectorActive = state.activeTool === 'vector';
   const polygonActive = state.activeTool === 'polygon';
   const circleActive = state.activeTool === 'circle';
   const angleActive = state.activeTool === 'angle';
+  const measuredAngleActive = state.activeTool === 'angle-measured';
   state.pointButton.classList.toggle('is-active', pointActive);
   state.pointButton.setAttribute('aria-pressed', pointActive ? 'true' : 'false');
   state.pointButton.setAttribute('aria-label', pointActive ? text.stopPoint : text.setPoint);
   state.pointButton.title = pointActive ? text.stopPoint : text.setPoint;
-  state.segmentButton.classList.toggle('is-active', segmentActive || lineActive);
+  state.segmentButton.classList.toggle('is-active', segmentActive || rayActive || lineActive || vectorActive);
   state.segmentToolButton.classList.toggle('is-active', segmentActive);
   state.segmentToolButton.setAttribute('aria-pressed', segmentActive ? 'true' : 'false');
+  state.rayToolButton.classList.toggle('is-active', rayActive);
+  state.rayToolButton.setAttribute('aria-pressed', rayActive ? 'true' : 'false');
   state.lineToolButton.classList.toggle('is-active', lineActive);
   state.lineToolButton.setAttribute('aria-pressed', lineActive ? 'true' : 'false');
+  state.vectorToolButton.classList.toggle('is-active', vectorActive);
+  state.vectorToolButton.setAttribute('aria-pressed', vectorActive ? 'true' : 'false');
   state.polygonButton.classList.toggle('is-active', polygonActive || circleActive);
   state.polygonButton.setAttribute('aria-pressed', polygonActive || circleActive ? 'true' : 'false');
   state.polygonToolButton.classList.toggle('is-active', polygonActive);
   state.polygonToolButton.setAttribute('aria-pressed', polygonActive ? 'true' : 'false');
   state.circleToolButton.classList.toggle('is-active', circleActive);
   state.circleToolButton.setAttribute('aria-pressed', circleActive ? 'true' : 'false');
-  state.angleButton.classList.toggle('is-active', angleActive);
-  state.angleButton.setAttribute('aria-pressed', angleActive ? 'true' : 'false');
+  state.angleButton.classList.toggle('is-active', angleActive || measuredAngleActive);
+  state.angleButton.setAttribute('aria-pressed', angleActive || measuredAngleActive ? 'true' : 'false');
+  state.angleToolButton.classList.toggle('is-active', angleActive);
+  state.angleToolButton.setAttribute('aria-pressed', angleActive ? 'true' : 'false');
+  state.measuredAngleToolButton.classList.toggle('is-active', measuredAngleActive);
+  state.measuredAngleToolButton.setAttribute('aria-pressed', measuredAngleActive ? 'true' : 'false');
   refreshConstructionModeCursor(state.boardContainer);
 }
 
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'point' | 'segment' | 'line' | 'polygon' | 'circle' | 'angle',
+  tool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'polygon' | 'circle' | 'angle' | 'angle-measured',
   deactivateRegression = true
 ): void {
   if (tool) {
@@ -2766,6 +3188,7 @@ function setActiveTool(
       setSelectedSegmentPoint(other, null);
       setSelectedPolygonPoints(other, []);
       setSelectedAnglePoints(other, []);
+      setAngleDialogOpen(other, false);
       clearDgsCirclePreview(other);
       other.activeTool = '';
       renderToolState(other);
@@ -2773,11 +3196,15 @@ function setActiveTool(
     if (deactivateRegression) notifyRegressionLayout(state, false);
   }
 
-  if ((state.activeTool === 'segment' || state.activeTool === 'line') && tool !== state.activeTool) {
+  if ((state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector') &&
+      tool !== state.activeTool) {
     setSelectedSegmentPoint(state, null);
   }
   if (state.activeTool === 'polygon' && tool !== 'polygon') setSelectedPolygonPoints(state, []);
-  if (state.activeTool === 'angle' && tool !== 'angle') setSelectedAnglePoints(state, []);
+  if ((state.activeTool === 'angle' || state.activeTool === 'angle-measured') && tool !== state.activeTool) {
+    setSelectedAnglePoints(state, []);
+  }
+  if (state.activeTool === 'angle-measured' && tool !== 'angle-measured') setAngleDialogOpen(state, false);
   if (state.activeTool === 'circle' && tool !== 'circle') clearDgsCirclePreview(state);
   state.activeTool = tool;
   renderToolState(state);
@@ -2798,12 +3225,16 @@ function applyLayout(state: DgsState): void {
   state.menuBar.style.color = tone;
   state.sideMenu.style.color = tone;
   state.colorPopup.style.color = tone;
+  state.angleDialog.style.color = tone;
   state.menuBar.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.menuBar.style.setProperty('--lia-dgs-theme-color', accent);
+  state.menuBar.style.setProperty('--lia-dgs-neutral-color', tone);
   state.sideMenu.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.sideMenu.style.setProperty('--lia-dgs-theme-color', accent);
   state.colorPopup.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.colorPopup.style.setProperty('--lia-dgs-theme-color', accent);
+  state.angleDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.angleDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
@@ -3068,6 +3499,7 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   const coordinatesAvailable = open && !state.coordinateSection.hidden;
   state.xCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
   state.yCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
+  state.angleMeasureInput.tabIndex = open && !state.angleMeasureSection.hidden ? 0 : -1;
   state.fixedCheckbox.tabIndex = open ? 0 : -1;
   state.nameCheckbox.tabIndex = open ? 0 : -1;
   state.objectCheckbox.tabIndex = open ? 0 : -1;
@@ -3100,18 +3532,22 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setGeometrySubmenuOpen(state, false);
   if (!open) setShapeSubmenuOpen(state, false);
+  if (!open) setAngleSubmenuOpen(state, false);
   if (changed) trackAxisWithMenu(state);
   if (changed) notifyRegressionLayout(state, open);
 }
 
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setShapeSubmenuOpen(state, false);
+  if (open) setAngleSubmenuOpen(state, false);
   state.geometrySubmenuOpen = open;
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.segmentButton.setAttribute('aria-expanded', open ? 'true' : 'false');
   state.segmentToolButton.tabIndex = open ? 0 : -1;
+  state.rayToolButton.tabIndex = open ? 0 : -1;
   state.lineToolButton.tabIndex = open ? 0 : -1;
+  state.vectorToolButton.tabIndex = open ? 0 : -1;
 }
 
 function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
@@ -3121,14 +3557,81 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
     state.geometrySubmenu.setAttribute('aria-hidden', 'true');
     state.segmentButton.setAttribute('aria-expanded', 'false');
     state.segmentToolButton.tabIndex = -1;
+    state.rayToolButton.tabIndex = -1;
     state.lineToolButton.tabIndex = -1;
+    state.vectorToolButton.tabIndex = -1;
   }
+  if (open) setAngleSubmenuOpen(state, false);
   state.shapeSubmenuOpen = open;
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
   state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.polygonButton.setAttribute('aria-expanded', open ? 'true' : 'false');
   state.polygonToolButton.tabIndex = open ? 0 : -1;
   state.circleToolButton.tabIndex = open ? 0 : -1;
+}
+
+function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
+  if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
+  state.angleSubmenuOpen = open;
+  state.angleSubmenu.dataset.open = open ? '1' : '0';
+  state.angleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.angleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  state.angleToolButton.tabIndex = open ? 0 : -1;
+  state.measuredAngleToolButton.tabIndex = open ? 0 : -1;
+}
+
+function setAngleDialogOpen(state: DgsState, open: boolean): void {
+  state.angleDialogOpen = open;
+  state.angleDialog.dataset.open = open ? '1' : '0';
+  state.angleDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.angleDialogInput.tabIndex = open ? 0 : -1;
+  state.angleDialogConfirmButton.tabIndex = open ? 0 : -1;
+  state.angleDialogCancelButton.tabIndex = open ? 0 : -1;
+  if (open) {
+    state.angleDialogInput.value = '90';
+    state.angleDialogInput.setAttribute('aria-invalid', 'false');
+    window.setTimeout(() => {
+      try { state.angleDialogInput.focus(); state.angleDialogInput.select(); } catch (e) {}
+    }, 0);
+  }
+}
+
+function createMeasuredDgsAngleFromDialog(state: DgsState): boolean {
+  const degrees = parseDgsAngleDegrees(state.angleDialogInput.value);
+  state.angleDialogInput.setAttribute('aria-invalid', degrees == null ? 'true' : 'false');
+  if (degrees == null || state.selectedAnglePoints.length !== 2) return false;
+  const first = state.selectedAnglePoints[0];
+  const vertex = state.selectedAnglePoints[1];
+  try {
+    const firstX = Number(first.X());
+    const firstY = Number(first.Y());
+    const vertexX = Number(vertex.X());
+    const vertexY = Number(vertex.Y());
+    const dx = firstX - vertexX;
+    const dy = firstY - vertexY;
+    if (Math.hypot(dx, dy) <= 1e-12) {
+      state.angleDialogInput.setAttribute('aria-invalid', 'true');
+      return false;
+    }
+    const radians = degrees * Math.PI / 180;
+    const targetX = vertexX + Math.cos(radians) * dx - Math.sin(radians) * dy;
+    const targetY = vertexY + Math.sin(radians) * dx + Math.cos(radians) * dy;
+    const generated = createDgsPoint(state, targetX, targetY);
+    if (!generated) return false;
+    const angle = createDgsAngle(state, [first, vertex, generated]);
+    if (!angle) return false;
+    angle.__liaDgsMeasuredConstruction = true;
+    angle.__liaDgsTargetAngle = degrees;
+    angle.__liaDgsGeneratedPoint = generated;
+    angle.__liaDgsShowAngle = true;
+    configureDgsMeasuredAngle(state, angle);
+    applyDgsMeasuredAngle(state, angle, degrees, false);
+    persistDgsConstruction(state);
+    setAngleDialogOpen(state, false);
+    setActiveTool(state, '', false);
+    return true;
+  } catch (e) { return false; }
 }
 
 function getDgsGeometryLanguage(anchor: HTMLElement | null, explicitLanguage?: string): 'de' | 'en' {
@@ -3200,9 +3703,16 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.segmentButton?.isConnected &&
     !!existing.polygonButton?.isConnected &&
     !!existing.angleButton?.isConnected &&
+    !!existing.angleSubmenu?.isConnected &&
+    !!existing.angleToolButton?.isConnected &&
+    !!existing.measuredAngleToolButton?.isConnected &&
+    !!existing.angleDialog?.isConnected &&
+    !!existing.angleMeasureInput?.isConnected &&
     !!existing.geometrySubmenu?.isConnected &&
     !!existing.segmentToolButton?.isConnected &&
+    !!existing.rayToolButton?.isConnected &&
     !!existing.lineToolButton?.isConnected &&
+    !!existing.vectorToolButton?.isConnected &&
     !!existing.shapeSubmenu?.isConnected &&
     !!existing.polygonToolButton?.isConnected &&
     !!existing.circleToolButton?.isConnected &&
@@ -3260,6 +3770,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     try { existing.menuClip.remove(); } catch (e) {}
     try { existing.sideMenuClip.remove(); } catch (e) {}
     try { existing.colorPopup.remove(); } catch (e) {}
+    try { existing.angleDialog.remove(); } catch (e) {}
   }
 
   const menuClip = document.createElement('div');
@@ -3287,11 +3798,17 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   menuBar.appendChild(pointButton);
 
   const segmentLabel = text.distance;
+  const rayLabel = text.ray;
   const lineLabel = text.straightLine;
+  const vectorLabel = text.vector;
   const segmentIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16L18 8"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
+  const rayIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18L22 5"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M11.5 10.5l3 3M14.5 10.5l-3 3"></path></svg>';
   const lineIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19L22 5"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
+  const vectorIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18L19 8M14.5 7.8L19 8L17.8 12.4"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M17.5 6.5l3 3M20.5 6.5l-3 3"></path></svg>';
   const polygonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-polygon-fill" d="M5 18L12 5L19 18Z"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M10.5 3.5l3 3M13.5 3.5l-3 3M17.5 16.5l3 3M20.5 16.5l-3 3"></path></svg>';
   const circleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"></circle><path class="lia-dgs-cross" d="M10.5 10.5l3 3M13.5 10.5l-3 3M17.8 10.5l3 3M20.8 10.5l-3 3"></path></svg>';
+  const angleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-angle-fill" d="M4 20L14 20A10 10 0 0 0 8.3 10.9Z"></path><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3M10.5 1.5l3 3M13.5 1.5l-3 3"></path></svg>';
+  const measuredAngleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3"></path><text class="lia-dgs-measure-mark" x="12.5" y="13">°</text></svg>';
 
   const segmentButton = document.createElement('button');
   segmentButton.type = 'button';
@@ -3324,8 +3841,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 
   const segmentToolButton = makeGeometryTool(geometrySubmenu, segmentLabel, segmentIcon);
   segmentToolButton.setAttribute('aria-pressed', 'false');
+  const rayToolButton = makeGeometryTool(geometrySubmenu, rayLabel, rayIcon);
+  rayToolButton.setAttribute('aria-pressed', 'false');
   const lineToolButton = makeGeometryTool(geometrySubmenu, lineLabel, lineIcon);
   lineToolButton.setAttribute('aria-pressed', 'false');
+  const vectorToolButton = makeGeometryTool(geometrySubmenu, vectorLabel, vectorIcon);
+  vectorToolButton.setAttribute('aria-pressed', 'false');
   menuBar.appendChild(geometrySubmenu);
 
   const polygonButton = document.createElement('button');
@@ -3357,10 +3878,24 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   angleButton.className = 'lia-dgs-geometry-button lia-dgs-angle-button';
   angleButton.setAttribute('aria-label', text.createAngle);
   angleButton.setAttribute('aria-pressed', 'false');
+  angleButton.setAttribute('aria-haspopup', 'menu');
+  angleButton.setAttribute('aria-expanded', 'false');
   angleButton.title = text.createAngle;
-  angleButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-angle-fill" d="M4 20L14 20A10 10 0 0 0 8.3 10.9Z"></path><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3M10.5 1.5l3 3M13.5 1.5l-3 3"></path></svg>';
+  angleButton.innerHTML = angleIcon;
   angleButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(angleButton);
+
+  const angleSubmenu = document.createElement('div');
+  angleSubmenu.id = `dgs-angle-submenu-${uid}`;
+  angleSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-angle-submenu';
+  angleSubmenu.setAttribute('role', 'menu');
+  angleSubmenu.setAttribute('aria-label', text.angle);
+  angleButton.setAttribute('aria-controls', angleSubmenu.id);
+  const angleToolButton = makeGeometryTool(angleSubmenu, text.createAngle, angleIcon);
+  angleToolButton.setAttribute('aria-pressed', 'false');
+  const measuredAngleToolButton = makeGeometryTool(angleSubmenu, text.createMeasuredAngle, measuredAngleIcon);
+  measuredAngleToolButton.setAttribute('aria-pressed', 'false');
+  menuBar.appendChild(angleSubmenu);
 
   const regressionDivider = document.createElement('span');
   regressionDivider.className = 'lia-dgs-regression-divider';
@@ -3428,6 +3963,28 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   coordinateSection.appendChild(coordinateTitle);
   coordinateSection.appendChild(coordinateRow);
   sideMenu.appendChild(coordinateSection);
+
+  const angleMeasureSection = document.createElement('div');
+  angleMeasureSection.className = 'lia-dgs-angle-measure-section';
+  angleMeasureSection.hidden = true;
+  const angleMeasureTitle = document.createElement('div');
+  angleMeasureTitle.className = 'lia-dgs-context-section-title';
+  angleMeasureTitle.textContent = text.angleMeasure;
+  const angleMeasureRow = document.createElement('label');
+  angleMeasureRow.className = 'lia-dgs-angle-measure-row';
+  const angleMeasureInput = document.createElement('input');
+  angleMeasureInput.type = 'text';
+  angleMeasureInput.inputMode = 'decimal';
+  angleMeasureInput.className = 'lia-dgs-angle-measure-input';
+  angleMeasureInput.setAttribute('aria-label', text.angleMeasure);
+  angleMeasureInput.setAttribute('aria-invalid', 'false');
+  const angleMeasureUnit = document.createElement('span');
+  angleMeasureUnit.textContent = '°';
+  angleMeasureRow.appendChild(angleMeasureInput);
+  angleMeasureRow.appendChild(angleMeasureUnit);
+  angleMeasureSection.appendChild(angleMeasureTitle);
+  angleMeasureSection.appendChild(angleMeasureRow);
+  sideMenu.appendChild(angleMeasureSection);
 
   const makeContextOption = (text: string) => {
     const label = document.createElement('label');
@@ -3562,6 +4119,45 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   sideMenu.appendChild(deleteButton);
   sideMenuClip.appendChild(sideMenu);
 
+  const angleDialog = document.createElement('div');
+  angleDialog.className = 'lia-dgs-angle-dialog';
+  angleDialog.setAttribute('role', 'dialog');
+  angleDialog.setAttribute('aria-modal', 'true');
+  angleDialog.setAttribute('aria-hidden', 'true');
+  angleDialog.dataset.open = '0';
+  const angleDialogTitle = document.createElement('div');
+  angleDialogTitle.className = 'lia-dgs-angle-dialog-title';
+  angleDialogTitle.textContent = text.createMeasuredAngle;
+  const angleDialogField = document.createElement('label');
+  angleDialogField.className = 'lia-dgs-angle-dialog-field';
+  const angleDialogInput = document.createElement('input');
+  angleDialogInput.type = 'text';
+  angleDialogInput.inputMode = 'decimal';
+  angleDialogInput.className = 'lia-dgs-angle-dialog-input';
+  angleDialogInput.setAttribute('aria-label', text.angleMeasure);
+  angleDialogInput.setAttribute('aria-invalid', 'false');
+  angleDialogInput.value = '90';
+  const angleDialogUnit = document.createElement('span');
+  angleDialogUnit.textContent = '°';
+  angleDialogField.appendChild(angleDialogInput);
+  angleDialogField.appendChild(angleDialogUnit);
+  const angleDialogActions = document.createElement('div');
+  angleDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const angleDialogCancelButton = document.createElement('button');
+  angleDialogCancelButton.type = 'button';
+  angleDialogCancelButton.className = 'lia-dgs-angle-dialog-button';
+  angleDialogCancelButton.textContent = text.cancel;
+  const angleDialogConfirmButton = document.createElement('button');
+  angleDialogConfirmButton.type = 'button';
+  angleDialogConfirmButton.className = 'lia-dgs-angle-dialog-button';
+  angleDialogConfirmButton.dataset.primary = '1';
+  angleDialogConfirmButton.textContent = text.create;
+  angleDialogActions.appendChild(angleDialogCancelButton);
+  angleDialogActions.appendChild(angleDialogConfirmButton);
+  angleDialog.appendChild(angleDialogTitle);
+  angleDialog.appendChild(angleDialogField);
+  angleDialog.appendChild(angleDialogActions);
+
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'lia-dgs-menu-button';
@@ -3572,6 +4168,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   menuBar.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   sideMenu.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   sideMenu.addEventListener('contextmenu', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -3580,6 +4177,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.appendChild(sideMenuClip);
   boardContainer.appendChild(menuClip);
   boardContainer.appendChild(colorPopup);
+  boardContainer.appendChild(angleDialog);
   boardContainer.appendChild(button);
   typesetDgsMath(pointButton);
 
@@ -3604,6 +4202,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     coordinateSection,
     xCoordinateInput,
     yCoordinateInput,
+    angleMeasureSection,
+    angleMeasureInput,
     fixedCheckbox: fixedOption.input,
     nameCheckbox: nameOption.input,
     objectCheckbox: objectOption.input,
@@ -3640,9 +4240,18 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     segmentButton,
     polygonButton,
     angleButton,
+    angleSubmenu,
+    angleToolButton,
+    measuredAngleToolButton,
+    angleDialog,
+    angleDialogInput,
+    angleDialogConfirmButton,
+    angleDialogCancelButton,
     geometrySubmenu,
     segmentToolButton,
+    rayToolButton,
     lineToolButton,
+    vectorToolButton,
     shapeSubmenu,
     polygonToolButton,
     circleToolButton,
@@ -3659,6 +4268,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     open: false,
     geometrySubmenuOpen: false,
     shapeSubmenuOpen: false,
+    angleSubmenuOpen: false,
+    angleDialogOpen: false,
     sideMenuOpen: false,
     contextObject: null,
     activeTool: '',
@@ -3675,6 +4286,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   setMenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
   setShapeSubmenuOpen(state, false);
+  setAngleSubmenuOpen(state, false);
+  setAngleDialogOpen(state, false);
   setSideMenuOpen(state, false);
   applyLayout(state);
 
@@ -3683,6 +4296,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.stopPropagation();
     setGeometrySubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'point' ? '' : 'point');
   });
 
@@ -3700,12 +4314,28 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setActiveTool(state, state.activeTool === 'segment' ? '' : 'segment');
   });
 
+  rayToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    segmentButton.innerHTML = rayIcon;
+    setGeometrySubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'ray' ? '' : 'ray');
+  });
+
   lineToolButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = lineIcon;
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'line' ? '' : 'line');
+  });
+
+  vectorToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    segmentButton.innerHTML = vectorIcon;
+    setGeometrySubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'vector' ? '' : 'vector');
   });
 
   polygonButton.addEventListener('click', (evt) => {
@@ -3736,7 +4366,23 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.stopPropagation();
     setGeometrySubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, !state.angleSubmenuOpen);
+  });
+
+  angleToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    angleButton.innerHTML = angleIcon;
+    setAngleSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'angle' ? '' : 'angle');
+  });
+
+  measuredAngleToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    angleButton.innerHTML = measuredAngleIcon;
+    setAngleSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'angle-measured' ? '' : 'angle-measured');
   });
 
   menuBar.addEventListener('click', (evt) => {
@@ -3747,6 +4393,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       target.closest('.lia-plot-draw-btn, .lia-plot-erase-toggle, .lia-plot-regression-toggle, .lia-plot-reg-item')
     ) {
       setGeometrySubmenuOpen(state, false);
+      setShapeSubmenuOpen(state, false);
+      setAngleSubmenuOpen(state, false);
       setActiveTool(state, '', false);
     }
   }, true);
@@ -3770,6 +4418,54 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       evt.stopPropagation();
       applyCoordinateInputs(state);
     });
+  });
+
+  const applyAngleMeasureInput = () => {
+    const object = state.contextObject;
+    const degrees = parseDgsAngleDegrees(angleMeasureInput.value);
+    const valid = !!object && isDgsAngle(object) && !!object.__liaDgsMeasuredConstruction && degrees != null;
+    angleMeasureInput.setAttribute('aria-invalid', valid ? 'false' : 'true');
+    if (!valid || degrees == null) return false;
+    return applyDgsMeasuredAngle(state, object, degrees);
+  };
+  angleMeasureInput.addEventListener('blur', applyAngleMeasureInput);
+  angleMeasureInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+        evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+      evt.stopPropagation();
+      return;
+    }
+    if (evt.key !== 'Enter') return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (applyAngleMeasureInput()) angleMeasureInput.blur();
+  });
+
+  angleDialogConfirmButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    createMeasuredDgsAngleFromDialog(state);
+  });
+  angleDialogCancelButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setActiveTool(state, '', false);
+  });
+  angleDialogInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+        evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+      evt.stopPropagation();
+      return;
+    }
+    if (evt.key === 'Enter') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      createMeasuredDgsAngleFromDialog(state);
+    } else if (evt.key === 'Escape') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setActiveTool(state, '', false);
+    }
   });
 
   fixedOption.input.addEventListener('change', () => {
@@ -3853,7 +4549,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 
   measurementOption.input.addEventListener('change', () => {
     const object = state.contextObject;
-    if (!object || isDgsPoint(object) || isDgsPolygon(object)) return;
+    if (!object || isDgsPoint(object) || isDgsRay(object) || isDgsVector(object) || isDgsPolygon(object) || isDgsCircle(object)) return;
     if (isDgsLine(object)) object.__liaDgsShowEquation = measurementOption.input.checked;
     else if (isDgsAngle(object)) object.__liaDgsShowAngle = measurementOption.input.checked;
     else object.__liaDgsShowLength = measurementOption.input.checked;
@@ -4016,14 +4712,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
 
     if (state.activeTool === 'circle') {
-      let point = findNearestBoardPoint(state, evt);
-      if (!point) {
-        const coordinates = eventToUserCoordinates(state, evt);
-        if (!coordinates) return;
-        point = createDgsPoint(state, coordinates.x, coordinates.y);
-        if (!point) return;
-        persistDgsConstruction(state);
-      }
+      const point = findOrCreateDgsPoint(state, evt);
+      if (!point) return;
       evt.preventDefault();
       evt.stopImmediatePropagation();
       if (!state.selectedCircleCenter) {
@@ -4041,8 +4731,20 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       return;
     }
 
+    if (state.activeTool === 'angle-measured') {
+      if (state.angleDialogOpen) return;
+      const point = findOrCreateDgsPoint(state, evt);
+      if (!point || state.selectedAnglePoints.includes(point)) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      const selected = state.selectedAnglePoints.concat(point);
+      setSelectedAnglePoints(state, selected);
+      if (selected.length === 2) setAngleDialogOpen(state, true);
+      return;
+    }
+
     if (state.activeTool === 'angle') {
-      const point = findNearestBoardPoint(state, evt);
+      const point = findOrCreateDgsPoint(state, evt);
       if (!point || state.selectedAnglePoints.includes(point)) return;
 
       evt.preventDefault();
@@ -4062,7 +4764,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     }
 
     if (state.activeTool === 'polygon') {
-      const point = findNearestBoardPoint(state, evt);
+      const point = findOrCreateDgsPoint(state, evt);
       if (!point) return;
 
       evt.preventDefault();
@@ -4088,8 +4790,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       return;
     }
 
-    if (state.activeTool === 'segment' || state.activeTool === 'line') {
-      const point = findNearestBoardPoint(state, evt);
+    if (state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector') {
+      const point = findOrCreateDgsPoint(state, evt);
       if (!point) return;
 
       evt.preventDefault();
@@ -4102,7 +4804,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 
       const geometry = state.activeTool === 'line'
         ? createDgsLine(state, state.selectedSegmentPoint, point)
-        : createDgsSegment(state, state.selectedSegmentPoint, point);
+        : (state.activeTool === 'ray'
+          ? createDgsRay(state, state.selectedSegmentPoint, point)
+          : (state.activeTool === 'vector'
+            ? createDgsVector(state, state.selectedSegmentPoint, point)
+            : createDgsSegment(state, state.selectedSegmentPoint, point)));
       if (geometry) {
         persistDgsConstruction(state);
         setActiveTool(state, '', false);
