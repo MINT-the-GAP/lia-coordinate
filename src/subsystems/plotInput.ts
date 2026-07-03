@@ -4,6 +4,7 @@
 import { splitTopLevel as sharedSplitTopLevel } from '../shared/parser';
 import { getNeutralColor, themeDoc, themeWin, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { compileFunctionExpression } from '../shared/functionExpression';
 
 export function init(): void {
   if (window.__plotInputReady) {
@@ -493,15 +494,7 @@ export function init(): void {
   };
 
   H.compileLatex = function(raw){
-    const prepared = H.prepareRawInput(raw);
-    const ascii = H.transformLatex(prepared);
-    const fn = H.compileExpr(ascii);
-
-    return {
-      prepared: prepared,
-      ascii: ascii,
-      fn: fn
-    };
+    return compileFunctionExpression(raw);
   };
 
   H.safeBBox = function(board){

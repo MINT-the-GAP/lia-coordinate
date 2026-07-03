@@ -695,7 +695,38 @@ creates the third point counterclockwise with equal arm lengths. Its angle measu
 changed from the right-click object menu.
 In German mode, right angles remain rounded; when their angle value is shown, the sector uses
 the conventional centered dot instead of changing to a square marker.
-Right-clicking a DGS point, segment, ray, vector, line, or polygon opens an object menu from the right. It can lock the
+The f(x) button between the geometry and regression groups opens a compact centered input
+dialog and creates a magenta JSXGraph function graph. It accepts familiar expressions such as
+x^2 - 2x, sin(x), or Math.sin(x) as well as TeX input such as
+\frac{1}{2}x^2 and \sqrt{x}. Enter confirms the expression, Escape closes the dialog,
+and invalid expressions keep the dialog open for correction. Created functions participate in
+the DGS undo/redo history. The function equation is shown as rendered TeX in the right-click
+menu and can be edited there; leaving the field or pressing Enter updates the existing graph.
+Simple quotients such as 5/7 are rendered as TeX fractions. Function labels stay inside the
+visible graph area below the open top menu; the object menu offers Show expression instead of
+the inapplicable Lock option.
+The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
+ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
+modes. The zero and
+ordinate-axis-intercept tools accept a function graph, segment, ray, vector, or straight line;
+the extrema and inflection tools accept a function graph. Tangents can be attached to function
+graphs, segments, rays, vectors, straight lines, and circles. The point tools create
+alphabetically named dependent points at all isolated zeros, local extrema, actual changes of
+concavity, or the intersection with the ordinate axis and then switch themselves off. For
+bounded or directed linear objects, the ordinate-axis intercept is only created when the
+intersection lies on the object. The tangent tool uses the selected object position as its
+contact point, constrains a movable glider to that object, and adds the dependent tangent line.
+For circles its direction remains perpendicular to the radius at the contact point. The points
+and tangent move with term or geometry changes. The intersection tool takes two objects in
+sequence and supports every combination of function graphs, segments, rays, vectors, straight
+lines, tangents, and circles; it creates every isolated visible crossing or contact point.
+Viewport changes also
+add or remove visible analysis points. All constructions participate in DGS undo/redo and can be
+removed from their object menus.
+Each zero point also offers Show value; enabling it adds the current x-value to its dynamic
+label. Extremum and inflection points offer the same option and display their current coordinate
+pair; an ordinate-axis intercept displays its current ordinate value.
+Right-clicking a DGS point, segment, ray, vector, line, function, or polygon opens an object menu from the right. It can lock the
 object and independently show or hide its name and visual representation; an open top menu
 pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
 inline color palette with hue and hexadecimal controls recolors DGS objects.
