@@ -714,6 +714,7 @@ export interface BoardConfig {
   id: string;
   axes: boolean;
   grid: boolean;
+  border: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -793,7 +794,25 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   window.__boards[cfg.id] = board;
 
   function applyAll(): void {
-    applyBoardFrame(board);
+    if (cfg.border) {
+      applyBoardFrame(board);
+    } else {
+      try {
+        board.containerObj.style.border = 'none';
+        board.containerObj.style.borderRadius = '0';
+        board.containerObj.style.background = 'transparent';
+        board.containerObj.style.position = 'relative';
+        board.containerObj.style.display = 'block';
+        board.containerObj.style.marginLeft = '0';
+        board.containerObj.style.marginRight = 'auto';
+        board.containerObj.style.boxSizing = 'border-box';
+        board.containerObj.style.touchAction = 'auto';
+      } catch (e) {}
+      try {
+        const nav = board.containerObj.querySelector('.JXG_navigation') as HTMLElement | null;
+        if (nav) nav.style.display = 'none';
+      } catch (e) {}
+    }
     applyNavColors(board);
     if (cfg.grid) applyGridColor(board, getAccentColor());
     if (cfg.axes) {
@@ -801,7 +820,14 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       applyAdaptiveTicks(board);
       updateStickyTickLabelPositions(board);
     }
-    ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
+    if (cfg.border) {
+      ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
+    } else {
+      try {
+        const handle = board.containerObj.querySelector('.lia-jxg-resize-handle') as HTMLElement | null;
+        if (handle) handle.remove();
+      } catch (e) {}
+    }
     runExternalBootstraps();
   }
 
@@ -895,7 +921,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
           applyAxisColors(board);
           updateStickyTickLabelPositions(board);
         }
-        ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
+        if (cfg.border) ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
 
         // Keep pan/zoom lightweight: avoid full DOM bootstrap scans on each move.
         // Axis titles need positional refresh on bounding-box changes.
@@ -949,7 +975,8 @@ export function parseCoordSpec(spec: string): BoardConfig {
     width: null,
     id:    obj.id != null ? obj.id : 'A1',
     axes:  true,
-    grid:  true
+    grid:  true,
+    border: true
   };
 
   function flag(value: string | undefined, fallback: boolean): boolean {
@@ -961,6 +988,7 @@ export function parseCoordSpec(spec: string): BoardConfig {
 
   cfg.axes = flag(obj.achsen != null ? obj.achsen : (obj.axes != null ? obj.axes : positional[0]), true);
   cfg.grid = flag(obj.grid != null ? obj.grid : positional[1], true);
+  cfg.border = flag(obj.border != null ? obj.border : (obj.rahmen != null ? obj.rahmen : positional[2]), true);
 
   if (!(cfg.xmax > cfg.xmin)) cfg.xmax = cfg.xmin + 1;
   if (!(cfg.ymax > cfg.ymin)) cfg.ymax = cfg.ymin + 1;

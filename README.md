@@ -46,8 +46,8 @@ script:   ./dist/index.js
       axis: false, grid: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
-      zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
-      pan:  { enabled: true, needShift: false, needTwoFingers: false }
+      zoom: { enabled: cfg.border, wheel: cfg.border, needShift: false, factorX: 1.15, factorY: 1.15 },
+      pan:  { enabled: cfg.border, needShift: false, needTwoFingers: false }
     });
 
     C.createBoardDecorations(board, cfg, C.getNeutralColor(), C.getAccentColor());
@@ -307,15 +307,19 @@ Parameters (semicolon-separated key=value pairs):
 - `width` — maximum initial width in pixels; on narrower screens the board
   automatically scales down to the available content width
 - `id` — board identifier used to connect other macros to this board
-- final positional flags `axes;grid` — `0` hides and `1` shows each element
-  (when omitted, both remain visible)
+- final positional flags `axes;grid;border` — `0` hides and `1` shows each element
+  (when omitted, all remain enabled/visible)
 
-The four combinations are `0;0` (neither), `0;1` (grid only), `1;0`
-(axes only), and `1;1` (both). Named forms such as `achsen=0;grid=1` are
-also accepted.
+`border=0` (or positional third flag `;0`) disables panning, zooming, and the
+resize handle, and hides the frame. `border=1` (or omitted) keeps the current
+interactive framed behavior.
+
+For `axes;grid`, the combinations are `0;0` (neither), `0;1` (grid only),
+`1;0` (axes only), and `1;1` (both). Named forms such as
+`achsen=0;grid=1;border=0` are also accepted.
 
 ``` markdown
-@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1;1;1`)
+@CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1;1;1;1`)
 ```
 
 ---
@@ -424,7 +428,7 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>];<color>;<segmentName>;length=
 
 ---
 
-@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance;1;1;0`)
 
 @Point(`ex_distance;A;-2;-1`)
 @Point(`ex_distance;B;3;2`)
@@ -669,9 +673,14 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 ## `@DGS`
 
-          --{{0}}--
+          --{{1}}--
 Adds a DGS menu button to the top-left corner of a coordinate board.
 Clicking the hamburger button slides a tool bar into the board from above.
+The mouse-pointer button between the hamburger and the point tool represents the normal board
+mode. It is highlighted whenever no DGS construction, function dialog, regression, drawing, or
+eraser tool is active. Clicking it cancels the current tool and any unfinished multi-step
+selection. Its pointer icon follows the neutral light/dark-mode color, while the vertical
+divider before the construction tools uses the selected theme color.
 Right-clicking the visible horizontal or vertical axis opens a dedicated axis editor. The
 variable name and the additional axis label are edited separately and rendered through the
 existing TeX-capable axis-title overlay. For example, variable t and label in [s] produce
@@ -683,6 +692,20 @@ gesture as one undoable history step; deleting a construction point also removes
 constructions through the same cleanup path as the object menu.
 The point tool places freely movable points by clicking the coordinate board and names them
 alphabetically (`A` to `Z`, then `A'` to `Z'`, `A''`, and so on), skipping names already in use.
+The coordinate fields in a point's right-click menu accept numbers as well as the same
+arithmetic and TeX-aware expressions used for functions. Existing named function graphs may be
+referenced directly. For example, entering `x` and `f(x)+1` creates the dynamic point
+`A(x|f(x)+1)`: dragging it changes the free horizontal parameter, while its vertical
+coordinate follows the function. Changes to `f`, undo/redo, and restoring the board keep the
+dependency intact. Entering two plain numbers removes the dependency and makes the point freely
+movable again.
+Each point menu also provides a Trace checkbox. While enabled, movement is sampled at regular
+spatial intervals and rendered as smaller cross markers in board coordinates, so the trail
+continues to fit when the board is zoomed or panned. Fast movements are interpolated to avoid
+large gaps. Recording can be paused without removing existing markers; once markers exist, a
+Clear trace button appears. Trace color has its own entry in the integrated color palette and
+does not change the point or label color. Trace state, color, and marker positions participate
+in DGS persistence and undo/redo.
 The segment tool connects two successively selected points, labels the magenta segment with
 lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
 The same line-tools submenu also provides rays, straight lines, and vectors. For a ray, the first selected
@@ -717,12 +740,25 @@ dialog and creates a magenta JSXGraph function graph. It accepts familiar expres
 x^2 - 2x, sin(x), or Math.sin(x) as well as TeX input such as
 \frac{1}{2}x^2 and \sqrt{x}. Enter confirms the expression, Escape closes the dialog,
 and invalid expressions keep the dialog open for correction. Created functions participate in
-the DGS undo/redo history. The function equation is shown as rendered TeX in the right-click
+the DGS undo/redo history. A new function may also reference an already existing named graph,
+for example `g(x)=f(x)+1`; compositions such as `g(f(x))` are supported and circular
+dependencies resolve to an invalid value instead of recursing indefinitely. The function
+equation is shown as rendered TeX in the right-click
 menu and can be edited there; leaving the field or pressing Enter updates the existing graph.
 Simple quotients such as 5/7 are rendered as TeX fractions. Function labels stay inside the
 visible graph area below the open top menu; the object menu offers Show expression instead of
 the inapplicable Lock option.
-The text button forms the final toolbar group on the far right, separated by a theme-colored
+The slider button directly to the left of the text tool creates a JSXGraph parameter slider.
+Its centered dialog accepts a unique parameter name, current value, minimum, maximum, and step
+size; German decimal commas are accepted as well. The slider is placed inside the current board
+view and can be edited later through its right-click menu. Slider values are registered as
+dynamic scalar symbols in the shared DGS expression evaluator. They can therefore be used in
+function terms and point-coordinate expressions, for example `f(x)=a*x^2` or
+`A(a|f(a)+1)`, and all geometry derived from those objects follows while the slider moves.
+Renaming a parameter updates existing DGS expression references. Position, range, step, value,
+colors, visibility, layer, deletion, persistence, and undo/redo are retained with the
+construction.
+The text button is part of the final toolbar group on the far right, separated by a theme-colored
 vertical divider. Activate it, click the desired board position, and enter ordinary plain text
 in the centered dialog. The resulting magenta text object is movable and participates in DGS
 undo/redo, persistence, deletion, and erasing. Its right-click menu edits the text directly and

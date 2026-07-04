@@ -198,6 +198,7 @@ interface Window {
   __bootstrapRegression: (() => void) | undefined;
   __setupRegressionUI: ((uid: string, spec: string) => void) | undefined;
   __relayoutRegressionForBoard: ((boardId: string, dgsOpen?: boolean) => void) | undefined;
+  __setDgsExternalToolActive: ((boardId: string, active: boolean) => void) | undefined;
   __liaRegressionStates: Record<string, any>;
   __checkRegressionFromSpec: ((spec: string) => boolean) | undefined;
   __checkRegressionQuiz: ((uid: string, spec: string) => boolean) | undefined;

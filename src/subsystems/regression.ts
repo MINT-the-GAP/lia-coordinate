@@ -1149,6 +1149,13 @@ function updateButtonStates(state: RegressionState): void {
   });
 
   setDrawLayerInteractive(state);
+  try {
+    const anyExternalToolActive = Object.keys(states).some((uid) => {
+      const other = states[uid];
+      return !!other && other.boardId === state.boardId && other.activeTool !== '';
+    });
+    window.__setDgsExternalToolActive?.(state.boardId, anyExternalToolActive);
+  } catch (e) {}
 }
 
 function getDrawPos(layer: HTMLCanvasElement, evt: PointerEvent): DrawPoint {
@@ -7599,27 +7606,27 @@ function applyLayout(state: RegressionState): void {
   state.redoButton.style.transition = usesDgsLayout ? 'top 220ms cubic-bezier(.2, .8, .2, 1)' : '';
 
   state.drawButton.style.position = 'absolute';
-  state.drawButton.style.left = usesDgsLayout ? '379px' : '82px';
+  state.drawButton.style.left = usesDgsLayout ? '422px' : '82px';
   state.drawButton.style.top = usesDgsLayout ? '7.5px' : 'auto';
   state.drawButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.drawButton.style.color = tone;
   state.drawButton.style.setProperty('--draw-color', state.drawColor);
 
   state.eraseButton.style.position = 'absolute';
-  state.eraseButton.style.left = usesDgsLayout ? '422px' : '118px';
+  state.eraseButton.style.left = usesDgsLayout ? '465px' : '118px';
   state.eraseButton.style.top = usesDgsLayout ? '7.5px' : 'auto';
   state.eraseButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.eraseButton.style.color = tone;
 
   state.toolsButton.style.position = 'absolute';
-  state.toolsButton.style.left = usesDgsLayout ? '465px' : '154px';
+  state.toolsButton.style.left = usesDgsLayout ? '508px' : '154px';
   state.toolsButton.style.top = usesDgsLayout ? '7.5px' : 'auto';
   state.toolsButton.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsButton.style.color = tone;
 
   const boardWidth = Math.max(0, state.boardContainer.clientWidth || 0);
   const popupMaxLeft = Math.max(4, boardWidth - 196);
-  state.drawColorMenu.style.left = usesDgsLayout ? Math.min(379, popupMaxLeft) + 'px' : '10px';
+  state.drawColorMenu.style.left = usesDgsLayout ? Math.min(422, popupMaxLeft) + 'px' : '10px';
   state.drawColorMenu.style.top = usesDgsLayout ? '56px' : 'auto';
   state.drawColorMenu.style.bottom = usesDgsLayout ? 'auto' : '56px';
   state.drawColorMenu.style.background = menuFill;
@@ -7629,7 +7636,7 @@ function applyLayout(state: RegressionState): void {
   state.drawColorMenu.style.borderWidth = '1px';
   state.drawColorMenu.style.boxShadow = '0 6px 18px rgba(0,0,0,.18)';
 
-  state.toolsMenu.style.left = usesDgsLayout ? Math.min(465, popupMaxLeft) + 'px' : '184px';
+  state.toolsMenu.style.left = usesDgsLayout ? Math.min(508, popupMaxLeft) + 'px' : '184px';
   state.toolsMenu.style.top = usesDgsLayout ? '56px' : 'auto';
   state.toolsMenu.style.bottom = usesDgsLayout ? 'auto' : '10px';
   state.toolsMenu.style.background = menuFill;

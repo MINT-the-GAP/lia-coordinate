@@ -194,39 +194,81 @@ function tokenize(expression: string): Token[] {
   return tokens;
 }
 
-export function normalizeFunctionExpression(expression: string): string {
+export function normalizeFunctionExpression(
+  expression: string,
+  additionalFunctions: Iterable<string> = [],
+  additionalVariables: Iterable<string> = []
+): string {
+  const allowedFunctions = new Set(FUNCTIONS);
+  const allowedVariables = new Set<string>();
+  for (const name of additionalFunctions) {
+    const normalizedName = String(name || '').toLowerCase();
+    if (/^[a-z][a-z0-9]*$/.test(normalizedName)) allowedFunctions.add(normalizedName);
+  }
+  for (const name of additionalVariables) {
+    const normalizedName = String(name || '').toLowerCase();
+    if (/^[a-z][a-z0-9]*$/.test(normalizedName)) allowedVariables.add(normalizedName);
+  }
   const output: Token[] = [];
   tokenize(expression).forEach((token) => {
     const previous = output[output.length - 1];
     const valueEnd = previous && (previous.type === 'number' || previous.type === 'ident' || previous.type === 'close');
     const valueStart = token.type === 'number' || token.type === 'ident' || token.type === 'open';
-    const functionCall = previous?.type === 'ident' && FUNCTIONS.has(previous.value) && token.type === 'open';
+    const functionCall = previous?.type === 'ident' && allowedFunctions.has(previous.value) && token.type === 'open';
     if (valueEnd && valueStart && !functionCall) output.push({ type: 'op', value: '*' });
     output.push(token);
   });
   return output.map((token) => {
     if (token.type === 'ident' && token.value !== 'x' && token.value !== 'pi' &&
-        token.value !== 'e' && !FUNCTIONS.has(token.value)) {
+        token.value !== 'e' && !allowedFunctions.has(token.value) && !allowedVariables.has(token.value)) {
       throw new Error('Unknown variable or function: ' + token.value);
     }
     return token.type === 'op' && token.value === '^' ? '**' : token.value;
   }).join('');
 }
 
-export function compileFunctionExpression(input: unknown): CompiledFunctionExpression {
+export function compileFunctionExpression(
+  input: unknown,
+  customFunctions: Record<string, (x: number) => number> = {},
+  customVariables: Record<string, number | (() => number)> = {}
+): CompiledFunctionExpression {
+  const normalizedCustomFunctions = new Map<string, (x: number) => number>();
+  Object.keys(customFunctions).forEach((name) => {
+    const normalizedName = String(name || '').toLowerCase();
+    if (!/^[a-z][a-z0-9]*$/.test(normalizedName) ||
+        normalizedName === 'x' || normalizedName === 'pi' || normalizedName === 'e' ||
+        FUNCTIONS.has(normalizedName) || typeof customFunctions[name] !== 'function') return;
+    normalizedCustomFunctions.set(normalizedName, customFunctions[name]);
+  });
+  const normalizedCustomVariables = new Map<string, () => number>();
+  Object.keys(customVariables).forEach((name) => {
+    const normalizedName = String(name || '').toLowerCase();
+    const value = customVariables[name];
+    if (!/^[a-z][a-z0-9]*$/.test(normalizedName) ||
+        normalizedName === 'x' || normalizedName === 'pi' || normalizedName === 'e' ||
+        FUNCTIONS.has(normalizedName) || normalizedCustomFunctions.has(normalizedName)) return;
+    normalizedCustomVariables.set(normalizedName, typeof value === 'function'
+      ? () => Number((value as () => number)())
+      : () => Number(value));
+  });
   const prepared = prepareFunctionInput(input);
   const ascii = transformLatex(prepared);
-  const normalized = normalizeFunctionExpression(ascii);
+  const customNames = Array.from(normalizedCustomFunctions.keys());
+  const customValues = customNames.map((name) => normalizedCustomFunctions.get(name)!);
+  const variableNames = Array.from(normalizedCustomVariables.keys());
+  const variableGetters = variableNames.map((name) => normalizedCustomVariables.get(name)!);
+  const normalized = normalizeFunctionExpression(ascii, customNames, variableNames);
   let fn: ((x: number) => number) | null = null;
   try {
-    fn = new Function('x',
+    const evaluator = new Function('x', ...customNames, ...variableNames,
       'const pi=Math.PI,e=Math.E;' +
       'const sin=Math.sin,cos=Math.cos,tan=Math.tan,asin=Math.asin,acos=Math.acos,atan=Math.atan;' +
       'const arcsin=Math.asin,arccos=Math.acos,arctan=Math.atan,sinh=Math.sinh,cosh=Math.cosh,tanh=Math.tanh;' +
       'const exp=Math.exp,log=(Math.log10||((v)=>Math.log(v)/Math.LN10)),ln=Math.log,sqrt=Math.sqrt,abs=Math.abs;' +
       'const floor=Math.floor,ceil=Math.ceil,round=Math.round,min=Math.min,max=Math.max,pow=Math.pow;' +
       'return (' + normalized + ');'
-    ) as (x: number) => number;
+    ) as (x: number, ...values: Array<number | ((x: number) => number)>) => number;
+    fn = (x: number) => evaluator(x, ...customValues, ...variableGetters.map((getter) => getter()));
   } catch (e) {}
   return { prepared, ascii, normalized, fn };
 }
