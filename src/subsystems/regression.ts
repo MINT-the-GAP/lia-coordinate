@@ -7269,6 +7269,37 @@ function eraseAtPoint(state: RegressionState, point: DrawPoint, thresholdPx: num
   return true;
 }
 
+function eraseAutoPointAtPoint(state: RegressionState, point: DrawPoint): boolean {
+  const hitPoint = findNearestAutoPoint(state, point, 14);
+  if (!hitPoint) return false;
+  const removed = removeAutoPoint(state, hitPoint.key);
+  if (!removed) return false;
+  state.undoActions.push({ type: 'point-remove', point: removed });
+  state.redoActions = [];
+  return true;
+}
+
+function eraseDgsAtPointer(state: RegressionState, evt: PointerEvent): boolean {
+  try {
+    return !!window.__eraseDgsAtClientPoint?.(state.boardId, evt.clientX, evt.clientY);
+  } catch (e) {
+    return false;
+  }
+}
+
+function eraseEverythingAtPointer(
+  state: RegressionState,
+  point: DrawPoint,
+  evt: PointerEvent,
+  thresholdPx: number
+): boolean {
+  let changed = false;
+  if (eraseAtPoint(state, point, thresholdPx)) changed = true;
+  if (eraseAutoPointAtPoint(state, point)) changed = true;
+  if (eraseDgsAtPointer(state, evt)) changed = true;
+  return changed;
+}
+
 function applyUndoAction(state: RegressionState, action: DrawAction): void {
   if (action.type === 'dgs') {
     try { if (window.__applyDgsHistory) window.__applyDgsHistory(state.boardId, action.before); } catch (e) {}
@@ -7373,20 +7404,10 @@ function bindDrawLayer(state: RegressionState): void {
 
     if (state.activeTool === 'erase') {
       state.eraseRemoved = [];
-      if (eraseAtPoint(state, point, 10)) {
+      try { window.__beginDgsErase?.(state.boardId); } catch (e) {}
+      if (eraseEverythingAtPointer(state, point, evt, 10)) {
         redrawCanvas(state);
         updateButtonStates(state);
-      } else {
-        const hitPoint = findNearestAutoPoint(state, point, 14);
-        if (hitPoint) {
-          const removed = removeAutoPoint(state, hitPoint.key);
-          if (removed) {
-            state.undoActions.push({ type: 'point-remove', point: removed });
-            state.redoActions = [];
-          }
-          redrawCanvas(state);
-          updateButtonStates(state);
-        }
       }
       state.pointerId = evt.pointerId;
       state.drawing = true;
@@ -7420,7 +7441,7 @@ function bindDrawLayer(state: RegressionState): void {
     const point = getDrawPos(layer, evt);
 
     if (state.activeTool === 'erase') {
-      if (eraseAtPoint(state, point, 12)) {
+      if (eraseEverythingAtPointer(state, point, evt, 12)) {
         redrawCanvas(state);
         updateButtonStates(state);
       }
@@ -7447,6 +7468,7 @@ function bindDrawLayer(state: RegressionState): void {
     }
 
     if (state.activeTool === 'erase') {
+      try { window.__finishDgsErase?.(state.boardId); } catch (e) {}
       if (state.eraseRemoved.length > 0) {
         state.undoActions.push({ type: 'erase', removed: state.eraseRemoved.slice() });
         state.redoActions = [];
@@ -7521,6 +7543,9 @@ function applyLayout(state: RegressionState): void {
   const dgsMenuOpen = usesDgsLayout && dgsMenu!.dataset.open === '1';
   const dgsDivider = dgsMenu && dgsMenu.querySelector<HTMLElement>('.lia-dgs-regression-divider');
   if (dgsDivider) dgsDivider.dataset.visible = '1';
+  const dgsTextDivider = dgsMenu && dgsMenu.querySelector<HTMLElement>('.lia-dgs-text-divider');
+  const dgsTextButton = dgsMenu && dgsMenu.querySelector<HTMLButtonElement>('.lia-dgs-text-button');
+  const dgsZoomModeButton = dgsMenu && dgsMenu.querySelector<HTMLButtonElement>('.lia-dgs-zoom-mode-button');
 
   const dgsButtonSize = usesDgsLayout ? '35px' : '';
   const dgsIconSize = usesDgsLayout ? '27.5px' : '';
@@ -7543,6 +7568,9 @@ function applyLayout(state: RegressionState): void {
       if (button.parentElement !== dgsMenu) dgsMenu!.appendChild(button);
       button.tabIndex = dgsMenuOpen ? 0 : -1;
     });
+    if (dgsTextDivider) dgsMenu!.appendChild(dgsTextDivider);
+    if (dgsTextButton) dgsMenu!.appendChild(dgsTextButton);
+    if (dgsZoomModeButton) dgsMenu!.appendChild(dgsZoomModeButton);
   } else {
     [state.drawButton, state.eraseButton, state.toolsButton].forEach((button) => {
       if (button.parentElement !== state.boardContainer) state.boardContainer.appendChild(button);
@@ -7778,7 +7806,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
 
   const eraseButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-erase-toggle',
-    'Pinselstrich loeschen',
+    'Objekt oder Pinselstrich loeschen',
     '<svg viewBox="0 0 24 24" aria-hidden="true" style="transform:translate(-1px, -2px);"><path class="ico-stroke" d="M6.2 15.7l8-8a2 2 0 0 1 2.8 0l3.1 3.1a2 2 0 0 1 0 2.8L13.4 20.3H9.3l-3.1-3.1a2 2 0 0 1 0-1.5z"></path><path class="ico-stroke" d="M9.2 20.3h8"></path><path class="ico-stroke" d="M10 13.9l5.7 5.7"></path></svg>'
   );
 

@@ -672,6 +672,15 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
           --{{0}}--
 Adds a DGS menu button to the top-left corner of a coordinate board.
 Clicking the hamburger button slides a tool bar into the board from above.
+Right-clicking the visible horizontal or vertical axis opens a dedicated axis editor. The
+variable name and the additional axis label are edited separately and rendered through the
+existing TeX-capable axis-title overlay. For example, variable t and label in [s] produce
+$t$ in [s]. Axis-label changes participate in DGS undo/redo and remain positioned outside the
+open top and side menus.
+The eraser removes freehand strokes, generated regression points, and every object created
+with the DGS tools. Dragging across several dependent DGS objects records the DGS part of the
+gesture as one undoable history step; deleting a construction point also removes its dependent
+constructions through the same cleanup path as the object menu.
 The point tool places freely movable points by clicking the coordinate board and names them
 alphabetically (`A` to `Z`, then `A'` to `Z'`, `A''`, and so on), skipping names already in use.
 The segment tool connects two successively selected points, labels the magenta segment with
@@ -681,14 +690,22 @@ point is its endpoint and the second selected point determines its direction. A 
 a finite arrow from the first selected point to the second selected point. Named endpoints produce
 an automatic vector label such as `\overrightarrow{AB}`; otherwise a lowercase fallback such as
 `\overrightarrow{a}` is used. The arrow spans the complete label.
-The line-relations submenu sits between the line and shape tools and provides perpendicular and
-parallel constructions. Select a segment, ray, vector, or straight line and a point in either order;
-it creates the dynamically linked straight line through that point and then switches itself off.
-The line, ray, vector, segment, perpendicular, parallel, polygon, circle, and angle tools reuse a nearby existing point or
+The line-relations submenu sits between the line and shape tools and provides perpendicular,
+parallel, midpoint, and angle-bisector constructions. For a perpendicular or parallel, select a
+segment, ray, vector, or straight line and a point in either order; it creates the dynamically
+linked straight line through that point and then switches itself off. The midpoint tool accepts
+exactly two already existing points and creates an alphabetically named dependent point halfway
+between them. Its object menu provides a Show coordinates checkbox for the dynamic coordinate
+pair. The angle-bisector tool accepts three existing points in arm–vertex–arm order and
+creates the dynamically linked internal angle-bisector line through the vertex.
+The line, ray, vector, segment, perpendicular, parallel, polygon, circle, circular-sector, and angle tools reuse a nearby existing point or
 automatically place a new alphabetically named DGS point when clicking an empty board position.
 The polygon tool selects points in sequence. Selecting the first point again after at
 least three distinct points closes the sequence and creates a movable polygon (for example,
 `A → B → C → A` or `B → C → A → B`).
+The circular-sector tool is located directly below the circle tool. Select or place three
+points in center–radius point–second arm point order. It creates a dynamically linked magenta
+sector; its object menu can show the area and perimeter and edit line, fill, and label colors.
 The angle submenu also provides an angle-by-measure construction. Select the first arm point
 and then the vertex, enter a value between 0 and 360 degrees in the centered dialog, and DGS
 creates the third point counterclockwise with equal arm lengths. Its angle measure can later be
@@ -705,6 +722,16 @@ menu and can be edited there; leaving the field or pressing Enter updates the ex
 Simple quotients such as 5/7 are rendered as TeX fractions. Function labels stay inside the
 visible graph area below the open top menu; the object menu offers Show expression instead of
 the inapplicable Lock option.
+The text button forms the final toolbar group on the far right, separated by a theme-colored
+vertical divider. Activate it, click the desired board position, and enter ordinary plain text
+in the centered dialog. The resulting magenta text object is movable and participates in DGS
+undo/redo, persistence, deletion, and erasing. Its right-click menu edits the text directly and
+provides a font-size field from 8 to 96 pixels.
+The button directly to the right of the text tool controls board zooming. Each click cycles
+through both axes, vertical only, horizontal only, and back to both axes. Three direction-arrow
+icons show the active mode without extra text. The selected direction applies consistently to
+mouse-wheel, keyboard, and pinch zoom while panning and programmatic resizing remain
+unaffected; the mode is kept with the board state.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and

@@ -172,6 +172,11 @@ export function init(): void {
 
     const w = board.containerObj.clientWidth || 0;
     const h = board.containerObj.clientHeight || 0;
+    const dgsMenu = board.containerObj.querySelector('.lia-dgs-top-menu');
+    const dgsSideMenu = board.containerObj.querySelector('.lia-dgs-side-menu');
+    const dgsMenuOpen = !!dgsMenu && dgsMenu.getAttribute('data-open') === '1';
+    const dgsSideMenuOpen = !!dgsSideMenu && dgsSideMenu.getAttribute('data-open') === '1';
+    const safeTop = dgsMenuOpen ? 62 : 12;
 
     const xAxisTop = 0 > ymax;
     const xAxisBottom = 0 < ymin;
@@ -180,12 +185,12 @@ export function init(): void {
 
     if (xEl && xHTML) {
       xEl.style.left = 'auto';
-      xEl.style.right = '12px';
+      xEl.style.right = (dgsSideMenuOpen ? 202 : 12) + 'px';
       xEl.style.textAlign = 'right';
       xEl.style.transform = 'none';
 
       if (xAxisTop) {
-        xEl.style.top = '44px';
+        xEl.style.top = (dgsMenuOpen ? 62 : 44) + 'px';
         xEl.style.bottom = 'auto';
       } else if (xAxisBottom) {
         xEl.style.top = 'auto';
@@ -194,17 +199,17 @@ export function init(): void {
         const scrY = userToScrY(board, 0);
 
         if (scrY < h / 2) {
-          xEl.style.top = Math.max(8, Math.round(scrY + 16)) + 'px';
+          xEl.style.top = Math.max(safeTop, Math.round(scrY + 16)) + 'px';
           xEl.style.bottom = 'auto';
         } else {
-          xEl.style.top = Math.max(8, Math.round(scrY - 34)) + 'px';
+          xEl.style.top = Math.max(safeTop, Math.round(scrY - 34)) + 'px';
           xEl.style.bottom = 'auto';
         }
       }
     }
 
     if (yEl && yHTML) {
-      yEl.style.top = (xAxisTop ? 64 : 12) + 'px';
+      yEl.style.top = Math.max(safeTop, xAxisTop ? 64 : 12) + 'px';
       yEl.style.bottom = 'auto';
 
       if (yAxisLeft) {

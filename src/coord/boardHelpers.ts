@@ -51,10 +51,14 @@ export function saveBoardState(board: any, id: string, initialBBox: number[]): v
 
   if (!(width > 0) || !(height > 0) || !isValidBBox(bbox)) return;
 
-  getBoardStateStore()[id] = {
+  const store = getBoardStateStore();
+  const previous = store[id] || {};
+  store[id] = {
+    ...previous,
     width,
     height,
-    bbox: bbox.slice()
+    bbox: bbox.slice(),
+    zoomMode: board.__liaDgsZoomMode || previous.zoomMode || previous.panMode || 'both'
   };
 }
 
@@ -753,7 +757,7 @@ export function createGrid(board: any, gridCol: string): void {
     : [];
 
   const grid = board.create('grid', parents, {
-    majorStep: 'auto', minorElements: 'auto', includeBoundaries: true, forceSquare: true,
+    majorStep: 'auto', minorElements: 'auto', includeBoundaries: true, forceSquare: false,
     major: {
       face: 'line', strokeColor: MAJOR_GRID_COLOR, strokeOpacity: MAJOR_GRID_OPACITY,
       highlightStrokeOpacity: MAJOR_GRID_OPACITY, strokeWidth: 1, dash: 0, drawZero: true
