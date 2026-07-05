@@ -681,6 +681,11 @@ mode. It is highlighted whenever no DGS construction, function dialog, regressio
 eraser tool is active. Clicking it cancels the current tool and any unfinished multi-step
 selection. Its pointer icon follows the neutral light/dark-mode color, while the vertical
 divider before the construction tools uses the selected theme color.
+The formatting button directly beside the pointer is a two-step one-shot tool. Select the
+source object first and then the target object; DGS copies text, line, fill, and applicable
+trace colors together with the object-label or text font size. The source is highlighted while
+the tool waits for its target, and the normal pointer mode is restored after the transfer.
+Transferred formatting participates in persistence and DGS undo/redo.
 Right-clicking the visible horizontal or vertical axis opens a dedicated axis editor. The
 variable name and the additional axis label are edited separately and rendered through the
 existing TeX-capable axis-title overlay. For example, variable t and label in [s] produce

@@ -94,6 +94,7 @@ type DgsState = {
   colorSaturation: number;
   colorValue: number;
   selectButton: HTMLButtonElement;
+  formatButton: HTMLButtonElement;
   toolsDivider: HTMLSpanElement;
   pointButton: HTMLButtonElement;
   segmentButton: HTMLButtonElement;
@@ -175,7 +176,7 @@ type DgsState = {
   objectListOpen: boolean;
   objectListSignature: string;
   contextObject: any | null;
-  activeTool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
+  activeTool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
   externalToolActive: boolean;
   pendingTextPosition: { x: number; y: number } | null;
   zoomMode: 'both' | 'vertical' | 'horizontal';
@@ -190,6 +191,7 @@ type DgsState = {
   selectedCircleCenter: any | null;
   selectedSectorPoints: any[];
   selectedIntersectionObject: any | null;
+  selectedFormatSource: any | null;
   circlePreview: any | null;
   circlePreviewPosition: { x: number; y: number } | null;
   restoring: boolean;
@@ -213,7 +215,7 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
-    objectList: 'Objektliste', noObjects: 'Noch keine Objekte',
+    objectList: 'Objektliste', noObjects: 'Noch keine Objekte', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
     coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
     showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
@@ -226,7 +228,7 @@ const DGS_TEXT = {
     enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
-    objectList: 'Object list', noObjects: 'No objects yet',
+    objectList: 'Object list', noObjects: 'No objects yet', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
     coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
     showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
@@ -249,10 +251,10 @@ const DGS_ZOOM_ICONS: Record<'both' | 'vertical' | 'horizontal', string> = {
 };
 
 const DGS_AXIS_SCALE_ICONS: Record<DgsAxisScaleMode, string> = {
-  cartesian: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text x=8 y=10>lin</text></svg>',
-  'log-x': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=7 y=17>log x</text></svg>',
-  'log-y': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=5 y=9>log y</text></svg>',
-  'log-log': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=5 y=10>log</text><text class=lia-dgs-axis-log-mark x=8 y=18>log</text></svg>'
+  cartesian: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text class=lia-dgs-axis-scale-label x=6 y=9>lin</text><text class=lia-dgs-axis-scale-label x=11 y=17>lin</text></svg>',
+  'log-x': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text class=lia-dgs-axis-scale-label x=6 y=9>lin</text><text class=lia-dgs-axis-scale-label x=10 y=17>log</text></svg>',
+  'log-y': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text class=lia-dgs-axis-scale-label x=6 y=9>log</text><text class=lia-dgs-axis-scale-label x=11 y=17>lin</text></svg>',
+  'log-log': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text class=lia-dgs-axis-scale-label x=6 y=9>log</text><text class=lia-dgs-axis-scale-label x=10 y=17>log</text></svg>'
 };
 
 function normalizeDgsAxisScaleMode(value: unknown): DgsAxisScaleMode {
@@ -1156,15 +1158,15 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-tools-divider {
-      left: 94px;
+      left: 138px;
     }
 
     .lia-dgs-function-divider {
-      left: 318px;
+      left: 362px;
     }
 
     .lia-dgs-regression-divider {
-      left: 413px;
+      left: 457px;
       display: none;
     }
 
@@ -1173,7 +1175,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-text-divider {
-      left: 551px;
+      left: 595px;
     }
 
     .lia-dgs-geometry-button {
@@ -1208,28 +1210,40 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 52px;
     }
 
+    .lia-dgs-format-button {
+      left: 95px;
+    }
+
+    .lia-dgs-format-button path {
+      stroke: currentColor !important;
+    }
+
+    .lia-dgs-format-source {
+      filter: drop-shadow(0 0 3px #ff00ff) drop-shadow(0 0 1px #ff00ff);
+    }
+
     .lia-dgs-point-button {
-      left: 103px;
+      left: 147px;
     }
 
     .lia-dgs-segment-button {
-      left: 146px;
+      left: 190px;
     }
 
     .lia-dgs-orthogonal-button {
-      left: 189px;
+      left: 233px;
     }
 
     .lia-dgs-polygon-button {
-      left: 232px;
+      left: 276px;
     }
 
     .lia-dgs-angle-button {
-      left: 275px;
+      left: 319px;
     }
 
     .lia-dgs-function-button {
-      left: 327px;
+      left: 371px;
       font-family: Georgia, 'Times New Roman', serif;
       font-size: 17px;
       font-style: italic;
@@ -1237,7 +1251,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-slider-button {
-      left: 560px;
+      left: 604px;
     }
 
     .lia-dgs-slider-button svg {
@@ -1253,13 +1267,13 @@ function ensureStyles(root: Document | ShadowRoot): void {
       stroke-linecap: round;
     }
 
-    .lia-dgs-slider-knob {
-      fill: #ff00ff;
-      stroke: none;
+    .lia-dgs-slider-button .lia-dgs-slider-knob {
+      fill: #ff00ff !important;
+      stroke: none !important;
     }
 
     .lia-dgs-text-button {
-      left: 603px;
+      left: 647px;
       font-family: Georgia, 'Times New Roman', serif;
       font-size: 20px;
       font-weight: 700;
@@ -1267,15 +1281,15 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-zoom-divider {
-      left: 646px;
+      left: 690px;
     }
 
     .lia-dgs-zoom-mode-button {
-      left: 655px;
+      left: 699px;
     }
 
     .lia-dgs-axis-scale-button {
-      left: 698px;
+      left: 742px;
     }
 
     .lia-dgs-object-list-button {
@@ -1284,8 +1298,12 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-object-list-dot {
-      fill: #ff00ff;
-      stroke: none;
+      fill: currentColor !important;
+      stroke: none !important;
+    }
+
+    .lia-dgs-object-list-button path {
+      stroke: currentColor !important;
     }
 
     .lia-dgs-axis-scale-button svg {
@@ -1295,20 +1313,20 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-axis-scale-button text,
     .lia-dgs-axis-scale-submenu text {
-      fill: currentColor;
+      fill: #ff00ff;
       stroke: none;
       font-family: Arial, sans-serif;
       font-size: 6px;
       font-weight: 700;
     }
 
-    .lia-dgs-axis-scale-button .lia-dgs-axis-log-mark,
-    .lia-dgs-axis-scale-submenu .lia-dgs-axis-log-mark {
-      fill: #ff00ff;
+    .lia-dgs-axis-scale-button path,
+    .lia-dgs-axis-scale-submenu path {
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
     }
 
     .lia-dgs-root-button {
-      left: 370px;
+      left: 414px;
     }
 
     .lia-dgs-root-button svg,
@@ -1360,7 +1378,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     .lia-dgs-geometry-submenu {
       position: absolute;
       top: 44px;
-      left: 138px;
+      left: 182px;
       min-width: 222.5px;
       display: grid;
       gap: 3.75px;
@@ -1380,7 +1398,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-axis-scale-submenu {
-      left: 602px;
+      left: 646px;
       min-width: 310px;
     }
 
@@ -1393,19 +1411,19 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-shape-submenu {
-      left: 224px;
+      left: 268px;
     }
 
     .lia-dgs-relation-submenu {
-      left: 181px;
+      left: 225px;
     }
 
     .lia-dgs-angle-submenu {
-      left: 267px;
+      left: 311px;
     }
 
     .lia-dgs-root-submenu {
-      left: 362px;
+      left: 406px;
     }
 
     .lia-dgs-geometry-tool {
@@ -2876,6 +2894,21 @@ function setSelectedSegmentPoint(state: DgsState, point: any | null): void {
   try { if (nextNode && nextNode.classList) nextNode.classList.add('lia-dgs-segment-endpoint'); } catch (e) {}
 }
 
+function setSelectedFormatSource(state: DgsState, object: any | null): void {
+  const toggle = (candidate: any, active: boolean) => {
+    try {
+      const node = candidate && candidate.rendNode;
+      if (node && node.classList) node.classList.toggle('lia-dgs-format-source', active);
+    } catch (e) {}
+  };
+  toggle(state.selectedFormatSource, false);
+  getDgsFontCandidates(state.selectedFormatSource).forEach((candidate) => toggle(candidate, false));
+  state.selectedFormatSource = object || null;
+  toggle(state.selectedFormatSource, true);
+  getDgsFontCandidates(state.selectedFormatSource).forEach((candidate) => toggle(candidate, true));
+  renderToolState(state);
+}
+
 function setSelectedRelationInputs(state: DgsState, line: any | null, point: any | null): void {
   [state.selectedRelationLine, state.selectedRelationPoint].forEach((object) => {
     const node = object && object.rendNode;
@@ -4316,7 +4349,8 @@ function refreshDgsSliderTypography(state: DgsState): void {
   getDgsBoardObjects(state.board).filter(isDgsSlider).forEach((slider) => {
     const baseScale = Number(slider.__liaDgsSliderFontBaseScale) || currentScale;
     slider.__liaDgsSliderFontBaseScale = baseScale;
-    const fontSize = Math.max(8, Math.min(48, 18 * currentScale / baseScale));
+    const baseFontSize = Math.max(8, Math.min(96, Number(slider.__liaDgsFormatFontSize) || 18));
+    const fontSize = Math.max(8, Math.min(96, baseFontSize * currentScale / baseScale));
     if (Math.abs(Number(slider.__liaDgsSliderFontSize) - fontSize) < 0.05) return;
     slider.__liaDgsSliderFontSize = fontSize;
     try { slider.label?.setAttribute({ fontSize }); } catch (e) {}
@@ -4405,6 +4439,7 @@ function createDgsSlider(
       Math.max(1e-9, Math.abs(Number(state.board.unitX) || 1)) *
       Math.max(1e-9, Math.abs(Number(state.board.unitY) || 1))
     );
+    slider.__liaDgsFormatFontSize = 18;
     slider.__liaDgsShowName = true;
     slider.__liaDgsShowObject = true;
     slider.__liaDgsOpacity = 1;
@@ -4564,6 +4599,7 @@ function createDgsText(
     textObject.__liaDgsText = true;
     textObject.__liaDgsTextContent = raw;
     textObject.__liaDgsTextFontSize = clampDgsTextFontSize(fontSize);
+    textObject.__liaDgsFormatFontSize = textObject.__liaDgsTextFontSize;
     textObject.__liaDgsShowName = true;
     textObject.__liaDgsShowObject = true;
     textObject.__liaDgsOpacity = 1;
@@ -4601,6 +4637,7 @@ function setDgsTextFontSize(state: DgsState, object: any, value: unknown): boole
   if (!isDgsText(object)) return false;
   const size = clampDgsTextFontSize(value);
   object.__liaDgsTextFontSize = size;
+  object.__liaDgsFormatFontSize = size;
   try { object.setAttribute({ fontSize: size }); } catch (e) {}
   try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
   persistDgsConstruction(state);
@@ -4837,6 +4874,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       textColor: getDgsObjectColor(object, 'text'),
       lineColor: getDgsObjectColor(object, 'line'),
       fillColor: getDgsObjectColor(object, 'fill'),
+      formatFontSize: getDgsFormatFontSize(object),
       showLength: !!object.__liaDgsShowLength,
       showEquation: !!object.__liaDgsShowEquation,
       showArea: !!object.__liaDgsShowArea,
@@ -5078,6 +5116,9 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   setDgsObjectColor(object, 'text', record.textColor || '#ff00ff');
   setDgsObjectColor(object, 'line', record.lineColor || '#ff00ff');
   setDgsObjectColor(object, 'fill', record.fillColor || '#ff00ff');
+  if (Number.isFinite(Number(record.formatFontSize))) {
+    setDgsFormatFontSize(state, object, Number(record.formatFontSize));
+  }
   if (isDgsAngle(object)) syncDgsRightAngleStyle(object);
   setDgsObjectOpacity(object, Number.isFinite(record.opacity) ? record.opacity : 1);
   setDgsObjectVisible(object, record.showObject !== false);
@@ -6560,6 +6601,81 @@ function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill' | 'trace'
   return color;
 }
 
+function getDgsFontCandidates(object: any): any[] {
+  const candidates = [
+    object && object.label,
+    object && object.__liaDgsMeasurementLabel,
+    object && object.__liaDgsAngleLabel,
+    object && object.__liaDgsCircleLabel,
+    object && object.__liaDgsFunctionLabel
+  ];
+  return candidates.filter((candidate, index) =>
+    !!candidate && candidates.indexOf(candidate) === index
+  );
+}
+
+function readDgsFontSizeValue(value: any): number {
+  try {
+    const resolved = typeof value === 'function' ? value() : value;
+    const number = Number(resolved);
+    return Number.isFinite(number) ? number : NaN;
+  } catch (e) {
+    return NaN;
+  }
+}
+
+function getDgsFormatFontSize(object: any): number {
+  const stored = readDgsFontSizeValue(object && object.__liaDgsFormatFontSize);
+  if (Number.isFinite(stored)) return Math.max(8, Math.min(96, stored));
+  if (isDgsText(object)) return clampDgsTextFontSize(object.__liaDgsTextFontSize);
+  for (const candidate of getDgsFontCandidates(object)) {
+    let size = NaN;
+    try { size = readDgsFontSizeValue(candidate.getAttribute?.('fontSize')); } catch (e) {}
+    if (!Number.isFinite(size)) size = readDgsFontSizeValue(candidate.visProp && candidate.visProp.fontsize);
+    if (!Number.isFinite(size)) size = readDgsFontSizeValue(candidate.visPropCalc && candidate.visPropCalc.fontsize);
+    if (!Number.isFinite(size)) {
+      try { size = parseFloat(String(candidate.rendNode && candidate.rendNode.style.fontSize || '')); } catch (e) {}
+    }
+    if (Number.isFinite(size)) return Math.max(8, Math.min(96, size));
+  }
+  return 18;
+}
+
+function setDgsFormatFontSize(state: DgsState, object: any, value: unknown): number {
+  const number = Number(value);
+  const size = Math.max(8, Math.min(96, Number.isFinite(number) ? number : 18));
+  if (!object) return size;
+  object.__liaDgsFormatFontSize = size;
+  if (isDgsText(object)) {
+    object.__liaDgsTextFontSize = clampDgsTextFontSize(size);
+    try { object.setAttribute({ fontSize: object.__liaDgsTextFontSize }); } catch (e) {}
+  }
+  getDgsFontCandidates(object).forEach((candidate) => {
+    try { candidate.setAttribute?.({ fontSize: size }); } catch (e) {}
+    try {
+      if (candidate.rendNode) candidate.rendNode.style.fontSize = size.toFixed(2) + 'px';
+    } catch (e) {}
+  });
+  if (isDgsSlider(object)) refreshDgsSliderTypography(state);
+  return size;
+}
+
+function copyDgsObjectFormat(state: DgsState, source: any, target: any): boolean {
+  if (!isDgsObjectListEntry(source) || !isDgsObjectListEntry(target) || source === target) return false;
+  setDgsObjectColor(target, 'line', getDgsObjectColor(source, 'line'));
+  setDgsObjectColor(target, 'fill', getDgsObjectColor(source, 'fill'));
+  setDgsObjectColor(target, 'text', getDgsObjectColor(source, 'text'));
+  if (isDgsPoint(source) && isDgsPoint(target)) {
+    setDgsObjectColor(target, 'trace', getDgsObjectColor(source, 'trace'));
+  }
+  setDgsFormatFontSize(state, target, getDgsFormatFontSize(source));
+  refreshDgsObjectLabel(target);
+  refreshSideMenusForObject(target);
+  try { state.board?.update?.(); } catch (e) {}
+  persistDgsConstruction(state);
+  return true;
+}
+
 function formatCoordinate(value: number): string {
   if (!Number.isFinite(value)) return '';
   const normalized = Math.abs(value) < 1e-12 ? 0 : value;
@@ -7368,6 +7484,7 @@ function refreshConstructionModeCursor(boardContainer: HTMLElement): void {
 function renderToolState(state: DgsState): void {
   const text = dgsText(state.language);
   const normalActive = state.activeTool === '' && !state.functionDialogOpen && !state.externalToolActive;
+  const formatActive = state.activeTool === 'format-copy';
   const pointActive = state.activeTool === 'point';
   const segmentActive = state.activeTool === 'segment';
   const rayActive = state.activeTool === 'ray';
@@ -7391,6 +7508,13 @@ function renderToolState(state: DgsState): void {
   const textActive = state.activeTool === 'text';
   state.selectButton.classList.toggle('is-active', normalActive);
   state.selectButton.setAttribute('aria-pressed', normalActive ? 'true' : 'false');
+  state.formatButton.classList.toggle('is-active', formatActive);
+  state.formatButton.setAttribute('aria-pressed', formatActive ? 'true' : 'false');
+  const formatLabel = formatActive && state.selectedFormatSource
+    ? text.selectFormatTarget
+    : text.copyFormat;
+  state.formatButton.setAttribute('aria-label', formatLabel);
+  state.formatButton.title = formatLabel;
   state.pointButton.classList.toggle('is-active', pointActive);
   state.pointButton.setAttribute('aria-pressed', pointActive ? 'true' : 'false');
   state.pointButton.setAttribute('aria-label', pointActive ? text.stopPoint : text.setPoint);
@@ -7463,7 +7587,7 @@ function renderToolState(state: DgsState): void {
 
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
+  tool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
   deactivateRegression = true
 ): void {
   if (tool) {
@@ -7477,6 +7601,7 @@ function setActiveTool(
       setSelectedMidpointPoint(other, null);
       setSelectedBisectorPoints(other, []);
       setSelectedIntersectionObject(other, null);
+      setSelectedFormatSource(other, null);
       setSelectedPolygonPoints(other, []);
       setSelectedAnglePoints(other, []);
       setSelectedSectorPoints(other, []);
@@ -7505,6 +7630,9 @@ function setActiveTool(
   if (state.activeTool === 'intersection' && tool !== 'intersection') {
     setSelectedIntersectionObject(state, null);
   }
+  if (state.activeTool === 'format-copy' && tool !== 'format-copy') {
+    setSelectedFormatSource(state, null);
+  }
   if (state.activeTool === 'polygon' && tool !== 'polygon') setSelectedPolygonPoints(state, []);
   if (state.activeTool === 'sector' && tool !== 'sector') setSelectedSectorPoints(state, []);
   if ((state.activeTool === 'angle' || state.activeTool === 'angle-measured') && tool !== state.activeTool) {
@@ -7521,6 +7649,7 @@ window.__setDgsExternalToolActive = function(boardId: string, active: boolean): 
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
     if (!state || state.boardId !== boardId) return;
+    if (active && state.activeTool === 'format-copy') setActiveTool(state, '', false);
     state.externalToolActive = active;
     renderToolState(state);
   });
@@ -7931,6 +8060,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.objectListPanel.dataset.topOpen = open ? '1' : '0';
   state.objectListPanel.classList.toggle('is-top-open', open);
   state.selectButton.tabIndex = open ? 0 : -1;
+  state.formatButton.tabIndex = open ? 0 : -1;
   state.pointButton.tabIndex = open ? 0 : -1;
   state.segmentButton.tabIndex = open ? 0 : -1;
   state.orthogonalButton.tabIndex = open ? 0 : -1;
@@ -8269,6 +8399,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.traceCheckbox?.isConnected &&
     !!existing.toolsDivider?.isConnected &&
     !!existing.selectButton?.isConnected &&
+    !!existing.formatButton?.isConnected &&
     !!existing.pointButton?.isConnected &&
     !!existing.segmentButton?.isConnected &&
     !!existing.orthogonalButton?.isConnected &&
@@ -8409,6 +8540,16 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   selectButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-select-pointer d=M5,3.5V20l4.2-4.1,2.6,5.2,3.3-1.65-2.55-5.1H18Z></path></svg>';
   selectButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(selectButton);
+
+  const formatButton = document.createElement('button');
+  formatButton.type = 'button';
+  formatButton.className = 'lia-dgs-geometry-button lia-dgs-format-button';
+  formatButton.setAttribute('aria-label', text.copyFormat);
+  formatButton.setAttribute('aria-pressed', 'false');
+  formatButton.title = text.copyFormat;
+  formatButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,5H16V10H4ZM16,7H19V12H13M13,12V20></path></svg>';
+  formatButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(formatButton);
 
   const toolsDivider = document.createElement('span');
   toolsDivider.className = 'lia-dgs-tools-divider';
@@ -9308,6 +9449,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     colorSaturation: 1,
     colorValue: 1,
     selectButton,
+    formatButton,
     toolsDivider,
     pointButton,
     segmentButton,
@@ -9404,6 +9546,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     selectedCircleCenter: null,
     selectedSectorPoints: [],
     selectedIntersectionObject: null,
+    selectedFormatSource: null,
     circlePreview: null,
     circlePreviewPosition: null,
     restoring: false,
@@ -9443,6 +9586,21 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setTextDialogOpen(state, false);
     setActiveTool(state, '', false);
     notifyRegressionLayout(state, false);
+  });
+
+  formatButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
+    setAngleDialogOpen(state, false);
+    setFunctionDialogOpen(state, false);
+    setTextDialogOpen(state, false);
+    setActiveTool(state, state.activeTool === 'format-copy' ? '' : 'format-copy');
   });
 
   pointButton.addEventListener('click', (evt) => {
@@ -10321,6 +10479,22 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   state.onBoardPointerDown = (evt: PointerEvent) => {
     if (!state.activeTool) return;
     if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+
+    if (state.activeTool === 'format-copy') {
+      const object = findDgsContextObject(state, evt as any);
+      if (!object) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      if (!state.selectedFormatSource) {
+        setSelectedFormatSource(state, object);
+        return;
+      }
+      if (object === state.selectedFormatSource) return;
+      if (copyDgsObjectFormat(state, state.selectedFormatSource, object)) {
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
 
     if (state.activeTool === 'text') {
       if (state.textDialogOpen) return;
