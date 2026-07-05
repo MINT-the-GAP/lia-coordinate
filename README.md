@@ -673,7 +673,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 ## `@DGS`
 
-          --{{1}}--
+          --{{0}}--
 Adds a DGS menu button to the top-left corner of a coordinate board.
 Clicking the hamburger button slides a tool bar into the board from above.
 The mouse-pointer button between the hamburger and the point tool represents the normal board
@@ -749,12 +749,24 @@ Simple quotients such as 5/7 are rendered as TeX fractions. Function labels stay
 visible graph area below the open top menu; the object menu offers Show expression instead of
 the inapplicable Lock option.
 The slider button directly to the left of the text tool creates a JSXGraph parameter slider.
-Its centered dialog accepts a unique parameter name, current value, minimum, maximum, and step
-size; German decimal commas are accepted as well. The slider is placed inside the current board
-view and can be edited later through its right-click menu. Slider values are registered as
+No initial dialog is opened: each click immediately creates the next uniquely named parameter
+with range `-5` to `5`, current value `1`, and step size `0.1`. Name, value, minimum,
+maximum, and step size can be edited later through the right-click menu; German decimal commas
+are accepted as well. While unlocked, its ruler and endpoints can be repositioned. The Lock
+position checkbox freezes that placement without disabling the value knob. Slider labels are
+rendered as TeX and their font size follows board zooming. Slider values are registered as
 dynamic scalar symbols in the shared DGS expression evaluator. They can therefore be used in
 function terms and point-coordinate expressions, for example `f(x)=a*x^2` or
 `A(a|f(a)+1)`, and all geometry derived from those objects follows while the slider moves.
+When a newly entered or edited function term contains a valid scalar parameter for which no
+slider exists, DGS creates that slider automatically. For example, `a*x^2+b` creates sliders
+`a` and `b` with the standard range and step. The whole expression is validated first, so
+invalid input does not leave orphan sliders, while known built-in and named functions are not
+mistaken for parameters.
+Implicit products containing the independent variable are expanded before parameter detection
+and evaluation: for example, `sin(ax)` is treated as `sin(a*x)` and creates only the slider
+`a`. Built-in and named function identifiers remain intact, and multi-letter parameters that
+do not contain `x` are not split.
 Renaming a parameter updates existing DGS expression references. Position, range, step, value,
 colors, visibility, layer, deletion, persistence, and undo/redo are retained with the
 construction.
@@ -768,6 +780,17 @@ through both axes, vertical only, horizontal only, and back to both axes. Three 
 icons show the active mode without extra text. The selected direction applies consistently to
 mouse-wheel, keyboard, and pinch zoom while panning and programmatic resizing remain
 unaffected; the mode is kept with the board state.
+The adjacent axis-scale button opens four base-10 scale choices: Cartesian, logarithmic x with
+Cartesian y, Cartesian x with logarithmic y, and double-logarithmic. Logarithmic axes show their
+physical values on evenly spaced exponent coordinates, and DGS function graphs are transformed
+accordingly (for example, power functions become straight lines in a log-log view). Values at or
+below zero are not displayed on a logarithmic axis. The selected scale is retained for the board;
+switching back to Cartesian restores ordinary tick labels and function plotting.
+The final toolbar button opens an object list from the right. It contains every user-facing DGS
+object with its name, type, color, and current visibility. Right-clicking an entry opens the
+ordinary object-properties panel immediately to the left of the list, so both panels remain
+usable at the same time. The horizontal axis shortens by the combined visible panel width, and
+the open top menu moves both panels downward.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and

@@ -4,7 +4,14 @@
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
-import { compileFunctionExpression } from '../shared/functionExpression';
+import {
+  compileFunctionExpression,
+  expandImplicitVariableProducts,
+  prepareFunctionInput,
+  transformLatex
+} from '../shared/functionExpression';
+
+type DgsAxisScaleMode = 'cartesian' | 'log-x' | 'log-y' | 'log-log';
 
 type DgsState = {
   uid: string;
@@ -21,6 +28,10 @@ type DgsState = {
   sideMenuObjectType: HTMLSpanElement;
   sideMenuNameInput: HTMLInputElement;
   sideMenuCloseButton: HTMLButtonElement;
+  objectListClip: HTMLDivElement;
+  objectListPanel: HTMLDivElement;
+  objectListContent: HTMLDivElement;
+  objectListCloseButton: HTMLButtonElement;
   nameOption: HTMLLabelElement;
   objectOption: HTMLLabelElement;
   coordinateSection: HTMLDivElement;
@@ -43,6 +54,7 @@ type DgsState = {
   axisDescriptionInput: HTMLInputElement;
   fixedOption: HTMLLabelElement;
   fixedCheckbox: HTMLInputElement;
+  fixedCheckboxText: HTMLSpanElement;
   traceOption: HTMLLabelElement;
   traceCheckbox: HTMLInputElement;
   nameCheckbox: HTMLInputElement;
@@ -127,19 +139,19 @@ type DgsState = {
   textDivider: HTMLSpanElement;
   sliderButton: HTMLButtonElement;
   textButton: HTMLButtonElement;
+  zoomDivider: HTMLSpanElement;
   zoomModeButton: HTMLButtonElement;
+  axisScaleButton: HTMLButtonElement;
+  axisScaleSubmenu: HTMLDivElement;
+  cartesianScaleButton: HTMLButtonElement;
+  logXScaleButton: HTMLButtonElement;
+  logYScaleButton: HTMLButtonElement;
+  logLogScaleButton: HTMLButtonElement;
+  objectListButton: HTMLButtonElement;
   textDialog: HTMLDivElement;
   textDialogInput: HTMLInputElement;
   textDialogConfirmButton: HTMLButtonElement;
   textDialogCancelButton: HTMLButtonElement;
-  sliderDialog: HTMLDivElement;
-  sliderDialogNameInput: HTMLInputElement;
-  sliderDialogValueInput: HTMLInputElement;
-  sliderDialogMinInput: HTMLInputElement;
-  sliderDialogMaxInput: HTMLInputElement;
-  sliderDialogStepInput: HTMLInputElement;
-  sliderDialogConfirmButton: HTMLButtonElement;
-  sliderDialogCancelButton: HTMLButtonElement;
   xAxis: any;
   xAxisOriginalPoint2: number[] | null;
   xAxisOriginalStraightLast: boolean;
@@ -155,16 +167,19 @@ type DgsState = {
   shapeSubmenuOpen: boolean;
   angleSubmenuOpen: boolean;
   rootSubmenuOpen: boolean;
+  axisScaleSubmenuOpen: boolean;
   angleDialogOpen: boolean;
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
-  sliderDialogOpen: boolean;
   sideMenuOpen: boolean;
+  objectListOpen: boolean;
+  objectListSignature: string;
   contextObject: any | null;
   activeTool: '' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
   externalToolActive: boolean;
   pendingTextPosition: { x: number; y: number } | null;
   zoomMode: 'both' | 'vertical' | 'horizontal';
+  axisScaleMode: DgsAxisScaleMode;
   selectedSegmentPoint: any | null;
   selectedRelationLine: any | null;
   selectedRelationPoint: any | null;
@@ -198,8 +213,9 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
+    objectList: 'Objektliste', noObjects: 'Noch keine Objekte',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
-    coordinates: 'Koordinaten', fixed: 'Fixieren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
+    coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
     showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
     showSegment: 'Strecke anzeigen', showEquation: 'Geradengleichung anzeigen',
     showDistance: 'Distanzwert anzeigen', showArea: 'Flächeninhalt anzeigen',
@@ -207,11 +223,12 @@ const DGS_TEXT = {
     fillColor: 'Inhaltsfarbe', opacity: 'Deckkraft', delete: 'Löschen',
     confirmDelete: 'Löschen bestätigen', setPoint: 'Punkt setzen', stopPoint: 'Punktmodus beenden',
     straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', createMeasuredAngle: 'Winkel nach Maß', angleMeasure: 'Winkelmaß', create: 'Erzeugen', cancel: 'Abbrechen', shapes: 'Flächenwerkzeuge', layer: 'Ebene',
-    enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
+    enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
+    objectList: 'Object list', noObjects: 'No objects yet',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
-    coordinates: 'Coordinates', fixed: 'Lock', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
+    coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
     showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
     showSegment: 'Show distance', showEquation: 'Show line equation',
     showDistance: 'Show distance value', showArea: 'Show area',
@@ -219,7 +236,7 @@ const DGS_TEXT = {
     fillColor: 'Fill color', opacity: 'Opacity', delete: 'Delete',
     confirmDelete: 'Confirm delete', setPoint: 'Place point', stopPoint: 'Exit point mode',
     straightLine: 'Straight Line', distance: 'Distance', createAngle: 'Mark angle', createMeasuredAngle: 'Angle by measure', angleMeasure: 'Angle measure', create: 'Create', cancel: 'Cancel', shapes: 'Shape tools', layer: 'Layer',
-    enterFunction: 'Enter function', functionInput: 'Function expression in JSXGraph or TeX syntax', functionEquation: 'Function equation', insertText: 'Insert text', textInput: 'Text content', fontSize: 'Font size', insertSlider: 'Insert slider', slider: 'Slider', parameterName: 'Parameter name', currentValue: 'Current value', minimum: 'Minimum', maximum: 'Maximum', stepWidth: 'Step size', variableName: 'Variable name', axisDescription: 'Axis label', normalMode: 'Normal mode', zoomBoth: 'Zoom both axes', zoomVertical: 'Zoom vertically only', zoomHorizontal: 'Zoom horizontally only', createRoots: 'Find zeros', createExtrema: 'Find extrema', createInflections: 'Find inflection points', createYIntercept: 'Find ordinate-axis intercept', createTangent: 'Create tangent', createIntersection: 'Find intersections', analysis: 'Function analysis'
+    enterFunction: 'Enter function', functionInput: 'Function expression in JSXGraph or TeX syntax', functionEquation: 'Function equation', insertText: 'Insert text', textInput: 'Text content', fontSize: 'Font size', insertSlider: 'Insert slider', slider: 'Slider', parameterName: 'Parameter name', currentValue: 'Current value', minimum: 'Minimum', maximum: 'Maximum', stepWidth: 'Step size', variableName: 'Variable name', axisDescription: 'Axis label', normalMode: 'Normal mode', zoomBoth: 'Zoom both axes', zoomVertical: 'Zoom vertically only', zoomHorizontal: 'Zoom horizontally only', axisScale: 'Axis scaling', cartesianScale: 'Cartesian', logXScale: 'logarithmic x, Cartesian y', logYScale: 'Cartesian x, logarithmic y', logLogScale: 'Double logarithmic', createRoots: 'Find zeros', createExtrema: 'Find extrema', createInflections: 'Find inflection points', createYIntercept: 'Find ordinate-axis intercept', createTangent: 'Create tangent', createIntersection: 'Find intersections', analysis: 'Function analysis'
   }
 } as const;
 
@@ -230,6 +247,33 @@ const DGS_ZOOM_ICONS: Record<'both' | 'vertical' | 'horizontal', string> = {
   vertical: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M12,3V21M9,6L12,3l3,3M9,18l3,3l3,-3></path></svg>',
   horizontal: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M3,12H21M6,9L3,12l3,3M18,9l3,3l-3,3></path></svg>'
 };
+
+const DGS_AXIS_SCALE_ICONS: Record<DgsAxisScaleMode, string> = {
+  cartesian: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text x=8 y=10>lin</text></svg>',
+  'log-x': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=7 y=17>log x</text></svg>',
+  'log-y': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=5 y=9>log y</text></svg>',
+  'log-log': '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21></path><text class=lia-dgs-axis-log-mark x=5 y=10>log</text><text class=lia-dgs-axis-log-mark x=8 y=18>log</text></svg>'
+};
+
+function normalizeDgsAxisScaleMode(value: unknown): DgsAxisScaleMode {
+  return value === 'log-x' || value === 'log-y' || value === 'log-log' ? value : 'cartesian';
+}
+
+function dgsAxisUsesLogX(mode: DgsAxisScaleMode): boolean {
+  return mode === 'log-x' || mode === 'log-log';
+}
+
+function dgsAxisUsesLogY(mode: DgsAxisScaleMode): boolean {
+  return mode === 'log-y' || mode === 'log-log';
+}
+
+function getDgsAxisScaleLabel(state: DgsState, mode: DgsAxisScaleMode): string {
+  const text = dgsText(state.language);
+  if (mode === 'log-x') return text.logXScale;
+  if (mode === 'log-y') return text.logYScale;
+  if (mode === 'log-log') return text.logLogScale;
+  return text.cartesianScale;
+}
 
 function normalizeDgsZoomMode(value: unknown): 'both' | 'vertical' | 'horizontal' {
   return value === 'vertical' || value === 'horizontal' ? value : 'both';
@@ -290,6 +334,109 @@ function setDgsZoomMode(state: DgsState, mode: unknown, save = true): void {
   renderDgsZoomMode(state);
 }
 
+function formatDgsLogTickLabel(exponent: number, language: 'de' | 'en'): string {
+  if (!Number.isFinite(exponent)) return '';
+  const roundedExponent = Math.round(exponent);
+  if (Math.abs(exponent - roundedExponent) < 1e-8) {
+    if (roundedExponent >= -4 && roundedExponent <= 6) {
+      const value = Math.pow(10, roundedExponent);
+      const text = roundedExponent < 0 ? value.toFixed(-roundedExponent) : String(value);
+      return language === 'de' ? text.replace('.', ',') : text;
+    }
+    const superscript: Record<string, string> = {
+      '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+      '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    };
+    return '10' + String(roundedExponent).split('').map((char) => superscript[char] || char).join('');
+  }
+  const value = Math.pow(10, exponent);
+  if (!Number.isFinite(value)) return '';
+  const text = value.toPrecision(3).replace(/(?:\.0+|(?:(\.\d*?)0+))(?=e|$)/, '$1');
+  return language === 'de' ? text.replace('.', ',') : text;
+}
+
+function applyDgsLogTickGenerator(state: DgsState, axis: any, key: 'x' | 'y', logarithmic: boolean): void {
+  const ticks = axis && axis.defaultTicks;
+  if (!ticks) return;
+  if (!('__liaDgsOriginalGenerateLabelText' in ticks)) {
+    ticks.__liaDgsOriginalGenerateLabelText = ticks.generateLabelText;
+  }
+  if (logarithmic) {
+    ticks.generateLabelText = function(tick: any, zero: any) {
+      const index = key === 'x' ? 1 : 2;
+      const exponent = Number(tick?.usrCoords?.[index]) - Number(zero?.usrCoords?.[index]);
+      return formatDgsLogTickLabel(exponent, state.language);
+    };
+  } else {
+    ticks.generateLabelText = ticks.__liaDgsOriginalGenerateLabelText;
+  }
+  ticks.needsUpdate = true;
+}
+
+function createDgsPlottedFunctionEvaluator(
+  state: DgsState,
+  evaluator: (x: number) => number
+): (coordinate: number) => number {
+  return (coordinate: number) => {
+    const physicalX = dgsAxisUsesLogX(state.axisScaleMode) ? Math.pow(10, coordinate) : coordinate;
+    const physicalY = Number(evaluator(physicalX));
+    if (!Number.isFinite(physicalY)) return NaN;
+    if (!dgsAxisUsesLogY(state.axisScaleMode)) return physicalY;
+    return physicalY > 0 ? Math.log10(physicalY) : NaN;
+  };
+}
+
+function refreshDgsFunctionAxisScaling(state: DgsState): void {
+  getDgsBoardObjects(state.board).filter(isDgsFunction).forEach((graph) => {
+    if (typeof graph.__liaDgsFunctionEvaluator !== 'function' && typeof graph.Y === 'function') {
+      graph.__liaDgsFunctionEvaluator = graph.Y;
+    }
+    if (typeof graph.__liaDgsFunctionEvaluator !== 'function') return;
+    graph.Y = createDgsPlottedFunctionEvaluator(state, graph.__liaDgsFunctionEvaluator);
+    graph.needsUpdate = true;
+    try { graph.updateCurve?.(); } catch (e) {}
+  });
+}
+
+function renderDgsAxisScaleMode(state: DgsState): void {
+  const label = getDgsAxisScaleLabel(state, state.axisScaleMode);
+  state.axisScaleButton.innerHTML = DGS_AXIS_SCALE_ICONS[state.axisScaleMode];
+  state.axisScaleButton.setAttribute('aria-label', dgsText(state.language).axisScale + ': ' + label);
+  state.axisScaleButton.title = label;
+  state.axisScaleButton.dataset.mode = state.axisScaleMode;
+  const buttons: Array<[HTMLButtonElement, DgsAxisScaleMode]> = [
+    [state.cartesianScaleButton, 'cartesian'],
+    [state.logXScaleButton, 'log-x'],
+    [state.logYScaleButton, 'log-y'],
+    [state.logLogScaleButton, 'log-log']
+  ];
+  buttons.forEach(([button, mode]) => {
+    const active = state.axisScaleMode === mode;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-checked', active ? 'true' : 'false');
+  });
+}
+
+function setDgsAxisScaleMode(state: DgsState, modeValue: unknown, save = true): void {
+  state.axisScaleMode = normalizeDgsAxisScaleMode(modeValue);
+  if (state.board) state.board.__liaDgsAxisScaleMode = state.axisScaleMode;
+  applyDgsLogTickGenerator(state, state.xAxis, 'x', dgsAxisUsesLogX(state.axisScaleMode));
+  applyDgsLogTickGenerator(state, state.yAxis, 'y', dgsAxisUsesLogY(state.axisScaleMode));
+  refreshDgsFunctionAxisScaling(state);
+  scheduleDgsRootUpdate(state);
+  renderDgsAxisScaleMode(state);
+  if (save) {
+    window.__coordBoardStates = window.__coordBoardStates || {};
+    window.__coordBoardStates[state.boardId] = {
+      ...(window.__coordBoardStates[state.boardId] || {}),
+      axisScaleMode: state.axisScaleMode
+    };
+  }
+  try { state.board?.fullUpdate?.(); } catch (e) {
+    try { state.board?.update?.(); } catch (e2) {}
+  }
+}
+
 const states: Record<string, DgsState> = {};
 const dgsConstructionStates: Record<string, any> =
   ((window as any).__dgsConstructionStates = (window as any).__dgsConstructionStates || {});
@@ -305,6 +452,7 @@ const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
 const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
+const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
 
 function ensureStyles(root: Document | ShadowRoot): void {
@@ -410,8 +558,17 @@ function ensureStyles(root: Document | ShadowRoot): void {
       transform: translateX(calc(100% + 2px));
       transition:
         transform ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1),
-        top ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1);
+        top ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1),
+        right ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1);
       pointer-events: none;
+    }
+
+    .lia-dgs-side-menu.has-object-list {
+      right: ${OBJECT_LIST_WIDTH_PX}px;
+    }
+
+    .lia-dgs-side-menu.has-object-list:not(.is-open) {
+      transform: translateX(calc(100% + ${OBJECT_LIST_WIDTH_PX + 2}px));
     }
 
     .lia-dgs-side-menu[data-open="1"] {
@@ -421,6 +578,129 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-side-menu[data-top-open="1"] {
       top: ${MENU_HEIGHT_PX}px;
+    }
+
+    .lia-dgs-object-list-clip {
+      position: absolute;
+      inset: 0;
+      z-index: 48;
+      overflow: hidden;
+      pointer-events: none;
+      border-radius: inherit;
+    }
+
+    .lia-dgs-object-list-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: ${OBJECT_LIST_WIDTH_PX}px;
+      box-sizing: border-box;
+      padding: 10px 8px 12px;
+      overflow-y: auto;
+      border-left: 2px solid currentColor;
+      background: var(--lia-dgs-menu-bg, #fff);
+      box-shadow: -6px 0 16px rgba(0, 0, 0, 0.18);
+      transform: translateX(calc(100% + 2px));
+      transition:
+        transform ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1),
+        top ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1);
+      pointer-events: none;
+    }
+
+    .lia-dgs-object-list-panel.is-open {
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    .lia-dgs-object-list-panel.is-top-open {
+      top: ${MENU_HEIGHT_PX}px;
+    }
+
+    .lia-dgs-object-list-header {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid var(--lia-dgs-theme-color, currentColor);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-object-list-content {
+      display: grid;
+      gap: 6px;
+    }
+
+    .lia-dgs-object-list-empty {
+      padding: 12px 6px;
+      opacity: .7;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .lia-dgs-object-list-entry {
+      width: 100%;
+      min-height: 40px;
+      display: grid;
+      grid-template-columns: 11px minmax(0, 1fr);
+      align-items: center;
+      gap: 6px;
+      box-sizing: border-box;
+      padding: 5px 6px;
+      border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: context-menu;
+    }
+
+    .lia-dgs-object-list-entry:hover,
+    .lia-dgs-object-list-entry:focus-visible,
+    .lia-dgs-object-list-entry.is-selected {
+      border-color: var(--lia-dgs-theme-color, currentColor);
+      background: color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 13%, transparent);
+      outline: none;
+    }
+
+    .lia-dgs-object-list-entry.is-hidden {
+      opacity: .55;
+    }
+
+    .lia-dgs-object-list-swatch {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--lia-dgs-object-color, #ff00ff);
+      box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent);
+    }
+
+    .lia-dgs-object-list-copy {
+      min-width: 0;
+      display: grid;
+      gap: 1px;
+    }
+
+    .lia-dgs-object-list-name,
+    .lia-dgs-object-list-type {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lia-dgs-object-list-name {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-object-list-type {
+      font-size: 11px;
+      opacity: .72;
     }
 
     .lia-dgs-side-menu-header {
@@ -511,16 +791,10 @@ function ensureStyles(root: Document | ShadowRoot): void {
       margin-bottom: 8px;
     }
 
-    .lia-dgs-slider-settings-grid,
-    .lia-dgs-slider-dialog-grid {
+    .lia-dgs-slider-settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 7px;
-    }
-
-    .lia-dgs-slider-dialog-grid {
-      width: 100%;
-      margin-top: 3px;
     }
 
     .lia-dgs-slider-field {
@@ -869,7 +1143,8 @@ function ensureStyles(root: Document | ShadowRoot): void {
     .lia-dgs-tools-divider,
     .lia-dgs-function-divider,
     .lia-dgs-regression-divider,
-    .lia-dgs-text-divider {
+    .lia-dgs-text-divider,
+    .lia-dgs-zoom-divider {
       position: absolute;
       top: 3px;
       width: 2px;
@@ -965,25 +1240,22 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 560px;
     }
 
-    .lia-dgs-slider-button::before {
-      content: '';
-      width: 23px;
-      height: 2px;
-      border-radius: 999px;
-      background: currentColor;
+    .lia-dgs-slider-button svg {
+      width: 28px;
+      height: 28px;
+      overflow: visible;
     }
 
-    .lia-dgs-slider-button::after {
-      content: '';
-      position: absolute;
-      left: 16px;
-      top: 13px;
-      width: 9px;
-      height: 9px;
-      box-sizing: border-box;
-      border: 2px solid #ff00ff;
-      border-radius: 50%;
-      background: var(--lia-dgs-menu-bg, #fff);
+    .lia-dgs-slider-track {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    .lia-dgs-slider-knob {
+      fill: #ff00ff;
+      stroke: none;
     }
 
     .lia-dgs-text-button {
@@ -994,8 +1266,45 @@ function ensureStyles(root: Document | ShadowRoot): void {
       line-height: 1;
     }
 
-    .lia-dgs-zoom-mode-button {
+    .lia-dgs-zoom-divider {
       left: 646px;
+    }
+
+    .lia-dgs-zoom-mode-button {
+      left: 655px;
+    }
+
+    .lia-dgs-axis-scale-button {
+      left: 698px;
+    }
+
+    .lia-dgs-object-list-button {
+      left: auto;
+      right: 10px;
+    }
+
+    .lia-dgs-object-list-dot {
+      fill: #ff00ff;
+      stroke: none;
+    }
+
+    .lia-dgs-axis-scale-button svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .lia-dgs-axis-scale-button text,
+    .lia-dgs-axis-scale-submenu text {
+      fill: currentColor;
+      stroke: none;
+      font-family: Arial, sans-serif;
+      font-size: 6px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-axis-scale-button .lia-dgs-axis-log-mark,
+    .lia-dgs-axis-scale-submenu .lia-dgs-axis-log-mark {
+      fill: #ff00ff;
     }
 
     .lia-dgs-root-button {
@@ -1068,6 +1377,11 @@ function ensureStyles(root: Document | ShadowRoot): void {
         transform 120ms ease,
         visibility 0s linear 120ms;
       pointer-events: none;
+    }
+
+    .lia-dgs-axis-scale-submenu {
+      left: 602px;
+      min-width: 310px;
     }
 
     .lia-dgs-geometry-submenu[data-open="1"] {
@@ -1728,6 +2042,7 @@ function getNextFunctionName(state: DgsState): string {
   const used = new Set<string>();
   getDgsBoardObjects(state.board).forEach((object) => {
     if (isDgsFunction(object)) used.add(String(object.__liaDgsFunctionName || object.name || ''));
+    if (isDgsSlider(object)) used.add(String(object.__liaDgsSliderName || ''));
   });
   for (let index = 0; ; index += 1) {
     const letter = String.fromCharCode(102 + (index % 21));
@@ -2313,6 +2628,10 @@ function getDgsInflections(state: DgsState, source: any): DgsAnalysisPosition[] 
 }
 
 function getDgsAnalysisPositions(state: DgsState, construction: any): DgsAnalysisPosition[] {
+  if (construction && isDgsFunctionTarget(construction.source)) {
+    if (construction.kind === 'roots' && dgsAxisUsesLogY(state.axisScaleMode)) return [];
+    if (construction.kind === 'ordinate-intercept' && dgsAxisUsesLogX(state.axisScaleMode)) return [];
+  }
   if (construction && construction.kind === 'intersections') {
     return getDgsIntersectionPositions(state, construction.source, construction.source2);
   }
@@ -2442,6 +2761,8 @@ function createDgsAnalysisConstruction(
 ): any | null {
   if (!source || (!isDgsLinearObject(source) && !isDgsFunctionTarget(source))) return null;
   if ((kind === 'extrema' || kind === 'inflections') && !isDgsFunctionTarget(source)) return null;
+  if (isDgsFunctionTarget(source) && kind === 'roots' && dgsAxisUsesLogY(state.axisScaleMode)) return null;
+  if (isDgsFunctionTarget(source) && kind === 'ordinate-intercept' && dgsAxisUsesLogX(state.axisScaleMode)) return null;
   const property = kind === 'extrema'
     ? '__liaDgsExtremaConstruction'
     : (kind === 'inflections'
@@ -3765,7 +4086,10 @@ function getDgsExpressionFunctionBindings(
       if (dgsFunctionEvaluationStack.has(object)) return NaN;
       dgsFunctionEvaluationStack.add(object);
       try {
-        const value = Number(object.Y(x));
+        const evaluator = typeof object.__liaDgsFunctionEvaluator === 'function'
+          ? object.__liaDgsFunctionEvaluator
+          : object.Y;
+        const value = Number(evaluator(x));
         return Number.isFinite(value) ? value : NaN;
       } catch (e) {
         return NaN;
@@ -3824,9 +4148,83 @@ function compileDgsExpression(state: DgsState, expression: unknown, excludeObjec
   );
 }
 
+function findMissingDgsExpressionParameters(
+  state: DgsState,
+  expression: unknown,
+  excludeObject?: any
+): string[] {
+  let ascii = '';
+  try { ascii = transformLatex(prepareFunctionInput(expression)); } catch (e) { return []; }
+  const knownFunctions = new Set(Object.keys(getDgsExpressionFunctionBindings(state, excludeObject)));
+  try { ascii = expandImplicitVariableProducts(ascii, knownFunctions); } catch (e) { return []; }
+  const knownVariables = new Set(Object.keys(getDgsExpressionVariableBindings(state, excludeObject)));
+  const missing: string[] = [];
+  const pattern = /[A-Za-z][A-Za-z0-9]*/g;
+  let match: RegExpExecArray | null = null;
+  while ((match = pattern.exec(ascii))) {
+    const name = String(match[0] || '').toLowerCase();
+    if (!name || DGS_RESERVED_PARAMETER_NAMES.has(name) ||
+        knownFunctions.has(name) || knownVariables.has(name) || missing.includes(name)) continue;
+    const followedByParenthesis = /^\s*\(/.test(ascii.slice(pattern.lastIndex));
+    if (followedByParenthesis && name.length > 1) continue;
+    if (normalizeDgsParameterName(name) && dgsParameterNameAvailable(state, name, excludeObject)) {
+      missing.push(name);
+    }
+  }
+  return missing;
+}
+
+function compileDgsFunctionWithAutomaticParameters(
+  state: DgsState,
+  expression: unknown,
+  excludeObject?: any
+): { compiled: ReturnType<typeof compileFunctionExpression>; createdSliders: any[] } | null {
+  const raw = String(expression == null ? '' : expression).trim();
+  if (!raw) return null;
+  if (state.restoring) {
+    try {
+      const compiled = compileDgsExpression(state, raw, excludeObject);
+      return compiled.fn && compiled.normalized ? { compiled, createdSliders: [] } : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  const missing = findMissingDgsExpressionParameters(state, raw, excludeObject);
+  const functionBindings = getDgsExpressionFunctionBindings(state, excludeObject);
+  const virtualVariables: Record<string, () => number> = {
+    ...getDgsExpressionVariableBindings(state, excludeObject)
+  };
+  missing.forEach((name) => { virtualVariables[name] = () => 1; });
+  try {
+    const preliminary = compileFunctionExpression(raw, functionBindings, virtualVariables);
+    if (!preliminary.fn || !preliminary.normalized) return null;
+  } catch (e) {
+    return null;
+  }
+
+  const createdSliders: any[] = [];
+  for (const name of missing) {
+    const slider = createDgsSlider(state, name, -5, 5, 0.1, 1);
+    if (!slider) {
+      createdSliders.forEach((created) => removeDgsSliderImmediately(state, created));
+      return null;
+    }
+    createdSliders.push(slider);
+  }
+  try {
+    const compiled = compileDgsExpression(state, raw, excludeObject);
+    if (!compiled.fn || !compiled.normalized) throw new Error('Invalid function expression');
+    return { compiled, createdSliders };
+  } catch (e) {
+    createdSliders.forEach((created) => removeDgsSliderImmediately(state, created));
+    return null;
+  }
+}
+
 function dgsParameterNameAvailable(state: DgsState, nameValue: unknown, excludeObject?: any): boolean {
   const name = normalizeDgsParameterName(nameValue);
   if (!name) return false;
+  if (isDgsFunction(excludeObject) && getDgsExpressionFunctionName(excludeObject) === name) return false;
   return !getDgsBoardObjects(state.board).some((object) => {
     if (!object || object === excludeObject) return false;
     if (isDgsSlider(object)) return normalizeDgsParameterName(object.__liaDgsSliderName) === name;
@@ -3896,6 +4294,46 @@ function refreshDgsSliderDependents(state: DgsState, recordHistory = false): voi
   if (recordHistory) persistDgsConstruction(state);
 }
 
+function dgsSliderNameToTex(nameValue: unknown): string {
+  const name = normalizeDgsParameterName(nameValue);
+  if (!name) return '';
+  const greek = new Set([
+    'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota',
+    'kappa', 'lambda', 'mu', 'nu', 'xi', 'omicron', 'pi', 'rho', 'sigma', 'tau',
+    'upsilon', 'phi', 'chi', 'psi', 'omega'
+  ]);
+  const match = name.match(/^([a-z]+)(\d+)?$/);
+  if (!match) return name;
+  const base = greek.has(match[1]) ? '\\' + match[1] : (match[1].length === 1 ? match[1] : '\\mathit{' + match[1] + '}');
+  return match[2] ? base + '_{' + match[2] + '}' : base;
+}
+
+function refreshDgsSliderTypography(state: DgsState): void {
+  const currentScale = Math.sqrt(
+    Math.max(1e-9, Math.abs(Number(state.board && state.board.unitX) || 1)) *
+    Math.max(1e-9, Math.abs(Number(state.board && state.board.unitY) || 1))
+  );
+  getDgsBoardObjects(state.board).filter(isDgsSlider).forEach((slider) => {
+    const baseScale = Number(slider.__liaDgsSliderFontBaseScale) || currentScale;
+    slider.__liaDgsSliderFontBaseScale = baseScale;
+    const fontSize = Math.max(8, Math.min(48, 18 * currentScale / baseScale));
+    if (Math.abs(Number(slider.__liaDgsSliderFontSize) - fontSize) < 0.05) return;
+    slider.__liaDgsSliderFontSize = fontSize;
+    try { slider.label?.setAttribute({ fontSize }); } catch (e) {}
+    try {
+      if (slider.label && slider.label.rendNode) slider.label.rendNode.style.fontSize = fontSize.toFixed(2) + 'px';
+    } catch (e) {}
+  });
+}
+
+function removeDgsSliderImmediately(state: DgsState, slider: any): void {
+  if (!isDgsSlider(slider)) return;
+  slider.__liaDgsSliderDeleted = true;
+  [slider.label, slider.highline, slider.baseline, slider.point1, slider.point2, slider].forEach((part) => {
+    try { if (part && state.board) state.board.removeObject(part); } catch (e) {}
+  });
+}
+
 function createDgsSlider(
   state: DgsState,
   nameValue: unknown,
@@ -3929,7 +4367,9 @@ function createDgsSlider(
       highlightFillColor: '#ff00ff',
       baseline: {
         strokeColor: '#ff00ff',
-        highlightStrokeColor: '#ff00ff'
+        highlightStrokeColor: '#ff00ff',
+        fixed: false,
+        needsRegularUpdate: true
       },
       highline: {
         strokeColor: '#ff00ff',
@@ -3937,15 +4377,19 @@ function createDgsSlider(
       },
       point1: {
         strokeColor: '#ff00ff',
-        fillColor: '#ff00ff'
+        fillColor: '#ff00ff',
+        fixed: false
       },
       point2: {
         strokeColor: '#ff00ff',
-        fillColor: '#ff00ff'
+        fillColor: '#ff00ff',
+        fixed: false
       },
       label: {
         strokeColor: '#ff00ff',
-        highlightStrokeColor: '#ff00ff'
+        highlightStrokeColor: '#ff00ff',
+        useMathJax: true,
+        fontSize: 18
       },
       fixed: false,
       frozen: false
@@ -3956,6 +4400,11 @@ function createDgsSlider(
     slider.__liaDgsSliderMaximum = settings.maximum;
     slider.__liaDgsSliderStep = settings.step;
     slider.__liaDgsSliderValue = settings.value;
+    slider.__liaDgsSliderPositionLocked = false;
+    slider.__liaDgsSliderFontBaseScale = Math.sqrt(
+      Math.max(1e-9, Math.abs(Number(state.board.unitX) || 1)) *
+      Math.max(1e-9, Math.abs(Number(state.board.unitY) || 1))
+    );
     slider.__liaDgsShowName = true;
     slider.__liaDgsShowObject = true;
     slider.__liaDgsOpacity = 1;
@@ -3976,7 +4425,12 @@ function createDgsSlider(
     };
     try { slider.on('drag', () => update(false)); } catch (e) {}
     try { slider.on('up', () => update(true)); } catch (e) {}
+    [slider.point1, slider.point2, slider.baseline].forEach((part: any) => {
+      try { part?.on('drag', () => persistDgsConstruction(state, false)); } catch (e) {}
+      try { part?.on('up', () => persistDgsConstruction(state, true)); } catch (e) {}
+    });
     refreshDgsObjectLabel(slider);
+    refreshDgsSliderTypography(state);
     refreshDgsSliderDependents(state, false);
     return slider;
   } catch (e) {
@@ -4018,11 +4472,14 @@ function setDgsSliderSettings(
 function createDgsFunction(state: DgsState, expression: string): any | null {
   const raw = String(expression || '').trim();
   if (!state.board || !raw) return null;
+  let createdSliders: any[] = [];
   try {
-    const compiled = compileDgsExpression(state, raw);
-    if (!compiled.fn || !compiled.normalized) return null;
+    const result = compileDgsFunctionWithAutomaticParameters(state, raw);
+    if (!result) return null;
+    const compiled = result.compiled;
+    createdSliders = result.createdSliders;
     const name = getNextFunctionName(state);
-    const graph = state.board.create('functiongraph', [compiled.fn], {
+    const graph = state.board.create('functiongraph', [createDgsPlottedFunctionEvaluator(state, compiled.fn)], {
       name,
       strokeColor: '#ff00ff',
       highlightStrokeColor: '#ff00ff',
@@ -4034,6 +4491,7 @@ function createDgsFunction(state: DgsState, expression: string): any | null {
       withLabel: false
     });
     graph.__liaDgsFunction = true;
+    graph.__liaDgsFunctionEvaluator = compiled.fn;
     graph.__liaDgsFunctionName = name;
     graph.__liaDgsFunctionExpression = raw;
     graph.__liaDgsFunctionNormalized = compiled.normalized;
@@ -4067,6 +4525,7 @@ function createDgsFunction(state: DgsState, expression: string): any | null {
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return graph;
   } catch (e) {
+    createdSliders.forEach((slider) => removeDgsSliderImmediately(state, slider));
     return null;
   }
 }
@@ -4200,10 +4659,14 @@ function applyDgsFunctionExpression(
   if (!isDgsFunction(object)) return false;
   const raw = String(expression || '').trim();
   if (!raw) return false;
+  let createdSliders: any[] = [];
   try {
-    const compiled = compileDgsExpression(state, raw, object);
-    if (!compiled.fn || !compiled.normalized) return false;
-    object.Y = compiled.fn;
+    const result = compileDgsFunctionWithAutomaticParameters(state, raw, object);
+    if (!result) return false;
+    const compiled = result.compiled;
+    createdSliders = result.createdSliders;
+    object.__liaDgsFunctionEvaluator = compiled.fn;
+    object.Y = createDgsPlottedFunctionEvaluator(state, compiled.fn);
     object.__liaDgsFunctionExpression = raw;
     object.__liaDgsFunctionNormalized = compiled.normalized;
     object.needsUpdate = true;
@@ -4224,6 +4687,7 @@ function applyDgsFunctionExpression(
     persistDgsConstruction(state, recordHistory);
     return true;
   } catch (e) {
+    createdSliders.forEach((slider) => removeDgsSliderImmediately(state, slider));
     return false;
   }
 }
@@ -4877,7 +5341,6 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
   clearDgsCirclePreview(state);
   setAngleDialogOpen(state, false);
   setTextDialogOpen(state, false);
-  setSliderDialogOpen(state, false);
   setSelectedSegmentPoint(state, null);
   setSelectedRelationInputs(state, null, null);
   setSelectedMidpointPoint(state, null);
@@ -5292,6 +5755,114 @@ function getDgsObjectName(object: any): string {
   return String(object && object.__liaDgsSegmentName || '');
 }
 
+function isDgsObjectListEntry(object: any): boolean {
+  return isDgsPoint(object) || isDgsFunction(object) || isDgsText(object) || isDgsSlider(object) ||
+    isDgsLinearObject(object) || isDgsPolygon(object) || isDgsCircle(object) ||
+    isDgsSector(object) || isDgsAngle(object);
+}
+
+function getDgsObjectTypeLabel(state: DgsState, object: any): string {
+  const text = dgsText(state.language);
+  if (object && object.__liaDgsRootPoint) return text.root;
+  if (object && object.__liaDgsExtremumPoint) return text.extremum;
+  if (object && object.__liaDgsInflectionPoint) return text.inflection;
+  if (object && object.__liaDgsYInterceptPoint) return text.yIntercept;
+  if (object && object.__liaDgsIntersectionPoint) return text.intersection;
+  if (object && object.__liaDgsMidpoint) return text.midpoint;
+  if (isDgsPoint(object)) return text.point;
+  if (isDgsFunction(object)) return text.function;
+  if (isDgsSlider(object)) return text.slider;
+  if (isDgsText(object)) return text.text;
+  if (isDgsRay(object)) return text.ray;
+  if (isDgsVector(object)) return text.vector;
+  if (object && object.__liaDgsTangent) return text.tangent;
+  if (object && object.__liaDgsAngleBisector) return text.angleBisector;
+  if (isDgsLine(object)) return text.line;
+  if (isDgsPolygon(object)) return text.polygon;
+  if (isDgsCircle(object)) return text.circle;
+  if (isDgsSector(object)) return text.sector;
+  if (isDgsAngle(object)) return text.angle;
+  return text.segment;
+}
+
+function getDgsObjectListEntries(state: DgsState): any[] {
+  return getDgsBoardObjects(state.board).filter(isDgsObjectListEntry);
+}
+
+function refreshDgsObjectList(state: DgsState, force = false): void {
+  if (!state.objectListOpen && !force) return;
+  const objects = getDgsObjectListEntries(state);
+  const selectedId = state.contextObject && String(state.contextObject.id || '');
+  const signature = objects.map((object, index) => [
+    String(object.id || index),
+    getDgsObjectName(object),
+    getDgsObjectTypeLabel(state, object),
+    object.__liaDgsShowObject === false ? '0' : '1',
+    getDgsObjectLayer(object),
+    getDgsObjectColor(object, isDgsText(object) ? 'text' : 'line')
+  ].join(':')).join('|') + '#selected=' + selectedId;
+  if (!force && signature === state.objectListSignature) return;
+  state.objectListSignature = signature;
+  state.objectListContent.replaceChildren();
+
+  if (!objects.length) {
+    const empty = document.createElement('div');
+    empty.className = 'lia-dgs-object-list-empty';
+    empty.textContent = dgsText(state.language).noObjects;
+    state.objectListContent.appendChild(empty);
+    return;
+  }
+
+  objects.forEach((object, index) => {
+    const entry = document.createElement('button');
+    entry.type = 'button';
+    entry.className = 'lia-dgs-object-list-entry';
+    entry.classList.toggle('is-hidden', object.__liaDgsShowObject === false);
+    entry.classList.toggle('is-selected', state.contextObject === object && state.sideMenuOpen);
+    const typeLabel = getDgsObjectTypeLabel(state, object);
+    const name = getDgsObjectName(object).trim() || typeLabel + ' ' + String(index + 1);
+    entry.setAttribute('aria-label', name + ', ' + typeLabel);
+    entry.title = state.language === 'de'
+      ? 'Rechtsklick: Eigenschaften von ' + name
+      : 'Right-click: properties of ' + name;
+
+    const swatch = document.createElement('span');
+    swatch.className = 'lia-dgs-object-list-swatch';
+    swatch.style.setProperty(
+      '--lia-dgs-object-color',
+      getDgsObjectColor(object, isDgsText(object) ? 'text' : 'line')
+    );
+    swatch.setAttribute('aria-hidden', 'true');
+    const copy = document.createElement('span');
+    copy.className = 'lia-dgs-object-list-copy';
+    const nameElement = document.createElement('span');
+    nameElement.className = 'lia-dgs-object-list-name';
+    nameElement.textContent = name;
+    const typeElement = document.createElement('span');
+    typeElement.className = 'lia-dgs-object-list-type';
+    typeElement.textContent = typeLabel;
+    copy.appendChild(nameElement);
+    copy.appendChild(typeElement);
+    entry.appendChild(swatch);
+    entry.appendChild(copy);
+
+    const openProperties = (evt: Event) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setActiveTool(state, '', false);
+      updateSideMenuControls(state, object);
+      setSideMenuOpen(state, true);
+      refreshDgsObjectList(state, true);
+    };
+    entry.addEventListener('click', openProperties);
+    entry.addEventListener('contextmenu', openProperties);
+    entry.addEventListener('keydown', (evt) => {
+      if (evt.key === 'ContextMenu' || (evt.shiftKey && evt.key === 'F10')) openProperties(evt);
+    });
+    state.objectListContent.appendChild(entry);
+  });
+}
+
 function renameDgsParameterReferences(state: DgsState, oldName: string, newName: string): void {
   if (!oldName || oldName === newName) return;
   const escaped = oldName.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&');
@@ -5531,7 +6102,10 @@ function dgsObjectLabelText(object: any): string {
   const showName = object && object.__liaDgsShowName !== false;
 
   if (isDgsSlider(object)) {
-    return showName && name ? name + ' = ' + formatDgsMeasurement(getDgsSliderValue(object), object.__liaDgsLanguage) : '';
+    return showName && name
+      ? '\\(' + dgsSliderNameToTex(name) + ' = ' +
+        formatDgsMeasurement(getDgsSliderValue(object), object.__liaDgsLanguage) + '\\)'
+      : '';
   }
 
   if (object && object.__liaDgsMidpoint) {
@@ -5678,6 +6252,7 @@ function refreshDgsObjectLabel(object: any): void {
 }
 
 function getDgsObjectFixed(object: any): boolean {
+  if (isDgsSlider(object)) return !!object.__liaDgsSliderPositionLocked;
   try {
     if (object && typeof object.getAttribute === 'function') return !!object.getAttribute('fixed');
   } catch (e) {}
@@ -5685,6 +6260,13 @@ function getDgsObjectFixed(object: any): boolean {
 }
 
 function setDgsObjectFixed(object: any, fixed: boolean): void {
+  if (isDgsSlider(object)) {
+    object.__liaDgsSliderPositionLocked = fixed;
+    [object.point1, object.point2, object.baseline].forEach((part: any) => {
+      try { if (part && typeof part.setAttribute === 'function') part.setAttribute({ fixed }); } catch (e) {}
+    });
+    return;
+  }
   try { if (object && typeof object.setAttribute === 'function') object.setAttribute({ fixed }); } catch (e) {}
 }
 
@@ -6153,7 +6735,9 @@ function refreshSideMenuCoordinates(state: DgsState): void {
 function refreshSideMenusForObject(object: any): void {
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
-    if (state && state.contextObject === object) refreshSideMenuCoordinates(state);
+    if (!state) return;
+    if (state.contextObject === object) refreshSideMenuCoordinates(state);
+    refreshDgsObjectList(state);
   });
 }
 
@@ -6687,8 +7271,9 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   state.sideMenuNameInput.setAttribute('aria-invalid', 'false');
   state.sideMenuNameInput.setAttribute('aria-label', textObject ? text.textInput : (sliderObject ? text.parameterName : (state.language === 'de' ? 'Objektname' : 'Object name')));
   state.fixedCheckbox.checked = getDgsObjectFixed(object);
-  state.fixedOption.hidden = functionObject || sliderObject || analysisPoint || midpointPoint;
-  state.fixedCheckbox.disabled = functionObject || sliderObject || analysisPoint || midpointPoint;
+  state.fixedCheckboxText.textContent = sliderObject ? text.lockPosition : text.fixed;
+  state.fixedOption.hidden = functionObject || analysisPoint || midpointPoint;
+  state.fixedCheckbox.disabled = functionObject || analysisPoint || midpointPoint;
   state.traceOption.hidden = !point;
   state.traceCheckbox.disabled = !point;
   state.traceCheckbox.checked = point && !!object.__liaDgsTraceEnabled;
@@ -6782,7 +7367,7 @@ function refreshConstructionModeCursor(boardContainer: HTMLElement): void {
 
 function renderToolState(state: DgsState): void {
   const text = dgsText(state.language);
-  const normalActive = state.activeTool === '' && !state.functionDialogOpen && !state.sliderDialogOpen && !state.externalToolActive;
+  const normalActive = state.activeTool === '' && !state.functionDialogOpen && !state.externalToolActive;
   const pointActive = state.activeTool === 'point';
   const segmentActive = state.activeTool === 'segment';
   const rayActive = state.activeTool === 'ray';
@@ -6883,7 +7468,7 @@ function setActiveTool(
 ): void {
   if (tool) {
     if (state.functionDialogOpen) setFunctionDialogOpen(state, false);
-    if (state.sliderDialogOpen) setSliderDialogOpen(state, false);
+    if (state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
     Object.keys(states).forEach((uid) => {
       const other = states[uid];
       if (!other || other === state || other.boardId !== state.boardId || !other.activeTool) return;
@@ -6955,16 +7540,18 @@ function applyLayout(state: DgsState): void {
   state.button.style.color = tone;
   state.menuBar.style.color = tone;
   state.sideMenu.style.color = tone;
+  state.objectListPanel.style.color = tone;
   state.colorPopup.style.color = tone;
   state.angleDialog.style.color = tone;
   state.functionDialog.style.color = tone;
   state.textDialog.style.color = tone;
-  state.sliderDialog.style.color = tone;
   state.menuBar.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.menuBar.style.setProperty('--lia-dgs-theme-color', accent);
   state.menuBar.style.setProperty('--lia-dgs-neutral-color', tone);
   state.sideMenu.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.sideMenu.style.setProperty('--lia-dgs-theme-color', accent);
+  state.objectListPanel.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.objectListPanel.style.setProperty('--lia-dgs-theme-color', accent);
   state.colorPopup.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.colorPopup.style.setProperty('--lia-dgs-theme-color', accent);
   state.angleDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
@@ -6973,8 +7560,6 @@ function applyLayout(state: DgsState): void {
   state.functionDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.textDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.textDialog.style.setProperty('--lia-dgs-theme-color', accent);
-  state.sliderDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
-  state.sliderDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
@@ -7013,6 +7598,20 @@ function setAxisPoint2(axis: any, homogeneous: number[]): void {
       axis.point2.setPositionDirectly(JXG.COORDS_BY_USER, coords);
     } else if (typeof axis.point2.setPosition === 'function' && typeof JXG !== 'undefined') {
       axis.point2.setPosition(JXG.COORDS_BY_USER, coords);
+    }
+  } catch (e) {}
+}
+
+function resetAxisPoint1ToOriginal(axis: any): void {
+  const original = axis && axis._point1UsrCoordsOrg;
+  if (!axis || !axis.point1 || !Array.isArray(original) || original.length < 3) return;
+  const z = Number(original[0]) || 1;
+  const coords = [Number(original[1]) / z, Number(original[2]) / z];
+  try {
+    if (typeof axis.point1.setPositionDirectly === 'function' && typeof JXG !== 'undefined') {
+      axis.point1.setPositionDirectly(JXG.COORDS_BY_USER, coords);
+    } else if (typeof axis.point1.setPosition === 'function' && typeof JXG !== 'undefined') {
+      axis.point1.setPosition(JXG.COORDS_BY_USER, coords);
     }
   } catch (e) {}
 }
@@ -7062,6 +7661,7 @@ function applyAxisInset(state: DgsState, insetPx: number): void {
   const endpoint = [1, x, y];
 
   axis._point2UsrCoordsOrg = endpoint.slice();
+  resetAxisPoint1ToOriginal(axis);
   setAxisPoint2(axis, endpoint);
 
   if (!state.axisAdjusted) {
@@ -7080,6 +7680,7 @@ function restoreAxis(state: DgsState): void {
   if (!state.axisAdjusted || !axis || !original) return;
 
   axis._point2UsrCoordsOrg = original.slice();
+  resetAxisPoint1ToOriginal(axis);
   setAxisPoint2(axis, original);
   try { axis.setAttribute({ straightLast: state.axisOriginalStraightLast }); } catch (e) {
     if (axis.visProp) axis.visProp.straightlast = state.axisOriginalStraightLast;
@@ -7125,14 +7726,34 @@ function trackAxisWithMenu(state: DgsState): void {
   state.axisAnimationRAF = requestAnimationFrame(frame);
 }
 
+function targetRightPanelInset(state: DgsState): number {
+  const requested = (state.sideMenuOpen ? SIDE_MENU_WIDTH_PX : 0) +
+    (state.objectListOpen ? OBJECT_LIST_WIDTH_PX : 0);
+  const available = Math.max(0, Number(state.boardContainer.clientWidth || 0) - 24);
+  return Math.min(requested, available || requested);
+}
+
 function currentSideMenuInset(state: DgsState): number {
   try {
     const boardRect = state.boardContainer.getBoundingClientRect();
-    const menuRect = state.sideMenu.getBoundingClientRect();
     const canvasRight = boardRect.left + (state.boardContainer.clientLeft || 0) + state.boardContainer.clientWidth;
-    return Math.max(0, Math.min(SIDE_MENU_WIDTH_PX, canvasRight - menuRect.left));
+    let leftmostVisible = canvasRight;
+    [state.sideMenu, state.objectListPanel].forEach((panel) => {
+      const rect = panel.getBoundingClientRect();
+      if (rect.left < canvasRight && rect.right > boardRect.left) {
+        leftmostVisible = Math.min(leftmostVisible, rect.left);
+      }
+    });
+    return Math.max(
+      0,
+      Math.min(
+        SIDE_MENU_WIDTH_PX + OBJECT_LIST_WIDTH_PX,
+        Math.max(0, state.boardContainer.clientWidth - 24),
+        canvasRight - leftmostVisible
+      )
+    );
   } catch (e) {
-    return state.sideMenuOpen ? SIDE_MENU_WIDTH_PX : 0;
+    return targetRightPanelInset(state);
   }
 }
 
@@ -7152,6 +7773,7 @@ function applyXAxisInset(state: DgsState, insetPx: number): void {
   const endpoint = [1, x, y];
 
   axis._point2UsrCoordsOrg = endpoint.slice();
+  resetAxisPoint1ToOriginal(axis);
   setAxisPoint2(axis, endpoint);
   if (!state.xAxisAdjusted) {
     state.xAxisAdjusted = true;
@@ -7168,6 +7790,7 @@ function restoreXAxis(state: DgsState): void {
   if (!state.xAxisAdjusted || !axis || !original) return;
 
   axis._point2UsrCoordsOrg = original.slice();
+  resetAxisPoint1ToOriginal(axis);
   setAxisPoint2(axis, original);
   try { axis.setAttribute({ straightLast: state.xAxisOriginalStraightLast }); } catch (e) {
     if (axis.visProp) axis.visProp.straightlast = state.xAxisOriginalStraightLast;
@@ -7192,7 +7815,7 @@ function trackXAxisWithSideMenu(state: DgsState): void {
     state.xAxisSyncRAF = 0;
   }
 
-  if (state.sideMenuOpen && !state.xAxisAdjusted) {
+  if ((state.sideMenuOpen || state.objectListOpen) && !state.xAxisAdjusted) {
     applyXAxisInset(state, currentSideMenuInset(state));
   }
 
@@ -7206,7 +7829,9 @@ function trackXAxisWithSideMenu(state: DgsState): void {
       return;
     }
 
-    if (state.sideMenuOpen) applyXAxisInset(state, SIDE_MENU_WIDTH_PX);
+    if (state.sideMenuOpen || state.objectListOpen) {
+      applyXAxisInset(state, targetRightPanelInset(state));
+    }
     else restoreXAxis(state);
   };
   state.xAxisAnimationRAF = requestAnimationFrame(frame);
@@ -7217,8 +7842,10 @@ function setColorPopupOpen(state: DgsState, open: boolean): void {
   state.colorPopup.dataset.open = open ? '1' : '0';
   state.colorPopup.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.colorPopup.style.top = (state.open ? MENU_HEIGHT_PX + 10 : 10) + 'px';
-  state.colorPopup.style.right = state.boardContainer.clientWidth >= SIDE_MENU_WIDTH_PX + 210
-    ? SIDE_MENU_WIDTH_PX + 10 + 'px'
+  const rightPanelsWidth = SIDE_MENU_WIDTH_PX +
+    (state.objectListOpen ? OBJECT_LIST_WIDTH_PX : 0);
+  state.colorPopup.style.right = state.boardContainer.clientWidth >= rightPanelsWidth + 210
+    ? rightPanelsWidth + 10 + 'px'
     : '10px';
   state.colorButtons.forEach((button) => button.setAttribute(
     'aria-expanded', open && button.dataset.colorKind === state.activeColorKind ? 'true' : 'false'
@@ -7233,6 +7860,8 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   const changed = state.sideMenuOpen !== open;
   state.sideMenuOpen = open;
   state.sideMenu.dataset.open = open ? '1' : '0';
+  state.sideMenu.classList.toggle('is-open', open);
+  state.sideMenu.dataset.objectListOpen = state.objectListOpen ? '1' : '0';
   state.sideMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.sideMenuCloseButton.tabIndex = open ? 0 : -1;
   state.sideMenuNameInput.tabIndex = open && !state.sideMenuNameInput.hidden ? 0 : -1;
@@ -7265,6 +7894,27 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
     resetDeleteButton(state);
   }
   if (changed) trackXAxisWithSideMenu(state);
+  if (state.objectListOpen) refreshDgsObjectList(state, true);
+  if (changed) {
+    try { window.__refreshAllAxisTitles?.(); } catch (e) {}
+  }
+}
+
+function setObjectListOpen(state: DgsState, open: boolean): void {
+  const changed = state.objectListOpen !== open;
+  state.objectListOpen = open;
+  state.objectListPanel.dataset.open = open ? '1' : '0';
+  state.objectListPanel.classList.toggle('is-open', open);
+  state.objectListPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.objectListButton.classList.toggle('is-active', open);
+  state.objectListButton.setAttribute('aria-pressed', open ? 'true' : 'false');
+  state.sideMenu.dataset.objectListOpen = open ? '1' : '0';
+  state.sideMenu.classList.toggle('has-object-list', open);
+  state.objectListCloseButton.tabIndex = open ? 0 : -1;
+  if (open) refreshDgsObjectList(state, true);
+  else state.objectListSignature = '';
+  if (state.colorPopupOpen) setColorPopupOpen(state, true);
+  if (changed) trackXAxisWithSideMenu(state);
   if (changed) {
     try { window.__refreshAllAxisTitles?.(); } catch (e) {}
   }
@@ -7278,6 +7928,8 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.button.setAttribute('aria-expanded', open ? 'true' : 'false');
   state.button.classList.toggle('is-active', open);
   state.sideMenu.dataset.topOpen = open ? '1' : '0';
+  state.objectListPanel.dataset.topOpen = open ? '1' : '0';
+  state.objectListPanel.classList.toggle('is-top-open', open);
   state.selectButton.tabIndex = open ? 0 : -1;
   state.pointButton.tabIndex = open ? 0 : -1;
   state.segmentButton.tabIndex = open ? 0 : -1;
@@ -7289,12 +7941,15 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.textButton.tabIndex = open ? 0 : -1;
   state.sliderButton.tabIndex = open ? 0 : -1;
   state.zoomModeButton.tabIndex = open ? 0 : -1;
+  state.axisScaleButton.tabIndex = open ? 0 : -1;
+  state.objectListButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setGeometrySubmenuOpen(state, false);
   if (!open) setRelationSubmenuOpen(state, false);
   if (!open) setShapeSubmenuOpen(state, false);
   if (!open) setAngleSubmenuOpen(state, false);
   if (!open) setRootSubmenuOpen(state, false);
+  if (!open) setAxisScaleSubmenuOpen(state, false);
   if (!open) setFunctionDialogOpen(state, false);
   if (!open) setTextDialogOpen(state, false);
   if (changed) trackAxisWithMenu(state);
@@ -7309,6 +7964,7 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
+  if (open) setAxisScaleSubmenuOpen(state, false);
   state.geometrySubmenuOpen = open;
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -7324,6 +7980,7 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
+  if (open) setAxisScaleSubmenuOpen(state, false);
   state.relationSubmenuOpen = open;
   state.relationSubmenu.dataset.open = open ? '1' : '0';
   state.relationSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -7348,6 +8005,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
+  if (open) setAxisScaleSubmenuOpen(state, false);
   state.shapeSubmenuOpen = open;
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
   state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -7362,6 +8020,7 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
   if (open && state.rootSubmenuOpen) setRootSubmenuOpen(state, false);
+  if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
   state.angleSubmenuOpen = open;
   state.angleSubmenu.dataset.open = open ? '1' : '0';
   state.angleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -7375,6 +8034,7 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
   if (open && state.angleSubmenuOpen) setAngleSubmenuOpen(state, false);
+  if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
   state.rootSubmenuOpen = open;
   state.rootSubmenu.dataset.open = open ? '1' : '0';
   state.rootSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -7385,6 +8045,22 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
   state.yInterceptToolButton.tabIndex = open ? 0 : -1;
   state.tangentToolButton.tabIndex = open ? 0 : -1;
   state.intersectionToolButton.tabIndex = open ? 0 : -1;
+}
+
+function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setGeometrySubmenuOpen(state, false);
+  if (open) setRelationSubmenuOpen(state, false);
+  if (open) setShapeSubmenuOpen(state, false);
+  if (open) setAngleSubmenuOpen(state, false);
+  if (open) setRootSubmenuOpen(state, false);
+  state.axisScaleSubmenuOpen = open;
+  state.axisScaleSubmenu.dataset.open = open ? '1' : '0';
+  state.axisScaleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.axisScaleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  state.cartesianScaleButton.tabIndex = open ? 0 : -1;
+  state.logXScaleButton.tabIndex = open ? 0 : -1;
+  state.logYScaleButton.tabIndex = open ? 0 : -1;
+  state.logLogScaleButton.tabIndex = open ? 0 : -1;
 }
 
 function setAngleDialogOpen(state: DgsState, open: boolean): void {
@@ -7461,72 +8137,6 @@ function createDgsTextFromDialog(state: DgsState): boolean {
   persistDgsConstruction(state);
   setTextDialogOpen(state, false);
   setActiveTool(state, '', false);
-  return true;
-}
-
-function setSliderDialogOpen(state: DgsState, open: boolean): void {
-  state.sliderDialogOpen = open;
-  state.sliderDialog.dataset.open = open ? '1' : '0';
-  state.sliderDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
-  [
-    state.sliderDialogNameInput,
-    state.sliderDialogValueInput,
-    state.sliderDialogMinInput,
-    state.sliderDialogMaxInput,
-    state.sliderDialogStepInput,
-    state.sliderDialogConfirmButton,
-    state.sliderDialogCancelButton
-  ].forEach((element) => { element.tabIndex = open ? 0 : -1; });
-  state.sliderButton.classList.toggle('is-active', open);
-  state.sliderButton.setAttribute('aria-pressed', open ? 'true' : 'false');
-  renderToolState(state);
-  if (open) {
-    state.sliderDialogNameInput.value = getNextDgsSliderName(state);
-    state.sliderDialogValueInput.value = '1';
-    state.sliderDialogMinInput.value = '-5';
-    state.sliderDialogMaxInput.value = '5';
-    state.sliderDialogStepInput.value = '0.1';
-    [
-      state.sliderDialogNameInput,
-      state.sliderDialogValueInput,
-      state.sliderDialogMinInput,
-      state.sliderDialogMaxInput,
-      state.sliderDialogStepInput
-    ].forEach((input) => input.setAttribute('aria-invalid', 'false'));
-    window.setTimeout(() => {
-      try { state.sliderDialogNameInput.focus(); state.sliderDialogNameInput.select(); } catch (e) {}
-    }, 0);
-  }
-}
-
-function createDgsSliderFromDialog(state: DgsState): boolean {
-  const name = normalizeDgsParameterName(state.sliderDialogNameInput.value);
-  const settings = normalizeDgsSliderSettings(
-    state.sliderDialogMinInput.value,
-    state.sliderDialogMaxInput.value,
-    state.sliderDialogStepInput.value,
-    state.sliderDialogValueInput.value
-  );
-  const nameValid = !!name && dgsParameterNameAvailable(state, name);
-  state.sliderDialogNameInput.setAttribute('aria-invalid', nameValid ? 'false' : 'true');
-  [
-    state.sliderDialogValueInput,
-    state.sliderDialogMinInput,
-    state.sliderDialogMaxInput,
-    state.sliderDialogStepInput
-  ].forEach((input) => input.setAttribute('aria-invalid', settings ? 'false' : 'true'));
-  if (!nameValid || !settings) return false;
-  const slider = createDgsSlider(
-    state,
-    name,
-    settings.minimum,
-    settings.maximum,
-    settings.step,
-    settings.value
-  );
-  if (!slider) return false;
-  persistDgsConstruction(state);
-  setSliderDialogOpen(state, false);
   return true;
 }
 
@@ -7632,6 +8242,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.sideMenu?.isConnected &&
     !!existing.sideMenuObjectType?.isConnected &&
     !!existing.sideMenuNameInput?.isConnected &&
+    !!existing.objectListClip?.isConnected &&
+    !!existing.objectListPanel?.isConnected &&
+    !!existing.objectListContent?.isConnected &&
+    !!existing.objectListCloseButton?.isConnected &&
     !!existing.nameOption?.isConnected &&
     !!existing.objectOption?.isConnected &&
     !!existing.axisLabelSection?.isConnected &&
@@ -7650,6 +8264,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.functionExpressionPreview?.isConnected &&
     !!existing.functionExpressionInput?.isConnected &&
     !!existing.fixedOption?.isConnected &&
+    !!existing.fixedCheckboxText?.isConnected &&
     !!existing.traceOption?.isConnected &&
     !!existing.traceCheckbox?.isConnected &&
     !!existing.toolsDivider?.isConnected &&
@@ -7692,19 +8307,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.textDivider?.isConnected &&
     !!existing.sliderButton?.isConnected &&
     !!existing.textButton?.isConnected &&
+    !!existing.zoomDivider?.isConnected &&
     !!existing.zoomModeButton?.isConnected &&
+    !!existing.axisScaleButton?.isConnected &&
+    !!existing.axisScaleSubmenu?.isConnected &&
+    !!existing.cartesianScaleButton?.isConnected &&
+    !!existing.logXScaleButton?.isConnected &&
+    !!existing.logYScaleButton?.isConnected &&
+    !!existing.logLogScaleButton?.isConnected &&
+    !!existing.objectListButton?.isConnected &&
     !!existing.textDialog?.isConnected &&
     !!existing.textDialogInput?.isConnected &&
     !!existing.textDialogConfirmButton?.isConnected &&
     !!existing.textDialogCancelButton?.isConnected &&
-    !!existing.sliderDialog?.isConnected &&
-    !!existing.sliderDialogNameInput?.isConnected &&
-    !!existing.sliderDialogValueInput?.isConnected &&
-    !!existing.sliderDialogMinInput?.isConnected &&
-    !!existing.sliderDialogMaxInput?.isConnected &&
-    !!existing.sliderDialogStepInput?.isConnected &&
-    !!existing.sliderDialogConfirmButton?.isConnected &&
-    !!existing.sliderDialogCancelButton?.isConnected &&
     !!existing.measurementOption?.isConnected &&
     !!existing.measurementCheckbox?.isConnected &&
     !!existing.areaOption?.isConnected &&
@@ -7769,11 +8384,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     try { existing.button.remove(); } catch (e) {}
     try { existing.menuClip.remove(); } catch (e) {}
     try { existing.sideMenuClip.remove(); } catch (e) {}
+    try { existing.objectListClip.remove(); } catch (e) {}
     try { existing.colorPopup.remove(); } catch (e) {}
     try { existing.angleDialog.remove(); } catch (e) {}
     try { existing.functionDialog.remove(); } catch (e) {}
     try { existing.textDialog.remove(); } catch (e) {}
-    try { existing.sliderDialog.remove(); } catch (e) {}
   }
 
   const menuClip = document.createElement('div');
@@ -8043,6 +8658,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   sliderButton.setAttribute('aria-label', text.insertSlider);
   sliderButton.setAttribute('aria-pressed', 'false');
   sliderButton.title = text.insertSlider;
+  sliderButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-slider-track d=M3,12H21></path><circle class=lia-dgs-slider-knob cx=15 cy=12 r=2.5></circle></svg>';
   sliderButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(sliderButton);
   const textButton = document.createElement('button');
@@ -8054,12 +8670,49 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   textButton.innerHTML = '<span aria-hidden=true>T</span>';
   textButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(textButton);
+  const zoomDivider = document.createElement('span');
+  zoomDivider.className = 'lia-dgs-zoom-divider';
+  zoomDivider.setAttribute('aria-hidden', 'true');
+  menuBar.appendChild(zoomDivider);
   const zoomModeButton = document.createElement('button');
   zoomModeButton.type = 'button';
   zoomModeButton.className = 'lia-dgs-geometry-button lia-dgs-zoom-mode-button';
   zoomModeButton.innerHTML = DGS_ZOOM_ICONS.both;
   zoomModeButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(zoomModeButton);
+  const axisScaleButton = document.createElement('button');
+  axisScaleButton.type = 'button';
+  axisScaleButton.className = 'lia-dgs-geometry-button lia-dgs-axis-scale-button';
+  axisScaleButton.setAttribute('aria-label', text.axisScale);
+  axisScaleButton.setAttribute('aria-haspopup', 'menu');
+  axisScaleButton.setAttribute('aria-expanded', 'false');
+  axisScaleButton.innerHTML = DGS_AXIS_SCALE_ICONS.cartesian;
+  axisScaleButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(axisScaleButton);
+  const objectListButton = document.createElement('button');
+  objectListButton.type = 'button';
+  objectListButton.className = 'lia-dgs-geometry-button lia-dgs-object-list-button';
+  objectListButton.setAttribute('aria-label', text.objectList);
+  objectListButton.setAttribute('aria-pressed', 'false');
+  objectListButton.title = text.objectList;
+  objectListButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><circle class=lia-dgs-object-list-dot cx=5 cy=6 r=1.6></circle><circle class=lia-dgs-object-list-dot cx=5 cy=12 r=1.6></circle><circle class=lia-dgs-object-list-dot cx=5 cy=18 r=1.6></circle><path d=M9,6H21M9,12H21M9,18H21></path></svg>';
+  objectListButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(objectListButton);
+  const axisScaleSubmenu = document.createElement('div');
+  axisScaleSubmenu.id = 'dgs-axis-scale-submenu-' + uid;
+  axisScaleSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-axis-scale-submenu';
+  axisScaleSubmenu.setAttribute('role', 'menu');
+  axisScaleSubmenu.setAttribute('aria-label', text.axisScale);
+  axisScaleButton.setAttribute('aria-controls', axisScaleSubmenu.id);
+  const cartesianScaleButton = makeGeometryTool(axisScaleSubmenu, text.cartesianScale, DGS_AXIS_SCALE_ICONS.cartesian);
+  const logXScaleButton = makeGeometryTool(axisScaleSubmenu, text.logXScale, DGS_AXIS_SCALE_ICONS['log-x']);
+  const logYScaleButton = makeGeometryTool(axisScaleSubmenu, text.logYScale, DGS_AXIS_SCALE_ICONS['log-y']);
+  const logLogScaleButton = makeGeometryTool(axisScaleSubmenu, text.logLogScale, DGS_AXIS_SCALE_ICONS['log-log']);
+  [cartesianScaleButton, logXScaleButton, logYScaleButton, logLogScaleButton].forEach((scaleButton) => {
+    scaleButton.setAttribute('role', 'menuitemradio');
+    scaleButton.setAttribute('aria-checked', 'false');
+  });
+  menuBar.appendChild(axisScaleSubmenu);
   menuClip.appendChild(menuBar);
 
   const sideMenuClip = document.createElement('div');
@@ -8070,6 +8723,35 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   sideMenu.className = 'lia-dgs-side-menu';
   sideMenu.setAttribute('role', 'dialog');
   sideMenu.setAttribute('aria-label', geometryLanguage === 'de' ? 'DGS-Objekteigenschaften' : 'DGS object properties');
+
+  const objectListClip = document.createElement('div');
+  objectListClip.className = 'lia-dgs-object-list-clip';
+  const objectListPanel = document.createElement('div');
+  objectListPanel.id = 'dgs-object-list-' + uid;
+  objectListPanel.className = 'lia-dgs-object-list-panel';
+  objectListPanel.setAttribute('role', 'complementary');
+  objectListPanel.setAttribute('aria-label', text.objectList);
+  objectListPanel.setAttribute('aria-hidden', 'true');
+  objectListButton.setAttribute('aria-controls', objectListPanel.id);
+  const objectListHeader = document.createElement('div');
+  objectListHeader.className = 'lia-dgs-object-list-header';
+  const objectListTitle = document.createElement('span');
+  objectListTitle.textContent = text.objectList;
+  const objectListCloseButton = document.createElement('button');
+  objectListCloseButton.type = 'button';
+  objectListCloseButton.className = 'lia-dgs-side-menu-close';
+  objectListCloseButton.setAttribute(
+    'aria-label',
+    geometryLanguage === 'de' ? 'Objektliste schlieÃŸen' : 'Close object list'
+  );
+  objectListCloseButton.textContent = '\u00d7';
+  objectListHeader.appendChild(objectListTitle);
+  objectListHeader.appendChild(objectListCloseButton);
+  const objectListContent = document.createElement('div');
+  objectListContent.className = 'lia-dgs-object-list-content';
+  objectListPanel.appendChild(objectListHeader);
+  objectListPanel.appendChild(objectListContent);
+  objectListClip.appendChild(objectListPanel);
 
   const sideMenuHeader = document.createElement('div');
   sideMenuHeader.className = 'lia-dgs-side-menu-header';
@@ -8499,57 +9181,6 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   textDialog.appendChild(textDialogField);
   textDialog.appendChild(textDialogActions);
 
-  const sliderDialog = document.createElement('div');
-  sliderDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-slider-dialog';
-  sliderDialog.setAttribute('role', 'dialog');
-  sliderDialog.setAttribute('aria-modal', 'true');
-  sliderDialog.setAttribute('aria-hidden', 'true');
-  sliderDialog.dataset.open = '0';
-  const sliderDialogTitle = document.createElement('div');
-  sliderDialogTitle.className = 'lia-dgs-angle-dialog-title';
-  sliderDialogTitle.textContent = text.insertSlider;
-  const sliderDialogGrid = document.createElement('div');
-  sliderDialogGrid.className = 'lia-dgs-slider-dialog-grid';
-  const makeSliderDialogField = (captionText: string, wide = false) => {
-    const label = document.createElement('label');
-    label.className = 'lia-dgs-slider-field';
-    if (wide) label.dataset.wide = '1';
-    const caption = document.createElement('span');
-    caption.textContent = captionText;
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.inputMode = captionText === text.parameterName ? 'text' : 'decimal';
-    input.autocomplete = 'off';
-    input.spellcheck = false;
-    input.setAttribute('aria-label', captionText);
-    input.setAttribute('aria-invalid', 'false');
-    label.appendChild(caption);
-    label.appendChild(input);
-    sliderDialogGrid.appendChild(label);
-    return input;
-  };
-  const sliderDialogNameInput = makeSliderDialogField(text.parameterName, true);
-  const sliderDialogValueInput = makeSliderDialogField(text.currentValue, true);
-  const sliderDialogMinInput = makeSliderDialogField(text.minimum);
-  const sliderDialogMaxInput = makeSliderDialogField(text.maximum);
-  const sliderDialogStepInput = makeSliderDialogField(text.stepWidth, true);
-  const sliderDialogActions = document.createElement('div');
-  sliderDialogActions.className = 'lia-dgs-angle-dialog-actions';
-  const sliderDialogCancelButton = document.createElement('button');
-  sliderDialogCancelButton.type = 'button';
-  sliderDialogCancelButton.className = 'lia-dgs-angle-dialog-button';
-  sliderDialogCancelButton.textContent = text.cancel;
-  const sliderDialogConfirmButton = document.createElement('button');
-  sliderDialogConfirmButton.type = 'button';
-  sliderDialogConfirmButton.className = 'lia-dgs-angle-dialog-button';
-  sliderDialogConfirmButton.dataset.primary = '1';
-  sliderDialogConfirmButton.textContent = text.create;
-  sliderDialogActions.appendChild(sliderDialogCancelButton);
-  sliderDialogActions.appendChild(sliderDialogConfirmButton);
-  sliderDialog.appendChild(sliderDialogTitle);
-  sliderDialog.appendChild(sliderDialogGrid);
-  sliderDialog.appendChild(sliderDialogActions);
-
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'lia-dgs-menu-button';
@@ -8559,23 +9190,27 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   button.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   sideMenu.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  objectListPanel.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   functionDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   textDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
-  sliderDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   sideMenu.addEventListener('contextmenu', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
   });
+  objectListPanel.addEventListener('contextmenu', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+  });
 
+  boardContainer.appendChild(objectListClip);
   boardContainer.appendChild(sideMenuClip);
   boardContainer.appendChild(menuClip);
   boardContainer.appendChild(colorPopup);
   boardContainer.appendChild(angleDialog);
   boardContainer.appendChild(functionDialog);
   boardContainer.appendChild(textDialog);
-  boardContainer.appendChild(sliderDialog);
   boardContainer.appendChild(button);
   typesetDgsMath(pointButton);
 
@@ -8584,6 +9219,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     board && board.__liaDgsZoomMode ||
     window.__coordBoardStates && window.__coordBoardStates[boardId] &&
       (window.__coordBoardStates[boardId].zoomMode || window.__coordBoardStates[boardId].panMode)
+  );
+  const storedAxisScaleMode = normalizeDgsAxisScaleMode(
+    board && board.__liaDgsAxisScaleMode ||
+    window.__coordBoardStates && window.__coordBoardStates[boardId] &&
+      window.__coordBoardStates[boardId].axisScaleMode
   );
   const xAxis = board && board.defaultAxes && board.defaultAxes.x;
   const yAxis = board && board.defaultAxes && board.defaultAxes.y;
@@ -8602,6 +9242,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     sideMenuObjectType,
     sideMenuNameInput,
     sideMenuCloseButton,
+    objectListClip,
+    objectListPanel,
+    objectListContent,
+    objectListCloseButton,
     nameOption: nameOption.label,
     coordinateSection,
     xCoordinateInput,
@@ -8623,6 +9267,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     axisDescriptionInput,
     fixedOption: fixedOption.label,
     fixedCheckbox: fixedOption.input,
+    fixedCheckboxText: fixedOption.caption,
     traceOption: traceOption.label,
     traceCheckbox: traceOption.input,
     nameCheckbox: nameOption.input,
@@ -8708,19 +9353,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     textDivider,
     sliderButton,
     textButton,
+    zoomDivider,
     zoomModeButton,
+    axisScaleButton,
+    axisScaleSubmenu,
+    cartesianScaleButton,
+    logXScaleButton,
+    logYScaleButton,
+    logLogScaleButton,
+    objectListButton,
     textDialog,
     textDialogInput,
     textDialogConfirmButton,
     textDialogCancelButton,
-    sliderDialog,
-    sliderDialogNameInput,
-    sliderDialogValueInput,
-    sliderDialogMinInput,
-    sliderDialogMaxInput,
-    sliderDialogStepInput,
-    sliderDialogConfirmButton,
-    sliderDialogCancelButton,
     xAxis,
     xAxisOriginalPoint2: readAxisPoint2(xAxis),
     xAxisOriginalStraightLast: readAxisStraightLast(xAxis),
@@ -8736,16 +9381,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     shapeSubmenuOpen: false,
     angleSubmenuOpen: false,
     rootSubmenuOpen: false,
+    axisScaleSubmenuOpen: false,
     angleDialogOpen: false,
     functionDialogOpen: false,
     textDialogOpen: false,
-    sliderDialogOpen: false,
     sideMenuOpen: false,
+    objectListOpen: false,
+    objectListSignature: '',
     contextObject: null,
     activeTool: '',
     externalToolActive: false,
     pendingTextPosition: null,
     zoomMode: storedZoomMode,
+    axisScaleMode: storedAxisScaleMode,
     selectedSegmentPoint: null,
     selectedRelationLine: null,
     selectedRelationPoint: null,
@@ -8765,6 +9413,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   };
   states[uid] = state;
   setDgsZoomMode(state, storedZoomMode, false);
+  setDgsAxisScaleMode(state, storedAxisScaleMode, false);
   restoreDgsConstruction(state);
   setMenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
@@ -8772,10 +9421,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   setShapeSubmenuOpen(state, false);
   setAngleSubmenuOpen(state, false);
   setRootSubmenuOpen(state, false);
+  setAxisScaleSubmenuOpen(state, false);
   setAngleDialogOpen(state, false);
   setFunctionDialogOpen(state, false);
   setTextDialogOpen(state, false);
-  setSliderDialogOpen(state, false);
+  setObjectListOpen(state, false);
   setSideMenuOpen(state, false);
   applyLayout(state);
 
@@ -8787,10 +9437,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, false);
     setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
     setAngleDialogOpen(state, false);
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
-    setSliderDialogOpen(state, false);
     setActiveTool(state, '', false);
     notifyRegressionLayout(state, false);
   });
@@ -8945,7 +9595,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, false);
     setRootSubmenuOpen(state, false);
-    setSliderDialogOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
     setActiveTool(state, '', false);
     setFunctionDialogOpen(state, !state.functionDialogOpen);
   });
@@ -8958,10 +9608,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, false);
     setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
     setActiveTool(state, '', false);
-    setSliderDialogOpen(state, !state.sliderDialogOpen);
+    const slider = createDgsSlider(state, getNextDgsSliderName(state), -5, 5, 0.1, 1);
+    if (slider) persistDgsConstruction(state);
   });
 
   textButton.addEventListener('click', (evt) => {
@@ -8972,8 +9624,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, false);
     setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
     setFunctionDialogOpen(state, false);
-    setSliderDialogOpen(state, false);
     setActiveTool(state, state.activeTool === 'text' ? '' : 'text');
   });
 
@@ -8982,12 +9634,61 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.stopPropagation();
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
-    setSliderDialogOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
     setActiveTool(state, '', false);
     const nextMode = state.zoomMode === 'both'
       ? 'vertical'
       : (state.zoomMode === 'vertical' ? 'horizontal' : 'both');
     setDgsZoomMode(state, nextMode);
+  });
+
+  axisScaleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setFunctionDialogOpen(state, false);
+    setTextDialogOpen(state, false);
+    setActiveTool(state, '', false);
+    setAxisScaleSubmenuOpen(state, !state.axisScaleSubmenuOpen);
+  });
+
+  const selectAxisScaleMode = (mode: DgsAxisScaleMode) => {
+    setDgsAxisScaleMode(state, mode);
+    setAxisScaleSubmenuOpen(state, false);
+  };
+  cartesianScaleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    selectAxisScaleMode('cartesian');
+  });
+  logXScaleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    selectAxisScaleMode('log-x');
+  });
+  logYScaleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    selectAxisScaleMode('log-y');
+  });
+  logLogScaleButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    selectAxisScaleMode('log-log');
+  });
+
+  objectListButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
+    setFunctionDialogOpen(state, false);
+    setTextDialogOpen(state, false);
+    setActiveTool(state, '', false);
+    setObjectListOpen(state, !state.objectListOpen);
   });
 
   rootButton.addEventListener('click', (evt) => {
@@ -9067,6 +9768,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setSideMenuOpen(state, false);
+  });
+
+  objectListCloseButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setObjectListOpen(state, false);
   });
 
   [xCoordinateInput, yCoordinateInput].forEach((input) => {
@@ -9238,37 +9945,6 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       evt.stopPropagation();
       setActiveTool(state, '', false);
     }
-  });
-
-  sliderDialogConfirmButton.addEventListener('click', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    createDgsSliderFromDialog(state);
-  });
-  sliderDialogCancelButton.addEventListener('click', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    setSliderDialogOpen(state, false);
-  });
-  [
-    sliderDialogNameInput,
-    sliderDialogValueInput,
-    sliderDialogMinInput,
-    sliderDialogMaxInput,
-    sliderDialogStepInput
-  ].forEach((input) => {
-    input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
-    input.addEventListener('keydown', (evt) => {
-      if (evt.key === 'Escape') {
-        evt.preventDefault();
-        evt.stopPropagation();
-        setSliderDialogOpen(state, false);
-      } else if (evt.key === 'Enter') {
-        evt.preventDefault();
-        evt.stopPropagation();
-        createDgsSliderFromDialog(state);
-      }
-    });
   });
 
   const applyTextFontSizeInput = () => {
@@ -9929,16 +10605,24 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.addEventListener('pointermove', state.onBoardPointerMove, true);
 
   state.onBoardViewportChange = () => {
+    applyDgsLogTickGenerator(state, state.xAxis, 'x', dgsAxisUsesLogX(state.axisScaleMode));
+    applyDgsLogTickGenerator(state, state.yAxis, 'y', dgsAxisUsesLogY(state.axisScaleMode));
     if (!state.axisSyncing) {
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
     }
     scheduleDgsRootUpdate(state);
+    refreshDgsSliderTypography(state);
   };
   state.onBoardRootUpdate = () => {
+    if (!state.axisSyncing) {
+      scheduleAxisSync(state);
+      scheduleXAxisSync(state);
+    }
     scheduleDgsRootUpdate(state);
     scheduleDgsCoordinateSync(state);
     recordAllDgsPointTraces(state);
+    refreshDgsObjectList(state);
   };
   if (board && typeof board.on === 'function') {
     try { board.on('move', state.onBoardViewportChange); } catch (e) {}
@@ -9951,6 +10635,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
       scheduleDgsRootUpdate(state);
+      refreshDgsSliderTypography(state);
     });
     state.resizeObserver.observe(boardContainer);
   }

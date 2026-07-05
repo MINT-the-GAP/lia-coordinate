@@ -194,6 +194,35 @@ function tokenize(expression: string): Token[] {
   return tokens;
 }
 
+export function expandImplicitVariableProducts(
+  expression: string,
+  additionalFunctions: Iterable<string> = []
+): string {
+  const protectedIdentifiers = new Set(FUNCTIONS);
+  for (const name of additionalFunctions) {
+    const normalizedName = String(name || '').toLowerCase();
+    if (/^[a-z][a-z0-9]*$/.test(normalizedName)) protectedIdentifiers.add(normalizedName);
+  }
+  const expanded: Token[] = [];
+  tokenize(expression).forEach((token) => {
+    if (token.type !== 'ident' || token.value === 'x' ||
+        protectedIdentifiers.has(token.value) || !token.value.includes('x')) {
+      expanded.push(token);
+      return;
+    }
+    const factors = token.value.split(/(x)/).filter(Boolean);
+    if (factors.length < 2) {
+      expanded.push(token);
+      return;
+    }
+    factors.forEach((factor, index) => {
+      if (index > 0) expanded.push({ type: 'op', value: '*' });
+      expanded.push({ type: 'ident', value: factor });
+    });
+  });
+  return expanded.map((token) => token.value).join('');
+}
+
 export function normalizeFunctionExpression(
   expression: string,
   additionalFunctions: Iterable<string> = [],
@@ -210,7 +239,7 @@ export function normalizeFunctionExpression(
     if (/^[a-z][a-z0-9]*$/.test(normalizedName)) allowedVariables.add(normalizedName);
   }
   const output: Token[] = [];
-  tokenize(expression).forEach((token) => {
+  tokenize(expandImplicitVariableProducts(expression, allowedFunctions)).forEach((token) => {
     const previous = output[output.length - 1];
     const valueEnd = previous && (previous.type === 'number' || previous.type === 'ident' || previous.type === 'close');
     const valueStart = token.type === 'number' || token.type === 'ident' || token.type === 'open';
