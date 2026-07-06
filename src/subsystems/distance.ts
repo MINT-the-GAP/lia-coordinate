@@ -1,7 +1,7 @@
 // Segment subsystem (@Strecke / @distance macros).
 // Connects two named points from the shared point registry on a JSXGraph board.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -9,6 +9,7 @@ interface DistanceConfig {
   boardId: string;
   point1Name: string;
   point2Name: string;
+  coordinates: CoordinatePair[] | null;
   color: string;
   hasExplicitColor: boolean;
   language: 'de' | 'en';
@@ -35,11 +36,14 @@ export function init(): void {
       .map(function(part) { return unquote(part).trim(); });
     const pointPair = String(parts[1] || '').trim();
     const usesPointPair = pointPair.startsWith('[') && pointPair.endsWith(']');
+    const coordinates = parseCoordinateList(pointPair);
     let point1Name = '';
     let point2Name = '';
     let colorIndex = 3;
 
-    if (usesPointPair) {
+    if (coordinates) {
+      colorIndex = 2;
+    } else if (usesPointPair) {
       const pointNames = splitTopLevel(pointPair.slice(1, -1))
         .map(function(pointName) { return unquote(pointName).trim(); });
       point1Name = String(pointNames[0] || '').trim();
@@ -63,6 +67,7 @@ export function init(): void {
       boardId: String(parts[0] || '').trim(),
       point1Name: point1Name,
       point2Name: point2Name,
+      coordinates: coordinates,
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
@@ -85,9 +90,15 @@ export function init(): void {
       if (entry.board && entry.label) entry.board.removeObject(entry.label);
     } catch (e) {}
 
-    try {
-      if (entry.board && entry.segment) entry.board.removeObject(entry.segment);
-    } catch (e) {}
+    const segments = Array.isArray(entry.segments)
+      ? entry.segments
+      : (entry.segment ? [entry.segment] : []);
+    segments.forEach(function(segment: any) {
+      try { if (entry.board && segment) entry.board.removeObject(segment); } catch (e) {}
+    });
+    (Array.isArray(entry.ownedPoints) ? entry.ownedPoints : []).forEach(function(point: any) {
+      try { if (entry.board && point) entry.board.removeObject(point); } catch (e) {}
+    });
 
     delete window.__distanceEntries[key];
   }
@@ -113,6 +124,27 @@ export function init(): void {
     return point;
   }
 
+  function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
+    return board.create('point', [coordinate.x, coordinate.y], {
+      name: '',
+      withLabel: false,
+      visible: false,
+      fixed: true,
+      frozen: true,
+      highlight: false,
+      showInfobox: false,
+      size: 0
+    });
+  }
+
+  function sameCoordinates(a: CoordinatePair[] | null, b: CoordinatePair[] | null): boolean {
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every(function(point, index) {
+      return Math.abs(point.x - b[index].x) < 1e-12 &&
+        Math.abs(point.y - b[index].y) < 1e-12;
+    });
+  }
+
   function applySegmentColor(segment: any, color: string): void {
     if (!segment || typeof segment.setAttribute !== 'function') return;
 
@@ -122,6 +154,10 @@ export function init(): void {
         highlightStrokeColor: color
       });
     } catch (e) {}
+  }
+
+  function applySegmentColors(segments: any[], color: string): void {
+    segments.forEach(function(segment) { applySegmentColor(segment, color); });
   }
 
   function applyLabelColor(label: any, color: string): void {
@@ -145,12 +181,16 @@ export function init(): void {
     return name;
   }
 
-  function lengthLabelText(cfg: DistanceConfig, point1: any, point2: any): string {
-    let distance = NaN;
-
+  function lengthLabelText(cfg: DistanceConfig, points: any[]): string {
+    let distance = 0;
     try {
-      distance = Math.hypot(point2.X() - point1.X(), point2.Y() - point1.Y());
-    } catch (e) {}
+      for (let index = 1; index < points.length; index++) {
+        distance += Math.hypot(
+          points[index].X() - points[index - 1].X(),
+          points[index].Y() - points[index - 1].Y()
+        );
+      }
+    } catch (e) { distance = NaN; }
 
     if (!Number.isFinite(distance)) return '';
 
@@ -164,7 +204,9 @@ export function init(): void {
     const pointNames = texPointName(cfg.point1Name) + texPointName(cfg.point2Name);
     const measuredObject = cfg.segmentName
       ? texPointName(cfg.segmentName)
-      : '\\left| \\overline{' + pointNames + '} \\right|';
+      : (pointNames
+        ? '\\left| \\overline{' + pointNames + '} \\right|'
+        : 's');
 
     return '\\(' + measuredObject + ' ' + relation + ' ' +
       value + '\\,\\mathrm{' + unit + '}\\)';
@@ -212,17 +254,48 @@ export function init(): void {
 
   function labelPosition(
     board: any,
-    point1: any,
-    point2: any,
+    points: any[],
     label: any,
     cfg: DistanceConfig
   ): { x: number; y: number } {
+    if (!Array.isArray(points) || points.length < 2) return { x: 0, y: 0 };
+    let point1 = points[0];
+    let point2 = points[1];
+    let midpointX = (Number(point1.X()) + Number(point2.X())) / 2;
+    let midpointY = (Number(point1.Y()) + Number(point2.Y())) / 2;
+    const lengths: number[] = [];
+    let totalLength = 0;
+    for (let index = 1; index < points.length; index++) {
+      const length = Math.hypot(
+        Number(points[index].X()) - Number(points[index - 1].X()),
+        Number(points[index].Y()) - Number(points[index - 1].Y())
+      );
+      lengths.push(length);
+      totalLength += length;
+    }
+    if (totalLength > 1e-12) {
+      const target = totalLength / 2;
+      let traversed = 0;
+      for (let index = 0; index < lengths.length; index++) {
+        const length = lengths[index];
+        if (traversed + length + 1e-12 < target) {
+          traversed += length;
+          continue;
+        }
+        point1 = points[index];
+        point2 = points[index + 1];
+        const ratio = length > 1e-12
+          ? Math.max(0, Math.min(1, (target - traversed) / length))
+          : 0.5;
+        midpointX = Number(point1.X()) + ratio * (Number(point2.X()) - Number(point1.X()));
+        midpointY = Number(point1.Y()) + ratio * (Number(point2.Y()) - Number(point1.Y()));
+        break;
+      }
+    }
     const x1 = Number(point1.X());
     const y1 = Number(point1.Y());
     const x2 = Number(point2.X());
     const y2 = Number(point2.Y());
-    const midpointX = (x1 + x2) / 2;
-    const midpointY = (y1 + y2) / 2;
     const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
     const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
 
@@ -257,13 +330,13 @@ export function init(): void {
     };
   }
 
-  function createLengthLabel(board: any, point1: any, point2: any, cfg: DistanceConfig): any {
+  function createLengthLabel(board: any, points: any[], cfg: DistanceConfig): any {
     let label = null;
 
     label = board.create('text', [
-      function() { return labelPosition(board, point1, point2, label, cfg).x; },
-      function() { return labelPosition(board, point1, point2, label, cfg).y; },
-      function() { return lengthLabelText(cfg, point1, point2); }
+      function() { return labelPosition(board, points, label, cfg).x; },
+      function() { return labelPosition(board, points, label, cfg).y; },
+      function() { return lengthLabelText(cfg, points); }
     ], {
       fixed: true,
       highlight: false,
@@ -292,78 +365,112 @@ export function init(): void {
   window.renderDistanceFromSpec = function(uid: string, spec: string, language?: string): boolean {
     const cfg = parseDistanceSpec(spec, language);
     const key = entryKey(uid);
+    const coordinateMode = !!cfg.coordinates;
 
-    if (!uid || !cfg.boardId || !cfg.point1Name || !cfg.point2Name) {
+    if (!uid || !cfg.boardId ||
+        (coordinateMode
+          ? (cfg.coordinates!.length < 2)
+          : (!cfg.point1Name || !cfg.point2Name))) {
       removeEntry(uid);
       return false;
     }
 
     const board = window.__boards && window.__boards[cfg.boardId];
-    const point1 = getLivePoint(board, cfg.boardId, cfg.point1Name);
-    const point2 = getLivePoint(board, cfg.boardId, cfg.point2Name);
+    if (!board) {
+      removeEntry(uid);
+      return false;
+    }
 
-    if (!board || !point1 || !point2 || point1 === point2) {
+    const namedPoints = coordinateMode
+      ? []
+      : [
+          getLivePoint(board, cfg.boardId, cfg.point1Name),
+          getLivePoint(board, cfg.boardId, cfg.point2Name)
+        ];
+    if (!coordinateMode && (!namedPoints[0] || !namedPoints[1] || namedPoints[0] === namedPoints[1])) {
       removeEntry(uid);
       return false;
     }
 
     const old = window.__distanceEntries[key];
+    const geometryUnchanged = coordinateMode
+      ? !!(old && sameCoordinates(old.coordinates || null, cfg.coordinates))
+      : !!(old && Array.isArray(old.points) &&
+          old.points[0] === namedPoints[0] && old.points[1] === namedPoints[1]);
     if (
       old &&
       old.board === board &&
-      old.point1 === point1 &&
-      old.point2 === point2 &&
       old.boardId === cfg.boardId &&
+      geometryUnchanged &&
       old.point1Name === cfg.point1Name &&
       old.point2Name === cfg.point2Name &&
       old.language === cfg.language &&
       old.showLength === cfg.showLength &&
       old.segmentName === cfg.segmentName &&
       (!cfg.showLength || old.label) &&
-      old.segment
+      Array.isArray(old.segments) &&
+      old.segments.length === (coordinateMode ? cfg.coordinates!.length - 1 : 1)
     ) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
-      applySegmentColor(old.segment, cfg.color);
+      applySegmentColors(old.segments, cfg.color);
       applyLabelColor(old.label, cfg.color);
       return true;
     }
 
     removeEntry(uid);
 
-    let segment = null;
+    const ownedPoints: any[] = [];
+    const segments: any[] = [];
     let label = null;
 
     try {
-      segment = board.create('segment', [point1, point2], {
-        name: '',
-        withLabel: false,
-        fixed: true,
-        highlight: false,
-        strokeColor: cfg.color,
-        highlightStrokeColor: cfg.color,
-        strokeWidth: 3,
-        highlightStrokeWidth: 3,
-        straightFirst: false,
-        straightLast: false
-      });
+      const points = coordinateMode
+        ? cfg.coordinates!.map(function(coordinate) {
+            const point = createHiddenPoint(board, coordinate);
+            ownedPoints.push(point);
+            return point;
+          })
+        : namedPoints;
 
-      if (cfg.showLength) label = createLengthLabel(board, point1, point2, cfg);
+      for (let index = 1; index < points.length; index++) {
+        const segment = board.create('segment', [points[index - 1], points[index]], {
+          name: '',
+          withLabel: false,
+          fixed: true,
+          highlight: false,
+          strokeColor: cfg.color,
+          highlightStrokeColor: cfg.color,
+          strokeWidth: 3,
+          highlightStrokeWidth: 3,
+          straightFirst: false,
+          straightLast: false
+        });
+        segments.push(segment);
+      }
+
+      if (cfg.showLength) label = createLengthLabel(board, points, cfg);
 
       window.__distanceEntries[key] = {
         uid: String(uid),
         boardId: cfg.boardId,
         point1Name: cfg.point1Name,
         point2Name: cfg.point2Name,
+        coordinates: cfg.coordinates ? cfg.coordinates.map(function(point) {
+          return { x: point.x, y: point.y };
+        }) : null,
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
         language: cfg.language,
         showLength: cfg.showLength,
         segmentName: cfg.segmentName,
         board: board,
-        point1: point1,
-        point2: point2,
-        segment: segment,
+        points: points,
+        point1: points[0],
+        point2: points[points.length - 1],
+        segments: segments,
+        segment: segments[0] || null,
+        ownedPoints: ownedPoints,
         label: label
       };
 
@@ -371,7 +478,12 @@ export function init(): void {
       return true;
     } catch (e) {
       try { if (label) board.removeObject(label); } catch (removeError) {}
-      try { if (segment) board.removeObject(segment); } catch (removeError) {}
+      segments.forEach(function(segment) {
+        try { board.removeObject(segment); } catch (removeError) {}
+      });
+      ownedPoints.forEach(function(point) {
+        try { board.removeObject(point); } catch (removeError) {}
+      });
       return false;
     }
   };
@@ -459,7 +571,10 @@ export function init(): void {
       if (!entry) return;
       if (!entry.hasExplicitColor) {
         entry.color = getAccentColor();
-        applySegmentColor(entry.segment, entry.color);
+        applySegmentColors(
+          Array.isArray(entry.segments) ? entry.segments : (entry.segment ? [entry.segment] : []),
+          entry.color
+        );
       }
       applyLabelColor(entry.label, entry.color);
       try { if (entry.board) entry.board.update(); } catch (e) {}

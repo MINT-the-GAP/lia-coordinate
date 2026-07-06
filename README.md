@@ -407,15 +407,18 @@ Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
 ## `@Strecke` / `@distance`
 
           --{{0}}--
-Connects two existing named points with a segment. The segment remains attached
-when either point is moved. Point names are case-sensitive; the color is optional
-and defaults to the current theme accent color. Add `length=1` to display the
-dynamic length at the segment midpoint. `@Strecke` uses a decimal comma and `LE`;
+Connects either two existing named points or a directly supplied coordinate list.
+Named points remain attached when they move. Coordinate input such as
+`[[2;3];[4;4];[6;2]]` creates fixed invisible helper points and connects each
+successive pair as one continuous polygonal path; no point markers or names are
+shown. Point names are case-sensitive; the color is optional and defaults to the
+current theme accent color. Add `length=1` to display the dynamic total path length
+near its geometric midpoint. `@Strecke` uses a decimal comma and `LE`;
 `@distance` uses a decimal point and `LU`. Without exactly `length=1`, only the
-segment is rendered. An optional segment name between the color and `length=1`
+path is rendered. An optional segment name between the color and `length=1`
 replaces the `|AB|` expression in the label.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>];<color>;<segmentName>;length=1`
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>;length=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
@@ -424,6 +427,8 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>];<color>;<segmentName>;length=
 @Point(`ex_distance;B;3;2`)
 
 @Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
+
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s;length=1`)
 ```
 
 ---
@@ -435,31 +440,23 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>];<color>;<segmentName>;length=
 
 @Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
 
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s;length=1`)
+
 ## `@Area` / `@Flaeche`
 
           --{{0}}--
-Creates a filled polygon from at least three existing named points. The fill
-opacity is clamped to the range `0` to `1`. Add `inhalt=1` and/or `umfang=1`
+Creates a filled polygon from at least three existing named points or directly
+supplied coordinates. Coordinate input such as `[[1;1];[3;1];[2;4]]` creates
+fixed invisible vertices, so only the polygon and optional measurements are shown.
+The fill opacity is clamped to the range `0` to `1`. Add `inhalt=1` and/or `umfang=1`
 to show live measurements at the polygon center. German output uses `FE` and
 `LE`; English output uses `AU` and `LU`. The English option aliases `area=1`
 and `perimeter=1` are also accepted.
 
-Parameters: `<boardId>;[<point1>;<point2>;...];<color>;<opacity>;inhalt=1;umfang=1`
+Parameters: `<boardId>;[<point1>;<point2>;...]|[[<x1>;<y1>];...];<color>;<opacity>;inhalt=1;umfang=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area`)
-
-@Point(`ex_area;A;0;0`)
-@Point(`ex_area;B;4;0`)
-@Point(`ex_area;C;4;3`)
-@Point(`ex_area;D;0;3`)
-
-@Flaeche(`ex_area;[A;B;C;D];#e63946;0.25;inhalt=1;umfang=1`)
-```
-
----
-
-@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area;1;0`)
 
 @Point(`ex_area;A;0;0;#e63946;0`)
 @Point(`ex_area;B;4;0;#e63946;0`)
@@ -467,6 +464,22 @@ Parameters: `<boardId>;[<point1>;<point2>;...];<color>;<opacity>;inhalt=1;umfang
 @Point(`ex_area;D;0;3;#e63946;0`)
 
 @Flaeche(`ex_area;[A;B;C;D];#e63946;0.25;inhalt=1;umfang=1`)
+
+@Flaeche(`ex_area;[[1;3.25];[3;3.25];[2;4]];#00ffff;0.5;inhalt=1;umfang=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area;1;0`)
+
+@Point(`ex_area;A;0;0;;0`)
+@Point(`ex_area;B;4;0;;0`)
+@Point(`ex_area;C;4;3;;0`)
+@Point(`ex_area;D;0;3;;0`)
+
+@Flaeche(`ex_area;[A;B;C;D];#e63946;0.25;inhalt=1;umfang=1`)
+
+@Flaeche(`ex_area;[[1;3.25];[3;3.25];[2;4]];#00ffff;0.5;inhalt=1;umfang=1`)
 
 ## `@angle` / `@Winkel`
 

@@ -1,13 +1,14 @@
 // Area subsystem (@Area / @Fläche macros).
 // Fills a polygon spanned by named points and optionally displays area/perimeter.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
 interface AreaConfig {
   boardId: string;
   pointNames: string[];
+  coordinates: CoordinatePair[] | null;
   color: string;
   hasExplicitColor: boolean;
   opacity: number;
@@ -39,12 +40,15 @@ export function init(): void {
     const parts = splitTopLevel(unquote(String(spec || '')), ';')
       .map(function(part) { return unquote(part).trim(); });
     const pointList = String(parts[1] || '').trim();
+    const coordinates = parseCoordinateList(pointList);
     const pointListBody = pointList.startsWith('[') && pointList.endsWith(']')
       ? pointList.slice(1, -1)
       : pointList;
-    const pointNames = splitTopLevel(pointListBody)
-      .map(function(pointName) { return unquote(pointName).trim(); })
-      .filter(Boolean);
+    const pointNames = coordinates
+      ? []
+      : splitTopLevel(pointListBody)
+          .map(function(pointName) { return unquote(pointName).trim(); })
+          .filter(Boolean);
     const explicitColor = String(parts[2] || '').trim();
     const parsedOpacity = parseFloat(String(parts[3] || '').replace(',', '.'));
     const opacity = Number.isFinite(parsedOpacity)
@@ -57,6 +61,7 @@ export function init(): void {
     return {
       boardId: String(parts[0] || '').trim(),
       pointNames: pointNames,
+      coordinates: coordinates,
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
       opacity: opacity,
@@ -85,6 +90,9 @@ export function init(): void {
     try {
       if (entry.board && entry.polygon) entry.board.removeObject(entry.polygon);
     } catch (e) {}
+    (Array.isArray(entry.ownedPoints) ? entry.ownedPoints : []).forEach(function(point: any) {
+      try { if (entry.board && point) entry.board.removeObject(point); } catch (e) {}
+    });
 
     delete window.__areaEntries[key];
   }
@@ -108,6 +116,27 @@ export function init(): void {
     }
 
     return point;
+  }
+
+  function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
+    return board.create('point', [coordinate.x, coordinate.y], {
+      name: '',
+      withLabel: false,
+      visible: false,
+      fixed: true,
+      frozen: true,
+      highlight: false,
+      showInfobox: false,
+      size: 0
+    });
+  }
+
+  function sameCoordinates(a: CoordinatePair[] | null, b: CoordinatePair[] | null): boolean {
+    if (!a || !b || a.length !== b.length) return false;
+    return a.every(function(point, index) {
+      return Math.abs(point.x - b[index].x) < 1e-12 &&
+        Math.abs(point.y - b[index].y) < 1e-12;
+    });
   }
 
   function pointCoordinates(points: any[]): XY[] {
@@ -379,8 +408,10 @@ export function init(): void {
   window.renderAreaFromSpec = function(uid: string, spec: string, language?: string): boolean {
     const cfg = parseAreaSpec(spec, language);
     const key = entryKey(uid);
+    const coordinateMode = !!cfg.coordinates;
 
-    if (!uid || !cfg.boardId || cfg.pointNames.length < 3) {
+    if (!uid || !cfg.boardId ||
+        (coordinateMode ? cfg.coordinates!.length < 3 : cfg.pointNames.length < 3)) {
       removeEntry(uid);
       return false;
     }
@@ -391,20 +422,30 @@ export function init(): void {
       return false;
     }
 
-    const points = cfg.pointNames.map(function(pointName) {
-      return getLivePoint(board, cfg.boardId, pointName);
-    });
-    if (points.some(function(point) { return !point; }) || new Set(points).size < 3) {
+    const namedPoints = coordinateMode
+      ? []
+      : cfg.pointNames.map(function(pointName) {
+          return getLivePoint(board, cfg.boardId, pointName);
+        });
+    const distinctCoordinates = coordinateMode
+      ? new Set(cfg.coordinates!.map(function(point) { return point.x + ':' + point.y; })).size
+      : 0;
+    if ((!coordinateMode &&
+        (namedPoints.some(function(point) { return !point; }) || new Set(namedPoints).size < 3)) ||
+        (coordinateMode && distinctCoordinates < 3)) {
       removeEntry(uid);
       return false;
     }
 
     const old = window.__areaEntries[key];
+    const geometryUnchanged = coordinateMode
+      ? !!(old && sameCoordinates(old.coordinates || null, cfg.coordinates))
+      : !!(old && samePoints(old.points, namedPoints));
     if (
       old &&
       old.board === board &&
       old.boardId === cfg.boardId &&
-      samePoints(old.points, points) &&
+      geometryUnchanged &&
       old.language === cfg.language &&
       old.showArea === cfg.showArea &&
       old.showPerimeter === cfg.showPerimeter &&
@@ -423,8 +464,16 @@ export function init(): void {
     removeEntry(uid);
     let polygon = null;
     let label = null;
+    const ownedPoints: any[] = [];
 
     try {
+      const points = coordinateMode
+        ? cfg.coordinates!.map(function(coordinate) {
+            const point = createHiddenPoint(board, coordinate);
+            ownedPoints.push(point);
+            return point;
+          })
+        : namedPoints;
       polygon = board.create('polygon', points, {
         fixed: true,
         highlight: false,
@@ -453,7 +502,11 @@ export function init(): void {
         uid: String(uid),
         boardId: cfg.boardId,
         pointNames: cfg.pointNames.slice(),
+        coordinates: cfg.coordinates ? cfg.coordinates.map(function(point) {
+          return { x: point.x, y: point.y };
+        }) : null,
         points: points,
+        ownedPoints: ownedPoints,
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
         opacity: cfg.opacity,
@@ -470,6 +523,9 @@ export function init(): void {
     } catch (e) {
       try { if (label) board.removeObject(label); } catch (removeError) {}
       try { if (polygon) board.removeObject(polygon); } catch (removeError) {}
+      ownedPoints.forEach(function(point) {
+        try { board.removeObject(point); } catch (removeError) {}
+      });
       return false;
     }
   };
