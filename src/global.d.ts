@@ -166,6 +166,15 @@ interface Window {
   __scheduleBootstrapAngles: (() => void) | undefined;
   renderAngleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
+  // Coordinate text subsystem (@CoordText / @KoordText)
+  __coordTextReady: boolean | undefined;
+  __coordTextEntries: Record<string, any>;
+  __coordTextRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapCoordTexts: (() => void) | undefined;
+  __bootstrapCoordTextsRAF: number | undefined;
+  __scheduleBootstrapCoordTexts: (() => void) | undefined;
+  renderCoordTextFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
   // Circle subsystem (@Circle / @Kreis)
   __circleReady: boolean | undefined;
   __circleEntries: Record<string, any>;

@@ -10,8 +10,8 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   ./dist/index.js
 
-@CoordinateSystem: @CoordinateSystem_(@0)
-@Koordinatensystem: @CoordinateSystem_(@0)
+@CoordinateSystem: @CoordinateSystem_(`@0`)
+@Koordinatensystem: @CoordinateSystem_(`@0`)
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
@@ -67,15 +67,15 @@ script:   ./dist/index.js
 ```
 @end
 
-@AxisLabel: @AxisLabel_(@uid,@0)
-@AchsenBeschriftung: @AxisLabel_(@uid,@0)
+@AxisLabel: @AxisLabel_(@uid,`@0`)
+@AchsenBeschriftung: @AxisLabel_(@uid,`@0`)
 
 @AxisLabel_
 <span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@CreatePoint: @CreatePoint_(@uid,@0,@1)
-@ErzeugePunkt: @CreatePoint_(@uid,@0,@1)
+@CreatePoint: @CreatePoint_(@uid,`@0`,`@1`)
+@ErzeugePunkt: @CreatePoint_(@uid,`@0`,`@1`)
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
@@ -92,63 +92,71 @@ script:   ./dist/index.js
 
 @end
 
-@Point: @Point_(@uid,@0)
-@Punkt: @Point_(@uid,@0)
+@Point: @Point_(@uid,`@0`)
+@Punkt: @Point_(@uid,`@0`)
 
 @Point_
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@Strecke: @Distance_(@uid,@0,de)
-@distance: @Distance_(@uid,@0,en)
+@CoordText: @CoordText_(@uid,`@0`)
+@KoordText: @CoordText_(@uid,`@0`)
+
+@CoordText_
+<span class='lia-coord-text-spec' id='coord-text-spec-@0' data-spec='@1' style='display:none;'></span>
+@end
+
+
+@Strecke: @Distance_(@uid,`@0`,de)
+@distance: @Distance_(@uid,`@0`,en)
 
 @Distance_
 <span id="distance-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@Area: @Area_(@uid,@0,en)
-@Flaeche: @Area_(@uid,@0,de)
+@Area: @Area_(@uid,`@0`,en)
+@Flaeche: @Area_(@uid,`@0`,de)
 
 @Area_
 <span id="area-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@angle: @Angle_(@uid,@0,en)
-@Winkel: @Angle_(@uid,@0,de)
+@angle: @Angle_(@uid,`@0`,en)
+@Winkel: @Angle_(@uid,`@0`,de)
 
 @Angle_
 <span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@Circle: @Circle_(@uid,@0,en)
-@Kreis: @Circle_(@uid,@0,de)
+@Circle: @Circle_(@uid,`@0`,en)
+@Kreis: @Circle_(@uid,`@0`,de)
 
 @Circle_
 <span id="circle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@PlotFunction: @PlotFunction_(@uid,@0)
-@PlotFunktion: @PlotFunction_(@uid,@0)
+@PlotFunction: @PlotFunction_(@uid,`@0`)
+@PlotFunktion: @PlotFunction_(@uid,`@0`)
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@PlotInput: @PlotInput_(@uid,@0)
-@PlotEingabeLatex: @PlotInput_(@uid,@0)
+@PlotInput: @PlotInput_(@uid,`@0`)
+@PlotEingabeLatex: @PlotInput_(@uid,`@0`)
 
 @PlotInput_
 <div id="lia-plot-input-@0" data-spec="@1"></div>
 @end
 
-@Schar: @Schar_(@uid,@0)
+@Schar: @Schar_(@uid,`@0`)
 
 @Schar_
 <span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@Rekonstruktion: @Rekonstruktion_(@uid,@0)
-@Reconstruction: @Rekonstruktion_(@uid,@0)
+@Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
+@Reconstruction: @Rekonstruktion_(@uid,`@0`)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
@@ -197,8 +205,8 @@ script:   ./dist/index.js
 </script>
 @end
 
-@PointOnGraph: @PointOnGraph_(@uid,@0)
-@PunktGraph: @PointOnGraph_(@uid,@0)
+@PointOnGraph: @PointOnGraph_(@uid,`@0`)
+@PunktGraph: @PointOnGraph_(@uid,`@0`)
 
 @PointOnGraph_
 <div id="graph-ui-@0">
@@ -214,8 +222,8 @@ script:   ./dist/index.js
 
 @end
 
-@PointsOnGraph: @PointsOnGraph_(@uid,@0)
-@PunkteAufGraph: @PointsOnGraph_(@uid,@0)
+@PointsOnGraph: @PointsOnGraph_(@uid,`@0`)
+@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
@@ -231,14 +239,14 @@ script:   ./dist/index.js
 
 @end
 
-@Table: @Table_(@uid,@0)
-@Tabelle: @Table_(@uid,@0)
+@Table: @Table_(@uid,`@0`)
+@Tabelle: @Table_(@uid,`@0`)
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
 @end
 
-@DGS: @DGS_(@uid,@0,@language)
+@DGS: @DGS_(@uid,`@0`,@language)
 
 @DGS_
 <span id="dgs-ui-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
@@ -252,9 +260,9 @@ script:   ./dist/index.js
 </script>
 @end
 
-@Regression: @Regression_(@uid,@0)
-@Regession: @Regression_(@uid,@0)
-@PlotZeichnen: @Regression_(@uid,@0)
+@Regression: @Regression_(@uid,`@0`)
+@Regession: @Regression_(@uid,`@0`)
+@PlotZeichnen: @Regression_(@uid,`@0`)
 
 @Regression_
 <span id="regression-ui-@0" data-spec="@1" style="display:none;"></span>
@@ -403,6 +411,31 @@ Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
 
 @Point(`ex_point;A;2;3`)
 @Point(`ex_point;B;-3;-1;#e63946;0.65;fix`)
+
+## `@CoordText` / `@KoordText`
+
+          --{{0}}--
+Places text at a fixed coordinate. Color is optional and defaults to the current
+theme accent color; opacity is clamped to `0` through `1`. Text enclosed in
+dollar signs is rendered as TeX, so both plain text and expressions such as
+`$f(x)$` are supported. Parentheses can be written directly in the backtick-
+wrapped macro argument; the legacy spelling `$f{{x}}$` remains supported.
+
+Parameters: `<boardId>;[<x>;<y>];<content>;<color>;<opacity>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_coord_text`)
+
+@CoordText(`ex_coord_text;[-2;2];Hinweis;#00ff00;0.8`)
+@KoordText(`ex_coord_text;[2;1];$f(x)=x^2$;#e63946;1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_coord_text`)
+
+@CoordText(`ex_coord_text;[-2;2];Hinweis;#00ff00;0.8`)
+@KoordText(`ex_coord_text;[2;1];$f(x)=x^2$;#e63946;1`)
 
 ## `@Strecke` / `@distance`
 
@@ -569,7 +602,7 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
 
 @PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 ```
@@ -578,7 +611,7 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
 
-@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
 
 @PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
 
@@ -592,7 +625,7 @@ Parameters: `<boardId>;<funcName>;<color>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g{{x}}$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
 
 @PlotInput(`ex_input;g;#0055cc`)
 ```
@@ -601,7 +634,7 @@ Parameters: `<boardId>;<funcName>;<color>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
 
-@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g{{x}}$`)
+@AxisLabel(`id=ex_input;xlabel=$x$;ylabel=$g(x)$`)
 
 @PlotInput(`ex_input;g;#0055cc`)
 
@@ -616,7 +649,7 @@ Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
@@ -627,7 +660,7 @@ Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
-@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_pg;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 
@@ -643,7 +676,7 @@ Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tole
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
@@ -654,7 +687,7 @@ Drag all 3 points onto the graph of $f(x) = x - 1$.
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
 
-@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_points_on_graph;xlabel=$x$;ylabel=$f(x)$`)
 
 Drag all 3 points onto the graph of $f(x) = x - 1$.
 
@@ -670,7 +703,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 ```
@@ -679,7 +712,7 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
 
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_tab`)
 
-@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f{{x}}$`)
+@AxisLabel(`id=ex_tab;xlabel=$x$;ylabel=$f(x)$`)
 
 @Table(`n=3;x;f;P;id=ex_tab`)
 
@@ -744,6 +777,12 @@ automatically place a new alphabetically named DGS point when clicking an empty 
 The polygon tool selects points in sequence. Selecting the first point again after at
 least three distinct points closes the sequence and creates a movable polygon (for example,
 `A → B → C → A` or `B → C → A → B`).
+Every polygon side is also registered as an individual DGS segment. It can be selected on
+the board or in the object list and used as the source for perpendiculars, parallels,
+tangents, intersections, and the other line-based constructions. Side names stay hidden by
+default to keep the polygon uncluttered, but can be shown or combined with the length display
+from the segment object menu. Side formatting and dependent constructions participate in
+DGS persistence and undo/redo together with their polygon.
 The circular-sector tool is located directly below the circle tool. Select or place three
 points in center–radius point–second arm point order. It creates a dynamically linked magenta
 sector; its object menu can show the area and perimeter and edit line, fill, and label colors.
@@ -938,7 +977,7 @@ Legacy-style multi-family setup with quadratic, cubic, and quartic parameterized
 
 @AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`g;x;d{{x+b}}^2+c;A3;term=1;#ff00ff`)
+@Schar(`g;x;d(x+b)^2+c;A3;term=1;#ff00ff`)
 
 @Schar(`p;x;ax^3+bx^2+cx+d;A3;term=1;#ff0000`)
 
@@ -951,7 +990,7 @@ Legacy-style multi-family setup with quadratic, cubic, and quartic parameterized
 
 @AxisLabel(`id=A3;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`g;x;d{{x+b}}^2+c;A3;term=1;#ff00ff`)
+@Schar(`g;x;d(x+b)^2+c;A3;term=1;#ff00ff`)
 
 @Schar(`p;x;ax^3+bx^2+cx+d;A3;term=1;#ff0000`)
 
@@ -967,11 +1006,11 @@ Legacy-style multi-family setup with sinus, exponential, and logarithmic paramet
 
 @AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`f;x;A sin{{b{{x+c}}}}+d;A11;term=1;#0077ff`)
+@Schar(`f;x;A sin(b(x+c))+d;A11;term=1;#0077ff`)
 
-@Schar(`h;x;A e^{{b{{x+c}}}}+d;A11;term=1;#00ff00`)
+@Schar(`h;x;A e^(b(x+c))+d;A11;term=1;#00ff00`)
 
-@Schar(`l;x;A ln{{b{{x+c}}}}+d;A11;term=1;#22aa66`)
+@Schar(`l;x;A ln(b(x+c))+d;A11;term=1;#22aa66`)
 ```
 
 ---
@@ -980,11 +1019,11 @@ Legacy-style multi-family setup with sinus, exponential, and logarithmic paramet
 
 @AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`f;x;A sin{{b{{x+c}}}}+d;A11;term=1;#0077ff`)
+@Schar(`f;x;A sin(b(x+c))+d;A11;term=1;#0077ff`)
 
-@Schar(`h;x;A e^{{b{{x+c}}}}+d;A11;term=1;#00ff00`)
+@Schar(`h;x;A e^(b(x+c))+d;A11;term=1;#00ff00`)
 
-@Schar(`l;x;A ln{{b{{x+c}}}}+d;A11;term=1;#22aa66`)
+@Schar(`l;x;A ln(b(x+c))+d;A11;term=1;#22aa66`)
 
 ## Sliding Function Family 4
 
@@ -996,11 +1035,11 @@ Legacy-style multi-family setup with square-root and reciprocal parameterized fu
 
 @AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`k;x;A sqrt{{b{{x+c}}}}+d;A11;term=1;#ff9900`)
+@Schar(`k;x;A sqrt(b(x+c))+d;A11;term=1;#ff9900`)
 
-@Schar(`q;x;A/{{b{{x+c}}}}+d;A11;term=1;#ffff00`)
+@Schar(`q;x;A/(b(x+c))+d;A11;term=1;#ffff00`)
 
-@Schar(`g;x;A/{{b{{x+c}}^2}}+d;A11;term=1;#0066ff`)
+@Schar(`g;x;A/(b(x+c)^2)+d;A11;term=1;#0066ff`)
 ```
 
 ---
@@ -1009,11 +1048,11 @@ Legacy-style multi-family setup with square-root and reciprocal parameterized fu
 
 @AxisLabel(`id=A11;xlabel=$x$;ylabel=$y$`)
 
-@Schar(`k;x;A sqrt{{b{{x+c}}}}+d;A11;term=1;#ff9900`)
+@Schar(`k;x;A sqrt(b(x+c))+d;A11;term=1;#ff9900`)
 
-@Schar(`q;x;A/{{b{{x+c}}}}+d;A11;term=1;#ffff00`)
+@Schar(`q;x;A/(b(x+c))+d;A11;term=1;#ffff00`)
 
-@Schar(`g;x;A/{{b{{x+c}}^2}}+d;A11;term=1;#0066ff`)
+@Schar(`g;x;A/(b(x+c)^2)+d;A11;term=1;#0066ff`)
 
 
 
@@ -1056,8 +1095,8 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/index.js
 
-@CoordinateSystem: @CoordinateSystem_(@0)
-@Koordinatensystem: @CoordinateSystem_(@0)
+@CoordinateSystem: @CoordinateSystem_(`@0`)
+@Koordinatensystem: @CoordinateSystem_(`@0`)
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
@@ -1108,15 +1147,15 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 ```
 @end
 
-@AxisLabel: @AxisLabel_(@uid,@0)
-@AchsenBeschriftung: @AxisLabel_(@uid,@0)
+@AxisLabel: @AxisLabel_(@uid,`@0`)
+@AchsenBeschriftung: @AxisLabel_(@uid,`@0`)
 
 @AxisLabel_
 <span id="axis-title-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@CreatePoint: @CreatePoint_(@uid,@0,@1)
-@ErzeugePunkt: @CreatePoint_(@uid,@0,@1)
+@CreatePoint: @CreatePoint_(@uid,`@0`,`@1`)
+@ErzeugePunkt: @CreatePoint_(@uid,`@0`,`@1`)
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
@@ -1132,63 +1171,71 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 </div>
 @end
 
-@Point: @Point_(@uid,@0)
-@Punkt: @Point_(@uid,@0)
+@Point: @Point_(@uid,`@0`)
+@Punkt: @Point_(@uid,`@0`)
 
 @Point_
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@Strecke: @Distance_(@uid,@0,de)
-@distance: @Distance_(@uid,@0,en)
+@CoordText: @CoordText_(@uid,`@0`)
+@KoordText: @CoordText_(@uid,`@0`)
+
+@CoordText_
+<span class='lia-coord-text-spec' id='coord-text-spec-@0' data-spec='@1' style='display:none;'></span>
+@end
+
+
+@Strecke: @Distance_(@uid,`@0`,de)
+@distance: @Distance_(@uid,`@0`,en)
 
 @Distance_
 <span id="distance-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@Area: @Area_(@uid,@0,en)
-@Flaeche: @Area_(@uid,@0,de)
+@Area: @Area_(@uid,`@0`,en)
+@Flaeche: @Area_(@uid,`@0`,de)
 
 @Area_
 <span id="area-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@angle: @Angle_(@uid,@0,en)
-@Winkel: @Angle_(@uid,@0,de)
+@angle: @Angle_(@uid,`@0`,en)
+@Winkel: @Angle_(@uid,`@0`,de)
 
 @Angle_
 <span id="angle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@Circle: @Circle_(@uid,@0,en)
-@Kreis: @Circle_(@uid,@0,de)
+@Circle: @Circle_(@uid,`@0`,en)
+@Kreis: @Circle_(@uid,`@0`,de)
 
 @Circle_
 <span id="circle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
-@PlotFunction: @PlotFunction_(@uid,@0)
-@PlotFunktion: @PlotFunction_(@uid,@0)
+@PlotFunction: @PlotFunction_(@uid,`@0`)
+@PlotFunktion: @PlotFunction_(@uid,`@0`)
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@PlotInput: @PlotInput_(@uid,@0)
-@PlotEingabeLatex: @PlotInput_(@uid,@0)
+@PlotInput: @PlotInput_(@uid,`@0`)
+@PlotEingabeLatex: @PlotInput_(@uid,`@0`)
 
 @PlotInput_
 <div id="lia-plot-input-@0" data-spec="@1"></div>
 @end
 
-@Schar: @Schar_(@uid,@0)
+@Schar: @Schar_(@uid,`@0`)
 
 @Schar_
 <span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@Rekonstruktion: @Rekonstruktion_(@uid,@0)
-@Reconstruction: @Rekonstruktion_(@uid,@0)
+@Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
+@Reconstruction: @Rekonstruktion_(@uid,`@0`)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
@@ -1237,8 +1284,8 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 </script>
 @end
 
-@PointOnGraph: @PointOnGraph_(@uid,@0)
-@PunktGraph: @PointOnGraph_(@uid,@0)
+@PointOnGraph: @PointOnGraph_(@uid,`@0`)
+@PunktGraph: @PointOnGraph_(@uid,`@0`)
 
 @PointOnGraph_
 <div id="graph-ui-@0">
@@ -1253,8 +1300,8 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 <span id="graph-spec-@0" style="display:none;">@1</span>
 @end
 
-@PointsOnGraph: @PointsOnGraph_(@uid,@0)
-@PunkteAufGraph: @PointsOnGraph_(@uid,@0)
+@PointsOnGraph: @PointsOnGraph_(@uid,`@0`)
+@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
@@ -1269,8 +1316,8 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 </div>
 @end
 
-@Table: @Table_(@uid,@0)
-@Tabelle: @Table_(@uid,@0)
+@Table: @Table_(@uid,`@0`)
+@Tabelle: @Table_(@uid,`@0`)
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>

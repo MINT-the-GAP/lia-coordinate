@@ -283,7 +283,7 @@ export function init(): void {
       strokeOpacity: cfg.opacity,
       fillOpacity: cfg.opacity,
       cssStyle: 'opacity:' + cfg.opacity + ';',
-      fontSize: 14
+      fontSize: 16
     });
 
     scheduleBootstrap(function() {

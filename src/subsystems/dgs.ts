@@ -1756,6 +1756,7 @@ function getUsedSegmentNames(state: DgsState): Set<string> {
   const used = new Set<string>();
   const visitSegment = (segment: any) => {
     if (!segment || typeof segment !== 'object') return;
+    if (segment.__liaDgsPolygonBorderInitializing) return;
     const type = String(segment.elType || '').toLowerCase();
     if (type !== 'segment' && type !== 'line' && !segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsLine && !segment.__liaDgsVector) return;
 
@@ -3603,6 +3604,85 @@ function createDgsParallel(state: DgsState, baseLine: any, throughPoint: any): a
   }
 }
 
+function initializeDgsPolygonBorders(state: DgsState, polygon: any): any[] {
+  const borders = polygon && Array.isArray(polygon.borders) ? polygon.borders : [];
+  const promoted: any[] = [];
+  borders.forEach((border: any) => {
+    if (border) border.__liaDgsPolygonBorderInitializing = true;
+  });
+
+  borders.forEach((border: any, index: number) => {
+    if (!border) return;
+    const name = getNextSegmentName(state);
+    delete border.__liaDgsPolygonBorderInitializing;
+    border.__liaDgsSegment = true;
+    border.__liaDgsPolygonBorder = true;
+    border.__liaDgsPolygonBorderOwner = polygon;
+    border.__liaDgsPolygonBorderIndex = index;
+    border.__liaDgsSegmentName = name;
+    border.__liaDgsLanguage = state.language;
+    border.__liaDgsColor = '#ff00ff';
+    border.__liaDgsShowName = false;
+    border.__liaDgsShowObject = true;
+    border.__liaDgsOpacity = 1;
+    border.__liaDgsShowLength = false;
+    ensureDgsPersistentId(border, 'polygon-border');
+
+    try {
+      border.setAttribute({
+        name: '\\(' + name + '\\)',
+        fixed: true,
+        strokeColor: '#ff00ff',
+        highlightStrokeColor: '#ff00ff',
+        strokeWidth: 3,
+        highlightStrokeWidth: 4
+      });
+    } catch (e) {}
+
+    let label = border.label || null;
+    if (!label) {
+      try {
+        label = state.board.create('text', [
+          function() { return (Number(border.point1.X()) + Number(border.point2.X())) / 2; },
+          function() { return (Number(border.point1.Y()) + Number(border.point2.Y())) / 2; },
+          function() { return dgsObjectLabelText(border); }
+        ], {
+          fixed: true,
+          visible: false,
+          highlight: false,
+          parse: false,
+          useMathJax: true,
+          display: 'html',
+          anchorX: 'middle',
+          anchorY: 'middle',
+          strokeColor: '#ff00ff',
+          fillColor: '#ff00ff',
+          fontSize: 20
+        });
+        border.label = label;
+      } catch (e) {
+        label = null;
+      }
+    }
+    try {
+      if (label && typeof label.setAttribute === 'function') {
+        label.setAttribute({
+          visible: false,
+          strokeColor: '#ff00ff',
+          fillColor: '#ff00ff',
+          fontSize: 20
+        });
+      }
+    } catch (e) {}
+    border.__liaDgsPolygonBorderLabel = label;
+    refreshDgsObjectLabel(border);
+    promoted.push(border);
+  });
+
+  polygon.__liaDgsPolygonBorders = promoted;
+  return promoted;
+}
+
 function createDgsPolygon(state: DgsState, points: any[]): any | null {
   if (!state.board || !Array.isArray(points) || points.length < 3 || new Set(points).size !== points.length) {
     return null;
@@ -3637,6 +3717,7 @@ function createDgsPolygon(state: DgsState, points: any[]): any | null {
     polygon.__liaDgsOpacity = 0.22;
     polygon.__liaDgsShowArea = false;
     polygon.__liaDgsShowPerimeter = false;
+    initializeDgsPolygonBorders(state, polygon);
     refreshDgsPolygonMeasurementLabel(polygon);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return polygon;
@@ -4833,6 +4914,42 @@ function dgsPointReference(point: any): any {
   };
 }
 
+function dgsDerivedPointRecord(point: any): any {
+  return {
+    ...dgsPointReference(point),
+    showName: point.__liaDgsShowName !== false,
+    showObject: point.__liaDgsShowObject !== false,
+    showValue: !!point.__liaDgsShowValue,
+    opacity: getDgsObjectOpacity(point),
+    textColor: getDgsObjectColor(point, 'text'),
+    lineColor: getDgsObjectColor(point, 'line'),
+    layer: getDgsObjectLayer(point)
+  };
+}
+
+function dgsPolygonBorderRecord(border: any): any {
+  return {
+    id: ensureDgsPersistentId(border, 'polygon-border'),
+    type: 'segment',
+    name: getDgsObjectName(border),
+    language: border.__liaDgsLanguage,
+    fixed: getDgsObjectFixed(border),
+    layer: getDgsObjectLayer(border),
+    showName: border.__liaDgsShowName !== false,
+    showObject: border.__liaDgsShowObject !== false,
+    opacity: getDgsObjectOpacity(border),
+    textColor: getDgsObjectColor(border, 'text'),
+    lineColor: getDgsObjectColor(border, 'line'),
+    fillColor: getDgsObjectColor(border, 'fill'),
+    formatFontSize: getDgsFormatFontSize(border),
+    showLength: !!border.__liaDgsShowLength,
+    showRoots: !!border.__liaDgsRootConstruction,
+    showYIntercept: !!border.__liaDgsYInterceptConstruction,
+    rootPoints: (border.__liaDgsRootConstruction?.points || []).map(dgsDerivedPointRecord),
+    yInterceptPoints: (border.__liaDgsYInterceptConstruction?.points || []).map(dgsDerivedPointRecord)
+  };
+}
+
 function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   if (!state || state.restoring || !state.board) return;
   const records: any[] = [];
@@ -4841,6 +4958,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
         object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
         object.__liaDgsIntersectionPoint)) return;
     if (object && (object.__liaDgsTangentPoint || object.__liaDgsTangentHelper)) return;
+    if (object && object.__liaDgsPolygonBorder) return;
     let type = '';
     if (object && object.__liaDgsTangent) type = 'tangent';
     else if (object && object.__liaDgsMidpoint) type = 'midpoint';
@@ -4966,6 +5084,9 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
     } else if (type === 'polygon') {
       record.points = (object.vertices || []).map(dgsPointReference);
+      record.borders = (object.__liaDgsPolygonBorders || object.borders || [])
+        .filter((border: any) => !!border)
+        .map(dgsPolygonBorderRecord);
     } else if (type === 'sector') {
       record.points = [
         dgsPointReference(object.__liaDgsSectorCenter),
@@ -5127,6 +5248,23 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   else refreshDgsObjectLabel(object);
 }
 
+function restoreDgsPolygonBorders(
+  state: DgsState,
+  polygon: any,
+  records: any[],
+  existingById: Map<string, any>
+): void {
+  const borders = polygon && (polygon.__liaDgsPolygonBorders || polygon.borders || []);
+  if (!Array.isArray(borders) || !Array.isArray(records)) return;
+
+  records.forEach((record: any, index: number) => {
+    const border = borders[index];
+    if (!border || !record) return;
+    applyRestoredDgsProperties(state, border, record);
+    if (record.id) existingById.set(String(record.id), border);
+  });
+}
+
 function restoreDgsPendingRecords(
   state: DgsState,
   input: any[],
@@ -5240,6 +5378,9 @@ function restoreDgsPendingRecords(
       if (!object) { unresolved.push(record); return; }
       applyRestoredDgsProperties(state, object, record);
       existingById.set(record.id, object);
+      if (record.type === 'polygon') {
+        restoreDgsPolygonBorders(state, object, record.borders || [], existingById);
+      }
       restoredThisPass += 1;
     });
     pending = unresolved;
@@ -5332,14 +5473,27 @@ function restoreDgsConstruction(state: DgsState): void {
       });
     };
     saved.records.forEach((record: any) => {
-      if (record.showRoots) restoreAnalysisPoints(record, 'roots', record.rootPoints || []);
-      if (record.showExtrema) restoreAnalysisPoints(record, 'extrema', record.extremaPoints || []);
-      if (record.showInflections) {
-        restoreAnalysisPoints(record, 'inflections', record.inflectionPoints || []);
-      }
-      if (record.showYIntercept) {
-        restoreAnalysisPoints(record, 'ordinate-intercept', record.yInterceptPoints || []);
-      }
+      const sourceRecords = [record].concat(
+        record.type === 'polygon' && Array.isArray(record.borders) ? record.borders : []
+      );
+      sourceRecords.forEach((sourceRecord: any) => {
+        if (sourceRecord.showRoots) {
+          restoreAnalysisPoints(sourceRecord, 'roots', sourceRecord.rootPoints || []);
+        }
+        if (sourceRecord.showExtrema) {
+          restoreAnalysisPoints(sourceRecord, 'extrema', sourceRecord.extremaPoints || []);
+        }
+        if (sourceRecord.showInflections) {
+          restoreAnalysisPoints(sourceRecord, 'inflections', sourceRecord.inflectionPoints || []);
+        }
+        if (sourceRecord.showYIntercept) {
+          restoreAnalysisPoints(
+            sourceRecord,
+            'ordinate-intercept',
+            sourceRecord.yInterceptPoints || []
+          );
+        }
+      });
     });
     if (pending.length) pending = restoreDgsPendingRecords(state, pending, existingById);
     saved.records
@@ -5406,6 +5560,9 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     removeDgsTangent(state, tangent, false);
   });
   objects.forEach((object) => {
+    if (object && object.__liaDgsPolygonBorder && object.__liaDgsPolygonBorderLabel) {
+      try { state.board.removeObject(object.__liaDgsPolygonBorderLabel); } catch (e) {}
+    }
     if (object && object.__liaDgsPolygon && object.__liaDgsMeasurementLabel) {
       try { state.board.removeObject(object.__liaDgsMeasurementLabel); } catch (e) {}
     }
@@ -5673,7 +5830,9 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
     }
     try {
       if (typeof segment.hasPoint === 'function' && segment.hasPoint(localX, localY)) {
-        if (layer > nearestLayer) {
+        const preferPolygonBorder = layer === nearestLayer &&
+          isDgsLinearObject(segment) && isDgsPolygon(nearest);
+        if (layer > nearestLayer || preferPolygonBorder) {
           nearest = segment;
           nearestDistance = 0;
           nearestLayer = layer;
@@ -5702,7 +5861,13 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
     const px = x1 + ratio * dx;
     const py = y1 + ratio * dy;
     const distance = Math.hypot(localX - px, localY - py);
-    if (distance <= 10 && (layer > nearestLayer || (layer === nearestLayer && distance < nearestDistance))) {
+    const preferPolygonBorder = layer === nearestLayer &&
+      isDgsLinearObject(segment) && isDgsPolygon(nearest);
+    if (distance <= 10 && (
+      layer > nearestLayer ||
+      preferPolygonBorder ||
+      (layer === nearestLayer && distance < nearestDistance)
+    )) {
       nearest = segment;
       nearestDistance = distance;
       nearestLayer = layer;
@@ -7036,6 +7201,9 @@ function resetDeleteButton(state: DgsState): void {
 
 function deleteDgsObject(state: DgsState, object: any, recordHistory = true): void {
   if (!state.board || !object) return;
+  if (object.__liaDgsPolygonBorder && object.__liaDgsPolygonBorderOwner) {
+    object = object.__liaDgsPolygonBorderOwner;
+  }
   const tangent = object.__liaDgsTangent ? object : object.__liaDgsTangentLine;
   if (tangent) {
     removeDgsTangent(state, tangent);
@@ -7049,6 +7217,23 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   }
 
   const toRemove = new Set<any>();
+  const addPolygonParts = (polygon: any) => {
+    if (!polygon) return;
+    toRemove.add(polygon);
+    const borders = polygon.__liaDgsPolygonBorders || polygon.borders || [];
+    if (Array.isArray(borders)) {
+      borders.forEach((border: any) => {
+        if (!border) return;
+        toRemove.add(border);
+        if (border.__liaDgsPolygonBorderLabel) {
+          toRemove.add(border.__liaDgsPolygonBorderLabel);
+        }
+      });
+    }
+    if (polygon.__liaDgsMeasurementLabel) {
+      toRemove.add(polygon.__liaDgsMeasurementLabel);
+    }
+  };
   if (Array.isArray(object.__liaDgsIntersectionConstructions)) {
     object.__liaDgsIntersectionConstructions.slice().forEach((construction: any) => {
       removeDgsRootConstruction(state, construction, false);
@@ -7068,7 +7253,7 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
         toRemove.add(candidate);
       }
       if (candidate.__liaDgsPolygon && Array.isArray(candidate.vertices) && candidate.vertices.includes(object)) {
-        toRemove.add(candidate);
+        addPolygonParts(candidate);
       }
       if (candidate.__liaDgsAngle && Array.isArray(candidate.__liaDgsAnglePoints) &&
           candidate.__liaDgsAnglePoints.includes(object)) {
@@ -7109,7 +7294,8 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       }
     } catch (e) {}
   }
-  toRemove.add(object);
+  if (isDgsPolygon(object)) addPolygonParts(object);
+  else toRemove.add(object);
 
   // Perpendiculars and parallels depend on both their source line and their
   // through-point. Resolve this transitively for chained constructions.
@@ -7144,7 +7330,7 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       }
       if (candidate.__liaDgsPolygon && Array.isArray(candidate.vertices) &&
           candidate.vertices.some((point: any) => toRemove.has(point))) {
-        toRemove.add(candidate);
+        addPolygonParts(candidate);
         addedDependent = true;
         return;
       }
