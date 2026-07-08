@@ -31,7 +31,13 @@ type DgsState = {
   objectListClip: HTMLDivElement;
   objectListPanel: HTMLDivElement;
   objectListContent: HTMLDivElement;
+  objectListFooter: HTMLDivElement;
   objectListCloseButton: HTMLButtonElement;
+  objectListExportButton: HTMLButtonElement;
+  exportDialog: HTMLDivElement;
+  exportTextarea: HTMLTextAreaElement;
+  exportCopyButton: HTMLButtonElement;
+  exportCloseButton: HTMLButtonElement;
   nameOption: HTMLLabelElement;
   objectOption: HTMLLabelElement;
   coordinateSection: HTMLDivElement;
@@ -172,6 +178,7 @@ type DgsState = {
   angleDialogOpen: boolean;
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
+  exportDialogOpen: boolean;
   sideMenuOpen: boolean;
   objectListOpen: boolean;
   objectListSignature: string;
@@ -215,7 +222,7 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
-    objectList: 'Objektliste', noObjects: 'Noch keine Objekte', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
+    objectList: 'Objektliste', noObjects: 'Noch keine Objekte', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
     coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
     showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
@@ -228,7 +235,7 @@ const DGS_TEXT = {
     enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
-    objectList: 'Object list', noObjects: 'No objects yet', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
+    objectList: 'Object list', noObjects: 'No objects yet', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
     coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
     showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
@@ -599,7 +606,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
       width: ${OBJECT_LIST_WIDTH_PX}px;
       box-sizing: border-box;
       padding: 10px 8px 12px;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
       border-left: 2px solid currentColor;
       background: var(--lia-dgs-menu-bg, #fff);
       box-shadow: -6px 0 16px rgba(0, 0, 0, 0.18);
@@ -633,8 +642,42 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-object-list-content {
+      min-height: 0;
+      flex: 1 1 auto;
+      overflow-y: auto;
       display: grid;
+      align-content: start;
       gap: 6px;
+    }
+
+    .lia-dgs-object-list-footer {
+      flex: 0 0 auto;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 2px solid var(--lia-dgs-theme-color, currentColor);
+    }
+
+    .lia-dgs-object-list-export {
+      width: 100%;
+      min-height: 34px;
+      box-sizing: border-box;
+      display: grid;
+      place-items: center;
+      padding: 5px 8px;
+      border: 2px solid var(--lia-dgs-theme-color, currentColor);
+      border-radius: 8px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .lia-dgs-object-list-export:hover,
+    .lia-dgs-object-list-export:focus-visible {
+      background: color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 15%, transparent);
+      outline: none;
     }
 
     .lia-dgs-object-list-empty {
@@ -1600,6 +1643,33 @@ function ensureStyles(root: Document | ShadowRoot): void {
       font-size: 12px;
       line-height: 1.3;
       opacity: .75;
+    }
+
+    .lia-dgs-export-dialog {
+      width: min(620px, calc(100% - 32px));
+      max-width: calc(100% - 32px);
+    }
+
+    .lia-dgs-export-textarea {
+      min-width: 0;
+      width: 100%;
+      height: min(42vh, 320px);
+      min-height: 180px;
+      box-sizing: border-box;
+      border: 1.5px solid currentColor;
+      border-radius: 8px;
+      background: transparent;
+      color: inherit;
+      padding: 8px 10px;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+      resize: vertical;
+      white-space: pre;
+      overflow: auto;
+    }
+
+    .lia-dgs-export-textarea:focus-visible {
+      outline: 2px solid var(--lia-dgs-theme-color, currentColor);
+      outline-offset: 2px;
     }
 
     .lia-dgs-angle-dialog-title {
@@ -6069,6 +6139,320 @@ function refreshDgsObjectList(state: DgsState, force = false): void {
   });
 }
 
+function randomDgsExportId(): string {
+  const first = 'abcdefghijklmnopqrstuvwxyz';
+  const chars = first + '0123456789';
+  const values = new Uint32Array(8);
+  try {
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      window.crypto.getRandomValues(values);
+    } else {
+      for (let i = 0; i < values.length; i += 1) values[i] = Math.floor(Math.random() * 0xffffffff);
+    }
+  } catch (e) {
+    for (let i = 0; i < values.length; i += 1) values[i] = Math.floor(Math.random() * 0xffffffff);
+  }
+  let id = first[values[0] % first.length];
+  for (let i = 1; i < values.length; i += 1) id += chars[values[i] % chars.length];
+  return id;
+}
+
+function formatDgsExportNumber(value: unknown, fallback = 0): string {
+  const parsed = Number(value);
+  const number = Number.isFinite(parsed) ? parsed : fallback;
+  const rounded = Math.round(number * 1e9) / 1e9;
+  return Object.is(rounded, -0) ? '0' : String(rounded);
+}
+
+function replaceDgsExportBackticks(value: unknown): string {
+  return String(value == null ? '' : value).split(String.fromCharCode(96)).join(String.fromCharCode(39));
+}
+
+function cleanDgsExportToken(value: unknown): string {
+  return replaceDgsExportBackticks(value)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/;/g, ',')
+    .trim();
+}
+
+function quoteDgsExportField(value: unknown): string {
+  const text = replaceDgsExportBackticks(value).replace(/[\r\n]+/g, ' ');
+  if (!text) return '';
+  const needsQuote = /[;]/.test(text) || /^\s|\s$/.test(text);
+  if (!needsQuote) return text;
+  const quote = String.fromCharCode(34);
+  return quote + text.split(quote).join('”') + quote;
+}
+
+function macroDgsExportLine(name: string, spec: string): string {
+  const tick = String.fromCharCode(96);
+  return '@' + name + '(' + tick + replaceDgsExportBackticks(spec) + tick + ')';
+}
+
+function isDgsExportVisibleElement(object: any): boolean {
+  if (!object) return false;
+  try { if (typeof object.evalVisProp === 'function') return object.evalVisProp('visible') !== false; } catch (e) {}
+  try { if (object.visPropCalc && object.visPropCalc.visible === false) return false; } catch (e) {}
+  try { if (object.visProp && object.visProp.visible === false) return false; } catch (e) {}
+  return true;
+}
+
+function getDgsExportPointCoordinates(point: any): { x: number; y: number } | null {
+  try {
+    const x = Number(point.X());
+    const y = Number(point.Y());
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getDgsExportBoardSpec(state: DgsState, exportId: string): string {
+  let bbox = [-5, 5, 5, -5];
+  try {
+    const current = state.board && state.board.getBoundingBox && state.board.getBoundingBox();
+    if (Array.isArray(current) && current.length === 4 && current.every((value: any) => Number.isFinite(Number(value))) &&
+        Number(current[2]) > Number(current[0]) && Number(current[1]) > Number(current[3])) {
+      bbox = current.map((value: any) => Number(value));
+    }
+  } catch (e) {}
+  const stored = window.__coordBoardStates && window.__coordBoardStates[state.boardId];
+  const containerRect = (() => {
+    try { return state.boardContainer.getBoundingClientRect(); } catch (e) { return null; }
+  })();
+  const width = Math.max(1, Math.round(
+    Number(stored && stored.width) ||
+    Number(state.boardContainer && state.boardContainer.clientWidth) ||
+    Number(containerRect && containerRect.width) ||
+    800
+  ));
+  const axes = (isDgsExportVisibleElement(state.xAxis) || isDgsExportVisibleElement(state.yAxis)) ? 1 : 0;
+  const grid = state.board && (state.board.__liaMajorGrid || state.board.__liaMinorGrid) ? 1 : 0;
+  let border = 1;
+  try { if (String(state.boardContainer.style.border || '').trim().toLowerCase() === 'none') border = 0; } catch (e) {}
+  return [
+    'xmin=' + formatDgsExportNumber(bbox[0]),
+    'xmax=' + formatDgsExportNumber(bbox[2]),
+    'ymin=' + formatDgsExportNumber(bbox[3]),
+    'ymax=' + formatDgsExportNumber(bbox[1]),
+    'width=' + String(width),
+    'id=' + exportId,
+    String(axes),
+    String(grid),
+    String(border)
+  ].join(';');
+}
+
+function buildDgsExportMacroBlock(state: DgsState): string {
+  const exportId = randomDgsExportId();
+  const useGerman = state.language === 'de';
+  const macros = {
+    coordinate: useGerman ? 'Koordinatensystem' : 'CoordinateSystem',
+    axisLabel: useGerman ? 'AchsenBeschriftung' : 'AxisLabel',
+    point: useGerman ? 'Punkt' : 'Point',
+    coordText: useGerman ? 'KoordText' : 'CoordText',
+    segment: useGerman ? 'Strecke' : 'distance',
+    area: useGerman ? 'Flaeche' : 'Area',
+    angle: useGerman ? 'Winkel' : 'angle',
+    circle: useGerman ? 'Kreis' : 'Circle',
+    plotFunction: useGerman ? 'PlotFunktion' : 'PlotFunction',
+    dgs: 'DGS'
+  };
+  const lines: string[] = [macroDgsExportLine(macros.coordinate, getDgsExportBoardSpec(state, exportId))];
+  const pointLines: string[] = [];
+  const objectLines: string[] = [];
+  const unsupported: string[] = [];
+  const exportedPoints = new Map<any, string>();
+  const usedPointNames = new Set<string>();
+  const objects = getDgsBoardObjects(state.board);
+  const sliderValues = new Map<string, string>();
+
+  objects.forEach((object) => {
+    if (!isDgsSlider(object)) return;
+    const name = normalizeDgsParameterName(object.__liaDgsSliderName || object.name || '');
+    if (!name) return;
+    sliderValues.set(name, formatDgsExportNumber(getDgsSliderValue(object), 0));
+  });
+
+  const exportFunctionExpression = (expression: unknown): string => {
+    let output = String(expression == null ? '' : expression);
+    sliderValues.forEach((value, name) => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      output = output.replace(new RegExp('\\b' + escaped + '\\b', 'g'), '(' + value + ')');
+    });
+    return output;
+  };
+
+  const allocatePointName = (point: any, preferred?: string): string => {
+    const base = cleanDgsExportToken(preferred || point && (point.__liaDgsPointName || point.name) || 'P') || 'P';
+    if (!usedPointNames.has(base)) {
+      usedPointNames.add(base);
+      return base;
+    }
+    for (let index = 2; ; index += 1) {
+      const candidate = base + '_' + index;
+      if (!usedPointNames.has(candidate)) {
+        usedPointNames.add(candidate);
+        return candidate;
+      }
+    }
+  };
+
+  const ensurePoint = (point: any, preferred?: string): string | null => {
+    if (!point || typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
+    if (exportedPoints.has(point)) return exportedPoints.get(point) || null;
+    const coordinates = getDgsExportPointCoordinates(point);
+    if (!coordinates) return null;
+    const name = allocatePointName(point, preferred);
+    exportedPoints.set(point, name);
+    const color = normalizeHexColor(getDgsObjectColor(point, 'line')) || '#ff00ff';
+    const opacity = point.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(point);
+    const parts = [
+      exportId,
+      cleanDgsExportToken(name),
+      formatDgsExportNumber(coordinates.x),
+      formatDgsExportNumber(coordinates.y),
+      color,
+      formatDgsExportNumber(opacity, 1)
+    ];
+    if (getDgsObjectFixed(point)) parts.push('fix');
+    pointLines.push(macroDgsExportLine(macros.point, parts.join(';')));
+    return name;
+  };
+
+  objects.forEach((object) => {
+    if (!object || object.__liaDgsPolygonBorder) return;
+    if (isDgsPoint(object)) ensurePoint(object);
+  });
+
+  const axisLabels = getDgsAxisLabels(state);
+  if (
+    normalizeDgsAxisVariable(axisLabels.x.variable) !== 'x' || String(axisLabels.x.description || '').trim() ||
+    normalizeDgsAxisVariable(axisLabels.y.variable) !== 'y' || String(axisLabels.y.description || '').trim()
+  ) {
+    objectLines.push(macroDgsExportLine(macros.axisLabel, [
+      'id=' + exportId,
+      'xlabel=' + quoteDgsExportField(formatDgsAxisLabel(axisLabels.x)),
+      'ylabel=' + quoteDgsExportField(formatDgsAxisLabel(axisLabels.y))
+    ].join(';')));
+  }
+
+  const pointList = (points: any[]): string | null => {
+    const names = points.map((point) => ensurePoint(point)).filter(Boolean) as string[];
+    return names.length === points.length ? '[' + names.map(cleanDgsExportToken).join(';') + ']' : null;
+  };
+
+  objects.forEach((object) => {
+    if (!object || isDgsPoint(object) || object.__liaDgsPolygonBorder) return;
+    const name = cleanDgsExportToken(getDgsObjectName(object));
+    const typeLabel = getDgsObjectTypeLabel(state, object);
+
+    if (isDgsText(object)) {
+      const coordinates = getDgsExportPointCoordinates(object);
+      if (!coordinates) return;
+      objectLines.push(macroDgsExportLine(macros.coordText, [
+        exportId,
+        '[' + formatDgsExportNumber(coordinates.x) + ';' + formatDgsExportNumber(coordinates.y) + ']',
+        quoteDgsExportField(object.__liaDgsTextContent || name),
+        normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff',
+        formatDgsExportNumber(object.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(object), 1)
+      ].join(';')));
+      return;
+    }
+
+    if (isDgsFunction(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      objectLines.push(macroDgsExportLine(macros.plotFunction, [
+        exportId,
+        cleanDgsExportToken(name || object.__liaDgsFunctionName || 'f'),
+        quoteDgsExportField(exportFunctionExpression(object.__liaDgsFunctionNormalized || object.__liaDgsFunctionExpression || '')),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ].join(';')));
+      return;
+    }
+
+    if (object.__liaDgsSegment && !isDgsRay(object) && !isDgsVector(object) && !isDgsLine(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      const points = pointList([object.point1, object.point2]);
+      if (!points) return;
+      const options = [name || 's'];
+      if (object.__liaDgsShowLength) options.push('length=1');
+      objectLines.push(macroDgsExportLine(macros.segment, [
+        exportId,
+        points,
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ].concat(options.filter(Boolean)).join(';')));
+      return;
+    }
+
+    if (isDgsPolygon(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      const points = pointList(Array.isArray(object.vertices) ? object.vertices : []);
+      if (!points) return;
+      const options: string[] = [];
+      if (object.__liaDgsShowArea) options.push(useGerman ? 'inhalt=1' : 'area=1');
+      if (object.__liaDgsShowPerimeter) options.push(useGerman ? 'umfang=1' : 'perimeter=1');
+      objectLines.push(macroDgsExportLine(macros.area, [
+        exportId,
+        points,
+        normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 0.25)
+      ].concat(options).join(';')));
+      return;
+    }
+
+    if (isDgsCircle(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      const centerName = ensurePoint(object.__liaDgsCircleCenter);
+      const radiusPointName = ensurePoint(object.__liaDgsCircleRadiusPoint);
+      if (!centerName) return;
+      const options: string[] = [];
+      if (radiusPointName) options.push('radius=' + cleanDgsExportToken(radiusPointName));
+      else {
+        try { options.push('radius=' + formatDgsExportNumber(Number(object.Radius()), 1)); } catch (e) {}
+      }
+      if (object.__liaDgsShowArea) options.push(useGerman ? 'inhalt=1' : 'area=1');
+      if (object.__liaDgsShowPerimeter) options.push(useGerman ? 'umfang=1' : 'circumference=1');
+      objectLines.push(macroDgsExportLine(macros.circle, [
+        exportId,
+        name || 'k',
+        cleanDgsExportToken(centerName),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 0.2)
+      ].concat(options).join(';')));
+      return;
+    }
+
+    if (isDgsAngle(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      const points = pointList(Array.isArray(object.__liaDgsAnglePoints) ? object.__liaDgsAnglePoints : []);
+      if (!points) return;
+      const options: string[] = [];
+      if (object.__liaDgsShowAngle) options.push(useGerman ? 'wert=1' : 'value=1');
+      objectLines.push(macroDgsExportLine(macros.angle, [
+        exportId,
+        name || 'alpha',
+        points,
+        normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 1)
+      ].concat(options).join(';')));
+      return;
+    }
+
+    if (isDgsSlider(object) || isDgsRay(object) || isDgsVector(object) || isDgsLine(object) ||
+        isDgsSector(object) || object.__liaDgsTangent || object.__liaDgsAngleBisector ||
+        object.__liaDgsPerpendicular || object.__liaDgsParallel) {
+      unsupported.push((name ? name + ' - ' : '') + typeLabel);
+    }
+  });
+
+  lines.push(...pointLines, ...objectLines, macroDgsExportLine(macros.dgs, exportId));
+  if (unsupported.length) {
+    lines.push('', '<!-- ' + dgsText(state.language).exportUnsupported + ': ' + unsupported.join(', ') + ' -->');
+  }
+  return lines.join('\n');
+}
+
 function renameDgsParameterReferences(state: DgsState, oldName: string, newName: string): void {
   if (!oldName || oldName === newName) return;
   const escaped = oldName.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&');
@@ -7827,6 +8211,7 @@ function setActiveTool(
   if (state.activeTool === 'angle-measured' && tool !== 'angle-measured') setAngleDialogOpen(state, false);
   if (state.activeTool === 'circle' && tool !== 'circle') clearDgsCirclePreview(state);
   if (state.activeTool === 'text' && tool !== 'text') setTextDialogOpen(state, false);
+  if (tool) setExportDialogOpen(state, false);
   state.activeTool = tool;
   renderToolState(state);
 }
@@ -7860,6 +8245,7 @@ function applyLayout(state: DgsState): void {
   state.angleDialog.style.color = tone;
   state.functionDialog.style.color = tone;
   state.textDialog.style.color = tone;
+  state.exportDialog.style.color = tone;
   state.menuBar.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.menuBar.style.setProperty('--lia-dgs-theme-color', accent);
   state.menuBar.style.setProperty('--lia-dgs-neutral-color', tone);
@@ -7875,6 +8261,8 @@ function applyLayout(state: DgsState): void {
   state.functionDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.textDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.textDialog.style.setProperty('--lia-dgs-theme-color', accent);
+  state.exportDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.exportDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
@@ -8226,6 +8614,7 @@ function setObjectListOpen(state: DgsState, open: boolean): void {
   state.sideMenu.dataset.objectListOpen = open ? '1' : '0';
   state.sideMenu.classList.toggle('has-object-list', open);
   state.objectListCloseButton.tabIndex = open ? 0 : -1;
+  state.objectListExportButton.tabIndex = open ? 0 : -1;
   if (open) refreshDgsObjectList(state, true);
   else state.objectListSignature = '';
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
@@ -8268,6 +8657,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   if (!open) setAxisScaleSubmenuOpen(state, false);
   if (!open) setFunctionDialogOpen(state, false);
   if (!open) setTextDialogOpen(state, false);
+  if (!open) setExportDialogOpen(state, false);
   if (changed) trackAxisWithMenu(state);
   if (changed) notifyRegressionLayout(state, open);
   if (changed) {
@@ -8380,6 +8770,7 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setAngleDialogOpen(state: DgsState, open: boolean): void {
+  if (open) setExportDialogOpen(state, false);
   state.angleDialogOpen = open;
   state.angleDialog.dataset.open = open ? '1' : '0';
   state.angleDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -8396,6 +8787,7 @@ function setAngleDialogOpen(state: DgsState, open: boolean): void {
 }
 
 function setFunctionDialogOpen(state: DgsState, open: boolean): void {
+  if (open) setExportDialogOpen(state, false);
   state.functionDialogOpen = open;
   state.functionDialog.dataset.open = open ? '1' : '0';
   state.functionDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -8425,6 +8817,7 @@ function createDgsFunctionFromDialog(state: DgsState): boolean {
 }
 
 function setTextDialogOpen(state: DgsState, open: boolean): void {
+  if (open) setExportDialogOpen(state, false);
   state.textDialogOpen = open;
   state.textDialog.dataset.open = open ? '1' : '0';
   state.textDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -8440,6 +8833,51 @@ function setTextDialogOpen(state: DgsState, open: boolean): void {
   } else {
     state.pendingTextPosition = null;
   }
+}
+
+function setExportDialogOpen(state: DgsState, open: boolean): void {
+  state.exportDialogOpen = open;
+  state.exportDialog.dataset.open = open ? '1' : '0';
+  state.exportDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.exportTextarea.tabIndex = open ? 0 : -1;
+  state.exportCopyButton.tabIndex = open ? 0 : -1;
+  state.exportCloseButton.tabIndex = open ? 0 : -1;
+  state.exportCopyButton.textContent = dgsText(state.language).copyExport;
+  if (open) {
+    state.exportTextarea.value = buildDgsExportMacroBlock(state);
+    window.setTimeout(() => {
+      try {
+        state.exportTextarea.focus();
+        state.exportTextarea.select();
+      } catch (e) {}
+    }, 0);
+  }
+}
+
+function copyDgsExportToClipboard(state: DgsState): void {
+  const value = String(state.exportTextarea.value || '');
+  const text = dgsText(state.language);
+  const markCopied = () => {
+    state.exportCopyButton.textContent = text.copiedExport;
+    window.setTimeout(() => {
+      if (state.exportDialogOpen) state.exportCopyButton.textContent = text.copyExport;
+    }, 1200);
+  };
+  const fallback = () => {
+    try {
+      state.exportTextarea.focus();
+      state.exportTextarea.select();
+      document.execCommand('copy');
+      markCopied();
+    } catch (e) {}
+  };
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(value).then(markCopied).catch(fallback);
+      return;
+    }
+  } catch (e) {}
+  fallback();
 }
 
 function createDgsTextFromDialog(state: DgsState): boolean {
@@ -8561,7 +8999,9 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.objectListClip?.isConnected &&
     !!existing.objectListPanel?.isConnected &&
     !!existing.objectListContent?.isConnected &&
+    !!existing.objectListFooter?.isConnected &&
     !!existing.objectListCloseButton?.isConnected &&
+    !!existing.objectListExportButton?.isConnected &&
     !!existing.nameOption?.isConnected &&
     !!existing.objectOption?.isConnected &&
     !!existing.axisLabelSection?.isConnected &&
@@ -8637,6 +9077,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.textDialogInput?.isConnected &&
     !!existing.textDialogConfirmButton?.isConnected &&
     !!existing.textDialogCancelButton?.isConnected &&
+    !!existing.exportDialog?.isConnected &&
+    !!existing.exportTextarea?.isConnected &&
+    !!existing.exportCopyButton?.isConnected &&
+    !!existing.exportCloseButton?.isConnected &&
     !!existing.measurementOption?.isConnected &&
     !!existing.measurementCheckbox?.isConnected &&
     !!existing.areaOption?.isConnected &&
@@ -8706,6 +9150,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     try { existing.angleDialog.remove(); } catch (e) {}
     try { existing.functionDialog.remove(); } catch (e) {}
     try { existing.textDialog.remove(); } catch (e) {}
+    try { existing.exportDialog.remove(); } catch (e) {}
   }
 
   const menuClip = document.createElement('div');
@@ -9076,8 +9521,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   objectListHeader.appendChild(objectListCloseButton);
   const objectListContent = document.createElement('div');
   objectListContent.className = 'lia-dgs-object-list-content';
+  const objectListFooter = document.createElement('div');
+  objectListFooter.className = 'lia-dgs-object-list-footer';
+  const objectListExportButton = document.createElement('button');
+  objectListExportButton.type = 'button';
+  objectListExportButton.className = 'lia-dgs-object-list-export';
+  objectListExportButton.textContent = text.exportMacros;
+  objectListExportButton.title = text.exportMacrosTitle;
+  objectListExportButton.setAttribute('aria-label', text.exportMacrosTitle);
+  objectListExportButton.tabIndex = -1;
+  objectListFooter.appendChild(objectListExportButton);
   objectListPanel.appendChild(objectListHeader);
   objectListPanel.appendChild(objectListContent);
+  objectListPanel.appendChild(objectListFooter);
   objectListClip.appendChild(objectListPanel);
 
   const sideMenuHeader = document.createElement('div');
@@ -9508,6 +9964,44 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   textDialog.appendChild(textDialogField);
   textDialog.appendChild(textDialogActions);
 
+  const exportDialog = document.createElement('div');
+  exportDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-export-dialog';
+  exportDialog.setAttribute('role', 'dialog');
+  exportDialog.setAttribute('aria-modal', 'true');
+  exportDialog.setAttribute('aria-hidden', 'true');
+  exportDialog.dataset.open = '0';
+  const exportDialogTitle = document.createElement('div');
+  exportDialogTitle.className = 'lia-dgs-angle-dialog-title';
+  exportDialogTitle.textContent = text.exportMacrosTitle;
+  const exportTextarea = document.createElement('textarea');
+  exportTextarea.className = 'lia-dgs-export-textarea';
+  exportTextarea.setAttribute('aria-label', text.exportMacrosTitle);
+  exportTextarea.spellcheck = false;
+  exportTextarea.readOnly = true;
+  exportTextarea.tabIndex = -1;
+  const exportDialogHint = document.createElement('div');
+  exportDialogHint.className = 'lia-dgs-function-dialog-hint';
+  exportDialogHint.textContent = text.exportHint;
+  const exportDialogActions = document.createElement('div');
+  exportDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const exportCloseButton = document.createElement('button');
+  exportCloseButton.type = 'button';
+  exportCloseButton.className = 'lia-dgs-angle-dialog-button';
+  exportCloseButton.textContent = text.closeExport;
+  exportCloseButton.tabIndex = -1;
+  const exportCopyButton = document.createElement('button');
+  exportCopyButton.type = 'button';
+  exportCopyButton.className = 'lia-dgs-angle-dialog-button';
+  exportCopyButton.dataset.primary = '1';
+  exportCopyButton.textContent = text.copyExport;
+  exportCopyButton.tabIndex = -1;
+  exportDialogActions.appendChild(exportCloseButton);
+  exportDialogActions.appendChild(exportCopyButton);
+  exportDialog.appendChild(exportDialogTitle);
+  exportDialog.appendChild(exportTextarea);
+  exportDialog.appendChild(exportDialogHint);
+  exportDialog.appendChild(exportDialogActions);
+
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'lia-dgs-menu-button';
@@ -9522,6 +10016,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   functionDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   textDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  exportDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   sideMenu.addEventListener('contextmenu', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -9538,6 +10033,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.appendChild(angleDialog);
   boardContainer.appendChild(functionDialog);
   boardContainer.appendChild(textDialog);
+  boardContainer.appendChild(exportDialog);
   boardContainer.appendChild(button);
   typesetDgsMath(pointButton);
 
@@ -9572,7 +10068,13 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     objectListClip,
     objectListPanel,
     objectListContent,
+    objectListFooter,
     objectListCloseButton,
+    objectListExportButton,
+    exportDialog,
+    exportTextarea,
+    exportCopyButton,
+    exportCloseButton,
     nameOption: nameOption.label,
     coordinateSection,
     xCoordinateInput,
@@ -9713,6 +10215,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     angleDialogOpen: false,
     functionDialogOpen: false,
     textDialogOpen: false,
+    exportDialogOpen: false,
     sideMenuOpen: false,
     objectListOpen: false,
     objectListSignature: '',
@@ -10118,6 +10621,43 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setObjectListOpen(state, false);
+  });
+
+  objectListExportButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
+    setFunctionDialogOpen(state, false);
+    setTextDialogOpen(state, false);
+    setActiveTool(state, '', false);
+    setExportDialogOpen(state, true);
+  });
+
+  exportCloseButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setExportDialogOpen(state, false);
+  });
+
+  exportCopyButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    copyDgsExportToClipboard(state);
+  });
+
+  exportTextarea.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setExportDialogOpen(state, false);
+    } else {
+      evt.stopPropagation();
+    }
   });
 
   [xCoordinateInput, yCoordinateInput].forEach((input) => {
@@ -10635,8 +11175,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   opacityInput.addEventListener('change', () => applyOpacity(true));
 
   state.onDocumentPointerDown = (evt: PointerEvent) => {
-    if (!state.colorPopupOpen) return;
     const path = typeof evt.composedPath === 'function' ? evt.composedPath() : [];
+    if (state.exportDialogOpen && !path.includes(exportDialog) && !path.includes(objectListExportButton)) {
+      setExportDialogOpen(state, false);
+    }
+    if (!state.colorPopupOpen) return;
     if (colorButtons.some((button) => path.includes(button)) || path.includes(colorPopup)) return;
     setColorPopupOpen(state, false);
   };

@@ -847,7 +847,12 @@ The final toolbar button opens an object list from the right. It contains every 
 object with its name, type, color, and current visibility. Right-clicking an entry opens the
 ordinary object-properties panel immediately to the left of the list, so both panels remain
 usable at the same time. The horizontal axis shortens by the combined visible panel width, and
-the open top menu moves both panels downward.
+the open top menu moves both panels downward. The button at the bottom of the object list opens
+a centered export dialog. It creates a fresh eight-character board id and emits the current board
+as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
+system, axis labels, points, coordinate text, function graphs, segments, polygons/areas, circles,
+and angles. Objects without standalone macros are listed in a short HTML comment so the exported
+block stays pasteable.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and
