@@ -114,6 +114,28 @@ script:   ./dist/index.js
 <span id="distance-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@Line: @LinearObject_(@uid,`@0`,line,en)
+@Gerade: @LinearObject_(@uid,`@0`,line,de)
+@Ray: @LinearObject_(@uid,`@0`,ray,en)
+@Strahl: @LinearObject_(@uid,`@0`,ray,de)
+@Vector: @LinearObject_(@uid,`@0`,vector,en)
+@Vektor: @LinearObject_(@uid,`@0`,vector,de)
+
+@LinearObject_
+<span id="linear-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)
+@Orthogonale: @RelationObject_(@uid,`@0`,orthogonal,de)
+@Parallel: @RelationObject_(@uid,`@0`,parallel,en)
+@Parallele: @RelationObject_(@uid,`@0`,parallel,de)
+@Midpoint: @RelationObject_(@uid,`@0`,midpoint,en)
+@Mittelpunkt: @RelationObject_(@uid,`@0`,midpoint,de)
+
+@RelationObject_
+<span id="relation-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
 @Area: @Area_(@uid,`@0`,en)
 @Flaeche: @Area_(@uid,`@0`,de)
 
@@ -135,11 +157,58 @@ script:   ./dist/index.js
 <span id="circle-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@Tangent: @Tangent_(@uid,`@0`,en)
+@Tangente: @Tangent_(@uid,`@0`,de)
+
+@Tangent_
+<span id="tangent-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@CircularSector: @CircularSector_(@uid,`@0`,en)
+@Sector: @CircularSector_(@uid,`@0`,en)
+@CircleSegment: @CircularSector_(@uid,`@0`,en)
+@CircularSegment: @CircularSector_(@uid,`@0`,en)
+@Kreissektor: @CircularSector_(@uid,`@0`,de)
+@Kreissegment: @CircularSector_(@uid,`@0`,de)
+
+@CircularSector_
+<span id="sector-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @PlotFunction: @PlotFunction_(@uid,`@0`)
 @PlotFunktion: @PlotFunction_(@uid,`@0`)
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Zeros: @FunctionAnalysisPoints_(@uid,`@0`,roots,en)
+@Nullstellen: @FunctionAnalysisPoints_(@uid,`@0`,roots,de)
+@Extrema: @FunctionAnalysisPoints_(@uid,`@0`,extrema,en)
+@Extrempunkte: @FunctionAnalysisPoints_(@uid,`@0`,extrema,de)
+@InflectionPoints: @FunctionAnalysisPoints_(@uid,`@0`,inflections,en)
+@Wendepunkte: @FunctionAnalysisPoints_(@uid,`@0`,inflections,de)
+
+@FunctionAnalysisPoints_
+<span id="function-analysis-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@OrdinateIntercept: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,en)
+@Ordinatenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@Ordinatenachsenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@Intersection: @ObjectAnalysisPoints_(@uid,`@0`,intersections,en)
+@Schnittpunkt: @ObjectAnalysisPoints_(@uid,`@0`,intersections,de)
+
+@ObjectAnalysisPoints_
+<span id="object-analysis-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Slider: @Slider_(@uid,`@0`,en)
+@Regler: @Slider_(@uid,`@0`,de)
+@Schieberegler: @Slider_(@uid,`@0`,de)
+
+@Slider_
+<span id="slider-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @PlotInput: @PlotInput_(@uid,`@0`)
@@ -475,6 +544,87 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 
 @Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s;length=1`)
 
+## `@Line` / `@Gerade`, `@Ray` / `@Strahl`, `@Vector` / `@Vektor`
+
+          --{{0}}--
+Creates a straight line, a ray, or a vector from two existing named points or
+from two directly supplied coordinates. Named points remain attached when they
+move; coordinate input creates fixed invisible helper points. Rays are rendered
+without arrowheads. Vectors use the JSXGraph arrow and are labelled as
+`\overrightarrow{...}`; if no explicit vector name is given, named endpoints are
+used automatically, for example `\overrightarrow{AB}`.
+
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_linear`)
+
+@Point(`ex_linear;A;-3;-1`)
+@Point(`ex_linear;B;2;2`)
+@Point(`ex_linear;C;-1;3`)
+@Point(`ex_linear;D;3;1`)
+
+@Gerade(`ex_linear;[A;B];#e63946;g`)
+@Strahl(`ex_linear;[C;D];#457b9d;r`)
+@Vektor(`ex_linear;[A;D];#ff00ff`)
+@Vector(`ex_linear;[[0;0];[2;1]];#00ffff;w`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_linear;1;1;0`)
+
+@Point(`ex_linear;A;-3;-1`)
+@Point(`ex_linear;B;2;2`)
+@Point(`ex_linear;C;-1;3`)
+@Point(`ex_linear;D;3;1`)
+
+@Gerade(`ex_linear;[A;B];#e63946;g`)
+@Strahl(`ex_linear;[C;D];#457b9d;r`)
+@Vektor(`ex_linear;[A;D];#ff00ff`)
+@Vector(`ex_linear;[[0;0];[2;1]];#00ffff;w`)
+
+## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`
+
+          --{{0}}--
+Creates a perpendicular line, a parallel line, or the midpoint of two points.
+Perpendicular and parallel lines can reference an existing named line-like
+object (`@Strecke`, `@Gerade`, `@Strahl`, `@Vektor`) or use a point pair as an
+implicit base line. The midpoint is registered as a point, so later macros can
+refer to it by name. Add `wert=1` / `value=1` to show its coordinates.
+
+Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>`
+
+Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>;wert=1`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_relations`)
+
+@Point(`ex_relations;A;-3;-1`)
+@Point(`ex_relations;B;2;2`)
+@Point(`ex_relations;C;-2;3`)
+@Point(`ex_relations;D;3;-1`)
+
+@Gerade(`ex_relations;[A;B];#e63946;g`)
+@Orthogonale(`ex_relations;g;C;#ff00ff;h`)
+@Parallel(`ex_relations;[A;B];D;#457b9d;p`)
+@Mittelpunkt(`ex_relations;[A;B];#ff00ff;M;wert=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_relations;1;1;0`)
+
+@Point(`ex_relations;A;-3;-1`)
+@Point(`ex_relations;B;2;2`)
+@Point(`ex_relations;C;-2;3`)
+@Point(`ex_relations;D;3;-1`)
+
+@Gerade(`ex_relations;[A;B];#e63946;g`)
+@Orthogonale(`ex_relations;g;C;#ff00ff;h`)
+@Parallel(`ex_relations;[A;B];D;#457b9d;p`)
+@Mittelpunkt(`ex_relations;[A;B];#ff00ff;M;wert=1`)
+
 ## `@Area` / `@Flaeche`
 
           --{{0}}--
@@ -590,6 +740,47 @@ Parameters: `<boardId>;<name>;<centerPoint>;<color>;<opacity>;radius=<number|poi
 
 @Kreis(`ex_circle;k_1;N;#00ff00;0.2;radius=1;inhalt=1;umfang=1`)
 
+## `@Tangent` / `@Tangente`, `@CircularSector` / `@Kreissektor` / `@Kreissegment`
+
+          --{{0}}--
+Creates a dependent tangent to a named function graph, line-like object, or circle.
+The contact point is given as `[x;y]`; for function graphs, the y-value is recomputed
+from the function. A line-like source can also be supplied directly as a point pair
+such as `[A;B]`, which is useful for exported polygon sides. The tangent registers
+as a named line, so intersection and ordinate-intercept macros can use it afterwards.
+The circular-sector macro uses three existing points in center--radius point--second
+arm point order. `@Kreissegment` is accepted as an alias for exported DGS sectors.
+
+Parameters for tangents: `<boardId>;<sourceName>|[<point1>;<point2>];[<x>;<y>];<color>;<lineName>;<contactPointName>`
+
+Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>];<color>;<opacity>;<name>;inhalt=1;umfang=1`
+
+``` markdown
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_tangent_sector`)
+
+@Point(`ex_tangent_sector;M;0;0`)
+@Point(`ex_tangent_sector;P;2;0`)
+@Point(`ex_tangent_sector;Q;0;2`)
+@PlotFunction(`ex_tangent_sector;f;0.25*x^2;#e63946`)
+@Kreis(`ex_tangent_sector;k;M;#457b9d;0.15;radius=P`)
+
+@Tangente(`ex_tangent_sector;f;[2;1];#ff00ff;t;T`)
+@Kreissektor(`ex_tangent_sector;[M;P;Q];#ff00ff;0.25;s;inhalt=1;umfang=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_tangent_sector`)
+
+@Point(`ex_tangent_sector;M;0;0`)
+@Point(`ex_tangent_sector;P;2;0`)
+@Point(`ex_tangent_sector;Q;0;2`)
+@PlotFunction(`ex_tangent_sector;f;0.25*x^2;#e63946`)
+@Kreis(`ex_tangent_sector;k;M;#457b9d;0.15;radius=P`)
+
+@Tangente(`ex_tangent_sector;f;[2;1];#ff00ff;t;T`)
+@Kreissegment(`ex_tangent_sector;[M;P;Q];#ff00ff;0.25;s;inhalt=1;umfang=1`)
+
 
 
 ## `@PlotFunction`
@@ -614,6 +805,70 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
 @AxisLabel(`id=ex_plot;xlabel=$x$;ylabel=$f(x)$`)
 
 @PlotFunction(`ex_plot;f;0.5*x^2-2;#b41f65`)
+
+## `@Zeros` / `@Nullstellen`, `@Extrema` / `@Extrempunkte`, `@InflectionPoints` / `@Wendepunkte`
+
+          --{{0}}--
+Creates dynamic analysis points for a named function: roots, extrema, or inflection points. The points update when the function, parameters, sliders, or the visible board range change.
+
+Parameters: `<boardId>;<funcName>;<color>;<prefix>;wert=1`
+
+Options: `names=[N_1;N_2;...]`, `wert=1` / `value=1`
+
+``` markdown
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=5;width=800;id=ex_function_analysis`)
+
+@PlotFunction(`ex_function_analysis;f;x^3-3*x+1;#e63946`)
+@Nullstellen(`ex_function_analysis;f;#ff00ff;N;wert=1`)
+@Extrempunkte(`ex_function_analysis;f;#457b9d;E;wert=1`)
+@Wendepunkte(`ex_function_analysis;f;#ff00ff;W;wert=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=5;width=800;id=ex_function_analysis`)
+
+@PlotFunction(`ex_function_analysis;f;x^3-3*x+1;#e63946`)
+@Nullstellen(`ex_function_analysis;f;#ff00ff;N;wert=1`)
+@Extrempunkte(`ex_function_analysis;f;#457b9d;E;wert=1`)
+@Wendepunkte(`ex_function_analysis;f;#ff00ff;W;wert=1`)
+
+## `@Regler` / `@Slider`, `@Ordinatenabschnitt` / `@OrdinateIntercept`, `@Schnittpunkt` / `@Intersection`
+
+          --{{0}}--
+Creates reusable parameter sliders and dependent object-analysis points. Sliders
+can be used as scalar parameters in function terms. The ordinate-intercept macro
+accepts a named function or linear object. The intersection macro accepts two
+named functions, linear objects, or circles.
+
+Parameters:
+
+- `@Regler`: `<boardId>;<name>;<min>;<max>;<step>;<value>;<color>;[[x1;y1];[x2;y2]];lockposition=1`
+- `@Ordinatenabschnitt`: `<boardId>;<objectName>;<color>;<prefix>;wert=1`
+- `@Schnittpunkt`: `<boardId>;<objectName1>;<objectName2>;<color>;<prefix>;wert=1`
+
+Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`, and for sliders
+`visible=0`, `fontsize=...`, `lockposition=1`.
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=5;width=800;id=ex_object_analysis`)
+
+@Regler(`ex_object_analysis;a;-3;3;0.1;1;#ff00ff;[[-4;4];[-2.5;4]]`)
+@PlotFunction(`ex_object_analysis;f;a*x^2-2;#e63946`)
+@Gerade(`ex_object_analysis;[[0;1];[4;3]];#457b9d;g`)
+@Ordinatenabschnitt(`ex_object_analysis;f;#ff00ff;O;wert=1`)
+@Schnittpunkt(`ex_object_analysis;f;g;#ff00ff;S;wert=1`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=5;width=800;id=ex_object_analysis`)
+
+@Regler(`ex_object_analysis;a;-3;3;0.1;1;#ff00ff;[[-4;4];[-2.5;4]]`)
+@PlotFunction(`ex_object_analysis;f;a*x^2-2;#e63946`)
+@Gerade(`ex_object_analysis;[[0;1];[4;3]];#457b9d;g`)
+@Ordinatenabschnitt(`ex_object_analysis;f;#ff00ff;O;wert=1`)
+@Schnittpunkt(`ex_object_analysis;f;g;#ff00ff;S;wert=1`)
 
 ## `@PlotInput`
 
@@ -850,9 +1105,11 @@ usable at the same time. The horizontal axis shortens by the combined visible pa
 the open top menu moves both panels downward. The button at the bottom of the object list opens
 a centered export dialog. It creates a fresh eight-character board id and emits the current board
 as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
-system, axis labels, points, coordinate text, function graphs, segments, polygons/areas, circles,
-and angles. Objects without standalone macros are listed in a short HTML comment so the exported
-block stays pasteable.
+system, axis labels, points, coordinate text, parameter sliders, function graphs, function-analysis
+points, ordinate-axis intercepts, intersections, segments, straight lines, rays, vectors,
+perpendiculars, parallels, midpoints, polygons/areas, circles, circular sectors/segments,
+tangents, and angles. Objects without standalone macros are listed in a short HTML comment so
+the exported block stays pasteable.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and
@@ -1198,6 +1455,28 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 <span id="distance-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@Line: @LinearObject_(@uid,`@0`,line,en)
+@Gerade: @LinearObject_(@uid,`@0`,line,de)
+@Ray: @LinearObject_(@uid,`@0`,ray,en)
+@Strahl: @LinearObject_(@uid,`@0`,ray,de)
+@Vector: @LinearObject_(@uid,`@0`,vector,en)
+@Vektor: @LinearObject_(@uid,`@0`,vector,de)
+
+@LinearObject_
+<span id="linear-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)
+@Orthogonale: @RelationObject_(@uid,`@0`,orthogonal,de)
+@Parallel: @RelationObject_(@uid,`@0`,parallel,en)
+@Parallele: @RelationObject_(@uid,`@0`,parallel,de)
+@Midpoint: @RelationObject_(@uid,`@0`,midpoint,en)
+@Mittelpunkt: @RelationObject_(@uid,`@0`,midpoint,de)
+
+@RelationObject_
+<span id="relation-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
 @Area: @Area_(@uid,`@0`,en)
 @Flaeche: @Area_(@uid,`@0`,de)
 
@@ -1224,6 +1503,35 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @PlotFunction_
 <span id="plot-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Zeros: @FunctionAnalysisPoints_(@uid,`@0`,roots,en)
+@Nullstellen: @FunctionAnalysisPoints_(@uid,`@0`,roots,de)
+@Extrema: @FunctionAnalysisPoints_(@uid,`@0`,extrema,en)
+@Extrempunkte: @FunctionAnalysisPoints_(@uid,`@0`,extrema,de)
+@InflectionPoints: @FunctionAnalysisPoints_(@uid,`@0`,inflections,en)
+@Wendepunkte: @FunctionAnalysisPoints_(@uid,`@0`,inflections,de)
+
+@FunctionAnalysisPoints_
+<span id="function-analysis-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@OrdinateIntercept: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,en)
+@Ordinatenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@Ordinatenachsenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@Intersection: @ObjectAnalysisPoints_(@uid,`@0`,intersections,en)
+@Schnittpunkt: @ObjectAnalysisPoints_(@uid,`@0`,intersections,de)
+
+@ObjectAnalysisPoints_
+<span id="object-analysis-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Slider: @Slider_(@uid,`@0`,en)
+@Regler: @Slider_(@uid,`@0`,de)
+@Schieberegler: @Slider_(@uid,`@0`,de)
+
+@Slider_
+<span id="slider-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @PlotInput: @PlotInput_(@uid,`@0`)

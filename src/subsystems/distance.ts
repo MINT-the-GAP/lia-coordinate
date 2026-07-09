@@ -101,6 +101,7 @@ export function init(): void {
     });
 
     delete window.__distanceEntries[key];
+    try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}
   }
 
   function removeEntry(uid: string): void {
@@ -475,6 +476,7 @@ export function init(): void {
       };
 
       try { board.update(); } catch (e) {}
+      try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}
       return true;
     } catch (e) {
       try { if (label) board.removeObject(label); } catch (removeError) {}

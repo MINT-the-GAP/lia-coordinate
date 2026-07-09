@@ -90,6 +90,36 @@ interface Window {
   __bootstrapPlotFunctions: (() => void) | undefined;
   renderPlotFunctionFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
+  // Slider subsystem (@Slider/@Regler)
+  __sliderReady: boolean | undefined;
+  __sliderEntries: Record<string, any>;
+  __sliderRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapSliders: (() => void) | undefined;
+  __bootstrapSlidersRAF: number | undefined;
+  __scheduleBootstrapSliders: (() => void) | undefined;
+  __getCoordSliderBindings: ((boardId?: string, excludeObject?: any) => Record<string, () => number>) | undefined;
+  renderSliderFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
+  // Function analysis point subsystem (@Zeros/@Nullstellen, @Extrema/@Extrempunkte, @InflectionPoints/@Wendepunkte)
+  __functionAnalysisPointsReady: boolean | undefined;
+  __functionAnalysisPointEntries: Record<string, any>;
+  __functionAnalysisPointsRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapFunctionAnalysisPoints: (() => void) | undefined;
+  __bootstrapFunctionAnalysisPointsRAF: number | undefined;
+  __scheduleBootstrapFunctionAnalysisPoints: (() => void) | undefined;
+  __scheduleFunctionAnalysisPointsForBoard: ((boardId?: string) => void) | undefined;
+  renderFunctionAnalysisPointsFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
+
+  // Object analysis point subsystem (@OrdinateIntercept/@Ordinatenabschnitt, @Intersection/@Schnittpunkt)
+  __objectAnalysisPointsReady: boolean | undefined;
+  __objectAnalysisPointEntries: Record<string, any>;
+  __objectAnalysisPointsRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapObjectAnalysisPoints: (() => void) | undefined;
+  __bootstrapObjectAnalysisPointsRAF: number | undefined;
+  __scheduleBootstrapObjectAnalysisPoints: (() => void) | undefined;
+  __scheduleObjectAnalysisPointsForBoard: ((boardId?: string) => void) | undefined;
+  renderObjectAnalysisPointsFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
+
   // PlotInput subsystem (@PlotInput)
   __plotInputReady: boolean | undefined;
   __plotInput: Record<string, any>;
@@ -148,6 +178,24 @@ interface Window {
   __scheduleBootstrapDistances: (() => void) | undefined;
   renderDistanceFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
+  // Linear object subsystem (@Line/@Gerade, @Ray/@Strahl, @Vector/@Vektor)
+  __linearObjectsReady: boolean | undefined;
+  __linearObjectEntries: Record<string, any>;
+  __linearObjectsRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapLinearObjects: (() => void) | undefined;
+  __bootstrapLinearObjectsRAF: number | undefined;
+  __scheduleBootstrapLinearObjects: (() => void) | undefined;
+  renderLinearObjectFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
+
+  // Relation object subsystem (@Perpendicular/@Orthogonale, @Parallel/@Parallele, @Midpoint/@Mittelpunkt)
+  __relationObjectsReady: boolean | undefined;
+  __relationObjectEntries: Record<string, any>;
+  __relationObjectsRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapRelationObjects: (() => void) | undefined;
+  __bootstrapRelationObjectsRAF: number | undefined;
+  __scheduleBootstrapRelationObjects: (() => void) | undefined;
+  renderRelationObjectFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
+
   // Area subsystem (@Area / @Fläche)
   __areaReady: boolean | undefined;
   __areaEntries: Record<string, any>;
@@ -183,6 +231,17 @@ interface Window {
   __bootstrapCirclesRAF: number | undefined;
   __scheduleBootstrapCircles: (() => void) | undefined;
   renderCircleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
+  // Tangent and circular-sector subsystem (@Tangent/@Tangente, @CircularSector/@Kreissektor/@Kreissegment)
+  __tangentSectorReady: boolean | undefined;
+  __tangentEntries: Record<string, any>;
+  __sectorEntries: Record<string, any>;
+  __tangentSectorRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapTangentSectorObjects: (() => void) | undefined;
+  __bootstrapTangentSectorObjectsRAF: number | undefined;
+  __scheduleBootstrapTangentSectorObjects: (() => void) | undefined;
+  renderTangentFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+  renderCircularSectorFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
   // Schar subsystem (@Schar)
   __scharReady: boolean | undefined;

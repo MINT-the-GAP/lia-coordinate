@@ -2,15 +2,21 @@
 
 import { init as initAxisTitle } from './subsystems/axisTitle';
 import { init as initCreatePoint } from './subsystems/createPoint';
+import { init as initSlider } from './subsystems/slider';
 import { init as initPlotFunction } from './subsystems/plotFunction';
 import { init as initPlotInput } from './subsystems/plotInput';
 import { init as initPointOnGraph } from './subsystems/pointOnGraph';
 import { init as initPointsOnGraph } from './subsystems/pointsOnGraph';
+import { init as initFunctionAnalysisPoints } from './subsystems/functionAnalysisPoints';
+import { init as initObjectAnalysisPoints } from './subsystems/objectAnalysisPoints';
 import { init as initDistance } from './subsystems/distance';
+import { init as initLinearObjects } from './subsystems/linearObjects';
+import { init as initRelationObjects } from './subsystems/relationObjects';
 import { init as initArea } from './subsystems/area';
 import { init as initAngle } from './subsystems/angle';
 import { init as initCoordText } from './subsystems/coordText';
 import { init as initCircle } from './subsystems/circle';
+import { init as initTangentSector } from './subsystems/tangentSector';
 import { init as initSchar } from './subsystems/schar';
 import { init as initTable } from './subsystems/table';
 import { init as initReconstruction } from './subsystems/reconstruction';
@@ -93,15 +99,21 @@ window.__coord = {
 
 initAxisTitle();
 initCreatePoint();
+initSlider();
 initPlotFunction();
 initPlotInput();
 initPointOnGraph();
 initPointsOnGraph();
+initFunctionAnalysisPoints();
 initDistance();
+initLinearObjects();
+initRelationObjects();
 initArea();
 initAngle();
 initCoordText();
 initCircle();
+initTangentSector();
+initObjectAnalysisPoints();
 initSchar();
 initTable();
 initReconstruction();

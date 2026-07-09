@@ -2,6 +2,7 @@
 // Renders a function graph from a mathematical expression onto a JSXGraph board.
 
 import { splitTopLevel, unquote } from '../shared/parser';
+import { compileFunctionExpression } from '../shared/functionExpression';
 
 export function init(): void {
   if (window.__plotFunctionReady) {
@@ -60,6 +61,7 @@ export function init(): void {
     } catch (e) {}
 
     delete window.__plotFunctionEntries[key];
+    try { if (window.__scheduleFunctionAnalysisPointsForBoard) window.__scheduleFunctionAnalysisPointsForBoard(entry.boardId); } catch (e) {}
   }
 
   function sameBoard(a, b) {
@@ -87,42 +89,13 @@ export function init(): void {
     return s.trim();
   }
 
-  function compileExpr(expr) {
-    const s = normalizeExpr(expr);
-
+  function compileExpr(expr, boardId) {
     try {
-      return new Function(
-        'x',
-        `
-        const pi = Math.PI;
-        const e = Math.E;
-
-        const sin = Math.sin;
-        const cos = Math.cos;
-        const tan = Math.tan;
-        const asin = Math.asin;
-        const acos = Math.acos;
-        const atan = Math.atan;
-
-        const sinh = Math.sinh;
-        const cosh = Math.cosh;
-        const tanh = Math.tanh;
-
-        const exp = Math.exp;
-        const log = Math.log;
-        const ln = Math.log;
-        const sqrt = Math.sqrt;
-        const abs = Math.abs;
-        const floor = Math.floor;
-        const ceil = Math.ceil;
-        const round = Math.round;
-        const min = Math.min;
-        const max = Math.max;
-        const pow = Math.pow;
-
-        return (${s});
-        `
-      );
+      const sliderBindings = typeof window.__getCoordSliderBindings === 'function'
+        ? window.__getCoordSliderBindings(boardId)
+        : {};
+      const compiled = compileFunctionExpression(expr, {}, sliderBindings);
+      return compiled.fn;
     } catch (e) {
       return null;
     }
@@ -275,7 +248,7 @@ export function init(): void {
 
     removeExisting(uid);
 
-    const fn = compileExpr(expr);
+    const fn = compileExpr(expr, boardId);
     if (!fn) return false;
 
     try {
@@ -289,6 +262,8 @@ export function init(): void {
         fixed: true,
         withLabel: false
       });
+      graph.__liaPlotFunctionName = name;
+      graph.__liaPlotFunctionExpression = expr;
 
       const labelPack = createFunctionLabel(board, fn, name, color);
 
@@ -304,6 +279,8 @@ export function init(): void {
       };
 
       try { board.update(); } catch (e) {}
+      try { if (window.__scheduleBootstrapFunctionAnalysisPoints) window.__scheduleBootstrapFunctionAnalysisPoints(); } catch (e) {}
+      try { if (window.__scheduleFunctionAnalysisPointsForBoard) window.__scheduleFunctionAnalysisPointsForBoard(boardId); } catch (e) {}
       return true;
     } catch (e) {
       return false;
