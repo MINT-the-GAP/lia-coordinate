@@ -2,7 +2,7 @@
 // @InflectionPoints/@Wendepunkte macros). Creates dynamic points for function
 // roots, extrema, and inflection points in the current visible x-range.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -16,6 +16,8 @@ interface AnalysisPointConfig {
   hasExplicitColor: boolean;
   prefix: string;
   explicitNames: string[];
+  explicitNameVisibility: boolean[];
+  showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
 }
@@ -35,6 +37,8 @@ interface AnalysisEntry {
   hasExplicitColor: boolean;
   prefix: string;
   explicitNames: string[];
+  explicitNameVisibility: boolean[];
+  showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
   board: any;
@@ -75,15 +79,18 @@ export function init(): void {
     return /^(wert|value|koordinaten|coordinates)\s*=\s*1$/i.test(String(part || '').trim());
   }
 
-  function parseNamesList(value: string): string[] {
+  function parseNamesList(value: string): Array<{ name: string; showName: boolean }> {
     let raw = String(value || '').trim();
     const match = raw.match(/^names?\s*=\s*(.+)$/i);
     if (match) raw = String(match[1] || '').trim();
     raw = unquote(raw);
     if (raw.startsWith('[') && raw.endsWith(']')) raw = raw.slice(1, -1);
     return splitTopLevel(raw, ';')
-      .map(function(part) { return cleanName(unquote(part)); })
-      .filter(Boolean);
+      .map(function(part) {
+        const parsed = parseMacroName(unquote(part));
+        return { name: cleanName(parsed.name), showName: parsed.showName };
+      })
+      .filter(function(parsed) { return !!parsed.name; });
   }
 
   function parseAnalysisSpec(spec: string, kind: string, language?: string): AnalysisPointConfig {
@@ -95,23 +102,29 @@ export function init(): void {
     const trailingOptions = parts.slice(3)
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
-    const namesOption = trailingOptions.find(function(part) { return /^names?\s*=/i.test(part); }) || '';
+    const namesOption = trailingOptions.find(function(part) {
+      return !isHiddenNameOption(part) && /^names?\s*=/i.test(part);
+    }) || '';
     const prefixOption = trailingOptions.map(function(part) {
       const match = part.match(/^prefix\s*=\s*(.+)$/i);
-      return match ? cleanName(match[1]) : '';
+      return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
     const positionalPrefix = trailingOptions.find(function(part) {
-      return !isValueOption(part) && !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
+      return !isValueOption(part) && !isHiddenNameOption(part) &&
+        !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
     }) || '';
-    const prefix = cleanName(prefixOption || positionalPrefix) || defaultPrefix(analysisKind, languageValue);
+    const parsedPrefix = parseMacroName(prefixOption || positionalPrefix, defaultPrefix(analysisKind, languageValue));
+    const parsedNames = namesOption ? parseNamesList(namesOption) : [];
     return {
       boardId: String(parts[0] || '').trim(),
       kind: analysisKind,
       sourceName: cleanName(parts[1] || ''),
       color: explicitColor || '#ff00ff',
       hasExplicitColor: !!explicitColor,
-      prefix,
-      explicitNames: namesOption ? parseNamesList(namesOption) : [],
+      prefix: cleanName(parsedPrefix.name) || defaultPrefix(analysisKind, languageValue),
+      explicitNames: parsedNames.map(function(parsed) { return parsed.name; }),
+      explicitNameVisibility: parsedNames.map(function(parsed) { return parsed.showName; }),
+      showName: parsedPrefix.showName && !trailingOptions.some(isHiddenNameOption),
       language: languageValue,
       showValue: trailingOptions.some(isValueOption)
     };
@@ -151,13 +164,20 @@ export function init(): void {
 
   function pointLabelText(entry: AnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
-    if (!entry.showValue) return '\\(' + name + '\\)';
+    const showName = pointNameVisible(entry, index);
+    if (!entry.showValue) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
     if (entry.kind === 'roots') {
-      return '\\(' + name + '\\; x = ' + formatNumber(holder.x, entry.language) + '\\)';
+      return '\\(' + (showName ? name + '\\; ' : '') + 'x = ' + formatNumber(holder.x, entry.language) + '\\)';
     }
-    return '\\(' + name + '\\; (' + formatNumber(holder.x, entry.language) + '\\mid ' +
+    return '\\(' + (showName ? name + '\\; ' : '') + '(' + formatNumber(holder.x, entry.language) + '\\mid ' +
       formatNumber(holder.y, entry.language) + ')\\)';
+  }
+
+  function pointNameVisible(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
+    if (entry.showName === false) return false;
+    if (entry.explicitNames[index]) return entry.explicitNameVisibility[index] !== false;
+    return true;
   }
 
   function keepPointLabelOnOneLine(point: any): void {
@@ -398,6 +418,7 @@ export function init(): void {
 
   function applyPointVisual(entry: AnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
+    const labelVisible = pointNameVisible(entry, index) || entry.showValue;
     try {
       point.setAttribute({
         strokeColor: entry.color,
@@ -420,6 +441,7 @@ export function init(): void {
       }
       if (point.label && typeof point.label.setAttribute === 'function') {
         point.label.setAttribute({
+          visible: labelVisible,
           strokeColor: labelColor,
           fillColor: labelColor,
           fontSize: 24,
@@ -428,10 +450,14 @@ export function init(): void {
           cssStyle: 'white-space: nowrap; width: max-content; max-width: none;'
         });
       }
+      if (point.label && labelVisible && typeof point.label.showElement === 'function') point.label.showElement();
+      if (point.label && !labelVisible && typeof point.label.hideElement === 'function') point.label.hideElement();
       keepPointLabelOnOneLine(point);
       requestAnimationFrame(function() { keepPointLabelOnOneLine(point); });
     } catch (e) {}
     point.__liaPointVisual = { color: entry.color, opacity: 1, hasExplicitColor: entry.hasExplicitColor };
+    point.__liaDgsShowName = pointNameVisible(entry, index);
+    point.__liaDgsShowValue = entry.showValue;
   }
 
   function createAnalysisPoint(entry: AnalysisEntry, index: number): any | null {
@@ -445,7 +471,7 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: true,
+        withLabel: pointNameVisible(entry, index) || entry.showValue,
         showInfobox: false,
         strokeColor: entry.color,
         fillColor: entry.color,
@@ -468,7 +494,7 @@ export function init(): void {
       point.__liaFunctionAnalysisKind = entry.kind;
       point.__liaFunctionAnalysisPointName = name;
       point.__liaDgsPointName = name;
-      point.__liaDgsShowName = true;
+      point.__liaDgsShowName = pointNameVisible(entry, index);
       point.__liaDgsShowValue = entry.showValue;
       point.__liaDgsShowObject = true;
       point.__liaDgsColor = entry.color;
@@ -592,7 +618,9 @@ export function init(): void {
     const old = window.__functionAnalysisPointEntries[key] as AnalysisEntry | undefined;
     if (old && old.board === board && old.kind === cfg.kind && old.sourceName === cfg.sourceName &&
         old.prefix === cfg.prefix && old.language === cfg.language && old.showValue === cfg.showValue &&
-        old.explicitNames.join('\n') === cfg.explicitNames.join('\n')) {
+        old.showName === cfg.showName &&
+        old.explicitNames.join('\n') === cfg.explicitNames.join('\n') &&
+        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n')) {
       old.source = source;
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
@@ -610,6 +638,8 @@ export function init(): void {
       hasExplicitColor: cfg.hasExplicitColor,
       prefix: cfg.prefix,
       explicitNames: cfg.explicitNames.slice(),
+      explicitNameVisibility: cfg.explicitNameVisibility.slice(),
+      showName: cfg.showName,
       language: cfg.language,
       showValue: cfg.showValue,
       board,

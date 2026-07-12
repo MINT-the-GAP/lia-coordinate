@@ -1,13 +1,14 @@
 // Circle subsystem (@Circle / @Kreis macros).
 // Creates a circle around a named point with optional area and circumference.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
 interface CircleConfig {
   boardId: string;
   name: string;
+  showName: boolean;
   centerName: string;
   color: string;
   hasExplicitColor: boolean;
@@ -44,6 +45,7 @@ export function init(): void {
     const options = parts.slice(5).map(function(option) {
       return String(option || '').trim();
     });
+    const name = parseMacroName(parts[1] || '');
     let radius = 1;
     let radiusPointName = '';
 
@@ -64,7 +66,8 @@ export function init(): void {
 
     return {
       boardId: String(parts[0] || '').trim(),
-      name: String(parts[1] || '').trim(),
+      name: name.name,
+      showName: name.showName && !options.some(isHiddenNameOption),
       centerName: String(parts[2] || '').trim(),
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
@@ -203,7 +206,7 @@ export function init(): void {
   }
 
   function createNameLabel(board: any, center: any, radiusPoint: any, cfg: CircleConfig): any {
-    if (!cfg.name) return null;
+    if (!cfg.showName || !cfg.name) return null;
 
     return board.create('text', [
       function() {
@@ -280,12 +283,13 @@ export function init(): void {
       old.radiusPoint === radiusPoint &&
       old.radiusPointName === cfg.radiusPointName &&
       old.name === cfg.name &&
+      old.showName === cfg.showName &&
       old.radius === cfg.radius &&
       old.language === cfg.language &&
       old.showArea === cfg.showArea &&
       old.showCircumference === cfg.showCircumference &&
       old.circle &&
-      (!cfg.name || old.nameLabel) &&
+      (!(cfg.showName && cfg.name) || old.nameLabel) &&
       (!(cfg.showArea || cfg.showCircumference) || old.measurementLabel)
     ) {
       old.color = cfg.color;
@@ -318,6 +322,7 @@ export function init(): void {
         fillOpacity: cfg.opacity,
         highlightFillOpacity: cfg.opacity
       });
+      circle.__liaDgsShowName = cfg.showName;
       applyCircleStyle(circle, cfg.color, cfg.opacity);
       nameLabel = createNameLabel(board, center, radiusPoint, cfg);
       measurementLabel = createMeasurementLabel(board, center, radiusPoint, cfg);
@@ -326,6 +331,7 @@ export function init(): void {
         uid: String(uid),
         boardId: cfg.boardId,
         name: cfg.name,
+        showName: cfg.showName,
         centerName: cfg.centerName,
         center: center,
         radiusPointName: cfg.radiusPointName,

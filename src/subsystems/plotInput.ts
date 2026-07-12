@@ -1,7 +1,7 @@
 // Plot input subsystem (@PlotInput macro).
 // Allows students to type a LaTeX formula and see it plotted live on a JSXGraph board.
 
-import { splitTopLevel as sharedSplitTopLevel } from '../shared/parser';
+import { parseMacroName, splitTopLevel as sharedSplitTopLevel } from '../shared/parser';
 import { getNeutralColor, themeDoc, themeWin, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { compileFunctionExpression } from '../shared/functionExpression';
@@ -36,10 +36,12 @@ export function init(): void {
 
   H.parseInputSpec = function(spec){
     const parts = sharedSplitTopLevel(String(spec || '').trim(), ';');
+    const name = parseMacroName(parts[1] || 'f', 'f');
 
     return {
       boardId: parts[0] || 'A1',
-      name: parts[1] || 'f',
+      name: name.name,
+      showName: name.showName,
       color: parts[2] || '#b41f65',
       placeholder: parts[3] || 'e.g. \\frac{1}{2}x^2 - 1',
       dx: H.numOr(parts, 4, 0.18),
@@ -561,9 +563,19 @@ export function init(): void {
         state[key] = null;
       }
     });
+    state.fn = null;
+  };
+
+  H.removeFunctionLabel = function(board, state) {
+    ['text', 'anchor'].forEach(function(key) {
+      if (!state[key]) return;
+      try { board.removeObject(state[key]); } catch (e) {}
+      state[key] = null;
+    });
   };
 
   H.createFunctionLabel = function(board, fn, state) {
+    if (state.showName === false) return { anchor: null, label: null };
     const labelText = H.texName(state.name);
 
     const anchor = board.create('point', [
@@ -638,6 +650,9 @@ export function init(): void {
       vectorContent: 2,
       plotpoints: false
     });
+    state.graph.__liaPlotInputName = state.name;
+    state.graph.__liaDgsShowName = state.showName !== false;
+    state.fn = fn;
 
     const labelPack = H.createFunctionLabel(board, fn, state);
     state.anchor = labelPack.anchor;
@@ -668,16 +683,38 @@ export function init(): void {
     const cfg = H.parseInputSpec(spec);
     const state = window.__plotInputStates[uid] || (window.__plotInputStates[uid] = {});
     const inst = window.__plotInputInstances[uid] || (window.__plotInputInstances[uid] = {});
+    const labelConfigChanged = state.name !== cfg.name ||
+      state.showName !== cfg.showName ||
+      state.color !== cfg.color ||
+      state.dx !== cfg.dx ||
+      state.dy !== cfg.dy ||
+      state.labelFontSize !== cfg.labelFontSize;
 
     state.uid = uid;
     state.boardId = cfg.boardId;
     state.name = cfg.name;
+    state.showName = cfg.showName;
     state.color = cfg.color;
     state.placeholder = cfg.placeholder;
     state.dx = cfg.dx;
     state.dy = cfg.dy;
     state.strokeWidth = cfg.strokeWidth;
     state.labelFontSize = cfg.labelFontSize;
+
+    if (state.graph && labelConfigChanged) {
+      const board = window.__boards && window.__boards[state.boardId];
+      if (board) {
+        H.removeFunctionLabel(board, state);
+        if (state.showName !== false && typeof state.fn === 'function') {
+          const labelPack = H.createFunctionLabel(board, state.fn, state);
+          state.anchor = labelPack.anchor;
+          state.text = labelPack.label;
+        }
+        state.graph.__liaPlotInputName = state.name;
+        state.graph.__liaDgsShowName = state.showName !== false;
+        try { board.update(); } catch (e) {}
+      }
+    }
 
     function hasFullInstance(instance) {
       return !!(

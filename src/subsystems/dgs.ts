@@ -2,7 +2,7 @@
 // Adds a menu button and a sliding top menu bar to a coordinate board.
 
 import { scheduleBootstrap } from '../shared/bootstrap';
-import { unquote } from '../shared/parser';
+import { formatMacroName, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import {
   compileFunctionExpression,
@@ -6324,7 +6324,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
     const opacity = point.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(point);
     const parts = [
       exportId,
-      cleanDgsExportToken(name),
+      formatMacroName(cleanDgsExportToken(name), point.__liaDgsShowName !== false),
       formatDgsExportNumber(coordinates.x),
       formatDgsExportNumber(coordinates.y),
       color,
@@ -6370,7 +6370,12 @@ function buildDgsExportMacroBlock(state: DgsState): string {
     const analysisPoints = Array.isArray(construction.points) ? construction.points : [];
     const options: string[] = [];
     const names = analysisPoints.map((point: any) => ensurePoint(point, point && point.__liaDgsPointName)).filter(Boolean) as string[];
-    if (names.length) options.push('names=[' + names.map(cleanDgsExportToken).join(';') + ']');
+    if (names.length) {
+      options.push('names=[' + names.map((name, index) => formatMacroName(
+        cleanDgsExportToken(name),
+        analysisPoints[index] && analysisPoints[index].__liaDgsShowName !== false
+      )).join(';') + ']');
+    }
     if (analysisPoints.some((point: any) => !!(point && point.__liaDgsShowValue))) {
       options.push(useGerman ? 'wert=1' : 'value=1');
     }
@@ -6393,7 +6398,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       exportId,
       points,
       normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
-      cleanDgsExportToken(midpointName)
+      formatMacroName(cleanDgsExportToken(midpointName), object.__liaDgsShowName !== false)
     ].concat(options).join(';')));
   });
 
@@ -6417,7 +6422,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
     }
     sliderLines.push(macroDgsExportLine(macros.slider, [
       exportId,
-      cleanDgsExportToken(sliderName),
+      formatMacroName(cleanDgsExportToken(sliderName), object.__liaDgsShowName !== false),
       formatDgsExportNumber(Number(object.__liaDgsSliderMinimum), -5),
       formatDgsExportNumber(Number(object.__liaDgsSliderMaximum), 5),
       formatDgsExportNumber(Number(object.__liaDgsSliderStep), 0.1),
@@ -6453,7 +6458,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       const sourceName = cleanDgsExportToken(name || object.__liaDgsFunctionName || 'f');
       objectLines.push(macroDgsExportLine(macros.plotFunction, [
         exportId,
-        sourceName,
+        formatMacroName(sourceName, object.__liaDgsShowName !== false),
         quoteDgsExportField(exportFunctionExpression(object.__liaDgsFunctionNormalized || object.__liaDgsFunctionExpression || '')),
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
       ].join(';')));
@@ -6493,9 +6498,11 @@ function buildDgsExportMacroBlock(state: DgsState): string {
         sourceReference,
         contact,
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
-        sourceName
+        formatMacroName(sourceName, object.__liaDgsShowName !== false)
       ];
-      if (pointName) parts.push(pointName);
+      if (pointName) {
+        parts.push(formatMacroName(pointName, contactPoint && contactPoint.__liaDgsShowName !== false));
+      }
       objectLines.push(macroDgsExportLine(macros.tangent, parts.join(';')));
       exportedObjectNames.set(object, sourceName);
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
@@ -6507,7 +6514,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       const points = pointList([object.point1, object.point2]);
       if (!points) return;
       const sourceName = cleanDgsExportToken(name || 's');
-      const options = [sourceName];
+      const options = [formatMacroName(sourceName, object.__liaDgsShowName !== false)];
       if (object.__liaDgsShowLength) options.push('length=1');
       objectLines.push(macroDgsExportLine(macros.segment, [
         exportId,
@@ -6539,7 +6546,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
         cleanDgsExportToken(throughName),
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
       ];
-      if (sourceName) parts.push(sourceName);
+      if (sourceName) parts.push(formatMacroName(sourceName, object.__liaDgsShowName !== false));
       objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
       exportedObjectNames.set(object, sourceName);
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
@@ -6558,7 +6565,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
         points,
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
       ];
-      if (sourceName) parts.push(sourceName);
+      if (sourceName) parts.push(formatMacroName(sourceName, object.__liaDgsShowName !== false));
       objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
       exportedObjectNames.set(object, sourceName);
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
@@ -6596,7 +6603,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       const sourceName = cleanDgsExportToken(name || 'k');
       objectLines.push(macroDgsExportLine(macros.circle, [
         exportId,
-        sourceName,
+        formatMacroName(sourceName, object.__liaDgsShowName !== false),
         cleanDgsExportToken(centerName),
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
         formatDgsExportNumber(getDgsObjectOpacity(object), 0.2)
@@ -6622,7 +6629,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
         points,
         normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
         formatDgsExportNumber(getDgsObjectOpacity(object), 0.2),
-        sourceName
+        formatMacroName(sourceName, object.__liaDgsShowName !== false)
       ].concat(options).join(';')));
       return;
     }
@@ -6635,7 +6642,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       if (object.__liaDgsShowAngle) options.push(useGerman ? 'wert=1' : 'value=1');
       objectLines.push(macroDgsExportLine(macros.angle, [
         exportId,
-        name || 'alpha',
+        formatMacroName(name || 'alpha', object.__liaDgsShowName !== false),
         points,
         normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
         formatDgsExportNumber(getDgsObjectOpacity(object), 1)

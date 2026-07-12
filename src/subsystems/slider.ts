@@ -2,7 +2,14 @@
 // Creates JSXGraph parameter sliders that can be used as scalar variables by
 // function expressions and DGS-dependent objects.
 
-import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import {
+  CoordinatePair,
+  isHiddenNameOption,
+  parseCoordinateList,
+  parseMacroName,
+  splitTopLevel,
+  unquote
+} from '../shared/parser';
 import { initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -18,6 +25,7 @@ interface SliderConfig {
   position: CoordinatePair[] | null;
   lockPosition: boolean;
   showObject: boolean;
+  showName: boolean;
   fontSize: number;
   language: 'de' | 'en';
 }
@@ -72,7 +80,8 @@ export function init(): void {
   }
 
   function isOption(value: string): boolean {
-    return /^(?:lockposition|positionlocked|lock|fix|fixed|visible|show|anzeigen|fontsize|font-size|schriftgroesse|schriftgröße|position)\s*=/i.test(value) ||
+    return isHiddenNameOption(value) ||
+      /^(?:lockposition|positionlocked|lock|fix|fixed|visible|show|anzeigen|fontsize|font-size|schriftgroesse|schriftgröße|position)\s*=/i.test(value) ||
       /^(?:lockposition|positionlocked|lock|fix|fixed)$/i.test(value);
   }
 
@@ -87,6 +96,7 @@ export function init(): void {
   function parseSliderSpec(spec: string, language?: string): SliderConfig {
     const parts = splitTopLevel(unquote(String(spec || '')), ';')
       .map(function(part) { return unquote(part).trim(); });
+    const parsedName = parseMacroName(parts[1] || 'a', 'a');
     const settings = normalizeSliderSettings(parts[2], parts[3], parts[4], parts[5]) || {
       minimum: -5,
       maximum: 5,
@@ -107,10 +117,15 @@ export function init(): void {
     let position: CoordinatePair[] | null = null;
     let lockPosition = false;
     let showObject = true;
+    let showName = parsedName.showName;
     let fontSize = 18;
     parts.slice(optionStart).forEach(function(option) {
       const raw = String(option || '').trim();
       if (!raw) return;
+      if (isHiddenNameOption(raw)) {
+        showName = false;
+        return;
+      }
       const parsedPosition = parsePositionOption(raw);
       if (parsedPosition) {
         position = parsedPosition;
@@ -138,7 +153,7 @@ export function init(): void {
 
     return {
       boardId: String(parts[0] || '').trim(),
-      name: normalizeParameterName(parts[1] || 'a'),
+      name: normalizeParameterName(parsedName.name),
       minimum: settings.minimum,
       maximum: settings.maximum,
       step: settings.step,
@@ -148,6 +163,7 @@ export function init(): void {
       position,
       lockPosition,
       showObject,
+      showName,
       fontSize,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
     };
@@ -261,6 +277,7 @@ export function init(): void {
   function applySliderVisual(slider: any, cfg: SliderConfig): void {
     if (!slider) return;
     const visible = cfg.showObject !== false;
+    slider.__liaDgsShowName = cfg.showName;
     try {
       slider.setAttribute({
         name: cfg.name,
@@ -299,7 +316,7 @@ export function init(): void {
       }
       if (slider.label && typeof slider.label.setAttribute === 'function') {
         slider.label.setAttribute({
-          visible,
+          visible: visible && cfg.showName,
           strokeColor: cfg.color,
           fillColor: cfg.color,
           fontSize: cfg.fontSize,
@@ -307,6 +324,8 @@ export function init(): void {
           useMathJax: true
         });
       }
+      if (slider.label && visible && cfg.showName && typeof slider.label.showElement === 'function') slider.label.showElement();
+      if (slider.label && (!visible || !cfg.showName) && typeof slider.label.hideElement === 'function') slider.label.hideElement();
     } catch (e) {}
   }
 
@@ -380,6 +399,7 @@ export function init(): void {
     if (old && old.board === board && old.name === cfg.name && old.minimum === cfg.minimum &&
         old.maximum === cfg.maximum && old.step === cfg.step && old.color === cfg.color &&
         old.lockPosition === cfg.lockPosition && old.showObject === cfg.showObject &&
+        old.showName === cfg.showName &&
         old.fontSize === cfg.fontSize && old.language === cfg.language &&
         JSON.stringify(old.position || null) === JSON.stringify(cfg.position || null)) {
       try {
@@ -429,7 +449,7 @@ export function init(): void {
       slider.__liaDgsSliderStep = cfg.step;
       slider.__liaDgsSliderValue = cfg.value;
       slider.__liaDgsSliderPositionLocked = cfg.lockPosition;
-      slider.__liaDgsShowName = true;
+      slider.__liaDgsShowName = cfg.showName;
       slider.__liaDgsShowObject = cfg.showObject;
       slider.__liaDgsOpacity = cfg.showObject ? 1 : 0;
       slider.__liaDgsFormatFontSize = cfg.fontSize;
@@ -466,6 +486,7 @@ export function init(): void {
         position: cfg.position ? cfg.position.map(function(point) { return { x: point.x, y: point.y }; }) : null,
         lockPosition: cfg.lockPosition,
         showObject: cfg.showObject,
+        showName: cfg.showName,
         fontSize: cfg.fontSize,
         language: cfg.language,
         board,

@@ -83,6 +83,39 @@ export function unquote(v: string): string {
   return s;
 }
 
+export interface MacroNameSpec {
+  name: string;
+  showName: boolean;
+}
+
+/**
+ * Parse a macro name and its optional visibility suffix.
+ *
+ * A terminal `=0` belongs to the display setting, not to the technical
+ * object name: `a=0` therefore keeps the identity `a` while hiding its
+ * label. Without that exact suffix the name is visible by default.
+ */
+export function parseMacroName(value: unknown, fallback = ''): MacroNameSpec {
+  const input = unquote(String(value == null ? '' : value)).trim() ||
+    unquote(String(fallback == null ? '' : fallback)).trim();
+  const hidden = input.match(/^(.+?)\s*=\s*0$/);
+  if (hidden && String(hidden[1] || '').trim()) {
+    return { name: String(hidden[1] || '').trim(), showName: false };
+  }
+  return { name: input, showName: true };
+}
+
+/** Exact standalone visibility option used where a macro has an auto-name. */
+export function isHiddenNameOption(value: unknown): boolean {
+  return /^name\s*=\s*0$/i.test(String(value == null ? '' : value).trim());
+}
+
+/** Serialize a technical name back into the public macro name slot. */
+export function formatMacroName(name: unknown, showName: boolean): string {
+  const value = String(name == null ? '' : name).trim();
+  return value && showName === false ? value + '=0' : value;
+}
+
 export interface CoordinatePair {
   x: number;
   y: number;

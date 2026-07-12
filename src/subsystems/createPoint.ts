@@ -1,7 +1,7 @@
 // Create-point subsystem (@CreatePoint and @Point macros).
 // Handles draggable student points and pre-placed static points on a JSXGraph board.
 
-import { unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -57,14 +57,20 @@ export function init(): void {
 
   function getPointTargetFromSpec(spec) {
     const parts = splitSpec(spec);
-    const colorToken = String(parts[4] || '').trim();
+    const parsedName = parseMacroName(parts[1] || 'A', 'A');
+    const rawOptions = parts.slice(4);
+    const visualOptions = rawOptions.filter(function(option) {
+      return !isHiddenNameOption(option);
+    });
+    const colorToken = String(visualOptions[0] || '').trim();
     const hasExplicitColor = !!colorToken && !parseFixToken(colorToken);
-    const opacityToken = String(parts[5] || '').trim();
+    const opacityToken = String(visualOptions[1] || '').trim();
     const parsedOpacity = parseFloat(opacityToken.replace(',', '.'));
 
     return {
       boardId: parts[0] || '',
-      name: parts[1] || 'A',
+      name: parsedName.name || 'A',
+      showName: parsedName.showName && !rawOptions.some(isHiddenNameOption),
       tx: parseFloat((parts[2] || '').replace(',', '.')),
       ty: parseFloat((parts[3] || '').replace(',', '.')),
       color: hasExplicitColor ? colorToken : '#ff00ff',
@@ -72,7 +78,7 @@ export function init(): void {
       opacity: Number.isFinite(parsedOpacity)
         ? Math.max(0, Math.min(1, parsedOpacity))
         : 1,
-      fixed: parts.slice(4).some(parseFixToken)
+      fixed: visualOptions.some(parseFixToken)
     };
   }
 
@@ -86,6 +92,7 @@ export function init(): void {
     const opacity = visual && Number.isFinite(Number(visual.opacity))
       ? Math.max(0, Math.min(1, Number(visual.opacity)))
       : 1;
+    const showName = pt.__liaDgsShowName !== false;
 
     try {
       pt.setAttribute({
@@ -96,6 +103,7 @@ export function init(): void {
           fillOpacity: opacity,
           highlightStrokeOpacity: opacity,
           highlightFillOpacity: opacity,
+          visible: showName,
           fontSize: 24,
           parse: false,
           useMathJax: true
@@ -112,6 +120,7 @@ export function init(): void {
           fillOpacity: opacity,
           highlightStrokeOpacity: opacity,
           highlightFillOpacity: opacity,
+          visible: showName,
           fontSize: 24,
           parse: false,
           useMathJax: true
@@ -120,8 +129,13 @@ export function init(): void {
     } catch (e) {}
 
     try {
+      if (pt.label && showName && typeof pt.label.showElement === 'function') pt.label.showElement();
+      if (pt.label && !showName && typeof pt.label.hideElement === 'function') pt.label.hideElement();
+    } catch (e) {}
+
+    try {
       if (pt.label && pt.label.rendNode && pt.label.rendNode.style) {
-        pt.label.rendNode.style.opacity = String(opacity);
+        pt.label.rendNode.style.opacity = String(showName ? opacity : 0);
       }
     } catch (e) {}
   }
@@ -139,6 +153,8 @@ export function init(): void {
       opacity: opacity,
       hasExplicitColor: !!target.hasExplicitColor
     };
+    pt.__liaDgsPointName = String(target.name || '');
+    pt.__liaDgsShowName = target.showName !== false;
 
     try {
       pt.setAttribute({
@@ -181,7 +197,8 @@ export function init(): void {
       window.__pointStates[boardId][name] = {
         x: pt.X(),
         y: pt.Y(),
-        fixed: fixed
+        fixed: fixed,
+        showName: pt.__liaDgsShowName !== false
       };
     } catch (e) {}
   }
@@ -228,7 +245,7 @@ export function init(): void {
     persist();
   }
 
-  function createPoint(board, boardId, name, x0, y0, isFixed = false) {
+  function createPoint(board, boardId, name, x0, y0, isFixed = false, showName = true) {
     try {
       const pt = board.create('point', [x0, y0], {
         name: texName(name),
@@ -246,11 +263,15 @@ export function init(): void {
         label: {
           strokeColor: getNeutralColor(),
           fillColor: getNeutralColor(),
+          visible: showName !== false,
           fontSize: 24,
           parse: false,
           useMathJax: true
         }
       });
+
+      pt.__liaDgsPointName = String(name || '');
+      pt.__liaDgsShowName = showName !== false;
 
       ensureBuckets(boardId);
       window.__points[boardId][name] = pt;
@@ -280,15 +301,18 @@ export function init(): void {
     return null;
   }
 
-  function restorePointFromState(boardId, name) {
+  function restorePointFromState(boardId, name, requestedShowName) {
     const board = window.__boards && window.__boards[boardId];
     const state = window.__pointStates && window.__pointStates[boardId] && window.__pointStates[boardId][name];
 
     if (!board || !state) return null;
 
+    const showName = typeof requestedShowName === 'boolean'
+      ? requestedShowName
+      : state.showName !== false;
     let pt = getLivePointOnCurrentBoard(boardId, name);
     if (!pt) {
-      pt = createPoint(board, boardId, name, state.x, state.y);
+      pt = createPoint(board, boardId, name, state.x, state.y, false, showName);
       if (!pt) return null;
     }
 
@@ -298,6 +322,8 @@ export function init(): void {
       pt.setAttribute({ fixed: !!state.fixed });
     } catch (e) {}
 
+    pt.__liaDgsPointName = String(name || '');
+    pt.__liaDgsShowName = showName;
     stylePointLabel(pt);
     bindPointPersistence(boardId, name, pt);
     savePointState(boardId, name, pt);
@@ -309,7 +335,7 @@ export function init(): void {
   window.restorePointFromSpec = function(spec) {
     const target = getPointTargetFromSpec(spec);
     if (!target.boardId || !target.name) return null;
-    return restorePointFromState(target.boardId, target.name);
+    return restorePointFromState(target.boardId, target.name, target.showName);
   };
 
   window.getPointFromSpec = function(spec) {
@@ -318,9 +344,14 @@ export function init(): void {
     const name = target.name;
 
     let pt = getLivePointOnCurrentBoard(boardId, name);
-    if (pt) return pt;
+    if (pt) {
+      pt.__liaDgsPointName = String(name || '');
+      pt.__liaDgsShowName = target.showName !== false;
+      stylePointLabel(pt);
+      return pt;
+    }
 
-    return restorePointFromState(boardId, name);
+    return restorePointFromState(boardId, name, target.showName);
   };
 
   window.ensurePointFromSpec = function(spec) {
@@ -335,6 +366,8 @@ export function init(): void {
 
     let pt = getLivePointOnCurrentBoard(boardId, name);
     if (pt) {
+      pt.__liaDgsPointName = String(name || '');
+      pt.__liaDgsShowName = target.showName !== false;
       stylePointLabel(pt);
       bindPointPersistence(boardId, name, pt);
       savePointState(boardId, name, pt);
@@ -342,7 +375,7 @@ export function init(): void {
       return true;
     }
 
-    pt = restorePointFromState(boardId, name);
+    pt = restorePointFromState(boardId, name, target.showName);
     if (pt) {
       try { board.update(); } catch (e) {}
       return true;
@@ -351,7 +384,7 @@ export function init(): void {
     const x0 = Math.random();
     const y0 = Math.random();
 
-    pt = createPoint(board, boardId, name, x0, y0);
+    pt = createPoint(board, boardId, name, x0, y0, false, target.showName);
     if (!pt) return false;
 
     try { board.update(); } catch (e) {}
@@ -371,8 +404,8 @@ export function init(): void {
     ensureBuckets(boardId);
 
     let pt = getLivePointOnCurrentBoard(boardId, name);
-    if (!pt) pt = restorePointFromState(boardId, name);
-    if (!pt) pt = createPoint(board, boardId, name, tx, ty);
+    if (!pt) pt = restorePointFromState(boardId, name, target.showName);
+    if (!pt) pt = createPoint(board, boardId, name, tx, ty, false, target.showName);
     if (!pt) return false;
 
     movePointTo(pt, tx, ty);
@@ -381,6 +414,8 @@ export function init(): void {
       pt.setAttribute({ fixed: true });
     } catch (e) {}
 
+    pt.__liaDgsPointName = String(name || '');
+    pt.__liaDgsShowName = target.showName !== false;
     stylePointLabel(pt);
     savePointState(boardId, name, pt);
 
@@ -409,15 +444,15 @@ export function init(): void {
 
     if (!pt) {
       if (isFixed) {
-        pt = createPoint(board, boardId, name, tx, ty, true);
+        pt = createPoint(board, boardId, name, tx, ty, true, target.showName);
       } else if (
         state &&
         Number.isFinite(state.x) &&
         Number.isFinite(state.y)
       ) {
-        pt = createPoint(board, boardId, name, state.x, state.y, false);
+        pt = createPoint(board, boardId, name, state.x, state.y, false, target.showName);
       } else {
-        pt = createPoint(board, boardId, name, tx, ty, false);
+        pt = createPoint(board, boardId, name, tx, ty, false, target.showName);
       }
     }
 

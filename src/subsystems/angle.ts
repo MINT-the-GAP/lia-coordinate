@@ -1,13 +1,14 @@
 // Angle subsystem (@angle / @Winkel macros).
 // Draws the minor angle defined by three named points and an optional measure.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
 interface AngleConfig {
   boardId: string;
   name: string;
+  showName: boolean;
   pointNames: string[];
   color: string;
   hasExplicitColor: boolean;
@@ -54,10 +55,12 @@ export function init(): void {
     const options = parts.slice(5).map(function(option) {
       return String(option || '').trim();
     });
+    const name = parseMacroName(parts[1] || '');
 
     return {
       boardId: String(parts[0] || '').trim(),
-      name: String(parts[1] || '').trim(),
+      name: name.name,
+      showName: name.showName && !options.some(isHiddenNameOption),
       pointNames: pointNames,
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
@@ -222,12 +225,13 @@ export function init(): void {
   }
 
   function labelText(cfg: AngleConfig, points: any[]): string {
-    const name = texName(cfg.name) || fallbackAngleName(cfg);
-    if (!cfg.showValue) return '\\(' + name + '\\)';
+    const name = cfg.showName ? (texName(cfg.name) || fallbackAngleName(cfg)) : '';
+    if (!cfg.showValue) return name ? '\\(' + name + '\\)' : '';
 
     const value = angleMeasure(points);
-    if (!Number.isFinite(value)) return '\\(' + name + '\\)';
-    return '\\(' + name + ' \\approx ' + formatMeasure(value, cfg.language) + '^\\circ\\)';
+    if (!Number.isFinite(value)) return name ? '\\(' + name + '\\)' : '';
+    const measure = formatMeasure(value, cfg.language) + '^\\circ';
+    return '\\(' + (name ? name + ' \\approx ' : '') + measure + '\\)';
   }
 
   function applyAngleStyle(angle: any, color: string, opacity: number): void {
@@ -266,6 +270,7 @@ export function init(): void {
   }
 
   function createLabel(board: any, points: any[], cfg: AngleConfig): any {
+    if (!cfg.showName && !cfg.showValue) return null;
     const label = board.create('text', [
       function() { return labelPosition(board, points).x; },
       function() { return labelPosition(board, points).y; },
@@ -330,10 +335,11 @@ export function init(): void {
       old.boardId === cfg.boardId &&
       samePoints(old.points, points) &&
       old.name === cfg.name &&
+      old.showName === cfg.showName &&
       old.language === cfg.language &&
       old.showValue === cfg.showValue &&
       old.angle &&
-      old.label
+      (!(cfg.showName || cfg.showValue) || old.label)
     ) {
       old.color = cfg.color;
       old.opacity = cfg.opacity;
@@ -373,11 +379,14 @@ export function init(): void {
       });
       applyAngleStyle(angle, cfg.color, cfg.opacity);
       label = createLabel(board, points, cfg);
+      angle.__liaDgsShowName = cfg.showName;
+      angle.__liaDgsShowAngle = cfg.showValue;
 
       window.__angleEntries[key] = {
         uid: String(uid),
         boardId: cfg.boardId,
         name: cfg.name,
+        showName: cfg.showName,
         pointNames: cfg.pointNames.slice(),
         points: points,
         color: cfg.color,

@@ -1,7 +1,7 @@
 // Plot function subsystem (@PlotFunction macro).
 // Renders a function graph from a mathematical expression onto a JSXGraph board.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { compileFunctionExpression } from '../shared/functionExpression';
 
 export function init(): void {
@@ -24,10 +24,13 @@ export function init(): void {
   function parsePlotSpec(spec) {
     const raw = unquote(spec);
     const parts = splitTopLevel(raw, ';');
+    const parsedName = parseMacroName(parts[1] ? unquote(parts[1]) : 'f', 'f');
+    const options = parts.slice(4).map(function(part) { return unquote(part).trim(); });
 
     return {
       boardId: parts[0] ? unquote(parts[0]) : '',
-      name:    parts[1] ? unquote(parts[1]) : 'f',
+      name:    parsedName.name,
+      showName: parsedName.showName && !options.some(isHiddenNameOption),
       expr:    parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
       color:   parts[3] ? unquote(parts[3]) : 'red'
     };
@@ -225,6 +228,7 @@ export function init(): void {
     const name = String(cfg.name || 'f').trim() || 'f';
     const expr = String(cfg.expr || '').trim();
     const color = String(cfg.color || 'red').trim() || 'red';
+    const showName = cfg.showName !== false;
 
     if (!boardId || !expr) return false;
 
@@ -238,6 +242,7 @@ export function init(): void {
       old &&
       old.boardId === boardId &&
       old.name === name &&
+      old.showName === showName &&
       old.expr === expr &&
       old.color === color &&
       old.graph &&
@@ -264,13 +269,17 @@ export function init(): void {
       });
       graph.__liaPlotFunctionName = name;
       graph.__liaPlotFunctionExpression = expr;
+      graph.__liaDgsShowName = showName;
 
-      const labelPack = createFunctionLabel(board, fn, name, color);
+      const labelPack = showName
+        ? createFunctionLabel(board, fn, name, color)
+        : { anchor: null, label: null };
 
       window.__plotFunctionEntries[key] = {
         uid: uid,
         boardId: boardId,
         name: name,
+        showName: showName,
         expr: expr,
         color: color,
         graph: graph,

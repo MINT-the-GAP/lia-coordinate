@@ -1,7 +1,14 @@
 // Segment subsystem (@Strecke / @distance macros).
 // Connects two named points from the shared point registry on a JSXGraph board.
 
-import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import {
+  CoordinatePair,
+  isHiddenNameOption,
+  parseCoordinateList,
+  parseMacroName,
+  splitTopLevel,
+  unquote
+} from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -15,6 +22,7 @@ interface DistanceConfig {
   language: 'de' | 'en';
   showLength: boolean;
   segmentName: string;
+  showName: boolean;
 }
 
 export function init(): void {
@@ -59,9 +67,11 @@ export function init(): void {
     const trailingOptions = parts.slice(colorIndex + 1)
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
-    const segmentName = trailingOptions.find(function(part) {
-      return !/^length\s*=/i.test(part);
+    const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
+    const rawSegmentName = trailingOptions.find(function(part) {
+      return !/^length\s*=/i.test(part) && !isHiddenNameOption(part);
     }) || '';
+    const parsedName = parseMacroName(rawSegmentName);
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -74,7 +84,8 @@ export function init(): void {
       showLength: trailingOptions.some(function(part) {
         return /^length\s*=\s*1$/i.test(part);
       }),
-      segmentName: segmentName
+      segmentName: parsedName.name,
+      showName: parsedName.showName && !standaloneHiddenName
     };
   }
 
@@ -182,7 +193,12 @@ export function init(): void {
     return name;
   }
 
-  function lengthLabelText(cfg: DistanceConfig, points: any[]): string {
+  function segmentLabelText(cfg: DistanceConfig, points: any[]): string {
+    const visibleName = cfg.showName && cfg.segmentName
+      ? texPointName(cfg.segmentName)
+      : '';
+    if (!cfg.showLength) return visibleName ? '\\(' + visibleName + '\\)' : '';
+
     let distance = 0;
     try {
       for (let index = 1; index < points.length; index++) {
@@ -203,14 +219,16 @@ export function init(): void {
 
     const unit = cfg.language === 'de' ? 'LE' : 'LU';
     const pointNames = texPointName(cfg.point1Name) + texPointName(cfg.point2Name);
-    const measuredObject = cfg.segmentName
-      ? texPointName(cfg.segmentName)
-      : (pointNames
+    const measuredObject = cfg.showName
+      ? (visibleName || (pointNames
         ? '\\left| \\overline{' + pointNames + '} \\right|'
-        : 's');
+        : 's'))
+      : '';
+    const measurement = value + '\\,\\mathrm{' + unit + '}';
 
-    return '\\(' + measuredObject + ' ' + relation + ' ' +
-      value + '\\,\\mathrm{' + unit + '}\\)';
+    return measuredObject
+      ? '\\(' + measuredObject + ' ' + relation + ' ' + measurement + '\\)'
+      : '\\(' + measurement + '\\)';
   }
 
   function labelPixelSize(label: any, cfg: DistanceConfig): { width: number; height: number } {
@@ -337,7 +355,7 @@ export function init(): void {
     label = board.create('text', [
       function() { return labelPosition(board, points, label, cfg).x; },
       function() { return labelPosition(board, points, label, cfg).y; },
-      function() { return lengthLabelText(cfg, points); }
+      function() { return segmentLabelText(cfg, points); }
     ], {
       fixed: true,
       highlight: false,
@@ -408,7 +426,8 @@ export function init(): void {
       old.language === cfg.language &&
       old.showLength === cfg.showLength &&
       old.segmentName === cfg.segmentName &&
-      (!cfg.showLength || old.label) &&
+      old.showName === cfg.showName &&
+      (!(cfg.showLength || (cfg.showName && cfg.segmentName)) || old.label) &&
       Array.isArray(old.segments) &&
       old.segments.length === (coordinateMode ? cfg.coordinates!.length - 1 : 1)
     ) {
@@ -447,10 +466,15 @@ export function init(): void {
           straightFirst: false,
           straightLast: false
         });
+        segment.__liaDgsSegmentName = cfg.segmentName;
+        segment.__liaDgsShowName = cfg.showName;
+        segment.__liaDgsShowLength = cfg.showLength;
         segments.push(segment);
       }
 
-      if (cfg.showLength) label = createLengthLabel(board, points, cfg);
+      if (cfg.showLength || (cfg.showName && cfg.segmentName)) {
+        label = createLengthLabel(board, points, cfg);
+      }
 
       window.__distanceEntries[key] = {
         uid: String(uid),
@@ -465,6 +489,7 @@ export function init(): void {
         language: cfg.language,
         showLength: cfg.showLength,
         segmentName: cfg.segmentName,
+        showName: cfg.showName,
         board: board,
         points: points,
         point1: points[0],

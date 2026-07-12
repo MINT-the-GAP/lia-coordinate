@@ -1,12 +1,13 @@
 // Schar subsystem (@Schar macro).
 // Provides a parameterized function family with sliders.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
 type ScharCfg = {
   name: string;
+  showName: boolean;
   variableName: string;
   expr: string;
   boardId: string;
@@ -346,9 +347,11 @@ function looksLikeColor(value: string): boolean {
 function parseScharSpec(spec: string): ScharCfg {
   const raw = unquote(String(spec || '').trim());
   const parts = splitTopLevel(raw, ';');
+  const name = parseMacroName(parts[0] ? unquote(parts[0]) : 'f', 'f');
 
   const cfg: ScharCfg = {
-    name: parts[0] ? unquote(parts[0]) : 'f',
+    name: name.name,
+    showName: name.showName,
     variableName: parts[1] ? unquote(parts[1]) : 'x',
     expr: parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
     boardId: parts[3] ? unquote(parts[3]) : '',
@@ -848,6 +851,7 @@ function chooseVisibleAnchorX(board: any, fn: (x: number) => number): number {
 }
 
 function createPinnedGraphLabel(entry: ScharEntry): any {
+  if (!entry.cfg.showName) return null;
   const board = entry.board;
   const fn = function (x: number): number {
     try {
@@ -1278,7 +1282,10 @@ function refreshEntry(entry: ScharEntry): void {
     entry.dragGraph = null;
   }
 
-  if (!entry.graphLabel) {
+  if (!entry.cfg.showName && entry.graphLabel) {
+    try { entry.board.removeObject(entry.graphLabel); } catch (e) {}
+    entry.graphLabel = null;
+  } else if (entry.cfg.showName && !entry.graphLabel) {
     entry.graphLabel = createPinnedGraphLabel(entry);
   }
   try {
@@ -1297,7 +1304,9 @@ function refreshEntry(entry: ScharEntry): void {
   entry.minBtnEl.style.color = entry.cfg.color;
 
   if (entry.cfg.showTerm && entry.termVisible) {
-    const texLhs = `${entry.cfg.name}(${entry.cfg.variableName})`;
+    const texLhs = entry.cfg.showName
+      ? `${entry.cfg.name}(${entry.cfg.variableName}) = `
+      : '';
     let texRhs: string;
 
     if (entry.linearMN) {
@@ -1324,11 +1333,11 @@ function refreshEntry(entry: ScharEntry): void {
     if (entry.polyCoeffDrag) {
       const shiftedTex = buildShiftedPolyTex(entry) || texRhs;
       const expandedTex = buildExpandedShiftedPolyTex(entry) || texRhs;
-      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + ' = ' + shiftedTex + '\\)</div>' +
+      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + shiftedTex + '\\)</div>' +
         '<br>' +
-        '<div class="lia-schar-term-line">\\(' + texLhs + ' = ' + expandedTex + '\\)</div>';
+        '<div class="lia-schar-term-line">\\(' + texLhs + expandedTex + '\\)</div>';
     } else {
-      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + ' = ' + texRhs + '\\)</div>';
+      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + texRhs + '\\)</div>';
     }
     entry.termEl.style.fontSize = '20px';
     entry.termEl.style.lineHeight = '1.2';
@@ -1784,9 +1793,13 @@ function createPanel(entry: ScharEntry): HTMLElement {
   miniName.className = 'lia-schar-mini-name';
   const miniStrip = document.createElement('span');
   miniStrip.className = 'lia-schar-mini-strip';
-  const cleanName = String(entry.cfg.name || 'f').trim().replace(/\(.*$/, '').replace(/[^A-Za-z]/g, '') || 'f';
-  miniName.textContent = '\\(' + cleanName + '\\)';
-  typesetMathNode(miniName);
+  if (entry.cfg.showName) {
+    const cleanName = String(entry.cfg.name || 'f').trim().replace(/\(.*$/, '').replace(/[^A-Za-z]/g, '') || 'f';
+    miniName.textContent = '\\(' + cleanName + '\\)';
+    typesetMathNode(miniName);
+  } else {
+    miniName.textContent = '';
+  }
   miniWrap.appendChild(miniName);
   miniWrap.appendChild(miniStrip);
   panel.appendChild(miniWrap);

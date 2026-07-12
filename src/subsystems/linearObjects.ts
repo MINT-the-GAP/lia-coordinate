@@ -1,7 +1,14 @@
 // Linear object subsystem (@Line/@Gerade, @Ray/@Strahl, @Vector/@Vektor macros).
 // Draws a straight line, ray, or vector through two named or hidden coordinate points.
 
-import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import {
+  CoordinatePair,
+  isHiddenNameOption,
+  parseCoordinateList,
+  parseMacroName,
+  splitTopLevel,
+  unquote
+} from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -16,6 +23,7 @@ interface LinearObjectConfig {
   color: string;
   hasExplicitColor: boolean;
   objectName: string;
+  showName: boolean;
   language: 'de' | 'en';
 }
 
@@ -66,13 +74,18 @@ export function init(): void {
     const trailingOptions = parts.slice(colorIndex + 1)
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
-    const namedOption = trailingOptions.map(function(part) {
+    const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
+    const nameOptions = trailingOptions.filter(function(part) {
+      return !isHiddenNameOption(part);
+    });
+    const namedOption = nameOptions.map(function(part) {
       const match = part.match(/^name\s*=\s*(.+)$/i);
       return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
-    const objectName = namedOption || trailingOptions.find(function(part) {
+    const rawObjectName = namedOption || nameOptions.find(function(part) {
       return !/^name\s*=/i.test(part);
     }) || '';
+    const parsedName = parseMacroName(rawObjectName);
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -82,7 +95,8 @@ export function init(): void {
       coordinates: coordinates ? coordinates.slice(0, 2) : null,
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
-      objectName: objectName,
+      objectName: parsedName.name,
+      showName: parsedName.showName && !standaloneHiddenName,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
     };
   }
@@ -166,6 +180,7 @@ export function init(): void {
   }
 
   function labelText(cfg: LinearObjectConfig, points: any[]): string {
+    if (!cfg.showName) return '';
     if (cfg.kind === 'vector') return '\\(\\overrightarrow{' + vectorBaseName(cfg, points) + '}\\)';
     if (!cfg.objectName) return '';
     return '\\(' + texName(cfg.objectName) + '\\)';
@@ -289,7 +304,8 @@ export function init(): void {
       ? !!(old && sameCoordinates(old.coordinates || null, cfg.coordinates))
       : !!(old && Array.isArray(old.points) && old.points[0] === namedPoints[0] && old.points[1] === namedPoints[1]);
     if (old && old.board === board && old.kind === cfg.kind && geometryUnchanged &&
-        old.objectName === cfg.objectName && old.language === cfg.language) {
+        old.objectName === cfg.objectName && old.showName === cfg.showName &&
+        old.language === cfg.language) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       applyObjectColor(old.object, old.label, cfg.color);
@@ -311,6 +327,11 @@ export function init(): void {
         : namedPoints;
       object = createLinearObject(board, points, cfg);
       label = createLabel(board, object, points, cfg);
+      const effectiveName = cfg.kind === 'vector' ? vectorBaseName(cfg, points) : cfg.objectName;
+      object.__liaDgsShowName = cfg.showName;
+      if (cfg.kind === 'vector') object.__liaDgsVectorName = effectiveName;
+      else if (cfg.kind === 'ray') object.__liaDgsRayName = effectiveName;
+      else object.__liaDgsLineName = effectiveName;
       window.__linearObjectEntries[key] = {
         uid: String(uid),
         boardId: cfg.boardId,
@@ -321,6 +342,7 @@ export function init(): void {
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
         objectName: cfg.objectName,
+        showName: cfg.showName,
         language: cfg.language,
         board: board,
         points: points,

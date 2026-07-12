@@ -461,7 +461,14 @@ X marker and its label. Opacity is clamped to `0` through `1`; add `fix` to make
 the point immovable. The legacy form with `fix` directly after the coordinates
 remains supported.
 
-Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
+Parameters: `<boardId>;<pointName>[=0];<x>;<y>;<color>;<opacity>;fix`
+
+For every macro name position in this template, a terminal `=0` hides only
+the displayed name. The part before it remains the technical object name:
+`A=0` creates a point whose label is hidden, but later macros still refer to
+it as `A`. Without exactly `=0`, names are always displayed. This also
+applies to function names, parameter names, line names, angle names, and
+automatically generated analysis-point names.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point`)
@@ -469,7 +476,7 @@ Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
 @AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
 @Point(`ex_point;A;2;3`)
-@Point(`ex_point;B;-3;-1;#e63946;0.65;fix`)
+@Point(`ex_point;B=0;-3;-1;#e63946;0.65;fix`)
 ```
 
 ---
@@ -479,7 +486,7 @@ Parameters: `<boardId>;<pointName>;<x>;<y>;<color>;<opacity>;fix`
 @AxisLabel(`id=ex_point;xlabel=$x$;ylabel=$y$`)
 
 @Point(`ex_point;A;2;3`)
-@Point(`ex_point;B;-3;-1;#e63946;0.65;fix`)
+@Point(`ex_point;B=0;-3;-1;#e63946;0.65;fix`)
 
 ## `@CoordText` / `@KoordText`
 
@@ -514,13 +521,15 @@ Named points remain attached when they move. Coordinate input such as
 `[[2;3];[4;4];[6;2]]` creates fixed invisible helper points and connects each
 successive pair as one continuous polygonal path; no point markers or names are
 shown. Point names are case-sensitive; the color is optional and defaults to the
-current theme accent color. Add `length=1` to display the dynamic total path length
+current theme accent color. A supplied segment name is displayed by default.
+Add `length=1` to display the dynamic total path length
 near its geometric midpoint. `@Strecke` uses a decimal comma and `LE`;
-`@distance` uses a decimal point and `LU`. Without exactly `length=1`, only the
-path is rendered. An optional segment name between the color and `length=1`
-replaces the `|AB|` expression in the label.
+`@distance` uses a decimal point and `LU`. A name ending in `=0` is kept
+for references but omitted from the label; with `length=1`, the numeric
+length and unit remain visible. Without a name and without exactly
+`length=1`, only the path is rendered.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>;length=1`
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>[=0];length=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
@@ -530,7 +539,7 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 
 @Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
 
-@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s;length=1`)
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s=0;length=1`)
 ```
 
 ---
@@ -542,7 +551,7 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 
 @Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
 
-@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s;length=1`)
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s=0;length=1`)
 
 ## `@Line` / `@Gerade`, `@Ray` / `@Strahl`, `@Vector` / `@Vektor`
 
@@ -554,7 +563,10 @@ without arrowheads. Vectors use the JSXGraph arrow and are labelled as
 `\overrightarrow{...}`; if no explicit vector name is given, named endpoints are
 used automatically, for example `\overrightarrow{AB}`.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>`
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0]`
+
+For a vector using its automatic endpoint name, append the standalone option
+`name=0` to hide that automatic label.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_linear`)
@@ -593,9 +605,9 @@ object (`@Strecke`, `@Gerade`, `@Strahl`, `@Vektor`) or use a point pair as an
 implicit base line. The midpoint is registered as a point, so later macros can
 refer to it by name. Add `wert=1` / `value=1` to show its coordinates.
 
-Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>`
+Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>[=0]`
 
-Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>;wert=1`
+Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0];wert=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_relations`)
@@ -676,7 +688,7 @@ places. `@Winkel` uses a decimal comma; `@angle` uses a decimal point. Common
 Greek names such as `alpha` may be written with or without the leading TeX
 backslash.
 
-Parameters: `<boardId>;<name>;[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1`
+Parameters: `<boardId>;<name>[=0];[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
@@ -717,7 +729,7 @@ center, rounded to three decimal places. German output uses `FE` and `LE`;
 English output uses `AU` and `LU`. The aliases `area=1`, `circumference=1`, and
 `perimeter=1` are also accepted.
 
-Parameters: `<boardId>;<name>;<centerPoint>;<color>;<opacity>;radius=<number|point>;inhalt=1;umfang=1`
+Parameters: `<boardId>;<name>[=0];<centerPoint>;<color>;<opacity>;radius=<number|point>;inhalt=1;umfang=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_circle`)
@@ -751,9 +763,9 @@ as a named line, so intersection and ordinate-intercept macros can use it afterw
 The circular-sector macro uses three existing points in center--radius point--second
 arm point order. `@Kreissegment` is accepted as an alias for exported DGS sectors.
 
-Parameters for tangents: `<boardId>;<sourceName>|[<point1>;<point2>];[<x>;<y>];<color>;<lineName>;<contactPointName>`
+Parameters for tangents: `<boardId>;<sourceName>|[<point1>;<point2>];[<x>;<y>];<color>;<lineName>[=0];<contactPointName>[=0]`
 
-Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>];<color>;<opacity>;<name>;inhalt=1;umfang=1`
+Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>];<color>;<opacity>;<name>[=0];inhalt=1;umfang=1`
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_tangent_sector`)
@@ -788,7 +800,7 @@ Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>
           --{{0}}--
 Plots a function curve on the board using a formula. The formula uses standard math syntax.
 
-Parameters: `<boardId>;<funcName>;<formula>;<color>`
+Parameters: `<boardId>;<funcName>[=0];<formula>;<color>`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
@@ -811,9 +823,11 @@ Parameters: `<boardId>;<funcName>;<formula>;<color>`
           --{{0}}--
 Creates dynamic analysis points for a named function: roots, extrema, or inflection points. The points update when the function, parameters, sliders, or the visible board range change.
 
-Parameters: `<boardId>;<funcName>;<color>;<prefix>;wert=1`
+Parameters: `<boardId>;<funcName>;<color>;<prefix>[=0];wert=1`
 
-Options: `names=[N_1;N_2;...]`, `wert=1` / `value=1`
+Options: `names=[N_1;N_2;...]`, `wert=1` / `value=1`. A hidden
+prefix (for example `N=0`) hides every generated point name; individual
+entries such as `names=[N_1=0;N_2]` can be controlled separately.
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=5;width=800;id=ex_function_analysis`)
@@ -843,9 +857,9 @@ named functions, linear objects, or circles.
 
 Parameters:
 
-- `@Regler`: `<boardId>;<name>;<min>;<max>;<step>;<value>;<color>;[[x1;y1];[x2;y2]];lockposition=1`
-- `@Ordinatenabschnitt`: `<boardId>;<objectName>;<color>;<prefix>;wert=1`
-- `@Schnittpunkt`: `<boardId>;<objectName1>;<objectName2>;<color>;<prefix>;wert=1`
+- `@Regler`: `<boardId>;<name>[=0];<min>;<max>;<step>;<value>;<color>;[[x1;y1];[x2;y2]];lockposition=1`
+- `@Ordinatenabschnitt`: `<boardId>;<objectName>;<color>;<prefix>[=0];wert=1`
+- `@Schnittpunkt`: `<boardId>;<objectName1>;<objectName2>;<color>;<prefix>[=0];wert=1`
 
 Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`, and for sliders
 `visible=0`, `fontsize=...`, `lockposition=1`.

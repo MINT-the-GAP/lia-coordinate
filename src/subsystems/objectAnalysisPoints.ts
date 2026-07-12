@@ -3,7 +3,7 @@
 // ordinate-axis intercept of a function/linear object and for intersections of
 // functions, linear objects, and circles.
 
-import { splitTopLevel, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -20,6 +20,8 @@ interface ObjectAnalysisConfig {
   hasExplicitColor: boolean;
   prefix: string;
   explicitNames: string[];
+  explicitNameVisibility: boolean[];
+  showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
 }
@@ -46,6 +48,8 @@ interface ObjectAnalysisEntry {
   hasExplicitColor: boolean;
   prefix: string;
   explicitNames: string[];
+  explicitNameVisibility: boolean[];
+  showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
   board: any;
@@ -115,15 +119,18 @@ export function init(): void {
     return !!left && left === right;
   }
 
-  function parseNamesList(value: string): string[] {
+  function parseNamesList(value: string): Array<{ name: string; showName: boolean }> {
     let raw = String(value || '').trim();
     const match = raw.match(/^names?\s*=\s*(.+)$/i);
     if (match) raw = String(match[1] || '').trim();
     raw = unquote(raw);
     if (raw.startsWith('[') && raw.endsWith(']')) raw = raw.slice(1, -1);
     return splitTopLevel(raw, ';')
-      .map(function(part) { return cleanName(unquote(part)); })
-      .filter(Boolean);
+      .map(function(part) {
+        const parsed = parseMacroName(unquote(part));
+        return { name: cleanName(parsed.name), showName: parsed.showName };
+      })
+      .filter(function(parsed) { return !!parsed.name; });
   }
 
   function parseObjectAnalysisSpec(spec: string, kind: string, language?: string): ObjectAnalysisConfig {
@@ -136,14 +143,19 @@ export function init(): void {
     const trailingOptions = parts.slice(colorIndex + 1)
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
-    const namesOption = trailingOptions.find(function(part) { return /^names?\s*=/i.test(part); }) || '';
+    const namesOption = trailingOptions.find(function(part) {
+      return !isHiddenNameOption(part) && /^names?\s*=/i.test(part);
+    }) || '';
     const prefixOption = trailingOptions.map(function(part) {
       const match = part.match(/^prefix\s*=\s*(.+)$/i);
-      return match ? cleanName(match[1]) : '';
+      return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
     const positionalPrefix = trailingOptions.find(function(part) {
-      return !isValueOption(part) && !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
+      return !isValueOption(part) && !isHiddenNameOption(part) &&
+        !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
     }) || '';
+    const parsedPrefix = parseMacroName(prefixOption || positionalPrefix, defaultPrefix(analysisKind, languageValue));
+    const parsedNames = namesOption ? parseNamesList(namesOption) : [];
     return {
       boardId: String(parts[0] || '').trim(),
       kind: analysisKind,
@@ -151,8 +163,10 @@ export function init(): void {
       source2Name: analysisKind === 'intersections' ? cleanName(parts[2] || '') : '',
       color: explicitColor || '#ff00ff',
       hasExplicitColor: !!explicitColor,
-      prefix: cleanName(prefixOption || positionalPrefix) || defaultPrefix(analysisKind, languageValue),
-      explicitNames: namesOption ? parseNamesList(namesOption) : [],
+      prefix: cleanName(parsedPrefix.name) || defaultPrefix(analysisKind, languageValue),
+      explicitNames: parsedNames.map(function(parsed) { return parsed.name; }),
+      explicitNameVisibility: parsedNames.map(function(parsed) { return parsed.showName; }),
+      showName: parsedPrefix.showName && !trailingOptions.some(isHiddenNameOption),
       language: languageValue,
       showValue: trailingOptions.some(isValueOption)
     };
@@ -183,11 +197,18 @@ export function init(): void {
     return prefix + '_' + (index + 1);
   }
 
+  function pointNameVisible(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): boolean {
+    if (entry.showName === false) return false;
+    if (entry.explicitNames[index]) return entry.explicitNameVisibility[index] !== false;
+    return true;
+  }
+
   function pointLabelText(entry: ObjectAnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
-    if (!entry.showValue) return '\\(' + name + '\\)';
+    const showName = pointNameVisible(entry, index);
+    if (!entry.showValue) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
-    return '\\(' + name + '\\; (' + formatNumber(holder.x, entry.language) + '\\mid ' +
+    return '\\(' + (showName ? name + '\\; ' : '') + '(' + formatNumber(holder.x, entry.language) + '\\mid ' +
       formatNumber(holder.y, entry.language) + ')\\)';
   }
 
@@ -627,6 +648,7 @@ export function init(): void {
 
   function applyPointVisual(entry: ObjectAnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
+    const labelVisible = pointNameVisible(entry, index) || entry.showValue;
     try {
       point.setAttribute({
         strokeColor: entry.color,
@@ -649,6 +671,7 @@ export function init(): void {
       }
       if (point.label && typeof point.label.setAttribute === 'function') {
         point.label.setAttribute({
+          visible: labelVisible,
           strokeColor: labelColor,
           fillColor: labelColor,
           fontSize: 24,
@@ -657,10 +680,14 @@ export function init(): void {
           cssStyle: 'white-space: nowrap; width: max-content; max-width: none;'
         });
       }
+      if (point.label && labelVisible && typeof point.label.showElement === 'function') point.label.showElement();
+      if (point.label && !labelVisible && typeof point.label.hideElement === 'function') point.label.hideElement();
       keepPointLabelOnOneLine(point);
       requestAnimationFrame(function() { keepPointLabelOnOneLine(point); });
     } catch (e) {}
     point.__liaPointVisual = { color: entry.color, opacity: 1, hasExplicitColor: entry.hasExplicitColor };
+    point.__liaDgsShowName = pointNameVisible(entry, index);
+    point.__liaDgsShowValue = entry.showValue;
   }
 
   function createAnalysisPoint(entry: ObjectAnalysisEntry, index: number): any | null {
@@ -674,7 +701,7 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: true,
+        withLabel: pointNameVisible(entry, index) || entry.showValue,
         showInfobox: false,
         strokeColor: entry.color,
         fillColor: entry.color,
@@ -699,7 +726,7 @@ export function init(): void {
       point.__liaDgsPointName = name;
       point.__liaDgsYInterceptPoint = entry.kind === 'ordinate-intercept';
       point.__liaDgsIntersectionPoint = entry.kind === 'intersections';
-      point.__liaDgsShowName = true;
+      point.__liaDgsShowName = pointNameVisible(entry, index);
       point.__liaDgsShowValue = entry.showValue;
       point.__liaDgsShowObject = true;
       point.__liaDgsColor = entry.color;
@@ -838,7 +865,9 @@ export function init(): void {
     const old = window.__objectAnalysisPointEntries[key] as ObjectAnalysisEntry | undefined;
     if (old && old.board === board && old.kind === cfg.kind && old.sourceName === cfg.sourceName &&
         old.source2Name === cfg.source2Name && old.prefix === cfg.prefix && old.language === cfg.language &&
-        old.showValue === cfg.showValue && old.explicitNames.join('\n') === cfg.explicitNames.join('\n')) {
+        old.showValue === cfg.showValue && old.showName === cfg.showName &&
+        old.explicitNames.join('\n') === cfg.explicitNames.join('\n') &&
+        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n')) {
       old.source = source;
       old.source2 = source2;
       old.color = cfg.color;
@@ -858,6 +887,8 @@ export function init(): void {
       hasExplicitColor: cfg.hasExplicitColor,
       prefix: cfg.prefix,
       explicitNames: cfg.explicitNames.slice(),
+      explicitNameVisibility: cfg.explicitNameVisibility.slice(),
+      showName: cfg.showName,
       language: cfg.language,
       showValue: cfg.showValue,
       board,
