@@ -24,22 +24,10 @@ script:   ./dist/index.js
     const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
     const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
 
-    // Pre-size from stored state before initBoard so it sees the right dimensions.
+    // Pre-size against the actual LiaScript content column before JSXGraph starts.
+    // Only a size explicitly chosen with the resize handle is restored as manual.
     const presetState = C.loadStoredBoardState(cfg.id);
-    if (presetState) {
-      try {
-        const maxPresetWidth = C.getConstrainedAncestorWidth(jxgbox);
-        const maxPresetHeight = C.clampHeight(presetState.height);
-        const presetScale = Math.min(
-          1,
-          maxPresetWidth / presetState.width,
-          maxPresetHeight / presetState.height
-        );
-        jxgbox.style.width  = Math.round(presetState.width * presetScale)  + 'px';
-        jxgbox.style.height = Math.round(presetState.height * presetScale) + 'px';
-      } catch (e) {}
-    }
-    try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
+    C.prepareBoardContainer(jxgbox, cfg.width, INITIAL_RATIO, presetState);
 
     // board.create() calls must be inline — jxgbox is only available in this fence.
     const board = JXG.JSXGraph.initBoard(jxgbox, {
@@ -382,7 +370,9 @@ Renders an interactive JSXGraph coordinate plane. Supports panning, zooming, and
 Parameters (semicolon-separated key=value pairs):
 - `xmin`, `xmax`, `ymin`, `ymax` — axis bounds (defaults: -4, 4, -3, 3)
 - `width` — maximum initial width in pixels; on narrower screens the board
-  automatically scales down to the available content width
+  automatically scales down to the available content width. If `width` is empty
+  or omitted, the board derives its start width from the current LiaScript content
+  column on every mount, including LiveEditor recompiles.
 - `id` — board identifier used to connect other macros to this board
 - final positional flags `axes;grid;border` — `0` hides and `1` shows each element
   (when omitted, all remain enabled/visible)
@@ -1112,6 +1102,10 @@ physical values on evenly spaced exponent coordinates, and DGS function graphs a
 accordingly (for example, power functions become straight lines in a log-log view). Values at or
 below zero are not displayed on a logarithmic axis. The selected scale is retained for the board;
 switching back to Cartesian restores ordinary tick labels and function plotting.
+The fullscreen button directly before the object-list button toggles the complete DGS board
+between its embedded size and browser fullscreen. Entering and leaving fullscreen resizes
+JSXGraph to the available viewport; Escape or a browser-initiated exit also synchronizes the
+button state and restores the previous embedded size while retaining the current pan/zoom view.
 The final toolbar button opens an object list from the right. It contains every user-facing DGS
 object with its name, type, color, and current visibility. Right-clicking an entry opens the
 ordinary object-properties panel immediately to the left of the list, so both panels remain
@@ -1386,20 +1380,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
     const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
 
     const presetState = C.loadStoredBoardState(cfg.id);
-    if (presetState) {
-      try {
-        const maxPresetWidth = C.getConstrainedAncestorWidth(jxgbox);
-        const maxPresetHeight = C.clampHeight(presetState.height);
-        const presetScale = Math.min(
-          1,
-          maxPresetWidth / presetState.width,
-          maxPresetHeight / presetState.height
-        );
-        jxgbox.style.width  = Math.round(presetState.width * presetScale)  + 'px';
-        jxgbox.style.height = Math.round(presetState.height * presetScale) + 'px';
-      } catch (e) {}
-    }
-    try { jxgbox.style.visibility = 'hidden'; } catch (e) {}
+    C.prepareBoardContainer(jxgbox, cfg.width, INITIAL_RATIO, presetState);
 
     const board = JXG.JSXGraph.initBoard(jxgbox, {
       axis: false, grid: false, showNavigation: false, showCopyright: false,

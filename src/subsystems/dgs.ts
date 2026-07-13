@@ -154,6 +154,7 @@ type DgsState = {
   logXScaleButton: HTMLButtonElement;
   logYScaleButton: HTMLButtonElement;
   logLogScaleButton: HTMLButtonElement;
+  fullscreenButton: HTMLButtonElement;
   objectListButton: HTMLButtonElement;
   textDialog: HTMLDivElement;
   textDialogInput: HTMLInputElement;
@@ -182,6 +183,15 @@ type DgsState = {
   sideMenuOpen: boolean;
   objectListOpen: boolean;
   objectListSignature: string;
+  fullscreenSnapshot: {
+    widthStyle: string;
+    heightStyle: string;
+    width: number;
+    height: number;
+    boundingBox: number[] | null;
+  } | null;
+  fullscreenRenderWidth: number;
+  fullscreenRenderHeight: number;
   contextObject: any | null;
   activeTool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
   externalToolActive: boolean;
@@ -213,7 +223,10 @@ type DgsState = {
   onBoardPointerMove?: (evt: PointerEvent) => void;
   onBoardContextMenu?: (evt: MouseEvent) => void;
   onDocumentPointerDown?: (evt: PointerEvent) => void;
+  onFullscreenChange?: () => void;
   resizeObserver?: ResizeObserver;
+  fullscreenResizeRAF?: number;
+  fullscreenReleaseTimer?: number;
   axisAnimationRAF?: number;
   axisSyncRAF?: number;
   xAxisAnimationRAF?: number;
@@ -222,6 +235,7 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
+    enterFullscreen: 'Vollbildmodus starten', exitFullscreen: 'Vollbildmodus beenden',
     objectList: 'Objektliste', noObjects: 'Noch keine Objekte', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
     coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
@@ -235,6 +249,7 @@ const DGS_TEXT = {
     enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
+    enterFullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen',
     objectList: 'Object list', noObjects: 'No objects yet', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
     coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
@@ -256,6 +271,197 @@ const DGS_ZOOM_ICONS: Record<'both' | 'vertical' | 'horizontal', string> = {
   vertical: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M12,3V21M9,6L12,3l3,3M9,18l3,3l3,-3></path></svg>',
   horizontal: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M3,12H21M6,9L3,12l3,3M18,9l3,3l-3,3></path></svg>'
 };
+
+const DGS_FULLSCREEN_ICONS: Record<'enter' | 'exit', string> = {
+  enter: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M9,4H4V9M15,4H20V9M4,15V20H9M20,15V20H15></path></svg>',
+  exit: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,9H9V4M20,9H15V4M4,15H9V20M20,15H15V20></path></svg>'
+};
+
+function getDgsFullscreenElement(state: DgsState): Element | null {
+  try {
+    const root = state.boardContainer.getRootNode?.() as Document | ShadowRoot;
+    const rootElement = root && (root as any).fullscreenElement;
+    if (rootElement) return rootElement;
+  } catch (e) {}
+  return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
+}
+
+function isDgsFullscreen(state: DgsState): boolean {
+  try { if (state.boardContainer.matches(':fullscreen')) return true; } catch (e) {}
+  try { if (state.boardContainer.matches(':-webkit-full-screen')) return true; } catch (e) {}
+  return getDgsFullscreenElement(state) === state.boardContainer;
+}
+
+function renderDgsFullscreenButton(state: DgsState): void {
+  const active = isDgsFullscreen(state);
+  const label = active ? dgsText(state.language).exitFullscreen : dgsText(state.language).enterFullscreen;
+  state.boardContainer.classList.toggle('lia-dgs-fullscreen-active', active);
+  state.fullscreenButton.innerHTML = DGS_FULLSCREEN_ICONS[active ? 'exit' : 'enter'];
+  state.fullscreenButton.classList.toggle('is-active', active);
+  state.fullscreenButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+  state.fullscreenButton.setAttribute('aria-label', label);
+  state.fullscreenButton.title = label;
+}
+
+function readDgsBoundingBox(state: DgsState): number[] | null {
+  try {
+    const bbox = state.board?.getBoundingBox?.();
+    if (Array.isArray(bbox) && bbox.length === 4 && bbox.every((value: unknown) => Number.isFinite(Number(value)))) {
+      return bbox.map(Number);
+    }
+  } catch (e) {}
+  return null;
+}
+
+function resizeDgsFullscreenBoard(state: DgsState): void {
+  if (!isDgsFullscreen(state)) return;
+  const rect = state.boardContainer.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width || state.boardContainer.clientWidth || window.innerWidth || 1));
+  const height = Math.max(1, Math.round(rect.height || state.boardContainer.clientHeight || window.innerHeight || 1));
+  if (width === state.fullscreenRenderWidth && height === state.fullscreenRenderHeight) return;
+  state.fullscreenRenderWidth = width;
+  state.fullscreenRenderHeight = height;
+  try { state.board?.resizeContainer?.(width, height, false, true); } catch (e) {}
+  try { state.board?.fullUpdate?.(); } catch (e) {
+    try { state.board?.update?.(); } catch (e2) {}
+  }
+  scheduleAxisSync(state);
+  scheduleXAxisSync(state);
+  scheduleDgsRootUpdate(state);
+  refreshDgsSliderTypography(state);
+  try { window.__refreshAllAxisTitles?.(); } catch (e) {}
+}
+
+function scheduleDgsFullscreenResize(state: DgsState): void {
+  if (state.fullscreenResizeRAF != null) cancelAnimationFrame(state.fullscreenResizeRAF);
+  let passes = 2;
+  const resize = () => {
+    state.fullscreenResizeRAF = undefined;
+    resizeDgsFullscreenBoard(state);
+    passes -= 1;
+    if (passes > 0 && isDgsFullscreen(state)) {
+      state.fullscreenResizeRAF = requestAnimationFrame(resize);
+    }
+  };
+  state.fullscreenResizeRAF = requestAnimationFrame(resize);
+}
+
+function restoreDgsEmbeddedSize(state: DgsState): void {
+  const snapshot = state.fullscreenSnapshot;
+  if (!snapshot) {
+    if (state.board) state.board.__liaDgsFullscreenActive = false;
+    return;
+  }
+  if (state.fullscreenResizeRAF != null) {
+    cancelAnimationFrame(state.fullscreenResizeRAF);
+    state.fullscreenResizeRAF = undefined;
+  }
+  if (state.fullscreenReleaseTimer != null) window.clearTimeout(state.fullscreenReleaseTimer);
+  const container = state.boardContainer;
+  const boundingBox = readDgsBoundingBox(state) || snapshot.boundingBox;
+  container.classList.remove('lia-dgs-fullscreen-active');
+  if (snapshot.widthStyle) container.style.width = snapshot.widthStyle;
+  else container.style.removeProperty('width');
+  if (snapshot.heightStyle) container.style.height = snapshot.heightStyle;
+  else container.style.removeProperty('height');
+  const rect = container.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width || snapshot.width));
+  const height = Math.max(1, Math.round(rect.height || snapshot.height));
+  if (state.board) state.board.__restoreLockUntil = Date.now() + 500;
+  try { state.board?.resizeContainer?.(width, height, false, true); } catch (e) {}
+  if (snapshot.widthStyle) container.style.width = snapshot.widthStyle;
+  else container.style.removeProperty('width');
+  if (snapshot.heightStyle) container.style.height = snapshot.heightStyle;
+  else container.style.removeProperty('height');
+  if (boundingBox) {
+    try { state.board?.setBoundingBox?.(boundingBox.slice(), true); } catch (e) {}
+  }
+  try { state.board?.fullUpdate?.(); } catch (e) {
+    try { state.board?.update?.(); } catch (e2) {}
+  }
+  state.fullscreenSnapshot = null;
+  state.fullscreenRenderWidth = 0;
+  state.fullscreenRenderHeight = 0;
+  scheduleAxisSync(state);
+  scheduleXAxisSync(state);
+  scheduleDgsRootUpdate(state);
+  refreshDgsSliderTypography(state);
+  try { window.__refreshAllAxisTitles?.(); } catch (e) {}
+  if (boundingBox) {
+    window.__coordBoardStates = window.__coordBoardStates || {};
+    const previousState = window.__coordBoardStates[state.boardId] || {};
+    const manualWidth = Number(state.board?.__manualWidth);
+    const manualHeight = Number(state.board?.__manualHeight);
+    const keepManualSize = previousState.sizeMode === 'manual' &&
+      Number.isFinite(manualWidth) && manualWidth > 0 &&
+      Number.isFinite(manualHeight) && manualHeight > 0;
+    window.__coordBoardStates[state.boardId] = {
+      ...previousState,
+      width: keepManualSize ? Math.round(manualWidth) : width,
+      height: keepManualSize ? Math.round(manualHeight) : height,
+      bbox: boundingBox.slice()
+    };
+  }
+  state.fullscreenReleaseTimer = window.setTimeout(() => {
+    state.fullscreenReleaseTimer = undefined;
+    if (!isDgsFullscreen(state) && state.board) state.board.__liaDgsFullscreenActive = false;
+  }, 120);
+}
+
+function handleDgsFullscreenChange(state: DgsState): void {
+  if (isDgsFullscreen(state)) {
+    if (state.fullscreenReleaseTimer != null) {
+      window.clearTimeout(state.fullscreenReleaseTimer);
+      state.fullscreenReleaseTimer = undefined;
+    }
+    if (state.board) state.board.__liaDgsFullscreenActive = true;
+    scheduleDgsFullscreenResize(state);
+  } else if (state.fullscreenSnapshot) {
+    restoreDgsEmbeddedSize(state);
+  } else if (state.board && state.fullscreenReleaseTimer == null) {
+    state.board.__liaDgsFullscreenActive = false;
+  }
+  renderDgsFullscreenButton(state);
+}
+
+async function toggleDgsFullscreen(state: DgsState): Promise<void> {
+  const doc = document as Document & {
+    webkitExitFullscreen?: () => Promise<void> | void;
+  };
+  const container = state.boardContainer as HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void> | void;
+  };
+  try {
+    if (isDgsFullscreen(state)) {
+      if (typeof document.exitFullscreen === 'function') await document.exitFullscreen();
+      else if (typeof doc.webkitExitFullscreen === 'function') await doc.webkitExitFullscreen();
+      handleDgsFullscreenChange(state);
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    state.fullscreenSnapshot = {
+      widthStyle: container.style.width,
+      heightStyle: container.style.height,
+      width: Math.max(1, Math.round(rect.width || container.clientWidth || 1)),
+      height: Math.max(1, Math.round(rect.height || container.clientHeight || 1)),
+      boundingBox: readDgsBoundingBox(state)
+    };
+    state.fullscreenRenderWidth = 0;
+    state.fullscreenRenderHeight = 0;
+    if (state.board) state.board.__liaDgsFullscreenActive = true;
+    if (typeof container.requestFullscreen === 'function') await container.requestFullscreen();
+    else if (typeof container.webkitRequestFullscreen === 'function') await container.webkitRequestFullscreen();
+    else throw new Error('Fullscreen API is unavailable');
+    handleDgsFullscreenChange(state);
+  } catch (error) {
+    if (!isDgsFullscreen(state)) {
+      state.fullscreenSnapshot = null;
+      if (state.board) state.board.__liaDgsFullscreenActive = false;
+    }
+    renderDgsFullscreenButton(state);
+    try { console.warn('[lia-coordinate] DGS fullscreen request failed.', error); } catch (e) {}
+  }
+}
 
 const DGS_AXIS_SCALE_ICONS: Record<DgsAxisScaleMode, string> = {
   cartesian: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M4,20V4M4,20H21M2.5,6L4,4l1.5,2M19,18.5L21,20l-2,1.5></path><text class=lia-dgs-axis-scale-label x=6 y=9>lin</text><text class=lia-dgs-axis-scale-label x=11 y=17>lin</text></svg>',
@@ -1335,6 +1541,19 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 742px;
     }
 
+    .lia-dgs-fullscreen-button {
+      left: auto;
+      right: 53px;
+    }
+
+    .lia-dgs-fullscreen-button path {
+      fill: none !important;
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
+      stroke-width: 2.1;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
     .lia-dgs-object-list-button {
       left: auto;
       right: 10px;
@@ -1347,6 +1566,25 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-object-list-button path {
       stroke: currentColor !important;
+    }
+
+    .lia-dgs-fullscreen-host.lia-dgs-fullscreen-active {
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      max-width: none !important;
+      max-height: none !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      background: var(--lia-dgs-fullscreen-bg, #fff) !important;
+    }
+
+    .lia-dgs-fullscreen-host.lia-dgs-fullscreen-active::backdrop {
+      background: var(--lia-dgs-fullscreen-bg, #fff);
+    }
+
+    .lia-dgs-fullscreen-host.lia-dgs-fullscreen-active .lia-jxg-resize-handle {
+      display: none !important;
     }
 
     .lia-dgs-axis-scale-button svg {
@@ -8482,6 +8720,7 @@ function applyLayout(state: DgsState): void {
   state.exportDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.exportDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
+  state.boardContainer.style.setProperty('--lia-dgs-fullscreen-bg', tone === '#fff' ? '#151a1c' : '#fff');
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
   if (state.xAxisAdjusted) scheduleXAxisSync(state);
@@ -8865,6 +9104,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.sliderButton.tabIndex = open ? 0 : -1;
   state.zoomModeButton.tabIndex = open ? 0 : -1;
   state.axisScaleButton.tabIndex = open ? 0 : -1;
+  state.fullscreenButton.tabIndex = open ? 0 : -1;
   state.objectListButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setGeometrySubmenuOpen(state, false);
@@ -9290,6 +9530,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.logXScaleButton?.isConnected &&
     !!existing.logYScaleButton?.isConnected &&
     !!existing.logLogScaleButton?.isConnected &&
+    !!existing.fullscreenButton?.isConnected &&
     !!existing.objectListButton?.isConnected &&
     !!existing.textDialog?.isConnected &&
     !!existing.textDialogInput?.isConnected &&
@@ -9319,7 +9560,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     typeof existing.onBoardPointerDown === 'function' &&
     typeof existing.onBoardPointerMove === 'function' &&
     typeof existing.onBoardContextMenu === 'function' &&
-    typeof existing.onDocumentPointerDown === 'function'
+    typeof existing.onDocumentPointerDown === 'function' &&
+    typeof existing.onFullscreenChange === 'function'
   ) {
     restoreDgsConstruction(existing);
     applyLayout(existing);
@@ -9354,6 +9596,28 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     }
     if (existing.onDocumentPointerDown) {
       document.removeEventListener('pointerdown', existing.onDocumentPointerDown, true);
+    }
+    if (existing.onFullscreenChange) {
+      document.removeEventListener('fullscreenchange', existing.onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', existing.onFullscreenChange as EventListener);
+      existing.boardContainer.removeEventListener('fullscreenchange', existing.onFullscreenChange);
+    }
+    if (existing.fullscreenResizeRAF != null) cancelAnimationFrame(existing.fullscreenResizeRAF);
+    if (existing.fullscreenReleaseTimer != null) window.clearTimeout(existing.fullscreenReleaseTimer);
+    if (isDgsFullscreen(existing)) {
+      try {
+        const result = typeof document.exitFullscreen === 'function'
+          ? document.exitFullscreen()
+          : (document as any).webkitExitFullscreen?.();
+        void Promise.resolve(result).then(
+          () => restoreDgsEmbeddedSize(existing),
+          () => restoreDgsEmbeddedSize(existing)
+        );
+      } catch (e) {
+        restoreDgsEmbeddedSize(existing);
+      }
+    } else if (existing.fullscreenSnapshot) {
+      restoreDgsEmbeddedSize(existing);
     }
     if (existing.resizeObserver) existing.resizeObserver.disconnect();
     if (Array.isArray(existing.rootConstructions)) {
@@ -9679,6 +9943,15 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   axisScaleButton.innerHTML = DGS_AXIS_SCALE_ICONS.cartesian;
   axisScaleButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(axisScaleButton);
+  const fullscreenButton = document.createElement('button');
+  fullscreenButton.type = 'button';
+  fullscreenButton.className = 'lia-dgs-geometry-button lia-dgs-fullscreen-button';
+  fullscreenButton.setAttribute('aria-label', text.enterFullscreen);
+  fullscreenButton.setAttribute('aria-pressed', 'false');
+  fullscreenButton.title = text.enterFullscreen;
+  fullscreenButton.innerHTML = DGS_FULLSCREEN_ICONS.enter;
+  fullscreenButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(fullscreenButton);
   const objectListButton = document.createElement('button');
   objectListButton.type = 'button';
   objectListButton.className = 'lia-dgs-geometry-button lia-dgs-object-list-button';
@@ -10253,6 +10526,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.appendChild(textDialog);
   boardContainer.appendChild(exportDialog);
   boardContainer.appendChild(button);
+  boardContainer.classList.add('lia-dgs-fullscreen-host');
   typesetDgsMath(pointButton);
 
   const board = window.__boards && window.__boards[boardId];
@@ -10409,6 +10683,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     logXScaleButton,
     logYScaleButton,
     logLogScaleButton,
+    fullscreenButton,
     objectListButton,
     textDialog,
     textDialogInput,
@@ -10437,6 +10712,9 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     sideMenuOpen: false,
     objectListOpen: false,
     objectListSignature: '',
+    fullscreenSnapshot: null,
+    fullscreenRenderWidth: 0,
+    fullscreenRenderHeight: 0,
     contextObject: null,
     activeTool: '',
     externalToolActive: false,
@@ -10478,6 +10756,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   setObjectListOpen(state, false);
   setSideMenuOpen(state, false);
   applyLayout(state);
+  renderDgsFullscreenButton(state);
 
   selectButton.addEventListener('click', (evt) => {
     evt.preventDefault();
@@ -10739,6 +11018,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     selectAxisScaleMode('log-log');
+  });
+
+  fullscreenButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    void toggleDgsFullscreen(state);
   });
 
   objectListButton.addEventListener('click', (evt) => {
@@ -11403,6 +11688,11 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   };
   document.addEventListener('pointerdown', state.onDocumentPointerDown, true);
 
+  state.onFullscreenChange = () => handleDgsFullscreenChange(state);
+  document.addEventListener('fullscreenchange', state.onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', state.onFullscreenChange as EventListener);
+  boardContainer.addEventListener('fullscreenchange', state.onFullscreenChange);
+
   state.onBoardContextMenu = (evt: MouseEvent) => {
     if (eventTargetsBoardUi(evt)) return;
     const object = findDgsContextObject(state, evt) || findDgsAxisContextObject(state, evt);
@@ -11753,6 +12043,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 
   if (typeof ResizeObserver === 'function') {
     state.resizeObserver = new ResizeObserver(() => {
+      if (isDgsFullscreen(state)) scheduleDgsFullscreenResize(state);
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
       scheduleDgsRootUpdate(state);

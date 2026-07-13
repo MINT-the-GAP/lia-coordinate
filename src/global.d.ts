@@ -23,10 +23,11 @@ interface Window {
     saveBoardState: (board: any, id: string, initialBBox: number[]) => void;
     getBoardStateStore: () => Record<string, any>;
     getConstrainedAncestorWidth: (el: HTMLElement | null) => number;
+    prepareBoardContainer: (el: HTMLElement, initialWidth: number | null, initialRatio: number, storedState: any) => void;
     clampWidth: (board: any, w: number) => number;
     clampHeight: (h: number) => number;
     solveAspectFittedSize: (board: any, preferredWidth: number, ratio: number) => { width: number; height: number };
-    applyBoardSize: (board: any, w: number, h: number, useInitial: boolean, anchorBBox: number[], initialBBox: number[], boardId: string) => any;
+    applyBoardSize: (board: any, w: number, h: number, useInitial: boolean, anchorBBox: number[], initialBBox: number[], boardId: string, limitHeight?: boolean) => any;
     fitBoardSize: (board: any, initialBBox: number[], initialWidth: number | null, initialRatio: number, boardId: string) => void;
     restoreSavedBoardState: (board: any, initialBBox: number[], boardId: string) => boolean;
     applyBoardFrame: (board: any) => void;

@@ -27,7 +27,16 @@ export function isValidBBox(bb: any): boolean {
     bb[1] > bb[3];
 }
 
-export function loadStoredBoardState(id: string): { width: number; height: number; bbox: number[] } | null {
+export type BoardSizeMode = 'auto' | 'capped' | 'manual';
+
+export interface StoredBoardState {
+  width: number;
+  height: number;
+  bbox: number[];
+  sizeMode: BoardSizeMode;
+}
+
+export function loadStoredBoardState(id: string): StoredBoardState | null {
   const store = getBoardStateStore();
   const st = store[id];
   if (!st) return null;
@@ -38,16 +47,56 @@ export function loadStoredBoardState(id: string): { width: number; height: numbe
 
   if (!(width > 0) || !(height > 0) || !isValidBBox(bbox)) return null;
 
-  return { width, height, bbox };
+  const rawMode = String(st.sizeMode || '').toLowerCase();
+  const sizeMode: BoardSizeMode = rawMode === 'manual' || st.manualSize === true
+    ? 'manual'
+    : rawMode === 'capped'
+      ? 'capped'
+      : 'auto';
+
+  return { width, height, bbox, sizeMode };
+}
+
+function readRenderedOuterSize(container: HTMLElement, dimension: 'width' | 'height'): number {
+  const offset = dimension === 'width' ? container.offsetWidth : container.offsetHeight;
+  if (Number.isFinite(offset) && offset > 0) return offset;
+
+  const inlineSize = parseFloat(dimension === 'width' ? container.style.width : container.style.height);
+  if (Number.isFinite(inlineSize) && inlineSize > 0) return inlineSize;
+
+  try {
+    const rect = container.getBoundingClientRect();
+    const rectSize = dimension === 'width' ? rect.width : rect.height;
+    if (Number.isFinite(rectSize) && rectSize > 0) return rectSize;
+  } catch (e) {}
+
+  const client = dimension === 'width' ? container.clientWidth : container.clientHeight;
+  return Number.isFinite(client) && client > 0 ? client : 0;
 }
 
 export function saveBoardState(board: any, id: string, initialBBox: number[]): void {
   if (!board || !board.containerObj) return;
+  if (board.__liaDgsFullscreenActive) return;
   if (board.__restoreLockUntil && Date.now() < board.__restoreLockUntil) return;
+  if (window.__boards && window.__boards[id] && window.__boards[id] !== board) return;
 
   const bbox = getSafeBBox(board, initialBBox);
-  const width = Math.round(board.containerObj.clientWidth || 0);
-  const height = Math.round(board.containerObj.clientHeight || 0);
+  const manualWidth = Number(board.__manualWidth);
+  const manualHeight = Number(board.__manualHeight);
+  const isManual = board.__coordSizeMode === 'manual' &&
+    Number.isFinite(manualWidth) && manualWidth > 0 &&
+    Number.isFinite(manualHeight) && manualHeight > 0;
+  const width = Math.round(isManual
+    ? manualWidth
+    : readRenderedOuterSize(board.containerObj, 'width'));
+  const height = Math.round(isManual
+    ? manualHeight
+    : readRenderedOuterSize(board.containerObj, 'height'));
+  const sizeMode: BoardSizeMode = isManual
+    ? 'manual'
+    : board.__coordSizeMode === 'capped'
+      ? 'capped'
+      : 'auto';
 
   if (!(width > 0) || !(height > 0) || !isValidBBox(bbox)) return;
 
@@ -58,6 +107,8 @@ export function saveBoardState(board: any, id: string, initialBBox: number[]): v
     width,
     height,
     bbox: bbox.slice(),
+    sizeMode,
+    manualSize: sizeMode === 'manual',
     zoomMode: board.__liaDgsZoomMode || previous.zoomMode || previous.panMode || 'both'
   };
 }
@@ -74,65 +125,118 @@ export function getSafeBBox(board: any, fallback: number[]): number[] {
   return fallback.slice();
 }
 
+function asHTMLElement(value: any): HTMLElement | null {
+  return value && value.nodeType === 1 ? value as HTMLElement : null;
+}
+
+function getComposedParent(node: HTMLElement | null): HTMLElement | null {
+  if (!node) return null;
+  if (node.parentElement) return node.parentElement;
+  try {
+    const root = node.getRootNode && node.getRootNode() as any;
+    return asHTMLElement(root && root.host);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getBoardShadowHost(el: HTMLElement | null): HTMLElement | null {
+  if (!el) return null;
+  try {
+    const root = el.getRootNode && el.getRootNode() as any;
+    return asHTMLElement(root && root.host);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getBoardContentStart(el: HTMLElement | null): HTMLElement | null {
+  const shadowHost = getBoardShadowHost(el);
+  return getComposedParent(shadowHost || el);
+}
+
+function isStableWidthContainer(display: string): boolean {
+  return display === 'block' ||
+    display === 'flex' ||
+    display === 'grid' ||
+    display === 'flow-root' ||
+    display === 'list-item' ||
+    display === 'table' ||
+    display === 'table-cell';
+}
+
+function readContentBoxWidth(node: HTMLElement, cs: CSSStyleDeclaration): number {
+  const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+  const paddingRight = parseFloat(cs.paddingRight) || 0;
+  const clientWidth = Number(node.clientWidth) || 0;
+  if (clientWidth > 1) return Math.max(0, clientWidth - paddingLeft - paddingRight);
+
+  try {
+    const rectWidth = Number(node.getBoundingClientRect().width) || 0;
+    const borderLeft = parseFloat(cs.borderLeftWidth) || 0;
+    const borderRight = parseFloat(cs.borderRightWidth) || 0;
+    return Math.max(0, rectWidth - borderLeft - borderRight - paddingLeft - paddingRight);
+  } catch (e) {
+    return 0;
+  }
+}
+
+function getBoardContentContainers(el: HTMLElement | null): HTMLElement[] {
+  let cur = getBoardContentStart(el);
+  const containers: HTMLElement[] = [];
+  while (cur) {
+    try {
+      const display = window.getComputedStyle(cur).display;
+      if (display === 'none') {
+        containers.push(cur);
+        break;
+      }
+      if (isStableWidthContainer(display)) containers.push(cur);
+    } catch (e) {}
+    if (cur === document.body || cur === document.documentElement) break;
+    cur = getComposedParent(cur);
+  }
+  return containers;
+}
+
+function stabilizeBoardHost(el: HTMLElement | null): void {
+  if (!el) return;
+  const host = getBoardShadowHost(el);
+  if (!host || String(host.tagName || '').toLowerCase() !== 'jsx-graph') return;
+  host.style.display = 'block';
+  host.style.width = '100%';
+  host.style.maxWidth = '100%';
+  host.style.minWidth = '0';
+  host.style.boxSizing = 'border-box';
+}
+
 export function getConstrainedAncestorWidth(el: HTMLElement | null): number {
-  function usableWidth(node: HTMLElement | null): number {
-    if (!node) return 0;
+  let cur = getBoardContentStart(el);
+  let minimum = Number.POSITIVE_INFINITY;
+  let hiddenLayout = false;
+
+  while (cur) {
     try {
-      const cs = window.getComputedStyle(node);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return 0;
-      const w = Math.round(node.getBoundingClientRect().width || 0);
-      return w > 1 ? w : 0;
-    } catch (e) {
-      return 0;
-    }
+      const cs = window.getComputedStyle(cur);
+      if (cs.display === 'none') {
+        hiddenLayout = true;
+        break;
+      }
+      if (isStableWidthContainer(cs.display)) {
+        const width = readContentBoxWidth(cur, cs);
+        if (width > 1) minimum = Math.min(minimum, width);
+      }
+    } catch (e) {}
+
+    if (cur === document.body || cur === document.documentElement) break;
+    cur = getComposedParent(cur);
   }
 
-  if (el) {
-    const oldWidth = el.style.width;
-    const oldMaxWidth = el.style.maxWidth;
-    const oldMinWidth = el.style.minWidth;
-    const oldBoxSizing = el.style.boxSizing;
-
-    try {
-      el.style.width = '100%';
-      el.style.maxWidth = 'none';
-      el.style.minWidth = '0';
-      el.style.boxSizing = 'border-box';
-      const measured = usableWidth(el);
-      if (measured) return measured;
-    } catch (e) {
-    } finally {
-      el.style.width = oldWidth;
-      el.style.maxWidth = oldMaxWidth;
-      el.style.minWidth = oldMinWidth;
-      el.style.boxSizing = oldBoxSizing;
-    }
+  if (!hiddenLayout && Number.isFinite(minimum)) {
+    return Math.max(1, Math.floor(minimum));
   }
 
-  let cur: HTMLElement | null = el ? el.parentElement : null;
-  while (cur && cur !== document.body && cur !== document.documentElement) {
-    const w = usableWidth(cur);
-    if (w) return w;
-    cur = cur.parentElement;
-  }
-
-  try {
-    const fallbackEl =
-      document.querySelector<HTMLElement>('.reveal .slides section.present') ||
-      document.querySelector<HTMLElement>('.lia-slide') ||
-      document.querySelector<HTMLElement>('.lia-content') ||
-      document.querySelector<HTMLElement>('main') ||
-      document.querySelector<HTMLElement>('article');
-    const w = usableWidth(fallbackEl);
-    if (w) return w;
-  } catch (e) {}
-
-  try {
-    const bodyWidth = usableWidth(document.body);
-    if (bodyWidth) return bodyWidth;
-  } catch (e) {}
-
-  const viewportWidth = Math.round(
+  const viewportWidth = Math.floor(
     (document.documentElement && document.documentElement.clientWidth) ||
     window.innerWidth ||
     900
@@ -166,12 +270,11 @@ export function solveAspectFittedSize(
   ratio: number
 ): { width: number; height: number } {
   const maxW = Math.max(1, getConstrainedAncestorWidth(board.containerObj));
-  const maxH = Math.max(1, maxBoardHeight());
   const safeRatio = Math.max(1e-9, ratio);
   const requestedMax = Number.isFinite(preferredWidth) && preferredWidth > 0
     ? preferredWidth
     : maxW;
-  const width = Math.max(1, Math.min(requestedMax, maxW, maxH / safeRatio));
+  const width = Math.max(1, Math.min(requestedMax, maxW));
 
   return {
     width: roundPx(width),
@@ -196,6 +299,38 @@ function fitDimensionsWithinBounds(
   };
 }
 
+export function prepareBoardContainer(
+  container: HTMLElement,
+  initialWidth: number | null,
+  initialRatio: number,
+  storedState: StoredBoardState | null
+): void {
+  if (!container) return;
+
+  stabilizeBoardHost(container);
+  container.style.boxSizing = 'border-box';
+  container.style.maxWidth = '100%';
+  container.style.minWidth = '0';
+  container.style.maxHeight = 'none';
+  container.style.aspectRatio = 'auto';
+
+  const size = storedState && storedState.sizeMode === 'manual'
+    ? fitDimensionsWithinBounds(
+      { containerObj: container },
+      storedState.width,
+      storedState.height
+    )
+    : solveAspectFittedSize(
+      { containerObj: container },
+      initialWidth != null ? initialWidth : getConstrainedAncestorWidth(container),
+      initialRatio
+    );
+
+  container.style.width = size.width + 'px';
+  container.style.height = size.height + 'px';
+  container.style.visibility = 'hidden';
+}
+
 export function computeResizeBBox(width: number, height: number, anchorBBox: number[], initialBBox: number[]): number[] {
   const bb = isValidBBox(anchorBBox) ? anchorBBox : initialBBox;
   const xmin  = bb[0];
@@ -212,12 +347,13 @@ export function applyBoardSize(
   useInitialBBox: boolean,
   anchorBBox: number[],
   initialBBox: number[],
-  boardId: string
+  boardId: string,
+  limitHeight: boolean = true
 ): { width: number; height: number } | null {
   if (!board || !board.containerObj) return null;
 
   const width  = clampWidth(board, desiredWidth);
-  const height = clampHeight(desiredHeight);
+  const height = limitHeight ? clampHeight(desiredHeight) : roundPx(desiredHeight);
 
   board.containerObj.style.width  = width + 'px';
   board.containerObj.style.height = height + 'px';
@@ -246,6 +382,10 @@ export function applyBoardFrame(board: any): void {
   board.containerObj.style.border = '2px solid ' + col;
   board.containerObj.style.borderRadius = '8px';
   board.containerObj.style.boxSizing = 'border-box';
+  board.containerObj.style.maxWidth = '100%';
+  board.containerObj.style.minWidth = '0';
+  board.containerObj.style.maxHeight = 'none';
+  board.containerObj.style.aspectRatio = 'auto';
   board.containerObj.style.background = 'transparent';
   board.containerObj.style.position = 'relative';
   board.containerObj.style.display = 'block';
@@ -524,8 +664,8 @@ export function ensureResizeHandle(
       pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      startW: board.containerObj.clientWidth,
-      startH: board.containerObj.clientHeight,
+      startW: board.containerObj.offsetWidth || board.containerObj.clientWidth,
+      startH: board.containerObj.offsetHeight || board.containerObj.clientHeight,
       anchorBBox: getSafeBBox(board, initialBBox)
     });
 
@@ -548,6 +688,7 @@ export function ensureResizeHandle(
     // Store manual dimensions on the board so fitBoardSize can read them.
     board.__manualWidth  = mw;
     board.__manualHeight = mh;
+    board.__coordSizeMode = 'manual';
 
     applyBoardSize(board, mw, mh, false, drag.anchorBBox, initialBBox, boardId);
     onResize();
@@ -587,7 +728,16 @@ export function fitBoardSize(
     const autoWidth = getConstrainedAncestorWidth(board.containerObj);
     const preferredWidth = initialWidth != null ? initialWidth : autoWidth;
     const size = solveAspectFittedSize(board, preferredWidth, initialRatio);
-    applyBoardSize(board, size.width, size.height, true, initialBBox, initialBBox, boardId);
+    applyBoardSize(
+      board,
+      size.width,
+      size.height,
+      false,
+      getSafeBBox(board, initialBBox),
+      initialBBox,
+      boardId,
+      false
+    );
   } else {
     const size = fitDimensionsWithinBounds(board, manualWidth, manualHeight);
     applyBoardSize(board, size.width, size.height, false, getSafeBBox(board, initialBBox), initialBBox, boardId);
@@ -604,8 +754,16 @@ export function restoreSavedBoardState(
   const st = loadStoredBoardState(boardId);
   if (!st) return false;
 
+  if (st.sizeMode !== 'manual') {
+    board.__manualWidth = null;
+    board.__manualHeight = null;
+    try { board.setBoundingBox(st.bbox.slice(), true); } catch (e) {}
+    return false;
+  }
+
   board.__manualWidth  = st.width;
   board.__manualHeight = st.height;
+  board.__coordSizeMode = 'manual';
 
   const size = fitDimensionsWithinBounds(board, st.width, st.height);
   const width = size.width;
@@ -792,6 +950,14 @@ export function createBoardDecorations(
 export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], initialRatio: number): void {
   window.__boards = window.__boards || {};
   window.__boards[cfg.id] = board;
+  board.__manualWidth = null;
+  board.__manualHeight = null;
+  board.__coordSizeMode = cfg.width == null ? 'auto' : 'capped';
+
+  function isCurrentBoard(): boolean {
+    return !!board && !!board.containerObj && board.containerObj.isConnected !== false &&
+      (!window.__boards || !window.__boards[cfg.id] || window.__boards[cfg.id] === board);
+  }
 
   function applyAll(): void {
     if (cfg.border) {
@@ -842,6 +1008,11 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   function finalize(): void {
     applyAll();
     try { board.containerObj.style.visibility = 'visible'; } catch (e) {}
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        if (isCurrentBoard()) scheduleLayoutRefit();
+      });
+    });
   }
 
   if (hadSavedState) {
@@ -864,7 +1035,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   // Color scheme change.
   try {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = function(): void { applyAll(); };
+    const handler = function(): void { if (isCurrentBoard()) applyAll(); };
     if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', handler);
     else if (mq && typeof (mq as any).addListener === 'function') (mq as any).addListener(handler);
   } catch (e) {}
@@ -875,9 +1046,17 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   let lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
 
   function scheduleLayoutRefit(): void {
+    if (!isCurrentBoard()) {
+      try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
+      window.removeEventListener('resize', scheduleLayoutRefit);
+      return;
+    }
+    if (board.__liaDgsFullscreenActive) return;
     if (layoutResizeRAF) return;
     layoutResizeRAF = requestAnimationFrame(function() {
       layoutResizeRAF = 0;
+      if (!isCurrentBoard()) return;
+      if (board.__liaDgsFullscreenActive) return;
       lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
       fitBoardSize(board, initialBBox, cfg.width, initialRatio, cfg.id);
       applyAll();
@@ -888,15 +1067,21 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 
   try {
     if (board.__coordContentResizeObserver) board.__coordContentResizeObserver.disconnect();
-    const observedContainer = board.containerObj.parentElement;
-    if (observedContainer && typeof ResizeObserver === 'function') {
+    const observedContainers = getBoardContentContainers(board.containerObj);
+    if (observedContainers.length && typeof ResizeObserver === 'function') {
       board.__coordContentResizeObserver = new ResizeObserver(function() {
+        if (!isCurrentBoard()) {
+          try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
+          return;
+        }
         const availableWidth = getConstrainedAncestorWidth(board.containerObj);
         if (Math.abs(availableWidth - lastAvailableWidth) < 1) return;
         lastAvailableWidth = availableWidth;
         scheduleLayoutRefit();
       });
-      board.__coordContentResizeObserver.observe(observedContainer);
+      observedContainers.forEach(function(container) {
+        try { board.__coordContentResizeObserver.observe(container); } catch (e) {}
+      });
     }
   } catch (e) {
     board.__coordContentResizeObserver = null;
@@ -937,7 +1122,13 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 
   // Theme color polling (accent color for grid).
   let lastGridColor = '';
-  setInterval(function() {
+  const themePoll = window.setInterval(function() {
+    if (!isCurrentBoard()) {
+      window.clearInterval(themePoll);
+      try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
+      window.removeEventListener('resize', scheduleLayoutRefit);
+      return;
+    }
     if (!cfg.grid) return;
     const c = getAccentColor();
     if (!c || c === lastGridColor) return;
