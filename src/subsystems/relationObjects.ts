@@ -12,6 +12,9 @@ import {
 } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getLivePoint, createHiddenPoint, getBoardObjects, sameCoordinates } from '../shared/boardObjects';
+import { normalizeName, namesEqual } from '../shared/format';
+import { normalizedTexName as texName } from '../shared/texName';
 
 type RelationKind = 'orthogonal' | 'parallel' | 'midpoint';
 
@@ -220,29 +223,6 @@ export function init(): void {
     removeEntryByKey(entryKey(uid));
   }
 
-  function getLivePoint(board: any, boardId: string, pointName: string): any {
-    const point = window.__points && window.__points[boardId] && window.__points[boardId][pointName];
-    if (!board || !point) return null;
-    try {
-      if (point.board !== board) return null;
-      if (typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
-    } catch (e) { return null; }
-    return point;
-  }
-
-  function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
-    return board.create('point', [coordinate.x, coordinate.y], {
-      name: '',
-      withLabel: false,
-      visible: false,
-      fixed: true,
-      frozen: true,
-      highlight: false,
-      showInfobox: false,
-      size: 0
-    });
-  }
-
   function createHiddenBaseLine(board: any, point1: any, point2: any): any {
     return board.create('line', [point1, point2], {
       name: '',
@@ -255,35 +235,6 @@ export function init(): void {
       straightFirst: true,
       straightLast: true
     });
-  }
-
-  function normalizeName(value: unknown): string {
-    let name = String(value == null ? '' : value).trim();
-    if (name.startsWith('\\(') && name.endsWith('\\)')) name = name.slice(2, -2).trim();
-    else if (name.startsWith('$') && name.endsWith('$')) name = name.slice(1, -1).trim();
-    name = name.replace(/^\\overrightarrow\{(.+)\}$/, '$1');
-    return name;
-  }
-
-  function namesEqual(a: unknown, b: unknown): boolean {
-    return !!normalizeName(a) && normalizeName(a) === normalizeName(b);
-  }
-
-  function getBoardObjects(board: any): any[] {
-    const seen = new Set<any>();
-    const objects: any[] = [];
-    const add = function(object: any) {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    try { if (Array.isArray(board && board.objectsList)) board.objectsList.forEach(add); } catch (e) {}
-    try {
-      if (board && board.objects && typeof board.objects === 'object') {
-        Object.keys(board.objects).forEach(function(key) { add(board.objects[key]); });
-      }
-    } catch (e) {}
-    return objects;
   }
 
   function candidateLineNames(object: any): string[] {
@@ -332,20 +283,6 @@ export function init(): void {
       if (candidateLineNames(object).some(function(name) { return name === wanted; })) return object;
     }
     return null;
-  }
-
-  function sameCoordinates(a: CoordinatePair[] | null, b: CoordinatePair[] | null): boolean {
-    if (!a || !b || a.length !== b.length) return false;
-    return a.every(function(point, index) {
-      return Math.abs(point.x - b[index].x) < 1e-12 && Math.abs(point.y - b[index].y) < 1e-12;
-    });
-  }
-
-  function texName(name: string): string {
-    let value = normalizeName(name);
-    const subscript = value.match(/^(.+?)_([^{}]+)$/);
-    if (subscript) value = subscript[1] + '_{' + subscript[2] + '}';
-    return value;
   }
 
   function mathName(name: string): string {

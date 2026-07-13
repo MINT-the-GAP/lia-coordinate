@@ -4,6 +4,7 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getLivePoint } from '../shared/boardObjects';
 
 interface AngleConfig {
   boardId: string;
@@ -93,23 +94,6 @@ export function init(): void {
 
   function removeEntry(uid: string): void {
     removeEntryByKey(entryKey(uid));
-  }
-
-  function getLivePoint(board: any, boardId: string, pointName: string): any {
-    const point = window.__points &&
-      window.__points[boardId] &&
-      window.__points[boardId][pointName];
-
-    if (!board || !point) return null;
-
-    try {
-      if (point.board !== board) return null;
-      if (typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
-    } catch (e) {
-      return null;
-    }
-
-    return point;
   }
 
   function coordinates(point: any): XY | null {

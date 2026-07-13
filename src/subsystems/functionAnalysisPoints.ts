@@ -5,6 +5,7 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { formatNumber } from '../shared/format';
 
 type AnalysisKind = 'roots' | 'extrema' | 'inflections';
 
@@ -154,13 +155,6 @@ export function init(): void {
     return match ? match[1] + '_{' + match[2] + '}' : raw;
   }
 
-  function formatNumber(value: number, language: 'de' | 'en'): string {
-    if (!Number.isFinite(value)) return '?';
-    const rounded = Math.abs(value) < 5e-10 ? 0 : Math.round((value + Number.EPSILON) * 1000) / 1000;
-    let text = String(rounded);
-    if (language === 'de') text = text.replace('.', '{,}');
-    return text;
-  }
 
   function pointLabelText(entry: AnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));

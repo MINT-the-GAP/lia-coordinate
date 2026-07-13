@@ -11,6 +11,8 @@ import {
 } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
+import { subscriptTexName as texName } from '../shared/texName';
 
 type LinearKind = 'line' | 'ray' | 'vector';
 
@@ -119,46 +121,6 @@ export function init(): void {
 
   function removeEntry(uid: string): void {
     removeEntryByKey(entryKey(uid));
-  }
-
-  function getLivePoint(board: any, boardId: string, pointName: string): any {
-    const point = window.__points && window.__points[boardId] && window.__points[boardId][pointName];
-    if (!board || !point) return null;
-    try {
-      if (point.board !== board) return null;
-      if (typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
-    } catch (e) { return null; }
-    return point;
-  }
-
-  function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
-    return board.create('point', [coordinate.x, coordinate.y], {
-      name: '',
-      withLabel: false,
-      visible: false,
-      fixed: true,
-      frozen: true,
-      highlight: false,
-      showInfobox: false,
-      size: 0
-    });
-  }
-
-  function sameCoordinates(a: CoordinatePair[] | null, b: CoordinatePair[] | null): boolean {
-    if (!a || !b || a.length !== b.length) return false;
-    return a.every(function(point, index) {
-      return Math.abs(point.x - b[index].x) < 1e-12 &&
-        Math.abs(point.y - b[index].y) < 1e-12;
-    });
-  }
-
-  function texName(name: string): string {
-    let value = String(name || '').trim();
-    if (value.startsWith('\\(') && value.endsWith('\\)')) value = value.slice(2, -2).trim();
-    else if (value.startsWith('$') && value.endsWith('$')) value = value.slice(1, -1).trim();
-    const subscript = value.match(/^(.+?)_([^{}]+)$/);
-    if (subscript) return subscript[1] + '_{' + subscript[2] + '}';
-    return value;
   }
 
   function cleanVectorBase(value: string): string {

@@ -6,6 +6,8 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getBoardObjects } from '../shared/boardObjects';
+import { formatNumber } from '../shared/format';
 
 type ObjectAnalysisKind = 'ordinate-intercept' | 'intersections';
 type SourceKind = 'function' | 'linear' | 'circle';
@@ -182,14 +184,6 @@ export function init(): void {
     return match ? match[1] + '_{' + match[2] + '}' : raw;
   }
 
-  function formatNumber(value: number, language: 'de' | 'en'): string {
-    if (!Number.isFinite(value)) return '?';
-    const rounded = Math.abs(value) < 5e-10 ? 0 : Math.round((value + Number.EPSILON) * 1000) / 1000;
-    let text = String(rounded);
-    if (language === 'de') text = text.replace('.', '{,}');
-    return text;
-  }
-
   function pointNameForIndex(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): string {
     const explicit = entry.explicitNames[index];
     if (explicit) return explicit;
@@ -226,23 +220,6 @@ export function init(): void {
       if (Array.isArray(bb) && bb.length === 4 && bb.every(Number.isFinite) && bb[2] > bb[0] && bb[1] > bb[3]) return bb.slice();
     } catch (e) {}
     return [-5, 5, 5, -5];
-  }
-
-  function getBoardObjects(board: any): any[] {
-    const seen = new Set<any>();
-    const objects: any[] = [];
-    const add = function(object: any) {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    try { if (Array.isArray(board && board.objectsList)) board.objectsList.forEach(add); } catch (e) {}
-    try {
-      if (board && board.objects && typeof board.objects === 'object') {
-        Object.keys(board.objects).forEach(function(key) { add(board.objects[key]); });
-      }
-    } catch (e) {}
-    return objects;
   }
 
   function detectLinearMode(object: any): LinearMode {

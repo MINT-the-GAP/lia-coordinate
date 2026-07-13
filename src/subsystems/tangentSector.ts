@@ -11,6 +11,9 @@ import {
 } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getLivePoint, createHiddenPoint, getBoardObjects } from '../shared/boardObjects';
+import { normalizeName, namesEqual } from '../shared/format';
+import { normalizedTexName as texName } from '../shared/texName';
 
 type SourceKind = 'function' | 'linear' | 'circle';
 
@@ -188,45 +191,9 @@ export function init(): void {
     return 'sector-' + String(uid || '');
   }
 
-  function normalizeName(value: unknown): string {
-    let name = String(value == null ? '' : value).trim();
-    if (name.startsWith('\\(') && name.endsWith('\\)')) name = name.slice(2, -2).trim();
-    else if (name.startsWith('$') && name.endsWith('$')) name = name.slice(1, -1).trim();
-    name = name.replace(/^\\overrightarrow\{(.+)\}$/, '$1');
-    return name;
-  }
-
-  function namesEqual(a: unknown, b: unknown): boolean {
-    return !!normalizeName(a) && normalizeName(a) === normalizeName(b);
-  }
-
-  function texName(name: string): string {
-    let value = normalizeName(name);
-    const subscript = value.match(/^(.+?)_([^{}]+)$/);
-    if (subscript) value = subscript[1] + '_{' + subscript[2] + '}';
-    return value;
-  }
-
   function mathName(name: string): string {
     const body = texName(name);
     return body ? '\\(' + body + '\\)' : '';
-  }
-
-  function getBoardObjects(board: any): any[] {
-    const seen = new Set<any>();
-    const objects: any[] = [];
-    const add = function(object: any) {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    try { if (Array.isArray(board && board.objectsList)) board.objectsList.forEach(add); } catch (e) {}
-    try {
-      if (board && board.objects && typeof board.objects === 'object') {
-        Object.keys(board.objects).forEach(function(key) { add(board.objects[key]); });
-      }
-    } catch (e) {}
-    return objects;
   }
 
   function sourceKind(object: any): SourceKind | null {
@@ -316,29 +283,6 @@ export function init(): void {
       if (source) return source;
     }
     return null;
-  }
-
-  function getLivePoint(board: any, boardId: string, pointName: string): any {
-    const point = window.__points && window.__points[boardId] && window.__points[boardId][pointName];
-    if (!board || !point) return null;
-    try {
-      if (point.board !== board) return null;
-      if (typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
-    } catch (e) { return null; }
-    return point;
-  }
-
-  function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
-    return board.create('point', [coordinate.x, coordinate.y], {
-      name: '',
-      withLabel: false,
-      visible: false,
-      fixed: true,
-      frozen: true,
-      highlight: false,
-      showInfobox: false,
-      size: 0
-    });
   }
 
   function createHiddenSegment(board: any, points: any[]): any {

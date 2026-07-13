@@ -4,6 +4,8 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getLivePoint } from '../shared/boardObjects';
+import { subscriptTexName as texName } from '../shared/texName';
 
 interface CircleConfig {
   boardId: string;
@@ -107,32 +109,6 @@ export function init(): void {
 
   function removeEntry(uid: string): void {
     removeEntryByKey(entryKey(uid));
-  }
-
-  function getLivePoint(board: any, boardId: string, pointName: string): any {
-    const point = window.__points &&
-      window.__points[boardId] &&
-      window.__points[boardId][pointName];
-
-    if (!board || !point) return null;
-
-    try {
-      if (point.board !== board) return null;
-      if (typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
-    } catch (e) {
-      return null;
-    }
-    return point;
-  }
-
-  function texName(name: string): string {
-    let value = String(name || '').trim();
-    if (value.startsWith('\\(') && value.endsWith('\\)')) value = value.slice(2, -2).trim();
-    else if (value.startsWith('$') && value.endsWith('$')) value = value.slice(1, -1).trim();
-
-    const subscript = value.match(/^(.+?)_([^{}]+)$/);
-    if (subscript) return subscript[1] + '_{' + subscript[2] + '}';
-    return value;
   }
 
   function formatValue(value: number, language: 'de' | 'en'): string {

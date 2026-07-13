@@ -12,6 +12,8 @@ import {
 } from '../shared/parser';
 import { initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getBoardObjects } from '../shared/boardObjects';
+import { formatNumber } from '../shared/format';
 
 interface SliderConfig {
   boardId: string;
@@ -173,23 +175,6 @@ export function init(): void {
     return 'slider-' + String(uid || '');
   }
 
-  function getBoardObjects(board: any): any[] {
-    const seen = new Set<any>();
-    const objects: any[] = [];
-    const add = function(object: any) {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    try { if (Array.isArray(board && board.objectsList)) board.objectsList.forEach(add); } catch (e) {}
-    try {
-      if (board && board.objects && typeof board.objects === 'object') {
-        Object.keys(board.objects).forEach(function(key) { add(board.objects[key]); });
-      }
-    } catch (e) {}
-    return objects;
-  }
-
   function isSliderObject(object: any): boolean {
     return !!object && (!!object.__liaDgsSlider || !!object.__liaMacroSlider);
   }
@@ -260,13 +245,6 @@ export function init(): void {
     return match[2] ? base + '_{' + match[2] + '}' : base;
   }
 
-  function formatNumber(value: number, language: 'de' | 'en'): string {
-    if (!Number.isFinite(value)) return '?';
-    const rounded = Math.abs(value) < 5e-10 ? 0 : Math.round((value + Number.EPSILON) * 1000) / 1000;
-    let text = String(rounded);
-    if (language === 'de') text = text.replace('.', '{,}');
-    return text;
-  }
 
   function sliderLabelText(slider: any): string {
     const name = sliderNameToTex(slider && (slider.__liaDgsSliderName || slider.__liaMacroSliderName));
