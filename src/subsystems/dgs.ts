@@ -742,6 +742,49 @@ function ensureStyles(root: Document | ShadowRoot): void {
       transform: translateY(calc(-100% - 2px));
       transition: transform ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1);
       pointer-events: none;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .lia-dgs-top-menu::-webkit-scrollbar {
+      display: none;
+    }
+
+    .lia-dgs-top-menu-fade {
+      position: absolute;
+      top: 0;
+      width: 24px;
+      height: ${MENU_HEIGHT_PX}px;
+      opacity: 0;
+      transition: opacity 150ms ease;
+      pointer-events: none;
+    }
+
+    .lia-dgs-top-menu-fade[data-visible="1"] {
+      opacity: 1;
+    }
+
+    .lia-dgs-top-menu-fade-start {
+      left: 48px;
+      background: linear-gradient(to right, var(--lia-dgs-menu-bg, #fff), transparent);
+    }
+
+    .lia-dgs-top-menu-fade-end {
+      right: 0;
+      background: linear-gradient(to left, var(--lia-dgs-menu-bg, #fff), transparent);
+    }
+
+    .lia-dgs-top-menu-mask-start {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 48px;
+      height: ${MENU_HEIGHT_PX}px;
+      background: var(--lia-dgs-menu-bg, #fff);
+      pointer-events: none;
     }
 
     .lia-dgs-top-menu[data-open="1"] {
@@ -1542,8 +1585,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-fullscreen-button {
-      left: auto;
-      right: 53px;
+      left: 785px;
     }
 
     .lia-dgs-fullscreen-button path {
@@ -1555,8 +1597,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-object-list-button {
-      left: auto;
-      right: 10px;
+      left: 828px;
     }
 
     .lia-dgs-object-list-dot {
@@ -9978,6 +10019,29 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   menuBar.appendChild(axisScaleSubmenu);
   menuClip.appendChild(menuBar);
 
+  const menuScrollMaskStart = document.createElement('div');
+  menuScrollMaskStart.className = 'lia-dgs-top-menu-mask-start';
+  menuClip.appendChild(menuScrollMaskStart);
+
+  const menuScrollFadeStart = document.createElement('div');
+  menuScrollFadeStart.className = 'lia-dgs-top-menu-fade lia-dgs-top-menu-fade-start';
+  menuClip.appendChild(menuScrollFadeStart);
+
+  const menuScrollFadeEnd = document.createElement('div');
+  menuScrollFadeEnd.className = 'lia-dgs-top-menu-fade lia-dgs-top-menu-fade-end';
+  menuClip.appendChild(menuScrollFadeEnd);
+
+  const updateMenuScrollFades = (): void => {
+    const maxScrollLeft = menuBar.scrollWidth - menuBar.clientWidth;
+    menuScrollFadeStart.setAttribute('data-visible', menuBar.scrollLeft > 1 ? '1' : '0');
+    menuScrollFadeEnd.setAttribute('data-visible', menuBar.scrollLeft < maxScrollLeft - 1 ? '1' : '0');
+  };
+  menuBar.addEventListener('scroll', updateMenuScrollFades, { passive: true });
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(updateMenuScrollFades).observe(menuBar);
+  }
+  updateMenuScrollFades();
+
   const sideMenuClip = document.createElement('div');
   sideMenuClip.className = 'lia-dgs-side-menu-clip';
 
@@ -10501,6 +10565,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path><path d="M5 12h14"></path><path d="M5 17h14"></path></svg>';
   button.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.addEventListener('wheel', (evt) => {
+    evt.stopPropagation();
+    if (menuBar.scrollWidth <= menuBar.clientWidth) return;
+    evt.preventDefault();
+    menuBar.scrollLeft += Math.abs(evt.deltaX) > Math.abs(evt.deltaY) ? evt.deltaX : evt.deltaY;
+  }, { passive: false });
   sideMenu.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   objectListPanel.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
