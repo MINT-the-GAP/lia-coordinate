@@ -22,6 +22,7 @@ type DgsState = {
   button: HTMLButtonElement;
   menuClip: HTMLDivElement;
   menuBar: HTMLDivElement;
+  menuEndGroup: HTMLDivElement;
   sideMenuClip: HTMLDivElement;
   sideMenu: HTMLDivElement;
   sideMenuTitle: HTMLDivElement;
@@ -669,12 +670,15 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
+const DGS_STYLE_VERSION = '2026-07-14-1';
 
 function ensureStyles(root: Document | ShadowRoot): void {
-  if (root.querySelector('#lia-dgs-style')) return;
+  const existingStyle = root.querySelector<HTMLStyleElement>('#lia-dgs-style');
+  if (existingStyle?.dataset.liaDgsStyleVersion === DGS_STYLE_VERSION) return;
 
-  const style = document.createElement('style');
+  const style = existingStyle || document.createElement('style');
   style.id = 'lia-dgs-style';
+  style.dataset.liaDgsStyleVersion = DGS_STYLE_VERSION;
   style.textContent = `
     .lia-dgs-menu-button {
       position: absolute;
@@ -759,12 +763,15 @@ function ensureStyles(root: Document | ShadowRoot): void {
       width: 24px;
       height: ${MENU_HEIGHT_PX}px;
       opacity: 0;
+      visibility: hidden;
       transition: opacity 150ms ease;
       pointer-events: none;
+      z-index: 2;
     }
 
-    .lia-dgs-top-menu-fade[data-visible="1"] {
+    .lia-dgs-top-menu[data-open="1"] ~ .lia-dgs-top-menu-fade[data-visible="1"] {
       opacity: 1;
+      visibility: visible;
     }
 
     .lia-dgs-top-menu-fade-start {
@@ -773,7 +780,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-top-menu-fade-end {
-      right: 0;
+      right: 98px;
       background: linear-gradient(to left, var(--lia-dgs-menu-bg, #fff), transparent);
     }
 
@@ -784,6 +791,55 @@ function ensureStyles(root: Document | ShadowRoot): void {
       width: 48px;
       height: ${MENU_HEIGHT_PX}px;
       background: var(--lia-dgs-menu-bg, #fff);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 150ms ease;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .lia-dgs-top-menu[data-open="1"] ~ .lia-dgs-top-menu-mask-start {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .lia-dgs-top-menu-end {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 98px;
+      height: ${MENU_HEIGHT_PX}px;
+      box-sizing: border-box;
+      padding: 7.5px 10px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 8px;
+      border-bottom: 2px solid currentColor;
+      background: var(--lia-dgs-menu-bg, #fff);
+      color: var(--lia-dgs-neutral-color, currentColor);
+      transform: translateY(calc(-100% - 2px));
+      transition: transform ${MENU_TRANSITION_MS}ms cubic-bezier(.2, .8, .2, 1);
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .lia-dgs-top-menu[data-open="1"] ~ .lia-dgs-top-menu-end {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .lia-dgs-top-menu-end .lia-dgs-geometry-button {
+      position: static;
+      flex: 0 0 35px;
+    }
+
+    .lia-dgs-top-menu-scroll-spacer {
+      position: absolute;
+      top: 0;
+      left: 882px;
+      width: 1px;
+      height: 1px;
       pointer-events: none;
     }
 
@@ -1585,7 +1641,8 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-fullscreen-button {
-      left: 785px;
+      left: auto;
+      right: auto;
     }
 
     .lia-dgs-fullscreen-button path {
@@ -1597,7 +1654,8 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-object-list-button {
-      left: 828px;
+      left: auto;
+      right: auto;
     }
 
     .lia-dgs-object-list-dot {
@@ -2013,6 +2071,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     @media (prefers-reduced-motion: reduce) {
       .lia-dgs-top-menu,
+      .lia-dgs-top-menu-end,
       .lia-dgs-side-menu,
       .lia-dgs-geometry-submenu {
         transition: none;
@@ -2020,10 +2079,12 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
   `;
 
-  if (root instanceof Document) {
-    (root.head || root.documentElement).appendChild(style);
-  } else {
-    root.appendChild(style);
+  if (!existingStyle) {
+    if (root instanceof Document) {
+      (root.head || root.documentElement).appendChild(style);
+    } else {
+      root.appendChild(style);
+    }
   }
 }
 
@@ -8760,7 +8821,9 @@ function applyLayout(state: DgsState): void {
   state.textDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.exportDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.exportDialog.style.setProperty('--lia-dgs-theme-color', accent);
+  state.boardContainer.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
+  state.boardContainer.style.setProperty('--lia-dgs-neutral-color', tone);
   state.boardContainer.style.setProperty('--lia-dgs-fullscreen-bg', tone === '#fff' ? '#151a1c' : '#fff');
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
@@ -9127,6 +9190,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.open = open;
   state.menuBar.dataset.open = open ? '1' : '0';
   state.menuBar.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.menuEndGroup.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.button.setAttribute('aria-expanded', open ? 'true' : 'false');
   state.button.classList.toggle('is-active', open);
   state.sideMenu.dataset.topOpen = open ? '1' : '0';
@@ -9491,6 +9555,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     existing.button.isConnected &&
     !!existing.menuClip?.isConnected &&
     !!existing.menuBar?.isConnected &&
+    !!existing.menuEndGroup?.isConnected &&
     !!existing.sideMenuClip?.isConnected &&
     !!existing.sideMenu?.isConnected &&
     !!existing.sideMenuObjectType?.isConnected &&
@@ -9984,6 +10049,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   axisScaleButton.innerHTML = DGS_AXIS_SCALE_ICONS.cartesian;
   axisScaleButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(axisScaleButton);
+  const menuEndGroup = document.createElement('div');
+  menuEndGroup.className = 'lia-dgs-top-menu-end';
+  menuEndGroup.setAttribute('role', 'group');
+  menuEndGroup.setAttribute('aria-hidden', 'true');
+  menuEndGroup.setAttribute(
+    'aria-label',
+    geometryLanguage === 'de' ? 'Ansicht und Objektliste' : 'View and object list'
+  );
+  menuEndGroup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuEndGroup.addEventListener('wheel', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+  }, { passive: false });
   const fullscreenButton = document.createElement('button');
   fullscreenButton.type = 'button';
   fullscreenButton.className = 'lia-dgs-geometry-button lia-dgs-fullscreen-button';
@@ -9992,7 +10070,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   fullscreenButton.title = text.enterFullscreen;
   fullscreenButton.innerHTML = DGS_FULLSCREEN_ICONS.enter;
   fullscreenButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
-  menuBar.appendChild(fullscreenButton);
+  menuEndGroup.appendChild(fullscreenButton);
   const objectListButton = document.createElement('button');
   objectListButton.type = 'button';
   objectListButton.className = 'lia-dgs-geometry-button lia-dgs-object-list-button';
@@ -10001,7 +10079,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   objectListButton.title = text.objectList;
   objectListButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><circle class=lia-dgs-object-list-dot cx=5 cy=6 r=1.6></circle><circle class=lia-dgs-object-list-dot cx=5 cy=12 r=1.6></circle><circle class=lia-dgs-object-list-dot cx=5 cy=18 r=1.6></circle><path d=M9,6H21M9,12H21M9,18H21></path></svg>';
   objectListButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
-  menuBar.appendChild(objectListButton);
+  menuEndGroup.appendChild(objectListButton);
   const axisScaleSubmenu = document.createElement('div');
   axisScaleSubmenu.id = 'dgs-axis-scale-submenu-' + uid;
   axisScaleSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-axis-scale-submenu';
@@ -10017,6 +10095,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     scaleButton.setAttribute('aria-checked', 'false');
   });
   menuBar.appendChild(axisScaleSubmenu);
+  const menuScrollSpacer = document.createElement('span');
+  menuScrollSpacer.className = 'lia-dgs-top-menu-scroll-spacer';
+  menuScrollSpacer.setAttribute('aria-hidden', 'true');
+  menuBar.appendChild(menuScrollSpacer);
   menuClip.appendChild(menuBar);
 
   const menuScrollMaskStart = document.createElement('div');
@@ -10030,6 +10112,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const menuScrollFadeEnd = document.createElement('div');
   menuScrollFadeEnd.className = 'lia-dgs-top-menu-fade lia-dgs-top-menu-fade-end';
   menuClip.appendChild(menuScrollFadeEnd);
+  menuClip.appendChild(menuEndGroup);
 
   const updateMenuScrollFades = (): void => {
     const maxScrollLeft = menuBar.scrollWidth - menuBar.clientWidth;
@@ -10621,6 +10704,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     button,
     menuClip,
     menuBar,
+    menuEndGroup,
     sideMenuClip,
     sideMenu,
     sideMenuTitle,
