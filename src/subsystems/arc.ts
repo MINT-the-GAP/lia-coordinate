@@ -30,6 +30,7 @@ interface ArcConfig extends ArcDesign {
   useMathJax: boolean;
   strokeWidth: number;
   color: string;
+  hasExplicitColor: boolean;
   language: 'de' | 'en';
 }
 
@@ -160,8 +161,13 @@ export function init(): void {
     return Number.isFinite(parsed) ? Math.max(0.25, Math.min(20, parsed)) : 3;
   }
 
-  function parseDesign(value: unknown): ArcDesign {
-    let raw = String(value == null ? '' : value)
+  function isStrokeWidthToken(value: unknown): boolean {
+    const raw = String(value == null ? '' : value).trim().replace(',', '.');
+    return /^((?:\d+(?:\.\d*)?|\.\d+))\s*(?:px)?$/i.test(raw);
+  }
+
+  function normalizeDesignToken(value: unknown): string {
+    return String(value == null ? '' : value)
       .trim()
       .replace(/&lt;/gi, '<')
       .replace(/&gt;/gi, '>')
@@ -171,6 +177,15 @@ export function init(): void {
       .replace(/←/g, '<-')
       .replace(/[−–—]/g, '-')
       .replace(/\s+/g, '');
+  }
+
+  function isDesignToken(value: unknown): boolean {
+    const raw = normalizeDesignToken(value);
+    return raw === '' || raw === '-' || /^\|?(?:->|<-|<->)\|?$/.test(raw);
+  }
+
+  function parseDesign(value: unknown): ArcDesign {
+    let raw = normalizeDesignToken(value);
     const startCap = raw.startsWith('|');
     const endCap = raw.endsWith('|');
     if (startCap) raw = raw.slice(1);
@@ -183,6 +198,18 @@ export function init(): void {
       startCap,
       endCap
     };
+  }
+
+  function arrowHead(enabled: boolean, strokeWidth: number): false | {
+    type: number;
+    size: number;
+    highlightSize: number;
+  } {
+    if (!enabled) return false;
+    // JSXGraph multiplies arrow size by the line width. Keep the filled,
+    // vector-like triangle at a compact and visually stable screen size.
+    const size = 13 / Math.max(0.25, strokeWidth);
+    return { type: 1, size, highlightSize: size };
   }
 
   function renderCaption(value: unknown): { text: string; useMathJax: boolean } {
@@ -209,7 +236,22 @@ export function init(): void {
     if (!parts[0] || !start || exitAngle == null || !end || entryAngle == null) return null;
     const caption = decodeLegacyParentheses(parts[5] || '');
     const renderedCaption = renderCaption(caption);
-    const design = parseDesign(parts[6] || '');
+    let designToken = parts[6] || '';
+    let strokeWidthToken = parts[7] || '';
+    let colorToken = parts[8] || '';
+    // The documented form appends color to the original signature. Also
+    // accept caption;color;design;width, matching the order of older macros.
+    if (!isDesignToken(designToken) && isDesignToken(strokeWidthToken)) {
+      colorToken = designToken;
+      designToken = strokeWidthToken;
+      strokeWidthToken = parts[8] || '';
+    } else if (!colorToken && strokeWidthToken && !isStrokeWidthToken(strokeWidthToken)) {
+      // Allow design;color as a shorthand when the default width is desired.
+      colorToken = strokeWidthToken;
+      strokeWidthToken = '';
+    }
+    const explicitColor = String(colorToken || '').trim();
+    const design = parseDesign(designToken);
     return {
       boardId: String(parts[0] || '').trim(),
       start,
@@ -219,8 +261,9 @@ export function init(): void {
       caption,
       renderedCaption: renderedCaption.text,
       useMathJax: renderedCaption.useMathJax,
-      strokeWidth: parseStrokeWidth(parts[7] || ''),
-      color: getAccentColor(),
+      strokeWidth: parseStrokeWidth(strokeWidthToken),
+      color: explicitColor || getAccentColor(),
+      hasExplicitColor: !!explicitColor,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
       ...design
     };
@@ -437,8 +480,8 @@ export function init(): void {
       strokeWidth: cfg.strokeWidth,
       highlightStrokeWidth: cfg.strokeWidth,
       lineCap: 'round',
-      firstArrow: cfg.firstArrow ? { type: 7 } : false,
-      lastArrow: cfg.lastArrow ? { type: 7 } : false,
+      firstArrow: arrowHead(cfg.firstArrow, cfg.strokeWidth),
+      lastArrow: arrowHead(cfg.lastArrow, cfg.strokeWidth),
       doAdvancedPlot: false,
       numberPointsLow: 64,
       numberPointsHigh: 128,
@@ -482,8 +525,8 @@ export function init(): void {
           highlightStrokeColor: color,
           strokeWidth: entry.strokeWidth,
           highlightStrokeWidth: entry.strokeWidth,
-          firstArrow: entry.firstArrow ? { type: 7 } : false,
-          lastArrow: entry.lastArrow ? { type: 7 } : false
+          firstArrow: arrowHead(entry.firstArrow, entry.strokeWidth),
+          lastArrow: arrowHead(entry.lastArrow, entry.strokeWidth)
         });
       }
     } catch (e) {}
@@ -513,6 +556,7 @@ export function init(): void {
       if (entry.curve) {
         entry.curve.__liaArcColor = color;
         entry.curve.__liaArcStrokeWidth = entry.strokeWidth;
+        entry.curve.__liaArcHasExplicitColor = !!entry.hasExplicitColor;
       }
     } catch (e) {}
   }
@@ -564,6 +608,7 @@ export function init(): void {
         old.strokeWidth === cfg.strokeWidth &&
         old.language === cfg.language) {
       old.color = cfg.color;
+      old.hasExplicitColor = cfg.hasExplicitColor;
       applyArcStyle(old, cfg.color);
       try { board.update(); } catch (e) {}
       return true;
@@ -611,6 +656,7 @@ export function init(): void {
       curve.__liaArcDesign = cfg.normalized;
       curve.__liaArcStrokeWidth = cfg.strokeWidth;
       curve.__liaArcColor = cfg.color;
+      curve.__liaArcHasExplicitColor = cfg.hasExplicitColor;
       curve.__liaArcLanguage = cfg.language;
 
       window.__arcEntries[key] = {
@@ -633,6 +679,7 @@ export function init(): void {
         endCap: cfg.endCap,
         strokeWidth: cfg.strokeWidth,
         color: cfg.color,
+        hasExplicitColor: cfg.hasExplicitColor,
         language: cfg.language,
         points,
         ownedPoints,
@@ -723,8 +770,10 @@ export function init(): void {
       Object.keys(window.__arcEntries || {}).forEach(function(key) {
         const entry = window.__arcEntries[key];
         if (!entry) return;
-        entry.color = getAccentColor();
-        applyArcStyle(entry, entry.color);
+        if (!entry.hasExplicitColor) {
+          entry.color = getAccentColor();
+          applyArcStyle(entry, entry.color);
+        }
         try { if (entry.board) entry.board.update(); } catch (e) {}
       });
     });

@@ -13,7 +13,15 @@ import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
 
-interface DistanceConfig {
+interface DistanceDesign {
+  normalizedDesign: string;
+  firstArrow: boolean;
+  lastArrow: boolean;
+  startCap: boolean;
+  endCap: boolean;
+}
+
+interface DistanceConfig extends DistanceDesign {
   boardId: string;
   point1Name: string;
   point2Name: string;
@@ -24,6 +32,12 @@ interface DistanceConfig {
   showLength: boolean;
   segmentName: string;
   showName: boolean;
+  strokeWidth: number;
+}
+
+interface DistanceCap {
+  segment: any;
+  points: any[];
 }
 
 export function init(): void {
@@ -39,6 +53,75 @@ export function init(): void {
   initThemeSync();
 
   let hasPendingDistances = false;
+
+  function normalizeDesignToken(value: unknown): string {
+    return String(value == null ? '' : value)
+      .trim()
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&vert;/gi, '|')
+      .replace(/\u2194/g, '<->')
+      .replace(/\u2192/g, '->')
+      .replace(/\u2190/g, '<-')
+      .replace(/[\u2212\u2013\u2014]/g, '-')
+      .replace(/\s+/g, '');
+  }
+
+  function designOptionValue(value: unknown): string | null {
+    const raw = String(value == null ? '' : value).trim();
+    const keyed = raw.match(/^design\s*=\s*(.*)$/i);
+    const token = normalizeDesignToken(keyed ? keyed[1] : raw);
+    return token === '-' || /^\|?(?:->|<-|<->)\|?$/.test(token)
+      ? token
+      : null;
+  }
+
+  function parseDesign(value: unknown): DistanceDesign {
+    let raw = normalizeDesignToken(value);
+    if (raw === '-') raw = '';
+    const startCap = raw.startsWith('|');
+    const endCap = raw.endsWith('|');
+    if (startCap) raw = raw.slice(1);
+    if (endCap && raw) raw = raw.slice(0, -1);
+    const arrow = raw === '->' || raw === '<-' || raw === '<->' ? raw : '';
+    return {
+      normalizedDesign: (startCap ? '|' : '') + arrow + (endCap ? '|' : ''),
+      firstArrow: arrow === '<-' || arrow === '<->',
+      lastArrow: arrow === '->' || arrow === '<->',
+      startCap,
+      endCap
+    };
+  }
+
+  function isStrokeWidthToken(value: unknown): boolean {
+    const raw = String(value == null ? '' : value).trim().replace(',', '.');
+    return /^(?:\d+(?:\.\d*)?|\.\d+)\s*(?:px)?$/i.test(raw);
+  }
+
+  function strokeWidthOptionValue(value: unknown, allowBareNumber: boolean): string | null {
+    const raw = String(value == null ? '' : value).trim();
+    const keyed = raw.match(/^(?:stroke-?width|line-?width|width|linienst(?:\u00e4rke|aerke))\s*=\s*(.+)$/i);
+    if (keyed) return isStrokeWidthToken(keyed[1]) ? keyed[1] : null;
+    if (!isStrokeWidthToken(raw)) return null;
+    return /px\s*$/i.test(raw) || allowBareNumber ? raw : null;
+  }
+
+  function parseStrokeWidth(value: unknown): number {
+    const raw = String(value == null ? '' : value).trim().replace(',', '.');
+    const match = raw.match(/^(?:\d+(?:\.\d*)?|\.\d+)/);
+    const parsed = match ? Number(match[0]) : NaN;
+    return Number.isFinite(parsed) ? Math.max(0.25, Math.min(20, parsed)) : 3;
+  }
+
+  function arrowHead(enabled: boolean, strokeWidth: number): false | {
+    type: number;
+    size: number;
+    highlightSize: number;
+  } {
+    if (!enabled) return false;
+    const size = 13 / Math.max(0.25, strokeWidth);
+    return { type: 1, size, highlightSize: size };
+  }
 
   function parseDistanceSpec(spec: string, language?: string): DistanceConfig {
     const parts = splitTopLevel(unquote(String(spec || '')), ';')
@@ -68,9 +151,29 @@ export function init(): void {
     const trailingOptions = parts.slice(colorIndex + 1)
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
+    const designIndex = trailingOptions.findIndex(function(part) {
+      return designOptionValue(part) != null;
+    });
+    let strokeWidthIndex = trailingOptions.findIndex(function(part) {
+      return strokeWidthOptionValue(part, false) != null;
+    });
+    if (strokeWidthIndex < 0 && designIndex >= 0) {
+      strokeWidthIndex = trailingOptions.findIndex(function(part, index) {
+        return index > designIndex && strokeWidthOptionValue(part, true) != null;
+      });
+    }
+    const design = parseDesign(
+      designIndex >= 0 ? designOptionValue(trailingOptions[designIndex]) : ''
+    );
+    const strokeWidthToken = strokeWidthIndex >= 0
+      ? strokeWidthOptionValue(trailingOptions[strokeWidthIndex], true)
+      : '';
     const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
-    const rawSegmentName = trailingOptions.find(function(part) {
-      return !/^length\s*=/i.test(part) && !isHiddenNameOption(part);
+    const rawSegmentName = trailingOptions.find(function(part, index) {
+      return index !== designIndex &&
+        index !== strokeWidthIndex &&
+        !/^length\s*=/i.test(part) &&
+        !isHiddenNameOption(part);
     }) || '';
     const parsedName = parseMacroName(rawSegmentName);
 
@@ -86,7 +189,9 @@ export function init(): void {
         return /^length\s*=\s*1$/i.test(part);
       }),
       segmentName: parsedName.name,
-      showName: parsedName.showName && !standaloneHiddenName
+      showName: parsedName.showName && !standaloneHiddenName,
+      strokeWidth: parseStrokeWidth(strokeWidthToken),
+      ...design
     };
   }
 
@@ -102,6 +207,12 @@ export function init(): void {
       if (entry.board && entry.label) entry.board.removeObject(entry.label);
     } catch (e) {}
 
+    (Array.isArray(entry.capSegments) ? entry.capSegments : []).forEach(function(segment: any) {
+      try { if (entry.board && segment) entry.board.removeObject(segment); } catch (e) {}
+    });
+    (Array.isArray(entry.capPoints) ? entry.capPoints : []).forEach(function(point: any) {
+      try { if (entry.board && point) entry.board.removeObject(point); } catch (e) {}
+    });
     const segments = Array.isArray(entry.segments)
       ? entry.segments
       : (entry.segment ? [entry.segment] : []);
@@ -120,19 +231,155 @@ export function init(): void {
     removeEntryByKey(entryKey(uid));
   }
 
-  function applySegmentColor(segment: any, color: string): void {
+  function endpointTangentScreen(
+    board: any,
+    points: any[],
+    atStart: boolean
+  ): { x: number; y: number; length: number } {
+    const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
+    const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
+    const endpointIndex = atStart ? 0 : points.length - 1;
+    const endpoint = points[endpointIndex];
+    if (!endpoint) return { x: 0, y: 0, length: 0 };
+
+    const step = atStart ? 1 : -1;
+    for (
+      let index = endpointIndex + step;
+      index >= 0 && index < points.length;
+      index += step
+    ) {
+      try {
+        const x = (Number(points[index].X()) - Number(endpoint.X())) * unitX;
+        const y = -(Number(points[index].Y()) - Number(endpoint.Y())) * unitY;
+        const length = Math.hypot(x, y);
+        if (Number.isFinite(length) && length > 1e-9) return { x, y, length };
+      } catch (e) {}
+    }
+    return { x: 0, y: 0, length: 0 };
+  }
+
+  function capOffset(
+    board: any,
+    points: any[],
+    atStart: boolean,
+    side: number
+  ): CoordinatePair {
+    const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
+    const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
+    const tangent = endpointTangentScreen(board, points, atStart);
+    if (tangent.length <= 1e-9) return { x: 0, y: 0 };
+    const normalScreenX = -tangent.y / tangent.length;
+    const normalScreenY = tangent.x / tangent.length;
+    const halfLengthPx = 6;
+    return {
+      x: side * normalScreenX * halfLengthPx / unitX,
+      y: -side * normalScreenY * halfLengthPx / unitY
+    };
+  }
+
+  function createCap(
+    board: any,
+    points: any[],
+    atStart: boolean,
+    color: string,
+    strokeWidth: number
+  ): DistanceCap {
+    const endpoint = points[atStart ? 0 : points.length - 1];
+    const makePoint = function(side: number) {
+      const point = board.create('point', [
+        function() { return Number(endpoint.X()) + capOffset(board, points, atStart, side).x; },
+        function() { return Number(endpoint.Y()) + capOffset(board, points, atStart, side).y; }
+      ], {
+        name: '',
+        withLabel: false,
+        visible: false,
+        fixed: true,
+        frozen: false,
+        highlight: false,
+        showInfobox: false,
+        size: 0
+      });
+      try { if (typeof point.addParents === 'function') point.addParents(points); } catch (e) {}
+      return point;
+    };
+    const capPoints = [makePoint(-1), makePoint(1)];
+    const segment = board.create('segment', capPoints, {
+      name: '',
+      withLabel: false,
+      fixed: true,
+      highlight: false,
+      visible: function() {
+        return endpointTangentScreen(board, points, atStart).length > 1e-9;
+      },
+      strokeColor: color,
+      highlightStrokeColor: color,
+      strokeWidth,
+      highlightStrokeWidth: strokeWidth,
+      lineCap: 'round'
+    });
+    return { segment, points: capPoints };
+  }
+
+  function applySegmentStyle(
+    segment: any,
+    color: string,
+    strokeWidth: number,
+    firstArrow: boolean,
+    lastArrow: boolean,
+    normalizedDesign: string
+  ): void {
     if (!segment || typeof segment.setAttribute !== 'function') return;
 
     try {
       segment.setAttribute({
         strokeColor: color,
-        highlightStrokeColor: color
+        highlightStrokeColor: color,
+        strokeWidth,
+        highlightStrokeWidth: strokeWidth,
+        firstArrow: arrowHead(firstArrow, strokeWidth),
+        lastArrow: arrowHead(lastArrow, strokeWidth)
       });
+    } catch (e) {}
+    try {
+      segment.__liaDistanceColor = color;
+      segment.__liaDistanceStrokeWidth = strokeWidth;
+      segment.__liaDistanceDesign = normalizedDesign;
     } catch (e) {}
   }
 
-  function applySegmentColors(segments: any[], color: string): void {
-    segments.forEach(function(segment) { applySegmentColor(segment, color); });
+  function applySegmentStyles(
+    segments: any[],
+    color: string,
+    strokeWidth: number,
+    firstArrow: boolean,
+    lastArrow: boolean,
+    normalizedDesign: string
+  ): void {
+    segments.forEach(function(segment, index) {
+      applySegmentStyle(
+        segment,
+        color,
+        strokeWidth,
+        firstArrow && index === 0,
+        lastArrow && index === segments.length - 1,
+        normalizedDesign
+      );
+    });
+  }
+
+  function applyCapStyles(capSegments: any[], color: string, strokeWidth: number): void {
+    capSegments.forEach(function(segment) {
+      try {
+        if (segment && typeof segment.setAttribute === 'function') {
+          segment.setAttribute({
+            strokeColor: color,
+            highlightStrokeColor: color,
+            strokeWidth,
+            highlightStrokeWidth: strokeWidth
+          });
+        }
+      } catch (e) {}
+    });
   }
 
   function applyLabelColor(label: any, color: string): void {
@@ -304,7 +551,8 @@ export function init(): void {
       Math.abs(normalX) * labelSize.width +
       Math.abs(normalY) * labelSize.height
     ) / 2;
-    const offsetPx = halfExtentAlongNormal + 6;
+    const lineGapPx = Math.max(6, cfg.strokeWidth / 2 + 3);
+    const offsetPx = halfExtentAlongNormal + lineGapPx;
 
     return {
       x: midpointX + normalX * offsetPx / unitX,
@@ -390,14 +638,31 @@ export function init(): void {
       old.showLength === cfg.showLength &&
       old.segmentName === cfg.segmentName &&
       old.showName === cfg.showName &&
+      old.normalizedDesign === cfg.normalizedDesign &&
       (!(cfg.showLength || (cfg.showName && cfg.segmentName)) || old.label) &&
       Array.isArray(old.segments) &&
-      old.segments.length === (coordinateMode ? cfg.coordinates!.length - 1 : 1)
+      old.segments.length === (coordinateMode ? cfg.coordinates!.length - 1 : 1) &&
+      Array.isArray(old.capSegments) &&
+      old.capSegments.length === (cfg.startCap ? 1 : 0) + (cfg.endCap ? 1 : 0)
     ) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
-      applySegmentColors(old.segments, cfg.color);
+      old.strokeWidth = cfg.strokeWidth;
+      old.firstArrow = cfg.firstArrow;
+      old.lastArrow = cfg.lastArrow;
+      old.startCap = cfg.startCap;
+      old.endCap = cfg.endCap;
+      applySegmentStyles(
+        old.segments,
+        cfg.color,
+        cfg.strokeWidth,
+        cfg.firstArrow,
+        cfg.lastArrow,
+        cfg.normalizedDesign
+      );
+      applyCapStyles(old.capSegments, cfg.color, cfg.strokeWidth);
       applyLabelColor(old.label, cfg.color);
+      try { board.update(); } catch (e) {}
       return true;
     }
 
@@ -405,6 +670,8 @@ export function init(): void {
 
     const ownedPoints: any[] = [];
     const segments: any[] = [];
+    const capSegments: any[] = [];
+    const capPoints: any[] = [];
     let label = null;
 
     try {
@@ -424,15 +691,34 @@ export function init(): void {
           highlight: false,
           strokeColor: cfg.color,
           highlightStrokeColor: cfg.color,
-          strokeWidth: 3,
-          highlightStrokeWidth: 3,
+          strokeWidth: cfg.strokeWidth,
+          highlightStrokeWidth: cfg.strokeWidth,
+          firstArrow: arrowHead(cfg.firstArrow && index === 1, cfg.strokeWidth),
+          lastArrow: arrowHead(
+            cfg.lastArrow && index === points.length - 1,
+            cfg.strokeWidth
+          ),
           straightFirst: false,
           straightLast: false
         });
         segment.__liaDgsSegmentName = cfg.segmentName;
         segment.__liaDgsShowName = cfg.showName;
         segment.__liaDgsShowLength = cfg.showLength;
+        segment.__liaDistanceColor = cfg.color;
+        segment.__liaDistanceStrokeWidth = cfg.strokeWidth;
+        segment.__liaDistanceDesign = cfg.normalizedDesign;
         segments.push(segment);
+      }
+
+      if (cfg.startCap) {
+        const cap = createCap(board, points, true, cfg.color, cfg.strokeWidth);
+        capSegments.push(cap.segment);
+        capPoints.push.apply(capPoints, cap.points);
+      }
+      if (cfg.endCap) {
+        const cap = createCap(board, points, false, cfg.color, cfg.strokeWidth);
+        capSegments.push(cap.segment);
+        capPoints.push.apply(capPoints, cap.points);
       }
 
       if (cfg.showLength || (cfg.showName && cfg.segmentName)) {
@@ -453,12 +739,20 @@ export function init(): void {
         showLength: cfg.showLength,
         segmentName: cfg.segmentName,
         showName: cfg.showName,
+        strokeWidth: cfg.strokeWidth,
+        normalizedDesign: cfg.normalizedDesign,
+        firstArrow: cfg.firstArrow,
+        lastArrow: cfg.lastArrow,
+        startCap: cfg.startCap,
+        endCap: cfg.endCap,
         board: board,
         points: points,
         point1: points[0],
         point2: points[points.length - 1],
         segments: segments,
         segment: segments[0] || null,
+        capSegments: capSegments,
+        capPoints: capPoints,
         ownedPoints: ownedPoints,
         label: label
       };
@@ -470,6 +764,12 @@ export function init(): void {
       try { if (label) board.removeObject(label); } catch (removeError) {}
       segments.forEach(function(segment) {
         try { board.removeObject(segment); } catch (removeError) {}
+      });
+      capSegments.forEach(function(segment) {
+        try { board.removeObject(segment); } catch (removeError) {}
+      });
+      capPoints.forEach(function(point) {
+        try { board.removeObject(point); } catch (removeError) {}
       });
       ownedPoints.forEach(function(point) {
         try { board.removeObject(point); } catch (removeError) {}
@@ -561,9 +861,18 @@ export function init(): void {
       if (!entry) return;
       if (!entry.hasExplicitColor) {
         entry.color = getAccentColor();
-        applySegmentColors(
+        applySegmentStyles(
           Array.isArray(entry.segments) ? entry.segments : (entry.segment ? [entry.segment] : []),
-          entry.color
+          entry.color,
+          Number(entry.strokeWidth) || 3,
+          !!entry.firstArrow,
+          !!entry.lastArrow,
+          String(entry.normalizedDesign || '')
+        );
+        applyCapStyles(
+          Array.isArray(entry.capSegments) ? entry.capSegments : [],
+          entry.color,
+          Number(entry.strokeWidth) || 3
         );
       }
       applyLabelColor(entry.label, entry.color);

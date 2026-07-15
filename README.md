@@ -526,7 +526,16 @@ for references but omitted from the label; with `length=1`, the numeric
 length and unit remain visible. Without a name and without exactly
 `length=1`, only the path is rendered.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>[=0];length=1`
+The optional design follows `@Arc` / `@Bogen`: `->`, `<-`, and
+`<->` add arrows, while a leading or trailing `|` adds a short
+perpendicular cap at that end (for example `|->`, `->|`, or
+`|<->|`). An empty design or `-` keeps the ordinary segment.
+For coordinate lists, arrows and caps are applied only to the two outer ends
+of the complete polygonal path. An optional line width such as `2px`
+defaults to `3px`; use `-;2px` when only the width should change.
+The unambiguous aliases `design=...` and `width=...` are accepted as well.
+
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>[=0][;length=1][;<design>][;<lineWidth>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
@@ -534,9 +543,9 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 @Point(`ex_distance;A;-2;-1`)
 @Point(`ex_distance;B;3;2`)
 
-@Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
+@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px`)
 
-@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s=0;length=1`)
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s=0;length=1;|<->|;4px`)
 ```
 
 ---
@@ -546,9 +555,9 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 @Point(`ex_distance;A;-2;-1`)
 @Point(`ex_distance;B;3;2`)
 
-@Strecke(`ex_distance;[A;B];#e63946;a;length=1`)
+@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px`)
 
-@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s=0;length=1`)
+@Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s=0;length=1;|<->|;4px`)
 
 ## `@Line` / `@Gerade`, `@Ray` / `@Strahl`, `@Vector` / `@Vektor`
 
@@ -614,10 +623,13 @@ the end, for example `|->`, `->|`, or `|<->|`. An empty design or
 `-` draws the curve without arrows. The caption accepts plain text and
 dollar-delimited TeX; leave its field empty with two adjacent separators
 (`...;<entryAngle>;;<design>;...`) to omit it. Line widths such as `2px`
-are measured in screen pixels; the default is `3px`. The curve uses the
-current theme accent color.
+are measured in screen pixels; the default is `3px`. An optional final CSS
+color, for example `#e63946`, colors the curve, arrowheads, caps, and caption.
+Without that argument, the curve follows the current theme accent color. For
+compatibility with the color position of the other geometry macros,
+`<caption>;<color>;<design>;<lineWidth>` is accepted as an alias as well.
 
-Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<entryAngle>;<caption>;<design>;<lineWidth>`
+Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<entryAngle>;<caption>;<design>;<lineWidth>[;<color>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_arc`)
@@ -625,8 +637,8 @@ Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<
 @Point(`ex_arc;A;-3;0`)
 @Point(`ex_arc;B;3;0`)
 
-@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px`)
-@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px`)
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946`)
+@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px;#457b9d`)
 ```
 
 ---
@@ -636,8 +648,8 @@ Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<
 @Point(`ex_arc;A;-3;0`)
 @Point(`ex_arc;B;3;0`)
 
-@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px`)
-@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px`)
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946`)
+@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px;#457b9d`)
 
 ## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`
 
@@ -1071,11 +1083,16 @@ does not change the point or label color. Trace state, color, and marker positio
 in DGS persistence and undo/redo.
 The segment tool connects two successively selected points, labels the magenta segment with
 lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
-The same line-tools submenu also provides rays, straight lines, and vectors. For a ray, the first selected
+The same line-tools submenu also provides rays, straight lines, vectors, and cubic arcs. For a ray, the first selected
 point is its endpoint and the second selected point determines its direction. A vector is drawn as
 a finite arrow from the first selected point to the second selected point. Named endpoints produce
 an automatic vector label such as `\overrightarrow{AB}`; otherwise a lowercase fallback such as
-`\overrightarrow{a}` is used. The arrow spans the complete label.
+`\overrightarrow{a}` is used. The arrow spans the complete label. The arc tool is located directly
+below the vector. Select its start and end point, then enter the exit and entry angles in the
+centered dialog using the same unit-circle convention as `@Arc` / `@Bogen`. The resulting magenta
+cubic Bézier curve stays attached to both movable endpoints and receives the next free lowercase
+object name. Both tangent angles can later be changed on blur or Enter in the right-click object
+menu; invalid values remain marked for correction.
 The line-relations submenu sits between the line and shape tools and provides perpendicular,
 parallel, midpoint, and angle-bisector constructions. For a perpendicular or parallel, select a
 segment, ray, vector, or straight line and a point in either order; it creates the dynamically
@@ -1084,7 +1101,7 @@ exactly two already existing points and creates an alphabetically named dependen
 between them. Its object menu provides a Show coordinates checkbox for the dynamic coordinate
 pair. The angle-bisector tool accepts three existing points in arm–vertex–arm order and
 creates the dynamically linked internal angle-bisector line through the vertex.
-The line, ray, vector, segment, perpendicular, parallel, polygon, circle, circular-sector, and angle tools reuse a nearby existing point or
+The line, ray, vector, arc, segment, perpendicular, parallel, polygon, circle, circular-sector, and angle tools reuse a nearby existing point or
 automatically place a new alphabetically named DGS point when clicking an empty board position.
 The polygon tool selects points in sequence. Selecting the first point again after at
 least three distinct points closes the sequence and creates a movable polygon (for example,
@@ -1167,7 +1184,7 @@ the open top menu moves both panels downward. The button at the bottom of the ob
 a centered export dialog. It creates a fresh eight-character board id and emits the current board
 as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
 system, axis labels, points, coordinate text, parameter sliders, function graphs, function-analysis
-points, ordinate-axis intercepts, intersections, segments, straight lines, rays, vectors,
+points, ordinate-axis intercepts, intersections, segments, straight lines, rays, vectors, arcs,
 perpendiculars, parallels, midpoints, polygons/areas, circles, circular sectors/segments,
 tangents, and angles. Objects without standalone macros are listed in a short HTML comment so
 the exported block stays pasteable.
@@ -1192,7 +1209,7 @@ removed from their object menus.
 Each zero point also offers Show value; enabling it adds the current x-value to its dynamic
 label. Extremum and inflection points offer the same option and display their current coordinate
 pair; an ordinate-axis intercept displays its current ordinate value.
-Right-clicking a DGS point, segment, ray, vector, line, function, or polygon opens an object menu from the right. It can lock the
+Right-clicking a DGS point, segment, ray, vector, arc, line, function, or polygon opens an object menu from the right. It can lock the
 object and independently show or hide its name and visual representation; an open top menu
 pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
 inline color palette with hue and hexadecimal controls recolors DGS objects.

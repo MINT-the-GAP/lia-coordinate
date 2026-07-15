@@ -46,6 +46,9 @@ type DgsState = {
   yCoordinateInput: HTMLInputElement;
   angleMeasureSection: HTMLDivElement;
   angleMeasureInput: HTMLInputElement;
+  arcSettingsSection: HTMLDivElement;
+  arcExitAngleInput: HTMLInputElement;
+  arcEntryAngleInput: HTMLInputElement;
   functionExpressionSection: HTMLDivElement;
   functionExpressionPreview: HTMLDivElement;
   functionExpressionInput: HTMLInputElement;
@@ -120,11 +123,17 @@ type DgsState = {
   angleDialogInput: HTMLInputElement;
   angleDialogConfirmButton: HTMLButtonElement;
   angleDialogCancelButton: HTMLButtonElement;
+  arcDialog: HTMLDivElement;
+  arcDialogExitInput: HTMLInputElement;
+  arcDialogEntryInput: HTMLInputElement;
+  arcDialogConfirmButton: HTMLButtonElement;
+  arcDialogCancelButton: HTMLButtonElement;
   geometrySubmenu: HTMLDivElement;
   segmentToolButton: HTMLButtonElement;
   rayToolButton: HTMLButtonElement;
   lineToolButton: HTMLButtonElement;
   vectorToolButton: HTMLButtonElement;
+  arcToolButton: HTMLButtonElement;
   shapeSubmenu: HTMLDivElement;
   polygonToolButton: HTMLButtonElement;
   circleToolButton: HTMLButtonElement;
@@ -178,6 +187,7 @@ type DgsState = {
   rootSubmenuOpen: boolean;
   axisScaleSubmenuOpen: boolean;
   angleDialogOpen: boolean;
+  arcDialogOpen: boolean;
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
   exportDialogOpen: boolean;
@@ -194,12 +204,13 @@ type DgsState = {
   fullscreenRenderWidth: number;
   fullscreenRenderHeight: number;
   contextObject: any | null;
-  activeTool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
+  activeTool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
   externalToolActive: boolean;
   pendingTextPosition: { x: number; y: number } | null;
   zoomMode: 'both' | 'vertical' | 'horizontal';
   axisScaleMode: DgsAxisScaleMode;
   selectedSegmentPoint: any | null;
+  pendingArcPoints: any[];
   selectedRelationLine: any | null;
   selectedRelationPoint: any | null;
   selectedMidpointPoint: any | null;
@@ -236,6 +247,8 @@ type DgsState = {
 
 const DGS_TEXT = {
   de: {
+    arc: 'Bogen', showArc: 'Bogen anzeigen', createArc: 'Bogen erzeugen',
+    exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
     enterFullscreen: 'Vollbildmodus starten', exitFullscreen: 'Vollbildmodus beenden',
     objectList: 'Objektliste', noObjects: 'Noch keine Objekte', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
@@ -250,6 +263,8 @@ const DGS_TEXT = {
     enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
+    arc: 'Arc', showArc: 'Show arc', createArc: 'Create arc',
+    exitAngle: 'Exit angle', entryAngle: 'Entry angle',
     enterFullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen',
     objectList: 'Object list', noObjects: 'No objects yet', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
@@ -2172,9 +2187,12 @@ function getUsedSegmentNames(state: DgsState): Set<string> {
     if (!segment || typeof segment !== 'object') return;
     if (segment.__liaDgsPolygonBorderInitializing) return;
     const type = String(segment.elType || '').toLowerCase();
-    if (type !== 'segment' && type !== 'line' && !segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsLine && !segment.__liaDgsVector) return;
+    if (type !== 'segment' && type !== 'line' &&
+        !segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsLine &&
+        !segment.__liaDgsVector && !segment.__liaDgsArc) return;
 
-    [segment.__liaDgsSegmentName, segment.__liaDgsRayName, segment.__liaDgsLineName, segment.__liaDgsVectorName, segment.name].forEach((value) => {
+    [segment.__liaDgsSegmentName, segment.__liaDgsRayName, segment.__liaDgsLineName,
+      segment.__liaDgsVectorName, segment.__liaDgsArcName, segment.name].forEach((value) => {
       const name = unwrapAlphabeticName(value);
       if (/^[a-z]'*$/.test(name)) used.add(name);
     });
@@ -3577,6 +3595,255 @@ function createDgsVector(state: DgsState, point1: any, point2: any): any | null 
   } catch (e) {
     return null;
   }
+}
+
+type DgsArcGeometry = {
+  p0: { x: number; y: number };
+  p1: { x: number; y: number };
+  p2: { x: number; y: number };
+  p3: { x: number; y: number };
+  chord: number;
+};
+
+function parseDgsArcAngle(value: unknown): number | null {
+  const raw = String(value == null ? '' : value)
+    .trim()
+    .toLowerCase()
+    .replace(/(?:\s*(?:deg|grad|°))$/, '')
+    .replace(',', '.');
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  const normalized = ((parsed % 360) + 360) % 360;
+  return Math.abs(normalized - 360) < 1e-12 ? 0 : normalized;
+}
+
+function getDefaultDgsArcAngles(point1: any, point2: any): { exitAngle: number; entryAngle: number } {
+  let direction = 0;
+  try {
+    direction = Math.atan2(
+      Number(point2.Y()) - Number(point1.Y()),
+      Number(point2.X()) - Number(point1.X())
+    ) * 180 / Math.PI;
+  } catch (e) {}
+  const normalize = (value: number) => ((value % 360) + 360) % 360;
+  return {
+    exitAngle: normalize(direction + 45),
+    entryAngle: normalize(direction + 135)
+  };
+}
+
+function getDgsArcGeometry(
+  point1: any,
+  point2: any,
+  exitAngle: number,
+  entryAngle: number
+): DgsArcGeometry {
+  let startX = NaN;
+  let startY = NaN;
+  let endX = NaN;
+  let endY = NaN;
+  try {
+    startX = Number(point1.X());
+    startY = Number(point1.Y());
+    endX = Number(point2.X());
+    endY = Number(point2.Y());
+  } catch (e) {}
+  const chord = Math.hypot(endX - startX, endY - startY);
+  const handle = chord / 3;
+  const exitRadians = exitAngle * Math.PI / 180;
+  const entryRadians = entryAngle * Math.PI / 180;
+  return {
+    p0: { x: startX, y: startY },
+    p1: {
+      x: startX + handle * Math.cos(exitRadians),
+      y: startY + handle * Math.sin(exitRadians)
+    },
+    p2: {
+      x: endX + handle * Math.cos(entryRadians),
+      y: endY + handle * Math.sin(entryRadians)
+    },
+    p3: { x: endX, y: endY },
+    chord
+  };
+}
+
+function getDgsArcPoint(geometry: DgsArcGeometry, t: number): { x: number; y: number } {
+  if (!Number.isFinite(geometry.chord) || geometry.chord < 1e-12) return { x: NaN, y: NaN };
+  const u = 1 - t;
+  const a = u * u * u;
+  const b = 3 * u * u * t;
+  const c = 3 * u * t * t;
+  const d = t * t * t;
+  return {
+    x: a * geometry.p0.x + b * geometry.p1.x + c * geometry.p2.x + d * geometry.p3.x,
+    y: a * geometry.p0.y + b * geometry.p1.y + c * geometry.p2.y + d * geometry.p3.y
+  };
+}
+
+function getDgsArcDerivative(geometry: DgsArcGeometry, t: number): { x: number; y: number } {
+  const u = 1 - t;
+  return {
+    x: 3 * u * u * (geometry.p1.x - geometry.p0.x) +
+      6 * u * t * (geometry.p2.x - geometry.p1.x) +
+      3 * t * t * (geometry.p3.x - geometry.p2.x),
+    y: 3 * u * u * (geometry.p1.y - geometry.p0.y) +
+      6 * u * t * (geometry.p2.y - geometry.p1.y) +
+      3 * t * t * (geometry.p3.y - geometry.p2.y)
+  };
+}
+
+function getDgsArcLabelPosition(arc: any): { x: number; y: number } {
+  const point1 = arc && arc.__liaDgsArcStartPoint;
+  const point2 = arc && arc.__liaDgsArcEndPoint;
+  const geometry = getDgsArcGeometry(
+    point1,
+    point2,
+    Number(arc && arc.__liaDgsArcExitAngle) || 0,
+    Number(arc && arc.__liaDgsArcEntryAngle) || 0
+  );
+  const midpoint = getDgsArcPoint(geometry, 0.5);
+  if (!Number.isFinite(midpoint.x) || !Number.isFinite(midpoint.y)) return midpoint;
+  let derivative = getDgsArcDerivative(geometry, 0.5);
+  if (Math.hypot(derivative.x, derivative.y) < 1e-12) {
+    derivative = { x: geometry.p3.x - geometry.p0.x, y: geometry.p3.y - geometry.p0.y };
+  }
+  const board = arc && arc.board;
+  const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
+  const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
+  const tangentX = derivative.x * unitX;
+  const tangentY = -derivative.y * unitY;
+  let normalX = -tangentY;
+  let normalY = tangentX;
+  const length = Math.hypot(normalX, normalY);
+  if (length > 1e-12) {
+    normalX /= length;
+    normalY /= length;
+  } else {
+    normalX = 0;
+    normalY = -1;
+  }
+  if (normalY > 0 || (Math.abs(normalY) < 1e-12 && normalX < 0)) {
+    normalX = -normalX;
+    normalY = -normalY;
+  }
+  const offsetPx = 15;
+  return {
+    x: midpoint.x + normalX * offsetPx / unitX,
+    y: midpoint.y - normalY * offsetPx / unitY
+  };
+}
+
+function createDgsArc(
+  state: DgsState,
+  point1: any,
+  point2: any,
+  exitAngleValue: unknown,
+  entryAngleValue: unknown
+): any | null {
+  if (!state.board || !point1 || !point2 || point1 === point2) return null;
+  const exitAngle = parseDgsArcAngle(exitAngleValue);
+  const entryAngle = parseDgsArcAngle(entryAngleValue);
+  if (exitAngle == null || entryAngle == null) return null;
+  const name = getNextSegmentName(state);
+  let arc: any = null;
+  try {
+    const geometry = () => {
+      const currentExitAngle = arc ? Number(arc.__liaDgsArcExitAngle) : NaN;
+      const currentEntryAngle = arc ? Number(arc.__liaDgsArcEntryAngle) : NaN;
+      return getDgsArcGeometry(
+        point1,
+        point2,
+        Number.isFinite(currentExitAngle) ? currentExitAngle : exitAngle,
+        Number.isFinite(currentEntryAngle) ? currentEntryAngle : entryAngle
+      );
+    };
+    arc = state.board.create('curve', [
+      function(t: number) { return getDgsArcPoint(geometry(), Number(t)).x; },
+      function(t: number) { return getDgsArcPoint(geometry(), Number(t)).y; },
+      0,
+      1
+    ], {
+      name: '',
+      withLabel: false,
+      fixed: true,
+      highlight: false,
+      visible: function() {
+        const current = geometry();
+        return Number.isFinite(current.chord) && current.chord > 1e-12;
+      },
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      lineCap: 'round',
+      firstArrow: false,
+      lastArrow: false,
+      doAdvancedPlot: false,
+      numberPointsLow: 64,
+      numberPointsHigh: 128,
+      needsRegularUpdate: true
+    });
+    arc.__liaDgsArc = true;
+    arc.__liaDgsArcName = name;
+    arc.__liaDgsArcStartPoint = point1;
+    arc.__liaDgsArcEndPoint = point2;
+    arc.__liaDgsArcExitAngle = exitAngle;
+    arc.__liaDgsArcEntryAngle = entryAngle;
+    arc.__liaDgsArcDesign = '-';
+    arc.__liaDgsArcStrokeWidth = 3;
+    arc.__liaDgsLanguage = state.language;
+    arc.__liaDgsColor = '#ff00ff';
+    arc.__liaDgsShowName = true;
+    arc.__liaDgsShowObject = true;
+    arc.__liaDgsOpacity = 1;
+    arc.point1 = point1;
+    arc.point2 = point2;
+    try { if (typeof arc.addParents === 'function') arc.addParents([point1, point2]); } catch (e) {}
+    const label = state.board.create('text', [
+      function() { return getDgsArcLabelPosition(arc).x; },
+      function() { return getDgsArcLabelPosition(arc).y; },
+      function() { return dgsObjectLabelText(arc); }
+    ], {
+      fixed: true,
+      highlight: false,
+      parse: false,
+      useMathJax: true,
+      display: 'html',
+      anchorX: 'middle',
+      anchorY: 'middle',
+      strokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      fontSize: 20
+    });
+    arc.label = label;
+    arc.__liaDgsArcLabel = label;
+    try { if (typeof label.addParents === 'function') label.addParents([point1, point2]); } catch (e) {}
+    refreshDgsObjectLabel(arc);
+    try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return arc;
+  } catch (e) {
+    try { if (arc) state.board.removeObject(arc); } catch (removeError) {}
+    return null;
+  }
+}
+
+function setDgsArcAngles(
+  state: DgsState,
+  arc: any,
+  exitAngleValue: unknown,
+  entryAngleValue: unknown,
+  recordHistory = true
+): boolean {
+  if (!isDgsArc(arc)) return false;
+  const exitAngle = parseDgsArcAngle(exitAngleValue);
+  const entryAngle = parseDgsArcAngle(entryAngleValue);
+  if (exitAngle == null || entryAngle == null) return false;
+  arc.__liaDgsArcExitAngle = exitAngle;
+  arc.__liaDgsArcEntryAngle = entryAngle;
+  try { if (typeof state.board.fullUpdate === 'function') state.board.fullUpdate(); else state.board.update(); } catch (e) {}
+  persistDgsConstruction(state, recordHistory);
+  return true;
 }
 
 function createDgsLine(state: DgsState, point1: any, point2: any): any | null {
@@ -5384,6 +5651,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     else if (object.__liaDgsSegment) type = 'segment';
     else if (isDgsRay(object)) type = 'ray';
     else if (isDgsVector(object)) type = 'vector';
+    else if (isDgsArc(object)) type = 'arc';
     else if (isDgsPerpendicular(object)) type = 'perpendicular';
     else if (isDgsParallel(object)) type = 'parallel';
     else if (isDgsLine(object)) type = 'line';
@@ -5494,6 +5762,15 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     } else if (type === 'parallel') {
       record.baseId = ensureDgsPersistentId(object.__liaDgsParallelBase, 'line');
       record.points = [dgsPointReference(object.__liaDgsParallelPoint)];
+    } else if (type === 'arc') {
+      record.points = [
+        dgsPointReference(object.__liaDgsArcStartPoint),
+        dgsPointReference(object.__liaDgsArcEndPoint)
+      ];
+      record.exitAngle = Number(object.__liaDgsArcExitAngle);
+      record.entryAngle = Number(object.__liaDgsArcEntryAngle);
+      record.design = String(object.__liaDgsArcDesign || '-');
+      record.strokeWidth = Number(object.__liaDgsArcStrokeWidth) || 3;
     } else if (type === 'segment' || type === 'ray' || type === 'vector' || type === 'line') {
       record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
     } else if (type === 'polygon') {
@@ -5639,6 +5916,16 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   if (isDgsPolygon(object)) object.__liaDgsPolygonAutoName = !!record.autoName;
   if (isDgsAngle(object)) object.__liaDgsAngleAutoName = !!record.autoName;
   if (isDgsVector(object)) object.__liaDgsVectorAutoName = !!record.autoName;
+  if (isDgsArc(object)) {
+    const exitAngle = parseDgsArcAngle(record.exitAngle);
+    const entryAngle = parseDgsArcAngle(record.entryAngle);
+    if (exitAngle != null) object.__liaDgsArcExitAngle = exitAngle;
+    if (entryAngle != null) object.__liaDgsArcEntryAngle = entryAngle;
+    object.__liaDgsArcDesign = String(record.design || '-');
+    const strokeWidth = Math.max(0.25, Math.min(20, Number(record.strokeWidth) || 3));
+    object.__liaDgsArcStrokeWidth = strokeWidth;
+    try { object.setAttribute({ strokeWidth, highlightStrokeWidth: Math.max(strokeWidth, strokeWidth + 1) }); } catch (e) {}
+  }
   if (isDgsAngle(object) && record.measuredAngle) {
     object.__liaDgsMeasuredConstruction = true;
     object.__liaDgsTargetAngle = Number(record.targetAngle);
@@ -5784,6 +6071,9 @@ function restoreDgsPendingRecords(
       } else if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
       else if (record.type === 'ray') object = createDgsRay(state, points[0], points[1]);
       else if (record.type === 'vector') object = createDgsVector(state, points[0], points[1]);
+      else if (record.type === 'arc') {
+        object = createDgsArc(state, points[0], points[1], record.exitAngle, record.entryAngle);
+      }
       else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
       else if (record.type === 'polygon') object = createDgsPolygon(state, points);
       else if (record.type === 'sector') object = createDgsSector(state, points[0], points[1], points[2]);
@@ -5949,8 +6239,10 @@ function restoreDgsConstruction(state: DgsState): void {
 function clearDgsConstructionFromBoard(state: DgsState): void {
   clearDgsCirclePreview(state);
   setAngleDialogOpen(state, false);
+  setArcDialogOpen(state, false);
   setTextDialogOpen(state, false);
   setSelectedSegmentPoint(state, null);
+  state.pendingArcPoints = [];
   setSelectedRelationInputs(state, null, null);
   setSelectedMidpointPoint(state, null);
   setSelectedBisectorPoints(state, []);
@@ -5989,6 +6281,9 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     if (object && object.__liaDgsRay && object.__liaDgsRayLabel) {
       try { state.board.removeObject(object.__liaDgsRayLabel); } catch (e) {}
     }
+    if (object && object.__liaDgsArc && object.__liaDgsArcLabel) {
+      try { state.board.removeObject(object.__liaDgsArcLabel); } catch (e) {}
+    }
     if (object && object.__liaDgsFunction && object.__liaDgsFunctionLabel) {
       try { state.board.removeObject(object.__liaDgsFunctionLabel); } catch (e) {}
     }
@@ -5998,7 +6293,7 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     try { state.board.removeObject(part); } catch (e) {}
   });
   objects.filter((object) => object && !isDgsPoint(object) && (
-    object.__liaDgsSegment || object.__liaDgsRay || object.__liaDgsVector || object.__liaDgsLine || object.__liaDgsPolygon ||
+    object.__liaDgsSegment || object.__liaDgsRay || object.__liaDgsVector || object.__liaDgsLine || object.__liaDgsArc || object.__liaDgsPolygon ||
     object.__liaDgsCircle || object.__liaDgsSector || object.__liaDgsAngle || object.__liaDgsFunction || object.__liaDgsText || object.__liaDgsSlider || object.__liaDgsTangentHelper ||
     object.__liaDgsAngleBisectorHelper
   )).forEach((object) => {
@@ -6210,7 +6505,7 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   const seen = new Set<any>();
   const add = (segment: any) => {
     if (!segment || typeof segment !== 'object' || seen.has(segment) ||
-        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsVector && !segment.__liaDgsLine &&
+        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsVector && !segment.__liaDgsLine && !segment.__liaDgsArc &&
          !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsSector &&
          !segment.__liaDgsAngle && !segment.__liaDgsFunction && !segment.__liaDgsText && !segment.__liaDgsSlider)) return;
     seen.add(segment);
@@ -6344,6 +6639,10 @@ function isDgsVector(object: any): boolean {
   return !!object && !!object.__liaDgsVector;
 }
 
+function isDgsArc(object: any): boolean {
+  return !!object && !!object.__liaDgsArc;
+}
+
 function isDgsPolygon(object: any): boolean {
   return !!object && !!object.__liaDgsPolygon;
 }
@@ -6367,6 +6666,7 @@ function getDgsObjectName(object: any): string {
   if (isDgsPoint(object)) return String(object.__liaDgsPointName || '');
   if (isDgsRay(object)) return String(object.__liaDgsRayName || '');
   if (isDgsVector(object)) return String(object.__liaDgsVectorName || '');
+  if (isDgsArc(object)) return String(object.__liaDgsArcName || '');
   if (isDgsLine(object)) return String(object.__liaDgsLineName || '');
   if (isDgsPolygon(object)) return String(object.__liaDgsPolygonName || '');
   if (isDgsCircle(object)) return String(object.__liaDgsCircleName || '');
@@ -6377,7 +6677,7 @@ function getDgsObjectName(object: any): string {
 
 function isDgsObjectListEntry(object: any): boolean {
   return isDgsPoint(object) || isDgsFunction(object) || isDgsText(object) || isDgsSlider(object) ||
-    isDgsLinearObject(object) || isDgsPolygon(object) || isDgsCircle(object) ||
+    isDgsLinearObject(object) || isDgsArc(object) || isDgsPolygon(object) || isDgsCircle(object) ||
     isDgsSector(object) || isDgsAngle(object);
 }
 
@@ -6395,6 +6695,7 @@ function getDgsObjectTypeLabel(state: DgsState, object: any): string {
   if (isDgsText(object)) return text.text;
   if (isDgsRay(object)) return text.ray;
   if (isDgsVector(object)) return text.vector;
+  if (isDgsArc(object)) return text.arc;
   if (object && object.__liaDgsTangent) return text.tangent;
   if (object && object.__liaDgsAngleBisector) return text.angleBisector;
   if (isDgsLine(object)) return text.line;
@@ -6599,6 +6900,7 @@ function buildDgsExportMacroBlock(state: DgsState): string {
     line: useGerman ? 'Gerade' : 'Line',
     ray: useGerman ? 'Strahl' : 'Ray',
     vector: useGerman ? 'Vektor' : 'Vector',
+    arc: useGerman ? 'Bogen' : 'Arc',
     perpendicular: useGerman ? 'Orthogonale' : 'Perpendicular',
     parallel: useGerman ? 'Parallele' : 'Parallel',
     midpoint: useGerman ? 'Mittelpunkt' : 'Midpoint',
@@ -6850,6 +7152,30 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       objectLines.push(macroDgsExportLine(macros.tangent, parts.join(';')));
       exportedObjectNames.set(object, sourceName);
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
+      return;
+    }
+
+    if (isDgsArc(object)) {
+      if (object.__liaDgsShowObject === false) return;
+      const startName = ensurePoint(object.__liaDgsArcStartPoint);
+      const endName = ensurePoint(object.__liaDgsArcEndPoint);
+      if (!startName || !endName) return;
+      const sourceName = cleanDgsExportToken(name || 'b');
+      const caption = object.__liaDgsShowName !== false && sourceName
+        ? '$' + sourceName + '$'
+        : '';
+      const strokeWidth = Number(object.__liaDgsArcStrokeWidth);
+      objectLines.push(macroDgsExportLine(macros.arc, [
+        exportId,
+        cleanDgsExportToken(startName),
+        formatDgsExportNumber(Number(object.__liaDgsArcExitAngle)),
+        cleanDgsExportToken(endName),
+        formatDgsExportNumber(Number(object.__liaDgsArcEntryAngle)),
+        caption,
+        String(object.__liaDgsArcDesign || '-'),
+        formatDgsExportNumber(Number.isFinite(strokeWidth) ? strokeWidth : 3, 3) + 'px',
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ].join(';')));
       return;
     }
 
@@ -7124,6 +7450,8 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
   } else if (isDgsVector(object)) {
     object.__liaDgsVectorName = name;
     object.__liaDgsVectorAutoName = false;
+  } else if (isDgsArc(object)) {
+    object.__liaDgsArcName = name;
   } else if (isDgsLine(object)) {
     object.__liaDgsLineName = name;
   } else if (isDgsPolygon(object)) {
@@ -8198,6 +8526,10 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
            candidate.__liaDgsPerpendicularPoint === object || candidate.__liaDgsParallelPoint === object)) {
         toRemove.add(candidate);
       }
+      if (candidate.__liaDgsArc &&
+          (candidate.__liaDgsArcStartPoint === object || candidate.__liaDgsArcEndPoint === object)) {
+        toRemove.add(candidate);
+      }
       if (candidate.__liaDgsPolygon && Array.isArray(candidate.vertices) && candidate.vertices.includes(object)) {
         addPolygonParts(candidate);
       }
@@ -8270,6 +8602,13 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
           (toRemove.has(candidate.point1) || toRemove.has(candidate.point2) ||
            toRemove.has(candidate.__liaDgsPerpendicularPoint) ||
            toRemove.has(candidate.__liaDgsParallelPoint))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
+      if (candidate.__liaDgsArc &&
+          (toRemove.has(candidate.__liaDgsArcStartPoint) ||
+           toRemove.has(candidate.__liaDgsArcEndPoint))) {
         toRemove.add(candidate);
         addedDependent = true;
         return;
@@ -8365,6 +8704,9 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
     if (candidate && candidate.__liaDgsRay && candidate.__liaDgsRayLabel) {
       toRemove.add(candidate.__liaDgsRayLabel);
     }
+    if (candidate && candidate.__liaDgsArc && candidate.__liaDgsArcLabel) {
+      toRemove.add(candidate.__liaDgsArcLabel);
+    }
     if (candidate && candidate.__liaDgsFunction && candidate.__liaDgsFunctionLabel) {
       toRemove.add(candidate.__liaDgsFunctionLabel);
     }
@@ -8455,6 +8797,7 @@ function updateAxisSideMenuControls(state: DgsState, axis: any, key: 'x' | 'y'):
   state.axisDescriptionInput.setAttribute('aria-invalid', 'false');
   state.coordinateSection.hidden = true;
   state.angleMeasureSection.hidden = true;
+  state.arcSettingsSection.hidden = true;
   state.functionExpressionSection.hidden = true;
   state.sliderSettingsSection.hidden = true;
   state.textFontSizeSection.hidden = true;
@@ -8499,6 +8842,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   const valuePoint = analysisPoint || midpointPoint;
   const ray = isDgsRay(object);
   const vector = isDgsVector(object);
+  const arc = isDgsArc(object);
   const line = isDgsLine(object);
   const polygon = isDgsPolygon(object);
   const angle = isDgsAngle(object);
@@ -8515,6 +8859,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   object.__liaDgsLanguage = state.language;
   if (angle) syncDgsRightAngleStyle(object);
   state.sideMenuObjectType.textContent = rootPoint ? text.root : (extremumPoint ? text.extremum : (inflectionPoint ? text.inflection : (yInterceptPoint ? text.yIntercept : (intersectionPoint ? text.intersection : (functionObject ? text.function : (sliderObject ? text.slider : (textObject ? text.text : (midpointPoint ? text.midpoint : (point ? text.point : (ray ? text.ray : (vector ? text.vector : (tangentObject ? text.tangent : (angleBisectorObject ? text.angleBisector : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (sector ? text.sector : (angle ? text.angle : text.segment))))))))))))))))));
+  if (arc) state.sideMenuObjectType.textContent = text.arc;
   state.sideMenuNameInput.value = name;
   state.sideMenuNameInput.setAttribute('aria-invalid', 'false');
   state.sideMenuNameInput.setAttribute('aria-label', textObject ? text.textInput : (sliderObject ? text.parameterName : (state.language === 'de' ? 'Objektname' : 'Object name')));
@@ -8529,7 +8874,8 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   state.nameOption.hidden = textObject;
   state.objectCheckbox.checked = object.__liaDgsShowObject !== false;
   state.objectCheckboxText.textContent = functionObject ? text.showFunction : (sliderObject ? text.showSlider : (textObject ? text.showText : (point ? text.showPoint : (ray ? text.showRay : (vector ? text.showVector : (line ? text.showLine : (polygon ? text.showPolygon : (circle ? text.showCircle : (sector ? text.showSector : (angle ? text.showAngleObject : text.showSegment))))))))));
-  state.measurementOption.hidden = textObject || sliderObject || (point && !valuePoint) || ray || vector || polygon || circle || sector;
+  if (arc) state.objectCheckboxText.textContent = text.showArc;
+  state.measurementOption.hidden = textObject || sliderObject || (point && !valuePoint) || ray || vector || arc || polygon || circle || sector;
   state.measurementCheckbox.checked = valuePoint
     ? !!object.__liaDgsShowValue
     : (functionObject
@@ -8546,6 +8892,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   state.perimeterCheckbox.checked = (polygon || circle || sector) && !!object.__liaDgsShowPerimeter;
   state.coordinateSection.hidden = !point || analysisPoint || midpointPoint;
   state.angleMeasureSection.hidden = !(angle && object.__liaDgsMeasuredConstruction);
+  state.arcSettingsSection.hidden = !arc;
   state.functionExpressionSection.hidden = !functionObject;
   state.sliderSettingsSection.hidden = !sliderObject;
   state.textFontSizeSection.hidden = !textObject;
@@ -8555,6 +8902,12 @@ function updateSideMenuControls(state: DgsState, object: any): void {
       : getDgsAngleRadians(object) * 180 / Math.PI;
     state.angleMeasureInput.value = formatCoordinate(degrees);
     state.angleMeasureInput.setAttribute('aria-invalid', 'false');
+  }
+  if (arc) {
+    state.arcExitAngleInput.value = formatCoordinate(Number(object.__liaDgsArcExitAngle));
+    state.arcEntryAngleInput.value = formatCoordinate(Number(object.__liaDgsArcEntryAngle));
+    state.arcExitAngleInput.setAttribute('aria-invalid', 'false');
+    state.arcEntryAngleInput.setAttribute('aria-invalid', 'false');
   }
   if (functionObject) {
     state.functionExpressionInput.value = String(object.__liaDgsFunctionExpression || '');
@@ -8622,6 +8975,7 @@ function renderToolState(state: DgsState): void {
   const rayActive = state.activeTool === 'ray';
   const lineActive = state.activeTool === 'line';
   const vectorActive = state.activeTool === 'vector';
+  const arcActive = state.activeTool === 'arc';
   const orthogonalActive = state.activeTool === 'orthogonal';
   const parallelActive = state.activeTool === 'parallel';
   const midpointActive = state.activeTool === 'midpoint';
@@ -8651,7 +9005,7 @@ function renderToolState(state: DgsState): void {
   state.pointButton.setAttribute('aria-pressed', pointActive ? 'true' : 'false');
   state.pointButton.setAttribute('aria-label', pointActive ? text.stopPoint : text.setPoint);
   state.pointButton.title = pointActive ? text.stopPoint : text.setPoint;
-  state.segmentButton.classList.toggle('is-active', segmentActive || rayActive || lineActive || vectorActive);
+  state.segmentButton.classList.toggle('is-active', segmentActive || rayActive || lineActive || vectorActive || arcActive);
   state.segmentToolButton.classList.toggle('is-active', segmentActive);
   state.segmentToolButton.setAttribute('aria-pressed', segmentActive ? 'true' : 'false');
   state.rayToolButton.classList.toggle('is-active', rayActive);
@@ -8660,6 +9014,10 @@ function renderToolState(state: DgsState): void {
   state.lineToolButton.setAttribute('aria-pressed', lineActive ? 'true' : 'false');
   state.vectorToolButton.classList.toggle('is-active', vectorActive);
   state.vectorToolButton.setAttribute('aria-pressed', vectorActive ? 'true' : 'false');
+  if (state.arcToolButton) {
+    state.arcToolButton.classList.toggle('is-active', arcActive);
+    state.arcToolButton.setAttribute('aria-pressed', arcActive ? 'true' : 'false');
+  }
   state.orthogonalButton.classList.toggle('is-active', orthogonalActive || parallelActive || midpointActive || angleBisectorActive);
   state.orthogonalButton.setAttribute('aria-pressed', orthogonalActive || parallelActive || midpointActive || angleBisectorActive ? 'true' : 'false');
   state.orthogonalToolButton.classList.toggle('is-active', orthogonalActive);
@@ -8719,7 +9077,7 @@ function renderToolState(state: DgsState): void {
 
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
+  tool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
   deactivateRegression = true
 ): void {
   if (tool) {
@@ -8738,6 +9096,7 @@ function setActiveTool(
       setSelectedAnglePoints(other, []);
       setSelectedSectorPoints(other, []);
       setAngleDialogOpen(other, false);
+      setArcDialogOpen(other, false);
       setTextDialogOpen(other, false);
       clearDgsCirclePreview(other);
       other.activeTool = '';
@@ -8746,10 +9105,11 @@ function setActiveTool(
     if (deactivateRegression) notifyRegressionLayout(state, false);
   }
 
-  if ((state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector') &&
+  if ((state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector' || state.activeTool === 'arc') &&
       tool !== state.activeTool) {
     setSelectedSegmentPoint(state, null);
   }
+  if (state.activeTool === 'arc' && tool !== 'arc') setArcDialogOpen(state, false);
   if ((state.activeTool === 'orthogonal' || state.activeTool === 'parallel') && tool !== state.activeTool) {
     setSelectedRelationInputs(state, null, null);
   }
@@ -8805,6 +9165,7 @@ function applyLayout(state: DgsState): void {
   state.objectListPanel.style.color = tone;
   state.colorPopup.style.color = tone;
   state.angleDialog.style.color = tone;
+  state.arcDialog.style.color = tone;
   state.functionDialog.style.color = tone;
   state.textDialog.style.color = tone;
   state.exportDialog.style.color = tone;
@@ -8819,6 +9180,8 @@ function applyLayout(state: DgsState): void {
   state.colorPopup.style.setProperty('--lia-dgs-theme-color', accent);
   state.angleDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.angleDialog.style.setProperty('--lia-dgs-theme-color', accent);
+  state.arcDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.arcDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.functionDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.functionDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.textDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
@@ -9138,6 +9501,8 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   state.xCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
   state.yCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
   state.angleMeasureInput.tabIndex = open && !state.angleMeasureSection.hidden ? 0 : -1;
+  state.arcExitAngleInput.tabIndex = open && !state.arcSettingsSection.hidden ? 0 : -1;
+  state.arcEntryAngleInput.tabIndex = open && !state.arcSettingsSection.hidden ? 0 : -1;
   state.functionExpressionInput.tabIndex = open && !state.functionExpressionSection.hidden ? 0 : -1;
   state.textFontSizeInput.tabIndex = open && !state.textFontSizeSection.hidden ? 0 : -1;
   [state.sliderValueInput, state.sliderMinInput, state.sliderMaxInput, state.sliderStepInput]
@@ -9298,6 +9663,7 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   state.rayToolButton.tabIndex = open ? 0 : -1;
   state.lineToolButton.tabIndex = open ? 0 : -1;
   state.vectorToolButton.tabIndex = open ? 0 : -1;
+  state.arcToolButton.tabIndex = open ? 0 : -1;
 }
 
 function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
@@ -9327,6 +9693,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
     state.rayToolButton.tabIndex = -1;
     state.lineToolButton.tabIndex = -1;
     state.vectorToolButton.tabIndex = -1;
+    state.arcToolButton.tabIndex = -1;
   }
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
@@ -9408,6 +9775,56 @@ function setAngleDialogOpen(state: DgsState, open: boolean): void {
       try { state.angleDialogInput.focus(); state.angleDialogInput.select(); } catch (e) {}
     }, 0);
   }
+}
+
+function setArcDialogOpen(state: DgsState, open: boolean): void {
+  if (!state.arcDialog || !state.arcDialogExitInput || !state.arcDialogEntryInput) {
+    state.arcDialogOpen = false;
+    state.pendingArcPoints = [];
+    return;
+  }
+  if (open) setExportDialogOpen(state, false);
+  state.arcDialogOpen = open;
+  state.arcDialog.dataset.open = open ? '1' : '0';
+  state.arcDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.arcDialogExitInput.tabIndex = open ? 0 : -1;
+  state.arcDialogEntryInput.tabIndex = open ? 0 : -1;
+  state.arcDialogConfirmButton.tabIndex = open ? 0 : -1;
+  state.arcDialogCancelButton.tabIndex = open ? 0 : -1;
+  if (open) {
+    const defaults = state.pendingArcPoints.length === 2
+      ? getDefaultDgsArcAngles(state.pendingArcPoints[0], state.pendingArcPoints[1])
+      : { exitAngle: 45, entryAngle: 135 };
+    state.arcDialogExitInput.value = formatCoordinate(defaults.exitAngle);
+    state.arcDialogEntryInput.value = formatCoordinate(defaults.entryAngle);
+    state.arcDialogExitInput.setAttribute('aria-invalid', 'false');
+    state.arcDialogEntryInput.setAttribute('aria-invalid', 'false');
+    window.setTimeout(() => {
+      try { state.arcDialogExitInput.focus(); state.arcDialogExitInput.select(); } catch (e) {}
+    }, 0);
+  } else {
+    state.pendingArcPoints = [];
+  }
+}
+
+function createDgsArcFromDialog(state: DgsState): boolean {
+  const exitAngle = parseDgsArcAngle(state.arcDialogExitInput.value);
+  const entryAngle = parseDgsArcAngle(state.arcDialogEntryInput.value);
+  state.arcDialogExitInput.setAttribute('aria-invalid', exitAngle == null ? 'true' : 'false');
+  state.arcDialogEntryInput.setAttribute('aria-invalid', entryAngle == null ? 'true' : 'false');
+  if (exitAngle == null || entryAngle == null || state.pendingArcPoints.length !== 2) return false;
+  const arc = createDgsArc(
+    state,
+    state.pendingArcPoints[0],
+    state.pendingArcPoints[1],
+    exitAngle,
+    entryAngle
+  );
+  if (!arc) return false;
+  persistDgsConstruction(state);
+  setArcDialogOpen(state, false);
+  setActiveTool(state, '', false);
+  return true;
 }
 
 function setFunctionDialogOpen(state: DgsState, open: boolean): void {
@@ -9672,11 +10089,20 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.measuredAngleToolButton?.isConnected &&
     !!existing.angleDialog?.isConnected &&
     !!existing.angleMeasureInput?.isConnected &&
+    !!existing.arcSettingsSection?.isConnected &&
+    !!existing.arcExitAngleInput?.isConnected &&
+    !!existing.arcEntryAngleInput?.isConnected &&
+    !!existing.arcDialog?.isConnected &&
+    !!existing.arcDialogExitInput?.isConnected &&
+    !!existing.arcDialogEntryInput?.isConnected &&
+    !!existing.arcDialogConfirmButton?.isConnected &&
+    !!existing.arcDialogCancelButton?.isConnected &&
     !!existing.geometrySubmenu?.isConnected &&
     !!existing.segmentToolButton?.isConnected &&
     !!existing.rayToolButton?.isConnected &&
     !!existing.lineToolButton?.isConnected &&
     !!existing.vectorToolButton?.isConnected &&
+    !!existing.arcToolButton?.isConnected &&
     !!existing.shapeSubmenu?.isConnected &&
     !!existing.polygonToolButton?.isConnected &&
     !!existing.circleToolButton?.isConnected &&
@@ -9803,6 +10229,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     try { existing.objectListClip.remove(); } catch (e) {}
     try { existing.colorPopup.remove(); } catch (e) {}
     try { existing.angleDialog.remove(); } catch (e) {}
+    try { existing.arcDialog.remove(); } catch (e) {}
     try { existing.functionDialog.remove(); } catch (e) {}
     try { existing.textDialog.remove(); } catch (e) {}
     try { existing.exportDialog.remove(); } catch (e) {}
@@ -9856,6 +10283,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const rayLabel = text.ray;
   const lineLabel = text.straightLine;
   const vectorLabel = text.vector;
+  const arcLabel = text.arc;
+  const arcIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M5,18C7,6,16,4,20,14></path><path class=lia-dgs-cross d=M3.5,16.5l3,3M6.5,16.5l-3,3M18.5,12.5l3,3M21.5,12.5l-3,3></path></svg>';
   const segmentIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16L18 8"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
   const rayIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18L22 5"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M11.5 10.5l3 3M14.5 10.5l-3 3"></path></svg>';
   const lineIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 19L22 5"></path><path class="lia-dgs-cross" d="M4.5 14.5l3 3M7.5 14.5l-3 3M16.5 6.5l3 3M19.5 6.5l-3 3"></path></svg>';
@@ -9907,6 +10336,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   lineToolButton.setAttribute('aria-pressed', 'false');
   const vectorToolButton = makeGeometryTool(geometrySubmenu, vectorLabel, vectorIcon);
   vectorToolButton.setAttribute('aria-pressed', 'false');
+  const arcToolButton = makeGeometryTool(geometrySubmenu, arcLabel, arcIcon);
+  arcToolButton.setAttribute('aria-pressed', 'false');
   menuBar.appendChild(geometrySubmenu);
 
   const orthogonalButton = document.createElement('button');
@@ -10326,6 +10757,37 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   angleMeasureSection.appendChild(angleMeasureRow);
   sideMenu.appendChild(angleMeasureSection);
 
+  const arcSettingsSection = document.createElement('div');
+  arcSettingsSection.className = 'lia-dgs-slider-settings-section lia-dgs-arc-settings-section';
+  arcSettingsSection.hidden = true;
+  const arcSettingsTitle = document.createElement('div');
+  arcSettingsTitle.className = 'lia-dgs-context-section-title';
+  arcSettingsTitle.textContent = text.arc;
+  const arcSettingsGrid = document.createElement('div');
+  arcSettingsGrid.className = 'lia-dgs-slider-settings-grid';
+  const makeArcSettingsField = (captionText: string) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-slider-field';
+    const caption = document.createElement('span');
+    caption.textContent = captionText + ' (°)';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', captionText);
+    input.setAttribute('aria-invalid', 'false');
+    label.appendChild(caption);
+    label.appendChild(input);
+    arcSettingsGrid.appendChild(label);
+    return input;
+  };
+  const arcExitAngleInput = makeArcSettingsField(text.exitAngle);
+  const arcEntryAngleInput = makeArcSettingsField(text.entryAngle);
+  arcSettingsSection.appendChild(arcSettingsTitle);
+  arcSettingsSection.appendChild(arcSettingsGrid);
+  sideMenu.appendChild(arcSettingsSection);
+
   const functionExpressionSection = document.createElement('div');
   functionExpressionSection.className = 'lia-dgs-function-expression-section';
   functionExpressionSection.hidden = true;
@@ -10604,6 +11066,54 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   angleDialog.appendChild(angleDialogField);
   angleDialog.appendChild(angleDialogActions);
 
+  const arcDialog = document.createElement('div');
+  arcDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-arc-dialog';
+  arcDialog.setAttribute('role', 'dialog');
+  arcDialog.setAttribute('aria-modal', 'true');
+  arcDialog.setAttribute('aria-hidden', 'true');
+  arcDialog.dataset.open = '0';
+  const arcDialogTitle = document.createElement('div');
+  arcDialogTitle.className = 'lia-dgs-angle-dialog-title';
+  arcDialogTitle.textContent = text.createArc;
+  const arcDialogFields = document.createElement('div');
+  arcDialogFields.className = 'lia-dgs-slider-settings-grid';
+  const makeArcDialogField = (captionText: string) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-slider-field';
+    const caption = document.createElement('span');
+    caption.textContent = captionText + ' (°)';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.className = 'lia-dgs-angle-dialog-input';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', captionText);
+    input.setAttribute('aria-invalid', 'false');
+    label.appendChild(caption);
+    label.appendChild(input);
+    arcDialogFields.appendChild(label);
+    return input;
+  };
+  const arcDialogExitInput = makeArcDialogField(text.exitAngle);
+  const arcDialogEntryInput = makeArcDialogField(text.entryAngle);
+  const arcDialogActions = document.createElement('div');
+  arcDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const arcDialogCancelButton = document.createElement('button');
+  arcDialogCancelButton.type = 'button';
+  arcDialogCancelButton.className = 'lia-dgs-angle-dialog-button';
+  arcDialogCancelButton.textContent = text.cancel;
+  const arcDialogConfirmButton = document.createElement('button');
+  arcDialogConfirmButton.type = 'button';
+  arcDialogConfirmButton.className = 'lia-dgs-angle-dialog-button';
+  arcDialogConfirmButton.dataset.primary = '1';
+  arcDialogConfirmButton.textContent = text.create;
+  arcDialogActions.appendChild(arcDialogCancelButton);
+  arcDialogActions.appendChild(arcDialogConfirmButton);
+  arcDialog.appendChild(arcDialogTitle);
+  arcDialog.appendChild(arcDialogFields);
+  arcDialog.appendChild(arcDialogActions);
+
   const functionDialog = document.createElement('div');
   functionDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog';
   functionDialog.setAttribute('role', 'dialog');
@@ -10744,6 +11254,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   objectListPanel.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  arcDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   functionDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   textDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   exportDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
@@ -10761,6 +11272,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.appendChild(menuClip);
   boardContainer.appendChild(colorPopup);
   boardContainer.appendChild(angleDialog);
+  boardContainer.appendChild(arcDialog);
   boardContainer.appendChild(functionDialog);
   boardContainer.appendChild(textDialog);
   boardContainer.appendChild(exportDialog);
@@ -10813,6 +11325,9 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     yCoordinateInput,
     angleMeasureSection,
     angleMeasureInput,
+    arcSettingsSection,
+    arcExitAngleInput,
+    arcEntryAngleInput,
     functionExpressionSection,
     functionExpressionPreview,
     functionExpressionInput,
@@ -10888,11 +11403,17 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     angleDialogInput,
     angleDialogConfirmButton,
     angleDialogCancelButton,
+    arcDialog,
+    arcDialogExitInput,
+    arcDialogEntryInput,
+    arcDialogConfirmButton,
+    arcDialogCancelButton,
     geometrySubmenu,
     segmentToolButton,
     rayToolButton,
     lineToolButton,
     vectorToolButton,
+    arcToolButton,
     shapeSubmenu,
     polygonToolButton,
     circleToolButton,
@@ -10946,6 +11467,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     rootSubmenuOpen: false,
     axisScaleSubmenuOpen: false,
     angleDialogOpen: false,
+    arcDialogOpen: false,
     functionDialogOpen: false,
     textDialogOpen: false,
     exportDialogOpen: false,
@@ -10962,6 +11484,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     zoomMode: storedZoomMode,
     axisScaleMode: storedAxisScaleMode,
     selectedSegmentPoint: null,
+    pendingArcPoints: [],
     selectedRelationLine: null,
     selectedRelationPoint: null,
     selectedMidpointPoint: null,
@@ -10992,6 +11515,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   setRootSubmenuOpen(state, false);
   setAxisScaleSubmenuOpen(state, false);
   setAngleDialogOpen(state, false);
+  setArcDialogOpen(state, false);
   setFunctionDialogOpen(state, false);
   setTextDialogOpen(state, false);
   setObjectListOpen(state, false);
@@ -11077,6 +11601,14 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     segmentButton.innerHTML = vectorIcon;
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'vector' ? '' : 'vector');
+  });
+
+  arcToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    segmentButton.innerHTML = arcIcon;
+    setGeometrySubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'arc' ? '' : 'arc');
   });
 
   orthogonalButton.addEventListener('click', (evt) => {
@@ -11440,6 +11972,53 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     if (applyAngleMeasureInput()) angleMeasureInput.blur();
   });
 
+  const applyArcSettingsInputs = () => {
+    const arc = state.contextObject;
+    const exitAngle = parseDgsArcAngle(arcExitAngleInput.value);
+    const entryAngle = parseDgsArcAngle(arcEntryAngleInput.value);
+    arcExitAngleInput.setAttribute('aria-invalid', exitAngle == null ? 'true' : 'false');
+    arcEntryAngleInput.setAttribute('aria-invalid', entryAngle == null ? 'true' : 'false');
+    if (!isDgsArc(arc) || exitAngle == null || entryAngle == null) return false;
+    const valid = setDgsArcAngles(
+      state,
+      arc,
+      exitAngle,
+      entryAngle
+    );
+    if (valid) {
+      arcExitAngleInput.value = formatCoordinate(Number(arc.__liaDgsArcExitAngle));
+      arcEntryAngleInput.value = formatCoordinate(Number(arc.__liaDgsArcEntryAngle));
+    }
+    return valid;
+  };
+  [arcExitAngleInput, arcEntryAngleInput].forEach((input) => {
+    input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+    input.addEventListener('blur', applyArcSettingsInputs);
+    input.addEventListener('keydown', (evt) => {
+      if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+          evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+        evt.stopPropagation();
+        return;
+      }
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        if (applyArcSettingsInputs()) input.blur();
+      } else if (evt.key === 'Escape') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const arc = state.contextObject;
+        if (isDgsArc(arc)) {
+          arcExitAngleInput.value = formatCoordinate(Number(arc.__liaDgsArcExitAngle));
+          arcEntryAngleInput.value = formatCoordinate(Number(arc.__liaDgsArcEntryAngle));
+        }
+        arcExitAngleInput.setAttribute('aria-invalid', 'false');
+        arcEntryAngleInput.setAttribute('aria-invalid', 'false');
+        input.blur();
+      }
+    });
+  });
+
   let editingFunctionObject: any | null = null;
   functionExpressionInput.addEventListener('focus', () => {
     if (state.contextObject && isDgsFunction(state.contextObject)) {
@@ -11513,6 +12092,36 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       evt.stopPropagation();
       setActiveTool(state, '', false);
     }
+  });
+
+  arcDialogConfirmButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    createDgsArcFromDialog(state);
+  });
+  arcDialogCancelButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setActiveTool(state, '', false);
+  });
+  [arcDialogExitInput, arcDialogEntryInput].forEach((input) => {
+    input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+    input.addEventListener('keydown', (evt) => {
+      if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+          evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+        evt.stopPropagation();
+        return;
+      }
+      if (evt.key === 'Enter') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        createDgsArcFromDialog(state);
+      } else if (evt.key === 'Escape') {
+        evt.preventDefault();
+        evt.stopPropagation();
+        setActiveTool(state, '', false);
+      }
+    });
   });
 
   functionDialogConfirmButton.addEventListener('click', (evt) => {
@@ -12211,7 +12820,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       return;
     }
 
-    if (state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector') {
+    if (state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector' || state.activeTool === 'arc') {
+      if (state.activeTool === 'arc' && state.arcDialogOpen) return;
       const point = findOrCreateDgsPoint(state, evt);
       if (!point) return;
 
@@ -12222,6 +12832,13 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
         return;
       }
       if (state.selectedSegmentPoint === point) return;
+
+      if (state.activeTool === 'arc') {
+        state.pendingArcPoints = [state.selectedSegmentPoint, point];
+        setSelectedSegmentPoint(state, null);
+        setArcDialogOpen(state, true);
+        return;
+      }
 
       const geometry = state.activeTool === 'line'
         ? createDgsLine(state, state.selectedSegmentPoint, point)
