@@ -670,7 +670,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-07-14-1';
+const DGS_STYLE_VERSION = '2026-07-15-1';
 
 function ensureStyles(root: Document | ShadowRoot): void {
   const existingStyle = root.querySelector<HTMLStyleElement>('#lia-dgs-style');
@@ -761,7 +761,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       position: absolute;
       top: 0;
       width: 24px;
-      height: ${MENU_HEIGHT_PX}px;
+      height: calc(${MENU_HEIGHT_PX}px - 2px);
       opacity: 0;
       visibility: hidden;
       transition: opacity 150ms ease;
@@ -789,7 +789,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       top: 0;
       left: 0;
       width: 48px;
-      height: ${MENU_HEIGHT_PX}px;
+      height: calc(${MENU_HEIGHT_PX}px - 2px);
       background: var(--lia-dgs-menu-bg, #fff);
       opacity: 0;
       visibility: hidden;
@@ -1759,13 +1759,17 @@ function ensureStyles(root: Document | ShadowRoot): void {
       position: absolute;
       top: 44px;
       left: 182px;
-      min-width: 222.5px;
+      z-index: 4;
+      box-sizing: border-box;
+      min-width: min(241.5px, calc(100% - 16px));
+      max-width: calc(100% - 16px);
       display: grid;
       gap: 3.75px;
       padding: 7.5px;
       border: 2px solid currentColor;
       border-radius: 8px;
       background: var(--lia-dgs-menu-bg, #fff);
+      color: var(--lia-dgs-neutral-color, currentColor);
       box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
       opacity: 0;
       visibility: hidden;
@@ -1779,7 +1783,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-axis-scale-submenu {
       left: 646px;
-      min-width: 310px;
+      min-width: min(329px, calc(100% - 16px));
     }
 
     .lia-dgs-geometry-submenu[data-open="1"] {
@@ -8830,6 +8834,7 @@ function applyLayout(state: DgsState): void {
   if (state.xAxisAdjusted) scheduleXAxisSync(state);
   notifyRegressionLayout(state);
   state.regressionDivider.dataset.visible = state.menuBar.querySelector('.lia-plot-draw-btn') ? '1' : '0';
+  positionOpenDgsSubmenu(state);
 }
 
 function readAxisStraightLast(axis: any): boolean {
@@ -9228,12 +9233,63 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   }
 }
 
+function positionDgsSubmenu(
+  state: DgsState,
+  submenu: HTMLDivElement,
+  anchorButton: HTMLButtonElement
+): void {
+  if (!state.menuClip.isConnected || !submenu.isConnected || !anchorButton.isConnected) return;
+
+  const clipRect = state.menuClip.getBoundingClientRect();
+  const anchorRect = anchorButton.getBoundingClientRect();
+  const localClipWidth = state.menuClip.clientWidth || state.menuClip.offsetWidth;
+  if (!(clipRect.width > 0) || !(localClipWidth > 0)) return;
+
+  const scaleX = clipRect.width / localClipWidth;
+  if (!(scaleX > 0)) return;
+  const submenuWidth = submenu.offsetWidth || submenu.getBoundingClientRect().width / scaleX;
+  if (!(submenuWidth > 0)) return;
+
+  const margin = 8;
+  const preferredLeft = (anchorRect.left - clipRect.left) / scaleX - margin;
+  const maxLeft = Math.max(margin, localClipWidth - submenuWidth - margin);
+  const left = Math.max(margin, Math.min(preferredLeft, maxLeft));
+  submenu.style.left = `${Math.round(left)}px`;
+}
+
+function positionOpenDgsSubmenu(state: DgsState): void {
+  if (state.geometrySubmenuOpen) {
+    positionDgsSubmenu(state, state.geometrySubmenu, state.segmentButton);
+    return;
+  }
+  if (state.relationSubmenuOpen) {
+    positionDgsSubmenu(state, state.relationSubmenu, state.orthogonalButton);
+    return;
+  }
+  if (state.shapeSubmenuOpen) {
+    positionDgsSubmenu(state, state.shapeSubmenu, state.polygonButton);
+    return;
+  }
+  if (state.angleSubmenuOpen) {
+    positionDgsSubmenu(state, state.angleSubmenu, state.angleButton);
+    return;
+  }
+  if (state.rootSubmenuOpen) {
+    positionDgsSubmenu(state, state.rootSubmenu, state.rootButton);
+    return;
+  }
+  if (state.axisScaleSubmenuOpen) {
+    positionDgsSubmenu(state, state.axisScaleSubmenu, state.axisScaleButton);
+  }
+}
+
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
   if (open) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.geometrySubmenu, state.segmentButton);
   state.geometrySubmenuOpen = open;
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9250,6 +9306,7 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
   if (open) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.relationSubmenu, state.orthogonalButton);
   state.relationSubmenuOpen = open;
   state.relationSubmenu.dataset.open = open ? '1' : '0';
   state.relationSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9275,6 +9332,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
   if (open) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.shapeSubmenu, state.polygonButton);
   state.shapeSubmenuOpen = open;
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
   state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9290,6 +9348,7 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
   if (open && state.rootSubmenuOpen) setRootSubmenuOpen(state, false);
   if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.angleSubmenu, state.angleButton);
   state.angleSubmenuOpen = open;
   state.angleSubmenu.dataset.open = open ? '1' : '0';
   state.angleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9304,6 +9363,7 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
   if (open && state.angleSubmenuOpen) setAngleSubmenuOpen(state, false);
   if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.rootSubmenu, state.rootButton);
   state.rootSubmenuOpen = open;
   state.rootSubmenu.dataset.open = open ? '1' : '0';
   state.rootSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9322,6 +9382,7 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.axisScaleSubmenu, state.axisScaleButton);
   state.axisScaleSubmenuOpen = open;
   state.axisScaleSubmenu.dataset.open = open ? '1' : '0';
   state.axisScaleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -9556,6 +9617,12 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.menuClip?.isConnected &&
     !!existing.menuBar?.isConnected &&
     !!existing.menuEndGroup?.isConnected &&
+    existing.geometrySubmenu?.parentElement === existing.menuClip &&
+    existing.relationSubmenu?.parentElement === existing.menuClip &&
+    existing.shapeSubmenu?.parentElement === existing.menuClip &&
+    existing.angleSubmenu?.parentElement === existing.menuClip &&
+    existing.rootSubmenu?.parentElement === existing.menuClip &&
+    existing.axisScaleSubmenu?.parentElement === existing.menuClip &&
     !!existing.sideMenuClip?.isConnected &&
     !!existing.sideMenu?.isConnected &&
     !!existing.sideMenuObjectType?.isConnected &&
@@ -10100,6 +10167,18 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   menuScrollSpacer.setAttribute('aria-hidden', 'true');
   menuBar.appendChild(menuScrollSpacer);
   menuClip.appendChild(menuBar);
+
+  // The toolbar scrolls horizontally and therefore clips its own descendants.
+  // Keep flyout menus in the board-sized clip layer so they can extend below it.
+  const flyoutSubmenus = [
+    geometrySubmenu,
+    relationSubmenu,
+    shapeSubmenu,
+    angleSubmenu,
+    rootSubmenu,
+    axisScaleSubmenu
+  ];
+  flyoutSubmenus.forEach((submenu) => menuClip.appendChild(submenu));
 
   const menuScrollMaskStart = document.createElement('div');
   menuScrollMaskStart.className = 'lia-dgs-top-menu-mask-start';
@@ -10654,6 +10733,13 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     menuBar.scrollLeft += Math.abs(evt.deltaX) > Math.abs(evt.deltaY) ? evt.deltaX : evt.deltaY;
   }, { passive: false });
+  flyoutSubmenus.forEach((submenu) => {
+    submenu.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+    submenu.addEventListener('wheel', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+    }, { passive: false });
+  });
   sideMenu.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   objectListPanel.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
@@ -10894,6 +10980,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     coordinateSyncing: false
   };
   states[uid] = state;
+  menuBar.addEventListener('scroll', () => positionOpenDgsSubmenu(state), { passive: true });
   setDgsZoomMode(state, storedZoomMode, false);
   setDgsAxisScaleMode(state, storedAxisScaleMode, false);
   restoreDgsConstruction(state);
@@ -12198,6 +12285,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   if (typeof ResizeObserver === 'function') {
     state.resizeObserver = new ResizeObserver(() => {
       if (isDgsFullscreen(state)) scheduleDgsFullscreenResize(state);
+      positionOpenDgsSubmenu(state);
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
       scheduleDgsRootUpdate(state);

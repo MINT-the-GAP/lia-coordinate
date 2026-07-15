@@ -113,6 +113,13 @@ script:   ./dist/index.js
 <span id="linear-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
 @end
 
+@Arc: @Arc_(@uid,`@0`,en)
+@Bogen: @Arc_(@uid,`@0`,de)
+
+@Arc_
+<span id="arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)
 @Orthogonale: @RelationObject_(@uid,`@0`,orthogonal,de)
 @Parallel: @RelationObject_(@uid,`@0`,parallel,en)
@@ -585,6 +592,52 @@ For a vector using its automatic endpoint name, append the standalone option
 @Strahl(`ex_linear;[C;D];#457b9d;r`)
 @Vektor(`ex_linear;[A;D];#ff00ff`)
 @Vector(`ex_linear;[[0;0];[2;1]];#00ffff;w`)
+
+## `@Arc` / `@Bogen`
+
+          --{{0}}--
+Draws a cubic Bézier arc whose tangent directions are controlled independently
+at the start and end. Each endpoint may be an existing point name or a direct
+coordinate `[x;y]`. Named points stay dynamically attached when they move;
+direct coordinates create invisible fixed helper points.
+
+Angles follow the unit-circle convention: `0` points right, `90` up,
+`180` left, and `270` down. The exit angle points from the start
+towards its control arm. The entry angle points from the end back towards the
+incoming control arm, following the familiar TikZ-like `out`/`in` convention.
+Consequently, `out=0` and `in=180` form a straight left-to-right
+connection. Both control arms use one third of the endpoint distance.
+
+The design may be `->`, `<-`, or `<->`. A leading `|` adds a
+short perpendicular cap at the start, while a trailing `|` adds one at
+the end, for example `|->`, `->|`, or `|<->|`. An empty design or
+`-` draws the curve without arrows. The caption accepts plain text and
+dollar-delimited TeX; leave its field empty with two adjacent separators
+(`...;<entryAngle>;;<design>;...`) to omit it. Line widths such as `2px`
+are measured in screen pixels; the default is `3px`. The curve uses the
+current theme accent color.
+
+Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<entryAngle>;<caption>;<design>;<lineWidth>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_arc`)
+
+@Point(`ex_arc;A;-3;0`)
+@Point(`ex_arc;B;3;0`)
+
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px`)
+@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_arc;1;1;0`)
+
+@Point(`ex_arc;A;-3;0`)
+@Point(`ex_arc;B;3;0`)
+
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px`)
+@Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px`)
 
 ## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`
 
@@ -1359,11 +1412,14 @@ Passe die Funktion so an, dass $f(x) = 2x -1$ dargestellt ist.
 
           --{{0}}--
 If you prefer not to use `import:`, copy the following block directly into the header of your LiaScript document.
+It uses the current `main` bundle so that all macros documented here are
+available. For a reproducible course, replace `main` with a release tag that
+already contains the macros you use.
 
 ```` markdown
 import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
-script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/index.js
+script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/index.js
 
 @CoordinateSystem: @CoordinateSystem_(`@0`)
 @Koordinatensystem: @CoordinateSystem_(`@0`)
@@ -1459,6 +1515,13 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@0.0.1/dist/ind
 
 @LinearObject_
 <span id="linear-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Arc: @Arc_(@uid,`@0`,en)
+@Bogen: @Arc_(@uid,`@0`,de)
+
+@Arc_
+<span id="arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)

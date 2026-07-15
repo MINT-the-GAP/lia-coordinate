@@ -188,6 +188,15 @@ interface Window {
   __scheduleBootstrapLinearObjects: (() => void) | undefined;
   renderLinearObjectFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
 
+  // Cubic arc subsystem (@Arc/@Bogen)
+  __arcReady: boolean | undefined;
+  __arcEntries: Record<string, any>;
+  __arcRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapArcs: (() => void) | undefined;
+  __bootstrapArcsRAF: number | undefined;
+  __scheduleBootstrapArcs: (() => void) | undefined;
+  renderArcFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
   // Relation object subsystem (@Perpendicular/@Orthogonale, @Parallel/@Parallele, @Midpoint/@Mittelpunkt)
   __relationObjectsReady: boolean | undefined;
   __relationObjectEntries: Record<string, any>;

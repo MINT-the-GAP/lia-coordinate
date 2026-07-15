@@ -11,6 +11,7 @@ import { init as initFunctionAnalysisPoints } from './subsystems/functionAnalysi
 import { init as initObjectAnalysisPoints } from './subsystems/objectAnalysisPoints';
 import { init as initDistance } from './subsystems/distance';
 import { init as initLinearObjects } from './subsystems/linearObjects';
+import { init as initArc } from './subsystems/arc';
 import { init as initRelationObjects } from './subsystems/relationObjects';
 import { init as initArea } from './subsystems/area';
 import { init as initAngle } from './subsystems/angle';
@@ -109,6 +110,7 @@ initPointsOnGraph();
 initFunctionAnalysisPoints();
 initDistance();
 initLinearObjects();
+initArc();
 initRelationObjects();
 initArea();
 initAngle();

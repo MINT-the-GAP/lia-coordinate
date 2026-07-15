@@ -799,6 +799,7 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapPointOnGraphs);
   call(window.__bootstrapPointsOnGraph);
   call(window.__bootstrapDistances);
+  call(window.__bootstrapArcs);
   call(window.__bootstrapAreas);
   call(window.__bootstrapAngles);
   call(window.__bootstrapCircles);
