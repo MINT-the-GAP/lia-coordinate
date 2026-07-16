@@ -36,6 +36,32 @@ export function splitTopLevel(str: string, sep?: string): string[] {
       continue;
     }
 
+    if (ch === String.fromCharCode(39)) {
+      let previous = i - 1;
+      while (previous >= 0 && /\s/.test(str[previous])) previous -= 1;
+      const atValueStart = previous < 0 || ';,([{=:'.includes(str[previous]);
+      let hasClosingQuote = false;
+      let escapedQuote = false;
+      for (let next = i + 1; atValueStart && next < str.length; next += 1) {
+        if (escapedQuote) {
+          escapedQuote = false;
+          continue;
+        }
+        if (str[next] === String.fromCharCode(92)) {
+          escapedQuote = true;
+          continue;
+        }
+        if (str[next] === ch) {
+          hasClosingQuote = true;
+          break;
+        }
+      }
+      if (!atValueStart || !hasClosingQuote) {
+        cur += ch;
+        continue;
+      }
+    }
+
     if (ch === '"' || ch === "'" || ch === '`') {
       cur += ch;
       quote = ch;
@@ -73,6 +99,13 @@ export function splitTopLevel(str: string, sep?: string): string[] {
  */
 export function unquote(v: string): string {
   const s = String(v || '').trim();
+  const jsonPrefix = '__lia_dgs_json_v1__:';
+  if (s.startsWith(jsonPrefix)) {
+    try {
+      const decoded = JSON.parse(s.slice(jsonPrefix.length));
+      if (typeof decoded === 'string') return decoded;
+    } catch (e) {}
+  }
   if (
     (s.startsWith('"') && s.endsWith('"')) ||
     (s.startsWith("'") && s.endsWith("'")) ||

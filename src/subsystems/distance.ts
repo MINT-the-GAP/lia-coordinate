@@ -33,6 +33,7 @@ interface DistanceConfig extends DistanceDesign {
   segmentName: string;
   showName: boolean;
   strokeWidth: number;
+  visible: boolean;
 }
 
 interface DistanceCap {
@@ -113,6 +114,13 @@ export function init(): void {
     return Number.isFinite(parsed) ? Math.max(0.25, Math.min(20, parsed)) : 3;
   }
 
+  function visibilityOptionValue(value: unknown): boolean | null {
+    const match = String(value == null ? '' : value).trim()
+      .match(/^(?:visible|sichtbar)\s*=\s*(0|1|false|true)$/i);
+    if (!match) return null;
+    return !/^(?:0|false)$/i.test(match[1]);
+  }
+
   function arrowHead(enabled: boolean, strokeWidth: number): false | {
     type: number;
     size: number;
@@ -169,10 +177,14 @@ export function init(): void {
       ? strokeWidthOptionValue(trailingOptions[strokeWidthIndex], true)
       : '';
     const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
+    const visibilityOptions = trailingOptions
+      .map(visibilityOptionValue)
+      .filter(function(value): value is boolean { return value != null; });
     const rawSegmentName = trailingOptions.find(function(part, index) {
       return index !== designIndex &&
         index !== strokeWidthIndex &&
         !/^length\s*=/i.test(part) &&
+        visibilityOptionValue(part) == null &&
         !isHiddenNameOption(part);
     }) || '';
     const parsedName = parseMacroName(rawSegmentName);
@@ -191,6 +203,7 @@ export function init(): void {
       segmentName: parsedName.name,
       showName: parsedName.showName && !standaloneHiddenName,
       strokeWidth: parseStrokeWidth(strokeWidthToken),
+      visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       ...design
     };
   }
@@ -393,6 +406,84 @@ export function init(): void {
     } catch (e) {}
   }
 
+  function applyDistanceVisibility(entry: any, cfg: DistanceConfig): void {
+    const visible = cfg.visible !== false;
+    const segments = Array.isArray(entry && entry.segments) ? entry.segments : [];
+    segments.forEach(function(segment: any) {
+      try {
+        if (segment && typeof segment.setAttribute === 'function') {
+          segment.setAttribute({ visible: visible });
+        }
+      } catch (e) {}
+    });
+
+    const points = Array.isArray(entry && entry.points) ? entry.points : [];
+    const capSegments = Array.isArray(entry && entry.capSegments) ? entry.capSegments : [];
+    capSegments.forEach(function(segment: any, index: number) {
+      const atStart = !!cfg.startCap && (index === 0 || !cfg.endCap);
+      try {
+        if (segment && typeof segment.setAttribute === 'function') {
+          segment.setAttribute({
+            visible: function() {
+              return visible && endpointTangentScreen(entry.board, points, atStart).length > 1e-9;
+            }
+          });
+        }
+      } catch (e) {}
+    });
+
+    try {
+      if (entry && entry.label && typeof entry.label.setAttribute === 'function') {
+        entry.label.setAttribute({
+          visible: visible && !!(cfg.showLength || (cfg.showName && cfg.segmentName))
+        });
+      }
+    } catch (e) {}
+  }
+
+  function applyDgsDistanceMetadata(entry: any, cfg: DistanceConfig): void {
+    const segments = Array.isArray(entry && entry.segments) ? entry.segments : [];
+    const points = Array.isArray(entry && entry.points) ? entry.points : [];
+    const isTwoPointSegment = segments.length === 1 && points.length === 2;
+    const design = cfg.normalizedDesign || '-';
+
+    segments.forEach(function(segment: any, index: number) {
+      if (!segment) return;
+      const firstPoint = points[index] || segment.point1 || null;
+      const secondPoint = points[index + 1] || segment.point2 || null;
+
+      segment.__liaDgsMacroManaged = true;
+      segment.__liaDgsSegment = true;
+      segment.__liaDgsSegmentName = cfg.segmentName;
+      segment.__liaDgsSegmentPoint1 = firstPoint;
+      segment.__liaDgsSegmentPoint2 = secondPoint;
+      segment.__liaDgsShowName = cfg.showName;
+      segment.__liaDgsShowLength = cfg.showLength;
+      segment.__liaDgsShowObject = cfg.visible;
+      if (!Number.isFinite(Number(segment.__liaDgsOpacity))) segment.__liaDgsOpacity = 1;
+      segment.__liaDgsColor = cfg.color;
+      segment.__liaDgsLineColor = cfg.color;
+      segment.__liaDgsFillColor = cfg.color;
+      segment.__liaDgsTextColor = cfg.color;
+      segment.__liaDgsLanguage = cfg.language;
+      segment.__liaDgsSegmentDesign = design;
+      segment.__liaDgsSegmentStrokeWidth = cfg.strokeWidth;
+
+      if (index === 0 && entry.label) segment.label = entry.label;
+      if (isTwoPointSegment) {
+        segment.__liaDgsStyleCapSegments = Array.isArray(entry.capSegments)
+          ? entry.capSegments
+          : [];
+        segment.__liaDgsStyleCapPoints = Array.isArray(entry.capPoints)
+          ? entry.capPoints
+          : [];
+      } else {
+        segment.__liaDgsStyleCapSegments = [];
+        segment.__liaDgsStyleCapPoints = [];
+      }
+    });
+  }
+
   function texPointName(pointName: string): string {
     let name = String(pointName || '').trim();
     if (name.startsWith('\\(') && name.endsWith('\\)')) name = name.slice(2, -2).trim();
@@ -577,7 +668,8 @@ export function init(): void {
       anchorY: 'middle',
       strokeColor: cfg.color,
       fillColor: cfg.color,
-      fontSize: 14
+      fontSize: 14,
+      visible: cfg.visible
     });
 
     // MathJax changes the DOM bounds asynchronously. Re-run the position after
@@ -652,6 +744,7 @@ export function init(): void {
       old.lastArrow = cfg.lastArrow;
       old.startCap = cfg.startCap;
       old.endCap = cfg.endCap;
+      old.visible = cfg.visible;
       applySegmentStyles(
         old.segments,
         cfg.color,
@@ -662,6 +755,8 @@ export function init(): void {
       );
       applyCapStyles(old.capSegments, cfg.color, cfg.strokeWidth);
       applyLabelColor(old.label, cfg.color);
+      applyDistanceVisibility(old, cfg);
+      applyDgsDistanceMetadata(old, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -699,7 +794,8 @@ export function init(): void {
             cfg.strokeWidth
           ),
           straightFirst: false,
-          straightLast: false
+          straightLast: false,
+          visible: cfg.visible
         });
         segment.__liaDgsSegmentName = cfg.segmentName;
         segment.__liaDgsShowName = cfg.showName;
@@ -725,7 +821,7 @@ export function init(): void {
         label = createLengthLabel(board, points, cfg);
       }
 
-      window.__distanceEntries[key] = {
+      const entry = {
         uid: String(uid),
         boardId: cfg.boardId,
         point1Name: cfg.point1Name,
@@ -739,6 +835,7 @@ export function init(): void {
         showLength: cfg.showLength,
         segmentName: cfg.segmentName,
         showName: cfg.showName,
+        visible: cfg.visible,
         strokeWidth: cfg.strokeWidth,
         normalizedDesign: cfg.normalizedDesign,
         firstArrow: cfg.firstArrow,
@@ -756,6 +853,9 @@ export function init(): void {
         ownedPoints: ownedPoints,
         label: label
       };
+      window.__distanceEntries[key] = entry;
+      applyDistanceVisibility(entry, cfg);
+      applyDgsDistanceMetadata(entry, cfg);
 
       try { board.update(); } catch (e) {}
       try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}

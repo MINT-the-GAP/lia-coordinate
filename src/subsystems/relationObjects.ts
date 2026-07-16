@@ -35,6 +35,7 @@ interface RelationConfig {
   showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
+  visible: boolean;
 }
 
 interface ResolvedRelationInput {
@@ -79,6 +80,16 @@ export function init(): void {
     return /^(wert|value|koordinaten|coordinates)\s*=\s*1$/i.test(String(part || '').trim());
   }
 
+  function isVisibilityOption(part: string): boolean {
+    return /^(?:visible|sichtbar)\s*=\s*[01]$/i.test(String(part || '').trim());
+  }
+
+  function optionVisibility(parts: string[]): boolean {
+    return !parts.some(function(part) {
+      return /^(?:visible|sichtbar)\s*=\s*0$/i.test(String(part || '').trim());
+    });
+  }
+
   function parseObjectName(trailingOptions: string[], fallback = ''): { name: string; showName: boolean } {
     const hiddenByOption = trailingOptions.some(isHiddenNameOption);
     const namedOption = trailingOptions.map(function(part) {
@@ -87,7 +98,8 @@ export function init(): void {
       return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
     const positionalName = trailingOptions.find(function(part) {
-      return !/^name\s*=/i.test(part) && !isValueOption(part) && !isHiddenNameOption(part);
+      return !/^name\s*=/i.test(part) && !isValueOption(part) &&
+        !isHiddenNameOption(part) && !isVisibilityOption(part);
     }) || '';
     const parsed = parseMacroName(namedOption || positionalName, fallback);
     return {
@@ -142,7 +154,8 @@ export function init(): void {
         objectName: objectName.name,
         showName: objectName.showName,
         language: languageValue,
-        showValue: trailingOptions.some(isValueOption)
+        showValue: trailingOptions.some(isValueOption),
+        visible: optionVisibility(trailingOptions)
       };
     }
 
@@ -185,7 +198,8 @@ export function init(): void {
       objectName: objectName.name,
       showName: objectName.showName,
       language: languageValue,
-      showValue: false
+      showValue: false,
+      visible: optionVisibility(trailingOptions)
     };
   }
 
@@ -318,6 +332,7 @@ export function init(): void {
     if (!object || typeof object.setAttribute !== 'function') return;
     try {
       object.setAttribute({
+        visible: cfg.visible,
         name: mathName(cfg.objectName),
         strokeColor: cfg.color,
         highlightStrokeColor: cfg.color,
@@ -331,9 +346,11 @@ export function init(): void {
       });
     } catch (e) {}
     try {
+      if (cfg.visible && typeof object.showElement === 'function') object.showElement();
+      if (!cfg.visible && typeof object.hideElement === 'function') object.hideElement();
       if (object.label && typeof object.label.setAttribute === 'function') {
         object.label.setAttribute({
-          visible: cfg.showName && !!cfg.objectName,
+          visible: cfg.visible && cfg.showName && !!cfg.objectName,
           strokeColor: cfg.color,
           fillColor: cfg.color,
           fontSize: 20,
@@ -341,18 +358,96 @@ export function init(): void {
           useMathJax: true
         });
       }
-      if (object.label && cfg.showName && cfg.objectName && typeof object.label.showElement === 'function') object.label.showElement();
-      if (object.label && (!cfg.showName || !cfg.objectName) && typeof object.label.hideElement === 'function') object.label.hideElement();
+      if (object.label && cfg.visible && cfg.showName && cfg.objectName && typeof object.label.showElement === 'function') object.label.showElement();
+      if (object.label && (!cfg.visible || !cfg.showName || !cfg.objectName) && typeof object.label.hideElement === 'function') object.label.hideElement();
     } catch (e) {}
     object.__liaDgsShowName = cfg.showName;
+  }
+
+  function applyRelationDgsMetadata(
+    object: any,
+    cfg: RelationConfig,
+    baseLine: any,
+    throughPoint: any
+  ): void {
+    if (!object || cfg.kind === 'midpoint') return;
+    const perpendicular = cfg.kind === 'orthogonal';
+    object.__liaDgsMacroManaged = true;
+    object.__liaDgsLine = true;
+    object.__liaDgsPerpendicular = perpendicular;
+    object.__liaDgsParallel = !perpendicular;
+    object.__liaDgsPerpendicularBase = perpendicular ? baseLine : null;
+    object.__liaDgsPerpendicularPoint = perpendicular ? throughPoint : null;
+    object.__liaDgsParallelBase = perpendicular ? null : baseLine;
+    object.__liaDgsParallelPoint = perpendicular ? null : throughPoint;
+    object.__liaDgsLineName = cfg.objectName;
+    object.__liaDgsLanguage = cfg.language;
+    object.__liaDgsColor = cfg.color;
+    object.__liaDgsTextColor = cfg.color;
+    object.__liaDgsLineColor = cfg.color;
+    object.__liaDgsFillColor = cfg.color;
+    object.__liaDgsShowName = cfg.showName;
+    object.__liaDgsShowObject = cfg.visible;
+    object.__liaDgsOpacity = 1;
+    object.__liaDgsShowEquation = false;
+    [baseLine && baseLine.point1, baseLine && baseLine.point2, throughPoint].forEach(function(point) {
+      if (!point || point.__liaDgsPointName) return;
+      point.__liaDgsMacroManaged = true;
+      point.__liaDgsShowObject = false;
+      point.__liaDgsOpacity = 0;
+    });
+    if (object.label) {
+      object.label.__liaDgsMacroManaged = true;
+      object.label.__liaDgsOwner = object;
+    }
+  }
+
+  function applyMidpointDgsMetadata(
+    point: any,
+    cfg: RelationConfig,
+    first: any,
+    second: any
+  ): void {
+    if (!point) return;
+    const labelColor = midpointLabelColor(cfg);
+    point.__liaDgsMacroManaged = true;
+    point.__liaDgsPointName = cfg.objectName;
+    point.__liaDgsMidpoint = true;
+    point.__liaDgsMidpointFirst = first;
+    point.__liaDgsMidpointSecond = second;
+    point.__liaDgsLanguage = cfg.language;
+    point.__liaDgsColor = cfg.color;
+    point.__liaDgsTextColor = labelColor;
+    point.__liaDgsLineColor = cfg.color;
+    point.__liaDgsFillColor = cfg.color;
+    point.__liaDgsShowName = cfg.showName;
+    point.__liaDgsShowValue = cfg.showValue;
+    point.__liaDgsShowObject = cfg.visible;
+    point.__liaDgsOpacity = 1;
+    point.__liaPointVisual = {
+      color: cfg.color,
+      opacity: 1,
+      hasExplicitColor: cfg.hasExplicitColor
+    };
+    [first, second].forEach(function(sourcePoint) {
+      if (!sourcePoint || sourcePoint.__liaDgsPointName) return;
+      sourcePoint.__liaDgsMacroManaged = true;
+      sourcePoint.__liaDgsShowObject = false;
+      sourcePoint.__liaDgsOpacity = 0;
+    });
+    if (point.label) {
+      point.label.__liaDgsMacroManaged = true;
+      point.label.__liaDgsOwner = point;
+    }
   }
 
   function applyMidpointVisual(point: any, cfg: RelationConfig): void {
     if (!point || typeof point.setAttribute !== 'function') return;
     const labelColor = midpointLabelColor(cfg);
-    const labelVisible = cfg.showName || cfg.showValue;
+    const labelVisible = cfg.visible && (cfg.showName || cfg.showValue);
     try {
       point.setAttribute({
+        visible: cfg.visible,
         name: midpointLabelText(point, cfg),
         strokeColor: cfg.color,
         fillColor: cfg.color,
@@ -372,6 +467,8 @@ export function init(): void {
       });
     } catch (e) {}
     try {
+      if (cfg.visible && typeof point.showElement === 'function') point.showElement();
+      if (!cfg.visible && typeof point.hideElement === 'function') point.hideElement();
       if (point.label && typeof point.label.setText === 'function') {
         point.label.setText(function() { return midpointLabelText(point, cfg); });
       }
@@ -442,6 +539,7 @@ export function init(): void {
       name: mathName(cfg.objectName),
       withLabel: true,
       fixed: true,
+      visible: cfg.visible,
       straightFirst: true,
       straightLast: true,
       strokeColor: cfg.color,
@@ -449,7 +547,7 @@ export function init(): void {
       strokeWidth: 3,
       highlightStrokeWidth: 4,
       label: {
-        visible: cfg.showName && !!cfg.objectName,
+        visible: cfg.visible && cfg.showName && !!cfg.objectName,
         strokeColor: cfg.color,
         fillColor: cfg.color,
         fontSize: 20,
@@ -496,7 +594,9 @@ export function init(): void {
         old.objectName === cfg.objectName && old.showName === cfg.showName && old.language === cfg.language) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyRelationVisual(old.object, cfg);
+      applyRelationDgsMetadata(old.object, cfg, old.baseLine, old.throughPoint);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -511,6 +611,7 @@ export function init(): void {
       object.__liaMacroRelationKind = cfg.kind;
       object.__liaMacroRelationName = cfg.objectName;
       object.__liaDgsShowName = cfg.showName;
+      applyRelationDgsMetadata(object, cfg, input.baseLine, input.throughPoint);
       window.__relationObjectEntries[key] = {
         uid: String(uid),
         boardId: cfg.boardId,
@@ -525,6 +626,7 @@ export function init(): void {
         objectName: cfg.objectName,
         showName: cfg.showName,
         language: cfg.language,
+        visible: cfg.visible,
         board: board,
         object: object,
         baseLine: input.baseLine,
@@ -561,34 +663,39 @@ export function init(): void {
     }
     const old = window.__relationObjectEntries[key];
     const geometryUnchanged = coordinateMode
-      ? !!(old && sameCoordinates(old.midpointCoordinates || null, cfg.midpointCoordinates))
+      ? !!(old && Array.isArray(old.points) && old.points.length >= 2 &&
+        sameCoordinates(old.midpointCoordinates || null, cfg.midpointCoordinates))
       : !!(old && Array.isArray(old.points) && old.points[0] === namedPoints[0] && old.points[1] === namedPoints[1]);
     if (old && old.board === board && old.kind === 'midpoint' && geometryUnchanged &&
         old.objectName === cfg.objectName && old.showName === cfg.showName &&
         old.language === cfg.language && old.showValue === cfg.showValue) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyMidpointVisual(old.object, cfg);
+      applyMidpointDgsMetadata(old.object, cfg, old.points[0], old.points[1]);
       try { board.update(); } catch (e) {}
       return true;
     }
 
     removeEntry(uid);
     let point: any = null;
+    const ownedPoints: any[] = [];
     try {
-      const points = coordinateMode ? [] : namedPoints;
-      const coordinates = coordinateMode ? cfg.midpointCoordinates! : null;
-      point = board.create('point', coordinateMode
-        ? [
-            (coordinates![0].x + coordinates![1].x) / 2,
-            (coordinates![0].y + coordinates![1].y) / 2
-          ]
-        : [
-            function() { return (Number(points[0].X()) + Number(points[1].X())) / 2; },
-            function() { return (Number(points[0].Y()) + Number(points[1].Y())) / 2; }
-          ], {
+      const points = coordinateMode
+        ? cfg.midpointCoordinates!.slice(0, 2).map(function(coordinate) {
+            const hiddenPoint = createHiddenPoint(board, coordinate);
+            ownedPoints.push(hiddenPoint);
+            return hiddenPoint;
+          })
+        : namedPoints;
+      point = board.create('point', [
+          function() { return (Number(points[0].X()) + Number(points[1].X())) / 2; },
+          function() { return (Number(points[0].Y()) + Number(points[1].Y())) / 2; }
+        ], {
           name: mathName(cfg.objectName),
           fixed: true,
+          visible: cfg.visible,
           withLabel: cfg.showName || cfg.showValue,
           showInfobox: false,
           strokeColor: cfg.color,
@@ -613,6 +720,7 @@ export function init(): void {
       point.__liaDgsShowValue = cfg.showValue;
       point.__liaPointVisual = { color: cfg.color, opacity: 1, hasExplicitColor: cfg.hasExplicitColor };
       applyMidpointVisual(point, cfg);
+      applyMidpointDgsMetadata(point, cfg, points[0], points[1]);
       window.__points = window.__points || {};
       window.__points[cfg.boardId] = window.__points[cfg.boardId] || {};
       window.__points[cfg.boardId][cfg.objectName] = point;
@@ -623,21 +731,26 @@ export function init(): void {
         point1Name: cfg.point1Name,
         point2Name: cfg.point2Name,
         midpointCoordinates: cfg.midpointCoordinates ? cfg.midpointCoordinates.map(function(value) { return { x: value.x, y: value.y }; }) : null,
+        points: points,
+        ownedPoints: ownedPoints,
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
         objectName: cfg.objectName,
         showName: cfg.showName,
         language: cfg.language,
         showValue: cfg.showValue,
+        visible: cfg.visible,
         board: board,
-        object: point,
-        points: points
+        object: point
       };
       scheduleDependentBootstraps();
       try { board.update(); } catch (e) {}
       return true;
     } catch (e) {
       try { if (point) board.removeObject(point); } catch (removeError) {}
+      ownedPoints.forEach(function(ownedPoint) {
+        try { board.removeObject(ownedPoint); } catch (removeError) {}
+      });
       return false;
     }
   }
@@ -735,7 +848,8 @@ export function init(): void {
         objectName: String(entry.objectName || ''),
         showName: entry.showName !== false,
         language: String(entry.language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-        showValue: !!entry.showValue
+        showValue: !!entry.showValue,
+        visible: entry.visible !== false
       };
       if (entry.kind === 'midpoint') applyMidpointVisual(entry.object, cfg);
       else applyRelationVisual(entry.object, cfg);

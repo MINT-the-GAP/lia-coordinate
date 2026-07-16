@@ -20,6 +20,7 @@ interface CircleConfig {
   showArea: boolean;
   showCircumference: boolean;
   language: 'de' | 'en';
+  visible: boolean;
 }
 
 export function init(): void {
@@ -48,6 +49,9 @@ export function init(): void {
       return String(option || '').trim();
     });
     const name = parseMacroName(parts[1] || '');
+    const visible = !options.some(function(option) {
+      return /^(?:visible|sichtbar)\s*=\s*0$/i.test(option);
+    });
     let radius = 1;
     let radiusPointName = '';
 
@@ -82,7 +86,8 @@ export function init(): void {
       showCircumference: options.some(function(option) {
         return /^(?:umfang|circumference|perimeter)\s*=\s*1$/i.test(option);
       }),
-      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
+      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
+      visible: visible
     };
   }
 
@@ -181,8 +186,29 @@ export function init(): void {
     try { label.setAttribute({ strokeColor: color, fillColor: color }); } catch (e) {}
   }
 
+  function setElementVisibility(element: any, visible: boolean): void {
+    if (!element) return;
+    try {
+      if (typeof element.setAttribute === 'function') element.setAttribute({ visible: visible });
+      if (visible && typeof element.showElement === 'function') element.showElement();
+      if (!visible && typeof element.hideElement === 'function') element.hideElement();
+    } catch (e) {}
+  }
+
+  function applyCircleVisibility(
+    circle: any,
+    nameLabel: any,
+    measurementLabel: any,
+    cfg: CircleConfig
+  ): void {
+    const visible = cfg.visible !== false;
+    setElementVisibility(circle, visible);
+    setElementVisibility(nameLabel, visible && cfg.showName && !!cfg.name);
+    setElementVisibility(measurementLabel, visible && (cfg.showArea || cfg.showCircumference));
+  }
+
   function createNameLabel(board: any, center: any, radiusPoint: any, cfg: CircleConfig): any {
-    if (!cfg.showName || !cfg.name) return null;
+    if (!cfg.name) return null;
 
     return board.create('text', [
       function() {
@@ -196,6 +222,7 @@ export function init(): void {
       '\\(' + texName(cfg.name) + '\\)'
     ], {
       fixed: true,
+      visible: cfg.visible && cfg.showName,
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -205,6 +232,42 @@ export function init(): void {
       strokeColor: cfg.color,
       fillColor: cfg.color,
       fontSize: 14
+    });
+  }
+
+  function applyCircleDgsMetadata(
+    circle: any,
+    center: any,
+    radiusPoint: any,
+    nameLabel: any,
+    measurementLabel: any,
+    cfg: CircleConfig
+  ): void {
+    if (!circle) return;
+    circle.__liaDgsMacroManaged = true;
+    circle.__liaDgsCircle = true;
+    circle.__liaDgsCircleName = cfg.name;
+    circle.__liaDgsCircleCenter = center;
+    circle.__liaDgsCircleRadiusPoint = radiusPoint || null;
+    circle.__liaDgsLanguage = cfg.language;
+    circle.__liaDgsColor = cfg.color;
+    circle.__liaDgsTextColor = cfg.color;
+    circle.__liaDgsLineColor = cfg.color;
+    circle.__liaDgsFillColor = cfg.color;
+    circle.__liaDgsShowName = cfg.showName;
+    circle.__liaDgsShowObject = cfg.visible;
+    circle.__liaDgsOpacity = cfg.opacity;
+    circle.__liaDgsShowArea = cfg.showArea;
+    circle.__liaDgsShowPerimeter = cfg.showCircumference;
+    circle.__liaDgsCircleNameLabel = nameLabel || null;
+    circle.__liaDgsCircleMeasurementLabel = measurementLabel || null;
+    circle.__liaDgsCircleLabel = nameLabel || measurementLabel || null;
+    circle.__liaDgsMeasurementLabel = measurementLabel || null;
+    if (nameLabel || measurementLabel) circle.label = nameLabel || measurementLabel;
+    [nameLabel, measurementLabel].forEach(function(label) {
+      if (!label) return;
+      label.__liaDgsMacroManaged = true;
+      label.__liaDgsOwner = circle;
     });
   }
 
@@ -218,6 +281,7 @@ export function init(): void {
       function() { return measurementText(cfg, center, radiusPoint); }
     ], {
       fixed: true,
+      visible: cfg.visible,
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -271,9 +335,19 @@ export function init(): void {
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyCircleStyle(old.circle, cfg.color, cfg.opacity);
       applyNameStyle(old.nameLabel, cfg.color);
       applyMeasurementTheme(old.measurementLabel);
+      applyCircleVisibility(old.circle, old.nameLabel, old.measurementLabel, cfg);
+      applyCircleDgsMetadata(
+        old.circle,
+        old.center,
+        old.radiusPoint,
+        old.nameLabel,
+        old.measurementLabel,
+        cfg
+      );
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -288,6 +362,7 @@ export function init(): void {
         name: '',
         withLabel: false,
         fixed: true,
+        visible: cfg.visible,
         highlight: false,
         strokeColor: cfg.color,
         highlightStrokeColor: cfg.color,
@@ -302,6 +377,8 @@ export function init(): void {
       applyCircleStyle(circle, cfg.color, cfg.opacity);
       nameLabel = createNameLabel(board, center, radiusPoint, cfg);
       measurementLabel = createMeasurementLabel(board, center, radiusPoint, cfg);
+      applyCircleDgsMetadata(circle, center, radiusPoint, nameLabel, measurementLabel, cfg);
+      applyCircleVisibility(circle, nameLabel, measurementLabel, cfg);
 
       window.__circleEntries[key] = {
         uid: String(uid),
@@ -319,6 +396,7 @@ export function init(): void {
         language: cfg.language,
         showArea: cfg.showArea,
         showCircumference: cfg.showCircumference,
+        visible: cfg.visible,
         board: board,
         circle: circle,
         nameLabel: nameLabel,
@@ -417,6 +495,7 @@ export function init(): void {
       applyCircleStyle(entry.circle, entry.color, entry.opacity);
       applyNameStyle(entry.nameLabel, entry.color);
       applyMeasurementTheme(entry.measurementLabel);
+      applyCircleVisibility(entry.circle, entry.nameLabel, entry.measurementLabel, entry as CircleConfig);
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });
   });

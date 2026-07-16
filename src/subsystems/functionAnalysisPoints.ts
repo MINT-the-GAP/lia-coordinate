@@ -18,6 +18,8 @@ interface AnalysisPointConfig {
   prefix: string;
   explicitNames: string[];
   explicitNameVisibility: boolean[];
+  explicitValueVisibility: boolean[];
+  explicitObjectVisibility: boolean[];
   showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
@@ -39,6 +41,8 @@ interface AnalysisEntry {
   prefix: string;
   explicitNames: string[];
   explicitNameVisibility: boolean[];
+  explicitValueVisibility: boolean[];
+  explicitObjectVisibility: boolean[];
   showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
@@ -50,6 +54,7 @@ interface AnalysisEntry {
   updateRAF?: number;
   updating?: boolean;
   handlers?: Array<{ event: string; fn: () => void }>;
+  __liaDgsMacroManaged?: boolean;
 }
 
 export function init(): void {
@@ -78,6 +83,21 @@ export function init(): void {
 
   function isValueOption(part: string): boolean {
     return /^(wert|value|koordinaten|coordinates)\s*=\s*1$/i.test(String(part || '').trim());
+  }
+
+  function parseBooleanListOption(parts: string[], names: RegExp): boolean[] {
+    const option = parts.find(function(part) { return names.test(String(part || '').trim()); }) || '';
+    const match = option.match(/^[^=]+\s*=\s*(.+)$/);
+    if (!match) return [];
+    let raw = unquote(String(match[1] || '').trim());
+    if (raw.startsWith('[') && raw.endsWith(']')) raw = raw.slice(1, -1);
+    return splitTopLevel(raw, ';').map(function(value) {
+      return !/^(?:0|false|nein|no)$/i.test(unquote(value).trim());
+    });
+  }
+
+  function isPerPointOption(part: string): boolean {
+    return /^(?:values|werte|visible|sichtbar)\s*=/i.test(String(part || '').trim());
   }
 
   function parseNamesList(value: string): Array<{ name: string; showName: boolean }> {
@@ -111,11 +131,13 @@ export function init(): void {
       return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
     const positionalPrefix = trailingOptions.find(function(part) {
-      return !isValueOption(part) && !isHiddenNameOption(part) &&
+      return !isValueOption(part) && !isPerPointOption(part) && !isHiddenNameOption(part) &&
         !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
     }) || '';
     const parsedPrefix = parseMacroName(prefixOption || positionalPrefix, defaultPrefix(analysisKind, languageValue));
     const parsedNames = namesOption ? parseNamesList(namesOption) : [];
+    const explicitValueVisibility = parseBooleanListOption(trailingOptions, /^(?:values|werte)\s*=/i);
+    const explicitObjectVisibility = parseBooleanListOption(trailingOptions, /^(?:visible|sichtbar)\s*=/i);
     return {
       boardId: String(parts[0] || '').trim(),
       kind: analysisKind,
@@ -125,6 +147,8 @@ export function init(): void {
       prefix: cleanName(parsedPrefix.name) || defaultPrefix(analysisKind, languageValue),
       explicitNames: parsedNames.map(function(parsed) { return parsed.name; }),
       explicitNameVisibility: parsedNames.map(function(parsed) { return parsed.showName; }),
+      explicitValueVisibility,
+      explicitObjectVisibility,
       showName: parsedPrefix.showName && !trailingOptions.some(isHiddenNameOption),
       language: languageValue,
       showValue: trailingOptions.some(isValueOption)
@@ -159,7 +183,7 @@ export function init(): void {
   function pointLabelText(entry: AnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
     const showName = pointNameVisible(entry, index);
-    if (!entry.showValue) return showName ? '\\(' + name + '\\)' : '';
+    if (!pointValueVisible(entry, index)) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
     if (entry.kind === 'roots') {
       return '\\(' + (showName ? name + '\\; ' : '') + 'x = ' + formatNumber(holder.x, entry.language) + '\\)';
@@ -171,6 +195,22 @@ export function init(): void {
   function pointNameVisible(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
     if (entry.showName === false) return false;
     if (entry.explicitNames[index]) return entry.explicitNameVisibility[index] !== false;
+    return true;
+  }
+
+  function pointValueVisible(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
+    if (Array.isArray(entry.explicitValueVisibility) &&
+        typeof entry.explicitValueVisibility[index] === 'boolean') {
+      return entry.explicitValueVisibility[index];
+    }
+    return entry.showValue;
+  }
+
+  function pointObjectVisible(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
+    if (Array.isArray(entry.explicitObjectVisibility) &&
+        typeof entry.explicitObjectVisibility[index] === 'boolean') {
+      return entry.explicitObjectVisibility[index];
+    }
     return true;
   }
 
@@ -386,6 +426,24 @@ export function init(): void {
     entry.handlers = [];
   }
 
+  function constructionProperty(kind: AnalysisKind): string {
+    if (kind === 'extrema') return '__liaDgsExtremaConstruction';
+    if (kind === 'inflections') return '__liaDgsInflectionConstruction';
+    return '__liaDgsRootConstruction';
+  }
+
+  function detachEntryFromSource(entry: AnalysisEntry, source = entry.source): void {
+    if (!entry || !source) return;
+    const property = constructionProperty(entry.kind);
+    if (source[property] === entry) delete source[property];
+  }
+
+  function attachEntryToSource(entry: AnalysisEntry): void {
+    if (!entry || !entry.source) return;
+    entry.__liaDgsMacroManaged = true;
+    entry.source[constructionProperty(entry.kind)] = entry;
+  }
+
   function removeEntryByKey(key: string): void {
     const entry = window.__functionAnalysisPointEntries[key] as AnalysisEntry | undefined;
     if (!entry) return;
@@ -394,6 +452,7 @@ export function init(): void {
       entry.updateRAF = undefined;
     }
     removeBoardHandlers(entry);
+    detachEntryFromSource(entry);
     entry.points.forEach(function(point) {
       const name = String(point && point.__liaFunctionAnalysisPointName || '');
       try {
@@ -412,9 +471,11 @@ export function init(): void {
 
   function applyPointVisual(entry: AnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
-    const labelVisible = pointNameVisible(entry, index) || entry.showValue;
+    const objectVisible = pointObjectVisible(entry, index);
+    const labelVisible = objectVisible && (pointNameVisible(entry, index) || pointValueVisible(entry, index));
     try {
       point.setAttribute({
+        visible: objectVisible,
         strokeColor: entry.color,
         fillColor: entry.color,
         highlightStrokeColor: entry.color,
@@ -450,8 +511,28 @@ export function init(): void {
       requestAnimationFrame(function() { keepPointLabelOnOneLine(point); });
     } catch (e) {}
     point.__liaPointVisual = { color: entry.color, opacity: 1, hasExplicitColor: entry.hasExplicitColor };
+    point.__liaDgsMacroManaged = true;
+    point.__liaDgsPointName = pointNameForIndex(entry, index);
+    point.__liaDgsRootPoint = entry.kind === 'roots';
+    point.__liaDgsExtremumPoint = entry.kind === 'extrema';
+    point.__liaDgsInflectionPoint = entry.kind === 'inflections';
+    point.__liaDgsYInterceptPoint = false;
+    point.__liaDgsIntersectionPoint = false;
+    point.__liaDgsAnalysisConstruction = entry;
+    point.__liaDgsRootConstruction = entry.kind === 'roots' ? entry : undefined;
+    point.__liaDgsExtremaConstruction = entry.kind === 'extrema' ? entry : undefined;
+    point.__liaDgsInflectionConstruction = entry.kind === 'inflections' ? entry : undefined;
+    point.__liaDgsRootHolder = entry.holders[index];
+    point.__liaDgsLanguage = entry.language;
+    point.__liaDgsColor = entry.color;
+    point.__liaDgsTextColor = labelColor;
+    point.__liaDgsLineColor = entry.color;
+    point.__liaDgsFillColor = entry.color;
     point.__liaDgsShowName = pointNameVisible(entry, index);
-    point.__liaDgsShowValue = entry.showValue;
+    point.__liaDgsShowValue = pointValueVisible(entry, index);
+    point.__liaDgsShowObject = objectVisible;
+    point.__liaDgsOpacity = 1;
+    point.__liaDgsFormatFontSize = 24;
   }
 
   function createAnalysisPoint(entry: AnalysisEntry, index: number): any | null {
@@ -465,7 +546,8 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: pointNameVisible(entry, index) || entry.showValue,
+        withLabel: pointNameVisible(entry, index) || pointValueVisible(entry, index),
+        visible: pointObjectVisible(entry, index),
         showInfobox: false,
         strokeColor: entry.color,
         fillColor: entry.color,
@@ -489,8 +571,8 @@ export function init(): void {
       point.__liaFunctionAnalysisPointName = name;
       point.__liaDgsPointName = name;
       point.__liaDgsShowName = pointNameVisible(entry, index);
-      point.__liaDgsShowValue = entry.showValue;
-      point.__liaDgsShowObject = true;
+      point.__liaDgsShowValue = pointValueVisible(entry, index);
+      point.__liaDgsShowObject = pointObjectVisible(entry, index);
       point.__liaDgsColor = entry.color;
       point.__liaDgsLineColor = entry.color;
       point.__liaDgsFillColor = entry.color;
@@ -547,13 +629,16 @@ export function init(): void {
     try {
       const source = findFunctionSource(entry.board, entry.boardId, entry.sourceName);
       if (!source) {
+        detachEntryFromSource(entry);
         const changed = syncEntryPoints(entry, []);
         if (changed) {
           try { if (entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
         }
         return false;
       }
+      if (entry.source !== source) detachEntryFromSource(entry);
       entry.source = source;
+      attachEntryToSource(entry);
       const positions = getPositions(entry);
       const changed = syncEntryPoints(entry, positions);
       if (changed) {
@@ -614,10 +699,14 @@ export function init(): void {
         old.prefix === cfg.prefix && old.language === cfg.language && old.showValue === cfg.showValue &&
         old.showName === cfg.showName &&
         old.explicitNames.join('\n') === cfg.explicitNames.join('\n') &&
-        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n')) {
+        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n') &&
+        (old.explicitValueVisibility || []).join('\n') === cfg.explicitValueVisibility.join('\n') &&
+        (old.explicitObjectVisibility || []).join('\n') === cfg.explicitObjectVisibility.join('\n')) {
+      if (old.source !== source) detachEntryFromSource(old);
       old.source = source;
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      attachEntryToSource(old);
       updateEntry(old);
       return true;
     }
@@ -633,6 +722,8 @@ export function init(): void {
       prefix: cfg.prefix,
       explicitNames: cfg.explicitNames.slice(),
       explicitNameVisibility: cfg.explicitNameVisibility.slice(),
+      explicitValueVisibility: cfg.explicitValueVisibility.slice(),
+      explicitObjectVisibility: cfg.explicitObjectVisibility.slice(),
       showName: cfg.showName,
       language: cfg.language,
       showValue: cfg.showValue,
@@ -640,9 +731,11 @@ export function init(): void {
       source,
       points: [],
       holders: [],
-      names: []
+      names: [],
+      __liaDgsMacroManaged: true
     };
     window.__functionAnalysisPointEntries[key] = entry;
+    attachEntryToSource(entry);
     bindBoardHandlers(entry);
     updateEntry(entry);
     try { board.update(); } catch (e) {}

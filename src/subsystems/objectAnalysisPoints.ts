@@ -23,6 +23,8 @@ interface ObjectAnalysisConfig {
   prefix: string;
   explicitNames: string[];
   explicitNameVisibility: boolean[];
+  explicitValueVisibility: boolean[];
+  explicitObjectVisibility: boolean[];
   showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
@@ -51,6 +53,8 @@ interface ObjectAnalysisEntry {
   prefix: string;
   explicitNames: string[];
   explicitNameVisibility: boolean[];
+  explicitValueVisibility: boolean[];
+  explicitObjectVisibility: boolean[];
   showName: boolean;
   language: 'de' | 'en';
   showValue: boolean;
@@ -63,6 +67,9 @@ interface ObjectAnalysisEntry {
   updateRAF?: number;
   updating?: boolean;
   handlers?: Array<{ event: string; fn: () => void }>;
+  __liaDgsMacroManaged?: boolean;
+  __liaDgsSource?: any;
+  __liaDgsSource2?: any;
 }
 
 export function init(): void {
@@ -91,6 +98,21 @@ export function init(): void {
 
   function isValueOption(part: string): boolean {
     return /^(wert|value|koordinaten|coordinates)\s*=\s*1$/i.test(String(part || '').trim());
+  }
+
+  function parseBooleanListOption(parts: string[], names: RegExp): boolean[] {
+    const option = parts.find(function(part) { return names.test(String(part || '').trim()); }) || '';
+    const match = option.match(/^[^=]+\s*=\s*(.+)$/);
+    if (!match) return [];
+    let raw = unquote(String(match[1] || '').trim());
+    if (raw.startsWith('[') && raw.endsWith(']')) raw = raw.slice(1, -1);
+    return splitTopLevel(raw, ';').map(function(value) {
+      return !/^(?:0|false|nein|no)$/i.test(unquote(value).trim());
+    });
+  }
+
+  function isPerPointOption(part: string): boolean {
+    return /^(?:values|werte|visible|sichtbar)\s*=/i.test(String(part || '').trim());
   }
 
   function cleanName(value: unknown): string {
@@ -153,11 +175,13 @@ export function init(): void {
       return match ? String(match[1] || '').trim() : '';
     }).find(Boolean) || '';
     const positionalPrefix = trailingOptions.find(function(part) {
-      return !isValueOption(part) && !isHiddenNameOption(part) &&
+      return !isValueOption(part) && !isPerPointOption(part) && !isHiddenNameOption(part) &&
         !/^names?\s*=/i.test(part) && !/^prefix\s*=/i.test(part);
     }) || '';
     const parsedPrefix = parseMacroName(prefixOption || positionalPrefix, defaultPrefix(analysisKind, languageValue));
     const parsedNames = namesOption ? parseNamesList(namesOption) : [];
+    const explicitValueVisibility = parseBooleanListOption(trailingOptions, /^(?:values|werte)\s*=/i);
+    const explicitObjectVisibility = parseBooleanListOption(trailingOptions, /^(?:visible|sichtbar)\s*=/i);
     return {
       boardId: String(parts[0] || '').trim(),
       kind: analysisKind,
@@ -168,6 +192,8 @@ export function init(): void {
       prefix: cleanName(parsedPrefix.name) || defaultPrefix(analysisKind, languageValue),
       explicitNames: parsedNames.map(function(parsed) { return parsed.name; }),
       explicitNameVisibility: parsedNames.map(function(parsed) { return parsed.showName; }),
+      explicitValueVisibility,
+      explicitObjectVisibility,
       showName: parsedPrefix.showName && !trailingOptions.some(isHiddenNameOption),
       language: languageValue,
       showValue: trailingOptions.some(isValueOption)
@@ -197,10 +223,26 @@ export function init(): void {
     return true;
   }
 
+  function pointValueVisible(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): boolean {
+    if (Array.isArray(entry.explicitValueVisibility) &&
+        typeof entry.explicitValueVisibility[index] === 'boolean') {
+      return entry.explicitValueVisibility[index];
+    }
+    return entry.showValue;
+  }
+
+  function pointObjectVisible(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): boolean {
+    if (Array.isArray(entry.explicitObjectVisibility) &&
+        typeof entry.explicitObjectVisibility[index] === 'boolean') {
+      return entry.explicitObjectVisibility[index];
+    }
+    return true;
+  }
+
   function pointLabelText(entry: ObjectAnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
     const showName = pointNameVisible(entry, index);
-    if (!entry.showValue) return showName ? '\\(' + name + '\\)' : '';
+    if (!pointValueVisible(entry, index)) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
     return '\\(' + (showName ? name + '\\; ' : '') + '(' + formatNumber(holder.x, entry.language) + '\\mid ' +
       formatNumber(holder.y, entry.language) + ')\\)';
@@ -281,9 +323,81 @@ export function init(): void {
     ].map(cleanName).filter(Boolean);
   }
 
+  function parsePointPairReference(value: unknown): [string, string] | null {
+    const raw = unquote(String(value == null ? '' : value)).trim();
+    if (!raw.startsWith('[') || !raw.endsWith(']')) return null;
+    const pointNames = splitTopLevel(raw.slice(1, -1), ';')
+      .map(function(part) {
+        return cleanName(parseMacroName(unquote(part)).name);
+      })
+      .filter(Boolean);
+    if (pointNames.length !== 2 || namesEqual(pointNames[0], pointNames[1])) return null;
+    return [pointNames[0], pointNames[1]];
+  }
+
+  function pointCandidateNames(point: any): string[] {
+    return [
+      point && point.__liaDgsPointName,
+      point && point.__liaPointName,
+      point && point.name
+    ].map(cleanName).filter(Boolean);
+  }
+
+  function findPointByName(board: any, boardId: string, pointName: string): any | null {
+    const registered = window.__points && window.__points[boardId];
+    if (registered && typeof registered === 'object') {
+      for (const key of Object.keys(registered)) {
+        const point = registered[key];
+        if (!point || point.board !== board || !namesEqual(key, pointName)) continue;
+        if (typeof point.X === 'function' && typeof point.Y === 'function') return point;
+      }
+    }
+    for (const point of getBoardObjects(board)) {
+      if (!point || point.board !== board ||
+          typeof point.X !== 'function' || typeof point.Y !== 'function') continue;
+      if (pointCandidateNames(point).some(function(name) { return namesEqual(name, pointName); })) {
+        return point;
+      }
+    }
+    return null;
+  }
+
+  function findPointPairSource(
+    board: any,
+    boardId: string,
+    sourceName: string
+  ): AnalysisSource | null {
+    const reference = parsePointPairReference(sourceName);
+    if (!reference) return null;
+    const first = findPointByName(board, boardId, reference[0]);
+    const second = findPointByName(board, boardId, reference[1]);
+    if (!first || !second || first === second) return null;
+    const matches = getBoardObjects(board).filter(function(object) {
+      if (!object || !object.point1 || !object.point2) return false;
+      return (object.point1 === first && object.point2 === second) ||
+        (object.point1 === second && object.point2 === first);
+    });
+    matches.sort(function(left, right) {
+      const score = function(object: any): number {
+        if (object && object.__liaDgsPolygonBorder) return 4;
+        if (object && object.__liaDgsSegment) return 3;
+        if (String(object && object.elType || '').toLowerCase() === 'segment') return 2;
+        return 1;
+      };
+      return score(right) - score(left);
+    });
+    for (const object of matches) {
+      const source = sourceFromObject(object, 'linear', detectLinearMode(object));
+      if (source) return source;
+    }
+    return null;
+  }
+
   function findSource(board: any, boardId: string, sourceName: string): AnalysisSource | null {
     const wanted = normalizeName(sourceName);
     if (!board || !wanted) return null;
+    const pointPairSource = findPointPairSource(board, boardId, sourceName);
+    if (pointPairSource) return pointPairSource;
 
     const plotEntries = window.__plotFunctionEntries || {};
     for (const key of Object.keys(plotEntries)) {
@@ -599,6 +713,45 @@ export function init(): void {
     entry.handlers = [];
   }
 
+  function detachEntryFromSources(entry: ObjectAnalysisEntry): void {
+    if (!entry) return;
+    const first = entry.source && entry.source.object;
+    const second = entry.source2 && entry.source2.object;
+    if (entry.kind === 'ordinate-intercept') {
+      if (first && first.__liaDgsYInterceptConstruction === entry) {
+        delete first.__liaDgsYInterceptConstruction;
+      }
+      return;
+    }
+    [first, second].forEach(function(source) {
+      if (!source || !Array.isArray(source.__liaDgsIntersectionConstructions)) return;
+      source.__liaDgsIntersectionConstructions = source.__liaDgsIntersectionConstructions
+        .filter(function(candidate: any) { return candidate !== entry; });
+    });
+  }
+
+  function attachEntryToSources(entry: ObjectAnalysisEntry): void {
+    if (!entry || !entry.source || !entry.source.object) return;
+    const first = entry.source.object;
+    const second = entry.source2 && entry.source2.object;
+    entry.__liaDgsMacroManaged = true;
+    entry.__liaDgsSource = first;
+    entry.__liaDgsSource2 = second || null;
+    if (entry.kind === 'ordinate-intercept') {
+      first.__liaDgsYInterceptConstruction = entry;
+      return;
+    }
+    [first, second].forEach(function(source) {
+      if (!source) return;
+      const constructions = Array.isArray(source.__liaDgsIntersectionConstructions)
+        ? source.__liaDgsIntersectionConstructions
+        : [];
+      source.__liaDgsIntersectionConstructions = constructions.includes(entry)
+        ? constructions
+        : constructions.concat(entry);
+    });
+  }
+
   function removeEntryByKey(key: string): void {
     const entry = window.__objectAnalysisPointEntries[key] as ObjectAnalysisEntry | undefined;
     if (!entry) return;
@@ -607,6 +760,7 @@ export function init(): void {
       entry.updateRAF = undefined;
     }
     removeBoardHandlers(entry);
+    detachEntryFromSources(entry);
     entry.points.forEach(function(point) {
       const name = String(point && point.__liaObjectAnalysisPointName || '');
       try {
@@ -625,9 +779,11 @@ export function init(): void {
 
   function applyPointVisual(entry: ObjectAnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
-    const labelVisible = pointNameVisible(entry, index) || entry.showValue;
+    const objectVisible = pointObjectVisible(entry, index);
+    const labelVisible = objectVisible && (pointNameVisible(entry, index) || pointValueVisible(entry, index));
     try {
       point.setAttribute({
+        visible: objectVisible,
         strokeColor: entry.color,
         fillColor: entry.color,
         highlightStrokeColor: entry.color,
@@ -663,8 +819,27 @@ export function init(): void {
       requestAnimationFrame(function() { keepPointLabelOnOneLine(point); });
     } catch (e) {}
     point.__liaPointVisual = { color: entry.color, opacity: 1, hasExplicitColor: entry.hasExplicitColor };
+    point.__liaDgsMacroManaged = true;
+    point.__liaDgsPointName = pointNameForIndex(entry, index);
+    point.__liaDgsRootPoint = false;
+    point.__liaDgsExtremumPoint = false;
+    point.__liaDgsInflectionPoint = false;
+    point.__liaDgsYInterceptPoint = entry.kind === 'ordinate-intercept';
+    point.__liaDgsIntersectionPoint = entry.kind === 'intersections';
+    point.__liaDgsAnalysisConstruction = entry;
+    point.__liaDgsYInterceptConstruction = entry.kind === 'ordinate-intercept' ? entry : undefined;
+    point.__liaDgsIntersectionConstruction = entry.kind === 'intersections' ? entry : undefined;
+    point.__liaDgsRootHolder = entry.holders[index];
+    point.__liaDgsLanguage = entry.language;
+    point.__liaDgsColor = entry.color;
+    point.__liaDgsTextColor = labelColor;
+    point.__liaDgsLineColor = entry.color;
+    point.__liaDgsFillColor = entry.color;
     point.__liaDgsShowName = pointNameVisible(entry, index);
-    point.__liaDgsShowValue = entry.showValue;
+    point.__liaDgsShowValue = pointValueVisible(entry, index);
+    point.__liaDgsShowObject = objectVisible;
+    point.__liaDgsOpacity = 1;
+    point.__liaDgsFormatFontSize = 24;
   }
 
   function createAnalysisPoint(entry: ObjectAnalysisEntry, index: number): any | null {
@@ -678,7 +853,8 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: pointNameVisible(entry, index) || entry.showValue,
+        withLabel: pointNameVisible(entry, index) || pointValueVisible(entry, index),
+        visible: pointObjectVisible(entry, index),
         showInfobox: false,
         strokeColor: entry.color,
         fillColor: entry.color,
@@ -704,8 +880,8 @@ export function init(): void {
       point.__liaDgsYInterceptPoint = entry.kind === 'ordinate-intercept';
       point.__liaDgsIntersectionPoint = entry.kind === 'intersections';
       point.__liaDgsShowName = pointNameVisible(entry, index);
-      point.__liaDgsShowValue = entry.showValue;
-      point.__liaDgsShowObject = true;
+      point.__liaDgsShowValue = pointValueVisible(entry, index);
+      point.__liaDgsShowObject = pointObjectVisible(entry, index);
       point.__liaDgsColor = entry.color;
       point.__liaDgsLineColor = entry.color;
       point.__liaDgsFillColor = entry.color;
@@ -765,6 +941,7 @@ export function init(): void {
         ? findSource(entry.board, entry.boardId, entry.source2Name)
         : null;
       if (!source || (entry.kind === 'intersections' && !source2)) {
+        detachEntryFromSources(entry);
         const changed = syncEntryPoints(entry, []);
         if (changed) {
           try { if (entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
@@ -772,14 +949,19 @@ export function init(): void {
         return false;
       }
       if (entry.kind === 'ordinate-intercept' && source.kind !== 'function' && source.kind !== 'linear') {
+        detachEntryFromSources(entry);
         const changed = syncEntryPoints(entry, []);
         if (changed) {
           try { if (entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
         }
         return false;
       }
+      const sourcesChanged = entry.source?.object !== source.object ||
+        entry.source2?.object !== source2?.object;
+      if (sourcesChanged) detachEntryFromSources(entry);
       entry.source = source;
       entry.source2 = source2;
+      attachEntryToSources(entry);
       const positions = entry.kind === 'intersections' && source2
         ? getIntersectionPositions(entry.board, source, source2)
         : getOrdinateIntercept(entry.board, source);
@@ -844,11 +1026,17 @@ export function init(): void {
         old.source2Name === cfg.source2Name && old.prefix === cfg.prefix && old.language === cfg.language &&
         old.showValue === cfg.showValue && old.showName === cfg.showName &&
         old.explicitNames.join('\n') === cfg.explicitNames.join('\n') &&
-        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n')) {
+        old.explicitNameVisibility.join('\n') === cfg.explicitNameVisibility.join('\n') &&
+        (old.explicitValueVisibility || []).join('\n') === cfg.explicitValueVisibility.join('\n') &&
+        (old.explicitObjectVisibility || []).join('\n') === cfg.explicitObjectVisibility.join('\n')) {
+      const sourcesChanged = old.source?.object !== source.object ||
+        old.source2?.object !== source2?.object;
+      if (sourcesChanged) detachEntryFromSources(old);
       old.source = source;
       old.source2 = source2;
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      attachEntryToSources(old);
       updateEntry(old);
       return true;
     }
@@ -865,6 +1053,8 @@ export function init(): void {
       prefix: cfg.prefix,
       explicitNames: cfg.explicitNames.slice(),
       explicitNameVisibility: cfg.explicitNameVisibility.slice(),
+      explicitValueVisibility: cfg.explicitValueVisibility.slice(),
+      explicitObjectVisibility: cfg.explicitObjectVisibility.slice(),
       showName: cfg.showName,
       language: cfg.language,
       showValue: cfg.showValue,
@@ -873,9 +1063,13 @@ export function init(): void {
       source2,
       points: [],
       holders: [],
-      names: []
+      names: [],
+      __liaDgsMacroManaged: true,
+      __liaDgsSource: source.object,
+      __liaDgsSource2: source2 ? source2.object : null
     };
     window.__objectAnalysisPointEntries[key] = entry;
+    attachEntryToSources(entry);
     bindBoardHandlers(entry);
     updateEntry(entry);
     try { board.update(); } catch (e) {}

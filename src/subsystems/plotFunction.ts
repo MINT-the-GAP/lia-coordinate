@@ -21,16 +21,27 @@ export function init(): void {
       .replace(/\}\}/g, ')');
   }
 
+  function visibilityOptionValue(value) {
+    const match = String(value == null ? '' : value).trim()
+      .match(/^(?:visible|sichtbar)\s*=\s*(0|1|false|true)$/i);
+    if (!match) return null;
+    return !/^(?:0|false)$/i.test(match[1]);
+  }
+
   function parsePlotSpec(spec) {
     const raw = unquote(spec);
     const parts = splitTopLevel(raw, ';');
     const parsedName = parseMacroName(parts[1] ? unquote(parts[1]) : 'f', 'f');
     const options = parts.slice(4).map(function(part) { return unquote(part).trim(); });
+    const visibilityOptions = options
+      .map(visibilityOptionValue)
+      .filter(function(value) { return value != null; });
 
     return {
       boardId: parts[0] ? unquote(parts[0]) : '',
       name:    parsedName.name,
       showName: parsedName.showName && !options.some(isHiddenNameOption),
+      visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       expr:    parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
       color:   parts[3] ? unquote(parts[3]) : 'red'
     };
@@ -75,6 +86,129 @@ export function init(): void {
     }
   }
 
+  const functionEvaluationStack = new Set<any>();
+
+  function normalizeFunctionBindingName(value) {
+    let name = String(value == null ? '' : value).trim();
+    name = name
+      .replace(/^\\\(|\\\)$/g, '')
+      .replace(/^\$+|\$+$/g, '')
+      .replace(/\s*\(\s*x\s*\)\s*$/i, '')
+      .trim()
+      .toLowerCase();
+    return /^[a-z][a-z0-9]*$/.test(name) ? name : '';
+  }
+
+  function boardObjects(board) {
+    const result: any[] = [];
+    const seen = new Set<any>();
+    const add = function(object) {
+      if (!object || seen.has(object)) return;
+      seen.add(object);
+      result.push(object);
+    };
+    try {
+      if (Array.isArray(board && board.objectsList)) board.objectsList.forEach(add);
+    } catch (e) {}
+    try {
+      Object.keys(board && board.objects || {}).forEach(function(id) { add(board.objects[id]); });
+    } catch (e) {}
+    return result;
+  }
+
+  function isFunctionBindingTarget(object) {
+    return !!object && (
+      object.__liaDgsFunction === true ||
+      typeof object.__liaDgsFunctionEvaluator === 'function' ||
+      (!!object.__liaPlotFunctionName && typeof object.Y === 'function')
+    );
+  }
+
+  function functionBindingName(object, fallback) {
+    return normalizeFunctionBindingName(
+      object && (object.__liaDgsFunctionName || object.__liaPlotFunctionName || object.name) || fallback
+    );
+  }
+
+  function availableFunctionNames(boardId, board, excludeUid, excludeGraph) {
+    const names = new Set<string>();
+    const addObject = function(object, fallbackName) {
+      if (!isFunctionBindingTarget(object) || object === excludeGraph) return;
+      if (excludeUid && String(object.__liaPlotFunctionUid || '') === excludeUid) return;
+      const name = functionBindingName(object, fallbackName);
+      if (name) names.add(name);
+    };
+
+    boardObjects(board).forEach(function(object) { addObject(object, ''); });
+    Object.keys(window.__plotFunctionEntries || {}).forEach(function(key) {
+      const entry = window.__plotFunctionEntries[key];
+      if (!entry || String(entry.boardId || '') !== boardId || String(entry.uid || '') === excludeUid) return;
+      if (!entry.graph || !sameBoard(entry.graph.board, board)) return;
+      addObject(entry.graph, entry.name);
+    });
+    return Array.from(names).sort();
+  }
+
+  function findFunctionBindingTarget(boardId, board, name, excludeUid, excludeGraph) {
+    const objects = boardObjects(board);
+    for (let index = 0; index < objects.length; index += 1) {
+      const object = objects[index];
+      if (!isFunctionBindingTarget(object) || object === excludeGraph) continue;
+      if (excludeUid && String(object.__liaPlotFunctionUid || '') === excludeUid) continue;
+      if (functionBindingName(object, '') === name) return object;
+    }
+
+    const entries = window.__plotFunctionEntries || {};
+    const keys = Object.keys(entries);
+    for (let index = 0; index < keys.length; index += 1) {
+      const entry = entries[keys[index]];
+      if (!entry || String(entry.boardId || '') !== boardId || String(entry.uid || '') === excludeUid) continue;
+      const graph = entry.graph;
+      if (!graph || graph === excludeGraph || !sameBoard(graph.board, board)) continue;
+      if (functionBindingName(graph, entry.name) === name) return graph;
+    }
+    return null;
+  }
+
+  function isCurrentFunctionBindingTarget(target, board, name, excludeUid, excludeGraph) {
+    if (!target || target === excludeGraph || !isFunctionBindingTarget(target)) return false;
+    if (excludeUid && String(target.__liaPlotFunctionUid || '') === excludeUid) return false;
+    if (functionBindingName(target, '') !== name) return false;
+    try {
+      if (target.id && board && board.objects && board.objects[target.id] !== target) return false;
+      if (!target.id && Array.isArray(board && board.objectsList) && !board.objectsList.includes(target)) return false;
+    } catch (e) {
+      return false;
+    }
+    return true;
+  }
+
+  function createFunctionBinding(boardId, board, name, excludeUid, excludeGraph) {
+    let cachedTarget: any = null;
+    return function(x) {
+      const currentBoard = window.__boards && window.__boards[boardId];
+      if (!sameBoard(currentBoard, board)) return NaN;
+      if (!isCurrentFunctionBindingTarget(cachedTarget, board, name, excludeUid, excludeGraph)) {
+        cachedTarget = findFunctionBindingTarget(boardId, board, name, excludeUid, excludeGraph);
+      }
+      const target = cachedTarget;
+      if (!target || functionEvaluationStack.has(target)) return NaN;
+      functionEvaluationStack.add(target);
+      try {
+        const evaluator = typeof target.__liaDgsFunctionEvaluator === 'function'
+          ? target.__liaDgsFunctionEvaluator
+          : target.Y;
+        if (typeof evaluator !== 'function') return NaN;
+        const value = Number(evaluator(x));
+        return Number.isFinite(value) ? value : NaN;
+      } catch (e) {
+        return NaN;
+      } finally {
+        functionEvaluationStack.delete(target);
+      }
+    };
+  }
+
   function normalizeExpr(expr) {
     let s = String(expr || '').trim();
 
@@ -92,13 +226,25 @@ export function init(): void {
     return s.trim();
   }
 
-  function compileExpr(expr, boardId) {
+  function compileExpr(expr, boardId, uid, excludeGraph) {
     try {
+      const board = window.__boards && window.__boards[boardId];
+      if (!board) return null;
       const sliderBindings = typeof window.__getCoordSliderBindings === 'function'
         ? window.__getCoordSliderBindings(boardId)
         : {};
-      const compiled = compileFunctionExpression(expr, {}, sliderBindings);
-      return compiled.fn;
+      const functionBindings: Record<string, (x: number) => number> = {};
+      availableFunctionNames(boardId, board, String(uid || ''), excludeGraph).forEach(function(name) {
+        functionBindings[name] = createFunctionBinding(
+          boardId,
+          board,
+          name,
+          String(uid || ''),
+          excludeGraph
+        );
+      });
+      const compiled = compileFunctionExpression(expr, functionBindings, sliderBindings);
+      return compiled.fn ? compiled : null;
     } catch (e) {
       return null;
     }
@@ -164,7 +310,7 @@ export function init(): void {
     return xmin + 0.60 * xspan;
   }
 
-  function createFunctionLabel(board, fn, name, color) {
+  function createFunctionLabel(board, fn, name, color, visible) {
     const labelText = texName(name);
 
     const anchor = board.create('point', [
@@ -207,6 +353,7 @@ export function init(): void {
       }
     ], {
       fixed: true,
+      visible: visible !== false,
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -221,6 +368,43 @@ export function init(): void {
     return { anchor, label };
   }
 
+  function applyFunctionVisibility(graph, label, showName, visible) {
+    const showObject = visible !== false;
+    try {
+      if (graph && typeof graph.setAttribute === 'function') {
+        graph.setAttribute({ visible: showObject });
+      }
+    } catch (e) {}
+    try {
+      if (label && typeof label.setAttribute === 'function') {
+        label.setAttribute({ visible: showObject && showName !== false });
+      }
+    } catch (e) {}
+  }
+
+  function applyDgsFunctionMetadata(graph, cfg) {
+    if (!graph || !cfg || typeof cfg.fn !== 'function') return;
+    graph.__liaDgsMacroManaged = true;
+    graph.__liaDgsFunction = true;
+    graph.__liaDgsFunctionEvaluator = cfg.fn;
+    graph.__liaDgsFunctionName = cfg.name;
+    graph.__liaDgsFunctionExpression = cfg.expression;
+    graph.__liaDgsFunctionNormalized = cfg.normalized;
+    graph.__liaDgsShowName = cfg.showName !== false;
+    graph.__liaDgsShowExpression = false;
+    graph.__liaDgsShowObject = cfg.visible !== false;
+    graph.__liaDgsOpacity = 1;
+    graph.__liaDgsColor = cfg.color;
+    graph.__liaDgsLineColor = cfg.color;
+    graph.__liaDgsTextColor = cfg.color;
+    graph.__liaDgsFillColor = cfg.color;
+    graph.__liaDgsFormatFontSize = 28;
+    graph.__liaDgsLanguage = graph.__liaDgsLanguage ||
+      (/^de(?:-|$)/i.test(String(document.documentElement.lang || '')) ? 'de' : 'en');
+    graph.label = cfg.label || null;
+    graph.__liaDgsFunctionLabel = cfg.label || null;
+  }
+
   window.renderPlotFunctionFromSpec = function(uid, spec) {
     const cfg = parsePlotSpec(spec);
 
@@ -229,6 +413,7 @@ export function init(): void {
     const expr = String(cfg.expr || '').trim();
     const color = String(cfg.color || 'red').trim() || 'red';
     const showName = cfg.showName !== false;
+    const visible = cfg.visible !== false;
 
     if (!boardId || !expr) return false;
 
@@ -237,6 +422,9 @@ export function init(): void {
 
     const key = makeKey(uid);
     const old = window.__plotFunctionEntries[key];
+    const compiled = compileExpr(expr, boardId, String(uid || ''), old && old.graph);
+    if (!compiled || typeof compiled.fn !== 'function') return false;
+    const fn = compiled.fn;
 
     if (
       old &&
@@ -246,18 +434,40 @@ export function init(): void {
       old.expr === expr &&
       old.color === color &&
       old.graph &&
+      old.evaluatorState &&
+      typeof old.evaluator === 'function' &&
       sameBoard(old.graph.board, board)
     ) {
+      old.graph.__liaPlotFunctionUid = String(uid || '');
+      old.evaluatorState.fn = fn;
+      old.fn = fn;
+      old.normalized = compiled.normalized;
+      old.visible = visible;
+      applyFunctionVisibility(old.graph, old.label, showName, visible);
+      applyDgsFunctionMetadata(old.graph, {
+        fn: old.evaluator,
+        name,
+        expression: expr,
+        normalized: compiled.normalized,
+        showName,
+        visible,
+        color,
+        label: old.label
+      });
+      old.graph.needsUpdate = true;
+      try { if (typeof old.graph.updateCurve === 'function') old.graph.updateCurve(); } catch (e) {}
+      try { if (typeof board.update === 'function') board.update(); } catch (e) {}
       return true;
     }
 
     removeExisting(uid);
 
-    const fn = compileExpr(expr, boardId);
-    if (!fn) return false;
-
     try {
-      const graph = board.create('functiongraph', [fn], {
+      const evaluatorState = { fn };
+      const evaluator = function(x: number): number {
+        return Number(evaluatorState.fn(x));
+      };
+      const graph = board.create('functiongraph', [evaluator], {
         strokeColor: color,
         highlightStrokeColor: color,
         strokeWidth: 3,
@@ -265,22 +475,35 @@ export function init(): void {
         vectorContent: 2,
         plotpoints: false,
         fixed: true,
-        withLabel: false
+        withLabel: false,
+        visible: visible
       });
       graph.__liaPlotFunctionName = name;
       graph.__liaPlotFunctionExpression = expr;
-      graph.__liaDgsShowName = showName;
-
-      const labelPack = showName
-        ? createFunctionLabel(board, fn, name, color)
-        : { anchor: null, label: null };
+      graph.__liaPlotFunctionUid = String(uid || '');
+      const labelPack = createFunctionLabel(board, evaluator, name, color, showName && visible);
+      applyDgsFunctionMetadata(graph, {
+        fn: evaluator,
+        name,
+        expression: expr,
+        normalized: compiled.normalized,
+        showName,
+        visible,
+        color,
+        label: labelPack.label
+      });
 
       window.__plotFunctionEntries[key] = {
         uid: uid,
         boardId: boardId,
         name: name,
         showName: showName,
+        visible: visible,
         expr: expr,
+        normalized: compiled.normalized,
+        fn: fn,
+        evaluatorState: evaluatorState,
+        evaluator: evaluator,
         color: color,
         graph: graph,
         anchor: labelPack.anchor,
@@ -296,16 +519,135 @@ export function init(): void {
     }
   };
 
-  window.__bootstrapPlotFunctions = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="plot-spec-"][data-spec]');
+  let plotBootstrapRunning = false;
+  let unresolvedRetrySignature = '';
+  let unresolvedRetryCount = 0;
+  const unresolvedBoardFunctionSignatures = new Map<string, string>();
+  const observedPendingBoards = new WeakSet<any>();
+  const MAX_UNRESOLVED_RETRIES = 8;
 
-    nodes.forEach(function(node) {
-      const uid = String(node.id || '').replace(/^plot-spec-/, '');
-      const spec = String(node.dataset.spec || '');
-      if (!uid || !spec) return;
-
-      window.renderPlotFunctionFromSpec(uid, spec);
+  function queuePlotFunctionBootstrap() {
+    if (window.__bootstrapPlotFunctionsRAF) return;
+    window.__bootstrapPlotFunctionsRAF = requestAnimationFrame(function() {
+      window.__bootstrapPlotFunctionsRAF = 0;
+      try {
+        if (window.__bootstrapPlotFunctions) window.__bootstrapPlotFunctions();
+      } catch (e) {}
     });
+  }
+
+  window.__scheduleBootstrapPlotFunctions = function() {
+    unresolvedRetrySignature = '';
+    unresolvedRetryCount = 0;
+    queuePlotFunctionBootstrap();
+  };
+
+  function plotSpecBoardId(spec) {
+    try {
+      return String(parsePlotSpec(spec).boardId || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function boardFunctionSignature(boardId, board) {
+    return availableFunctionNames(boardId, board, '', null).join(',');
+  }
+
+  function observePendingBoard(boardId, board) {
+    if (!boardId || !board) return;
+    unresolvedBoardFunctionSignatures.set(boardId, boardFunctionSignature(boardId, board));
+    if (observedPendingBoards.has(board)) return;
+    observedPendingBoards.add(board);
+    try {
+      board.on('update', function() {
+        if (!unresolvedBoardFunctionSignatures.has(boardId)) return;
+        const currentBoard = window.__boards && window.__boards[boardId];
+        if (!sameBoard(currentBoard, board)) return;
+        const nextSignature = boardFunctionSignature(boardId, board);
+        if (nextSignature === unresolvedBoardFunctionSignatures.get(boardId)) return;
+        unresolvedBoardFunctionSignatures.set(boardId, nextSignature);
+        if (window.__scheduleBootstrapPlotFunctions) {
+          window.__scheduleBootstrapPlotFunctions();
+        }
+      });
+    } catch (e) {}
+  }
+
+  function updatePendingBoardObservers(pending) {
+    const pendingBoardIds = new Set<string>();
+    pending.forEach(function(item) {
+      const boardId = plotSpecBoardId(item.spec);
+      if (!boardId) return;
+      pendingBoardIds.add(boardId);
+      const board = window.__boards && window.__boards[boardId];
+      if (board) observePendingBoard(boardId, board);
+    });
+    Array.from(unresolvedBoardFunctionSignatures.keys()).forEach(function(boardId) {
+      if (!pendingBoardIds.has(boardId)) {
+        unresolvedBoardFunctionSignatures.delete(boardId);
+      }
+    });
+  }
+
+  function scheduleUnresolvedRetry(pending) {
+    const signature = pending
+      .map(function(item) { return item.uid + '\u001f' + item.spec; })
+      .sort()
+      .join('\u001e');
+    if (signature !== unresolvedRetrySignature) {
+      unresolvedRetrySignature = signature;
+      unresolvedRetryCount = 0;
+    }
+    if (unresolvedRetryCount >= MAX_UNRESOLVED_RETRIES) return;
+    unresolvedRetryCount += 1;
+    queuePlotFunctionBootstrap();
+  }
+
+  window.__bootstrapPlotFunctions = function() {
+    if (plotBootstrapRunning) {
+      queuePlotFunctionBootstrap();
+      return;
+    }
+    plotBootstrapRunning = true;
+    try {
+      const nodes = Array.from(
+        document.querySelectorAll<HTMLElement>('[id^="plot-spec-"][data-spec]')
+      );
+      let pending = nodes.map(function(node) {
+        return {
+          uid: String(node.id || '').replace(/^plot-spec-/, ''),
+          spec: String(node.dataset.spec || '')
+        };
+      }).filter(function(item) {
+        return !!item.uid && !!item.spec;
+      });
+
+      const maxPasses = Math.max(1, pending.length + 1);
+      for (let pass = 0; pass < maxPasses && pending.length; pass += 1) {
+        const next: typeof pending = [];
+        let progress = false;
+        pending.forEach(function(item) {
+          if (window.renderPlotFunctionFromSpec(item.uid, item.spec)) {
+            progress = true;
+          } else {
+            next.push(item);
+          }
+        });
+        pending = next;
+        if (!progress) break;
+      }
+
+      updatePendingBoardObservers(pending);
+      if (pending.length) {
+        scheduleUnresolvedRetry(pending);
+      } else {
+        unresolvedRetrySignature = '';
+        unresolvedRetryCount = 0;
+      }
+    } finally {
+      plotBootstrapRunning = false;
+    }
   };
 
   try {
@@ -342,8 +684,8 @@ export function init(): void {
         if (needsBootstrap) break;
       }
 
-      if (needsBootstrap && window.__bootstrapPlotFunctions) {
-        window.__bootstrapPlotFunctions();
+      if (needsBootstrap && window.__scheduleBootstrapPlotFunctions) {
+        window.__scheduleBootstrapPlotFunctions();
       }
     });
 

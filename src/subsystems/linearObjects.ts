@@ -26,6 +26,7 @@ interface LinearObjectConfig {
   hasExplicitColor: boolean;
   objectName: string;
   showName: boolean;
+  visible: boolean;
   language: 'de' | 'en';
 }
 
@@ -47,6 +48,13 @@ export function init(): void {
     if (value === 'ray' || value === 'strahl') return 'ray';
     if (value === 'vector' || value === 'vektor') return 'vector';
     return 'line';
+  }
+
+  function visibilityOptionValue(value: unknown): boolean | null {
+    const match = String(value == null ? '' : value).trim()
+      .match(/^(?:visible|sichtbar)\s*=\s*(0|1|false|true)$/i);
+    if (!match) return null;
+    return !/^(?:0|false)$/i.test(match[1]);
   }
 
   function parseLinearObjectSpec(spec: string, kind: string, language?: string): LinearObjectConfig {
@@ -77,8 +85,11 @@ export function init(): void {
       .map(function(part) { return String(part || '').trim(); })
       .filter(Boolean);
     const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
+    const visibilityOptions = trailingOptions
+      .map(visibilityOptionValue)
+      .filter(function(value): value is boolean { return value != null; });
     const nameOptions = trailingOptions.filter(function(part) {
-      return !isHiddenNameOption(part);
+      return !isHiddenNameOption(part) && visibilityOptionValue(part) == null;
     });
     const namedOption = nameOptions.map(function(part) {
       const match = part.match(/^name\s*=\s*(.+)$/i);
@@ -99,6 +110,7 @@ export function init(): void {
       hasExplicitColor: !!explicitColor,
       objectName: parsedName.name,
       showName: parsedName.showName && !standaloneHiddenName,
+      visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
     };
   }
@@ -165,6 +177,20 @@ export function init(): void {
     } catch (e) {}
   }
 
+  function applyLinearObjectVisibility(entry: any, cfg: LinearObjectConfig): void {
+    const visible = cfg.visible !== false;
+    try {
+      if (entry && entry.object && typeof entry.object.setAttribute === 'function') {
+        entry.object.setAttribute({ visible: visible });
+      }
+    } catch (e) {}
+    try {
+      if (entry && entry.label && typeof entry.label.setAttribute === 'function') {
+        entry.label.setAttribute({ visible: visible && cfg.showName });
+      }
+    } catch (e) {}
+  }
+
   function labelPosition(board: any, points: any[]): { x: number; y: number } {
     const x1 = Number(points[0].X());
     const y1 = Number(points[0].Y());
@@ -209,7 +235,8 @@ export function init(): void {
       anchorY: 'middle',
       strokeColor: cfg.color,
       fillColor: cfg.color,
-      fontSize: 20
+      fontSize: 20,
+      visible: cfg.visible
     });
     object.label = label;
     scheduleBootstrap(function() { try { board.update(); } catch (e) {} });
@@ -227,7 +254,8 @@ export function init(): void {
       strokeWidth: 3,
       highlightStrokeWidth: 4,
       firstArrow: false,
-      lastArrow: cfg.kind === 'vector'
+      lastArrow: cfg.kind === 'vector',
+      visible: cfg.visible
     };
     if (cfg.kind === 'vector') {
       return board.create('segment', [points[0], points[1]], base);
@@ -238,6 +266,40 @@ export function init(): void {
       straightLast: true,
       lastArrow: false
     });
+  }
+
+  function applyDgsLinearObjectMetadata(entry: any, cfg: LinearObjectConfig): void {
+    const object = entry && entry.object;
+    const points = Array.isArray(entry && entry.points) ? entry.points : [];
+    if (!object || points.length < 2) return;
+
+    const effectiveName = cfg.kind === 'vector'
+      ? vectorBaseName(cfg, points)
+      : cfg.objectName;
+
+    object.__liaDgsMacroManaged = true;
+    object.__liaDgsSegment = false;
+    object.__liaDgsLine = cfg.kind === 'line';
+    object.__liaDgsRay = cfg.kind === 'ray';
+    object.__liaDgsVector = cfg.kind === 'vector';
+    object.__liaDgsLineName = cfg.kind === 'line' ? effectiveName : '';
+    object.__liaDgsRayName = cfg.kind === 'ray' ? effectiveName : '';
+    object.__liaDgsVectorName = cfg.kind === 'vector' ? effectiveName : '';
+    object.__liaDgsVectorAutoName = cfg.kind === 'vector' && !cfg.objectName;
+    object.__liaDgsLinearPoints = points.slice(0, 2);
+    object.__liaDgsShowName = cfg.showName;
+    object.__liaDgsShowObject = cfg.visible;
+    if (!Number.isFinite(Number(object.__liaDgsOpacity))) object.__liaDgsOpacity = 1;
+    if (typeof object.__liaDgsShowEquation !== 'boolean') object.__liaDgsShowEquation = false;
+    object.__liaDgsColor = cfg.color;
+    object.__liaDgsLineColor = cfg.color;
+    object.__liaDgsFillColor = cfg.color;
+    object.__liaDgsTextColor = cfg.color;
+    object.__liaDgsLanguage = cfg.language;
+
+    if (!object.point1) object.point1 = points[0];
+    if (!object.point2) object.point2 = points[1];
+    if (entry.label) object.label = entry.label;
   }
 
   window.renderLinearObjectFromSpec = function(uid: string, spec: string, kind: string, language?: string): boolean {
@@ -270,7 +332,10 @@ export function init(): void {
         old.language === cfg.language) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyObjectColor(old.object, old.label, cfg.color);
+      applyLinearObjectVisibility(old, cfg);
+      applyDgsLinearObjectMetadata(old, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -294,7 +359,7 @@ export function init(): void {
       if (cfg.kind === 'vector') object.__liaDgsVectorName = effectiveName;
       else if (cfg.kind === 'ray') object.__liaDgsRayName = effectiveName;
       else object.__liaDgsLineName = effectiveName;
-      window.__linearObjectEntries[key] = {
+      const entry = {
         uid: String(uid),
         boardId: cfg.boardId,
         kind: cfg.kind,
@@ -305,6 +370,7 @@ export function init(): void {
         hasExplicitColor: cfg.hasExplicitColor,
         objectName: cfg.objectName,
         showName: cfg.showName,
+        visible: cfg.visible,
         language: cfg.language,
         board: board,
         points: points,
@@ -312,6 +378,9 @@ export function init(): void {
         label: label,
         ownedPoints: ownedPoints
       };
+      window.__linearObjectEntries[key] = entry;
+      applyLinearObjectVisibility(entry, cfg);
+      applyDgsLinearObjectMetadata(entry, cfg);
       try { board.update(); } catch (e) {}
       try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}
       return true;

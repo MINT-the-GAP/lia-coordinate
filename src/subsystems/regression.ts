@@ -153,9 +153,10 @@ const ANALYSIS_CLASS_OPTIONS: AnalysisClassOption[] = [
 const states: Record<string, RegressionState> = {};
 
 window.__recordDgsHistory = function(boardId: string, before: any, after: any): void {
+  const board = window.__boards && window.__boards[boardId];
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
-    if (!state || state.boardId !== boardId) return;
+    if (!state || state.boardId !== boardId || state.board !== board) return;
     state.undoActions.push({ type: 'dgs', before, after });
     state.redoActions = [];
     updateButtonStates(state);
@@ -7661,9 +7662,10 @@ function applyLayout(state: RegressionState): void {
 }
 
 window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boolean): void {
+  const board = window.__boards && window.__boards[boardId];
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
-    if (!state || state.boardId !== boardId) return;
+    if (!state || state.boardId !== boardId || state.board !== board) return;
 
     if (dgsOpen === false) {
       state.drawColorMenuOpen = false;
@@ -7677,6 +7679,55 @@ window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boole
     applyLayout(state);
   });
 };
+
+function disposeRegressionState(state: RegressionState): void {
+  removeAllAnalysisOverlays(state);
+  removeAllQuadraticAnalysisOverlays(state);
+  removeAllCubicAnalysisOverlays(state);
+  removeAllQuarticAnalysisOverlays(state);
+  removeAllSinAnalysisOverlays(state);
+  removeAllExpAnalysisOverlays(state);
+  removeAllLogAnalysisOverlays(state);
+  removeAllSqrtAnalysisOverlays(state);
+  removeAllHyperbolaAnalysisOverlays(state);
+  removeAllHyperbola2AnalysisOverlays(state);
+
+  if (state.onBoardViewportChange && state.board && typeof state.board.off === 'function') {
+    try { state.board.off('update', state.onBoardViewportChange); } catch (e) {}
+    try { state.board.off('move', state.onBoardViewportChange); } catch (e) {}
+    try { state.board.off('boundingbox', state.onBoardViewportChange); } catch (e) {}
+  }
+  if (state.onBoardPointerDown) {
+    state.boardContainer.removeEventListener('pointerdown', state.onBoardPointerDown, true);
+  }
+  if (state.onDocPointerDown) {
+    document.removeEventListener('pointerdown', state.onDocPointerDown);
+  }
+  if (state.onWindowResize) {
+    window.removeEventListener('resize', state.onWindowResize);
+  }
+  if (state.resizeObserver) {
+    state.resizeObserver.disconnect();
+  }
+
+  try { state.drawLayer.remove(); } catch (e) {}
+  try { state.undoButton.remove(); } catch (e) {}
+  try { state.redoButton.remove(); } catch (e) {}
+  try { state.drawButton.remove(); } catch (e) {}
+  try { state.eraseButton.remove(); } catch (e) {}
+  try { state.toolsButton.remove(); } catch (e) {}
+  try { state.drawColorMenu.remove(); } catch (e) {}
+  try { state.toolsMenu.remove(); } catch (e) {}
+}
+
+function unregisterRegressionState(uid: string, state: RegressionState): void {
+  if (states[uid] === state) {
+    delete states[uid];
+  }
+  if (window.__liaRegressionStates && window.__liaRegressionStates[uid] === state) {
+    delete window.__liaRegressionStates[uid];
+  }
+}
 
 function setupRegressionUI(uid: string, boardId: string): void {
   if (!uid || !boardId) return;
@@ -7703,6 +7754,16 @@ function setupRegressionUI(uid: string, boardId: string): void {
     anchor.setAttribute('aria-hidden', 'true');
   }
 
+  // LiaScript's LiveEditor can replace the JSXGraph board while retaining the
+  // same container and board id. Such states still have connected controls,
+  // but their handlers and undo/redo history belong to the discarded board.
+  Object.keys(states).forEach((stateUid) => {
+    const state = states[stateUid];
+    if (!state || state.boardId !== boardId || state.board === board) return;
+    disposeRegressionState(state);
+    unregisterRegressionState(stateUid, state);
+  });
+
   // @DGS creates an automatic regression instance for its board. If an
   // explicit @Regression macro targets the same board (or vice versa), keep
   // the first live instance instead of rendering a duplicate toolbar.
@@ -7711,6 +7772,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
     .find((state) =>
       !!state &&
       state.boardId === boardId &&
+      state.board === board &&
       state.boardContainer === boardContainer &&
       state.drawLayer?.isConnected &&
       state.drawButton?.isConnected &&
@@ -7742,6 +7804,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
   }
   if (
     existing &&
+    existing.board === board &&
     existing.boardContainer === boardContainer &&
     existing.drawLayer.isConnected &&
     existing.undoButton.isConnected &&
@@ -7757,40 +7820,8 @@ function setupRegressionUI(uid: string, boardId: string): void {
   }
 
   if (existing) {
-    removeAllAnalysisOverlays(existing);
-    removeAllQuadraticAnalysisOverlays(existing);
-    removeAllCubicAnalysisOverlays(existing);
-    removeAllQuarticAnalysisOverlays(existing);
-    removeAllSinAnalysisOverlays(existing);
-    removeAllExpAnalysisOverlays(existing);
-    removeAllLogAnalysisOverlays(existing);
-    removeAllSqrtAnalysisOverlays(existing);
-    removeAllHyperbolaAnalysisOverlays(existing);
-    if (existing.onBoardViewportChange && existing.board && typeof existing.board.off === 'function') {
-      try { existing.board.off('update', existing.onBoardViewportChange); } catch (e) {}
-      try { existing.board.off('move', existing.onBoardViewportChange); } catch (e) {}
-      try { existing.board.off('boundingbox', existing.onBoardViewportChange); } catch (e) {}
-    }
-    if (existing.onBoardPointerDown) {
-      existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
-    }
-    if (existing.onDocPointerDown) {
-      document.removeEventListener('pointerdown', existing.onDocPointerDown);
-    }
-    if (existing.onWindowResize) {
-      window.removeEventListener('resize', existing.onWindowResize);
-    }
-    if (existing.resizeObserver) {
-      existing.resizeObserver.disconnect();
-    }
-    try { existing.drawLayer.remove(); } catch (e) {}
-    try { existing.undoButton.remove(); } catch (e) {}
-    try { existing.redoButton.remove(); } catch (e) {}
-    try { existing.drawButton.remove(); } catch (e) {}
-    try { existing.eraseButton.remove(); } catch (e) {}
-    try { existing.toolsButton.remove(); } catch (e) {}
-    try { existing.drawColorMenu.remove(); } catch (e) {}
-    try { existing.toolsMenu.remove(); } catch (e) {}
+    disposeRegressionState(existing);
+    unregisterRegressionState(uid, existing);
   }
 
   const undoButton = createToolbarButton(

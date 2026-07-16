@@ -25,7 +25,7 @@ export function getLivePoint(board: any, boardId: string, pointName: string): an
 
 /** Create an invisible, fixed helper point at the given coordinate. */
 export function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
-  return board.create('point', [coordinate.x, coordinate.y], {
+  const point = board.create('point', [coordinate.x, coordinate.y], {
     name: '',
     withLabel: false,
     visible: false,
@@ -35,6 +35,12 @@ export function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
     showInfobox: false,
     size: 0
   });
+  point.__liaDgsMacroManaged = true;
+  point.__liaDgsHelperPoint = true;
+  point.__liaDgsShowName = false;
+  point.__liaDgsShowObject = false;
+  point.__liaDgsOpacity = 0;
+  return point;
 }
 
 /** Collect all live objects registered on a board, deduplicated. */

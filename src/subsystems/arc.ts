@@ -31,6 +31,7 @@ interface ArcConfig extends ArcDesign {
   strokeWidth: number;
   color: string;
   hasExplicitColor: boolean;
+  visible: boolean;
   language: 'de' | 'en';
 }
 
@@ -89,6 +90,31 @@ export function init(): void {
         current += character;
         if (character === quote) quote = '';
         continue;
+      }
+      if (character === String.fromCharCode(39)) {
+        let previous = index - 1;
+        while (previous >= 0 && /\s/.test(input[previous])) previous -= 1;
+        const atValueStart = previous < 0 || ';,([{=:'.includes(input[previous]);
+        let hasClosingQuote = false;
+        let escapedQuote = false;
+        for (let next = index + 1; atValueStart && next < input.length; next += 1) {
+          if (escapedQuote) {
+            escapedQuote = false;
+            continue;
+          }
+          if (input[next] === String.fromCharCode(92)) {
+            escapedQuote = true;
+            continue;
+          }
+          if (input[next] === character) {
+            hasClosingQuote = true;
+            break;
+          }
+        }
+        if (!atValueStart || !hasClosingQuote) {
+          current += character;
+          continue;
+        }
       }
       if (character === '"' || character === "'" || character === '`') {
         current += character;
@@ -166,6 +192,13 @@ export function init(): void {
     return /^((?:\d+(?:\.\d*)?|\.\d+))\s*(?:px)?$/i.test(raw);
   }
 
+  function visibilityOptionValue(value: unknown): boolean | null {
+    const match = String(value == null ? '' : value).trim()
+      .match(/^(?:visible|sichtbar)\s*=\s*(0|1|false|true)$/i);
+    if (!match) return null;
+    return !/^(?:0|false)$/i.test(match[1]);
+  }
+
   function normalizeDesignToken(value: unknown): string {
     return String(value == null ? '' : value)
       .trim()
@@ -236,15 +269,21 @@ export function init(): void {
     if (!parts[0] || !start || exitAngle == null || !end || entryAngle == null) return null;
     const caption = decodeLegacyParentheses(parts[5] || '');
     const renderedCaption = renderCaption(caption);
-    let designToken = parts[6] || '';
-    let strokeWidthToken = parts[7] || '';
-    let colorToken = parts[8] || '';
+    const visibilityOptions = parts.slice(6)
+      .map(visibilityOptionValue)
+      .filter(function(value): value is boolean { return value != null; });
+    const styleParts = parts.slice(6).filter(function(part) {
+      return visibilityOptionValue(part) == null;
+    });
+    let designToken = styleParts[0] || '';
+    let strokeWidthToken = styleParts[1] || '';
+    let colorToken = styleParts[2] || '';
     // The documented form appends color to the original signature. Also
     // accept caption;color;design;width, matching the order of older macros.
     if (!isDesignToken(designToken) && isDesignToken(strokeWidthToken)) {
       colorToken = designToken;
       designToken = strokeWidthToken;
-      strokeWidthToken = parts[8] || '';
+      strokeWidthToken = styleParts[2] || '';
     } else if (!colorToken && strokeWidthToken && !isStrokeWidthToken(strokeWidthToken)) {
       // Allow design;color as a shorthand when the default width is desired.
       colorToken = strokeWidthToken;
@@ -264,6 +303,7 @@ export function init(): void {
       strokeWidth: parseStrokeWidth(strokeWidthToken),
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
+      visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
       ...design
     };
@@ -387,7 +427,8 @@ export function init(): void {
     angle: number,
     color: string,
     strokeWidth: number,
-    layer: number
+    layer: number,
+    visible: boolean
   ): ArcCap {
     const makePoint = function(side: number) {
       const point = board.create('point', [
@@ -412,7 +453,7 @@ export function init(): void {
       withLabel: false,
       fixed: true,
       highlight: false,
-      visible: function() { return hasVisibleChord(allEndpoints); },
+      visible: function() { return visible && hasVisibleChord(allEndpoints); },
       strokeColor: color,
       highlightStrokeColor: color,
       strokeWidth,
@@ -474,7 +515,7 @@ export function init(): void {
       withLabel: false,
       fixed: true,
       highlight: false,
-      visible: function() { return hasVisibleChord(points); },
+      visible: function() { return cfg.visible && hasVisibleChord(points); },
       strokeColor: cfg.color,
       highlightStrokeColor: cfg.color,
       strokeWidth: cfg.strokeWidth,
@@ -501,7 +542,7 @@ export function init(): void {
     ], {
       fixed: true,
       highlight: false,
-      visible: function() { return hasVisibleChord(points); },
+      visible: function() { return cfg.visible && hasVisibleChord(points); },
       parse: false,
       useMathJax: cfg.useMathJax,
       display: 'html',
@@ -515,6 +556,95 @@ export function init(): void {
     });
     try { if (typeof label.addParents === 'function') label.addParents(points); } catch (e) {}
     return label;
+  }
+
+  function dgsArcNameFromCaption(value: unknown): string {
+    const raw = decodeLegacyParentheses(value).trim();
+    if (!raw) return '';
+    const dollarMath = raw.match(/^\$([^$\r\n]+)\$$/);
+    const inlineMath = raw.match(/^\\\(([^\r\n]+)\\\)$/);
+    const candidate = String(
+      dollarMath ? dollarMath[1] : (inlineMath ? inlineMath[1] : raw)
+    ).trim();
+    return candidate && !/[\s;,\[\]()$]/.test(candidate) ? candidate : '';
+  }
+
+  function applyDgsArcMetadata(entry: any): void {
+    const curve = entry && entry.curve;
+    if (!curve) return;
+    const points = Array.isArray(entry.points) ? entry.points : [];
+    const startPoint = curve.__liaArcStartPoint || points[0] || null;
+    const endPoint = curve.__liaArcEndPoint || points[1] || null;
+    const caption = String(
+      entry.caption == null ? (curve.__liaArcCaption || '') : entry.caption
+    );
+    const name = dgsArcNameFromCaption(caption);
+    const design = String(
+      entry.normalized == null ? (curve.__liaArcDesign || '') : entry.normalized
+    ) || '-';
+    const strokeWidth = Number.isFinite(Number(entry.strokeWidth))
+      ? Number(entry.strokeWidth)
+      : (Number(curve.__liaArcStrokeWidth) || 3);
+    const color = String(entry.color || curve.__liaArcColor || getAccentColor());
+    const language = String(entry.language || curve.__liaArcLanguage || 'de')
+      .toLowerCase() === 'en' ? 'en' : 'de';
+
+    curve.__liaDgsMacroManaged = true;
+    curve.__liaDgsArc = true;
+    curve.__liaDgsArcName = name;
+    curve.__liaDgsArcStartPoint = startPoint;
+    curve.__liaDgsArcEndPoint = endPoint;
+    curve.__liaDgsArcExitAngle = Number(entry.exitAngle ?? curve.__liaArcExitAngle);
+    curve.__liaDgsArcEntryAngle = Number(entry.entryAngle ?? curve.__liaArcEntryAngle);
+    curve.__liaDgsArcCaption = caption;
+    curve.__liaDgsArcDesign = design;
+    curve.__liaDgsArcStrokeWidth = strokeWidth;
+    curve.__liaDgsArcColor = color;
+    curve.__liaDgsArcHasExplicitColor = !!(
+      entry.hasExplicitColor ?? curve.__liaArcHasExplicitColor
+    );
+    curve.__liaDgsArcLanguage = language;
+    curve.__liaDgsShowName = !!name;
+    curve.__liaDgsShowObject = entry.visible !== false;
+    if (!Number.isFinite(Number(curve.__liaDgsOpacity))) curve.__liaDgsOpacity = 1;
+    curve.__liaDgsColor = color;
+    curve.__liaDgsLineColor = color;
+    curve.__liaDgsFillColor = color;
+    curve.__liaDgsTextColor = color;
+    curve.__liaDgsLanguage = language;
+    curve.__liaDgsStyleCapSegments = Array.isArray(entry.capSegments)
+      ? entry.capSegments
+      : [];
+    curve.__liaDgsStyleCapPoints = Array.isArray(entry.capPoints)
+      ? entry.capPoints
+      : [];
+    curve.__liaDgsArcLabel = entry.label || null;
+    if (entry.label) curve.label = entry.label;
+  }
+
+  function applyArcVisibility(entry: any): void {
+    const visible = entry && entry.visible !== false;
+    const points = Array.isArray(entry && entry.points) ? entry.points : [];
+    const dynamicVisibility = function() {
+      return visible && hasVisibleChord(points);
+    };
+    try {
+      if (entry && entry.curve && typeof entry.curve.setAttribute === 'function') {
+        entry.curve.setAttribute({ visible: dynamicVisibility });
+      }
+    } catch (e) {}
+    (Array.isArray(entry && entry.capSegments) ? entry.capSegments : []).forEach(function(segment: any) {
+      try {
+        if (segment && typeof segment.setAttribute === 'function') {
+          segment.setAttribute({ visible: dynamicVisibility });
+        }
+      } catch (e) {}
+    });
+    try {
+      if (entry && entry.label && typeof entry.label.setAttribute === 'function') {
+        entry.label.setAttribute({ visible: dynamicVisibility });
+      }
+    } catch (e) {}
   }
 
   function applyArcStyle(entry: any, color: string): void {
@@ -559,6 +689,8 @@ export function init(): void {
         entry.curve.__liaArcHasExplicitColor = !!entry.hasExplicitColor;
       }
     } catch (e) {}
+    applyArcVisibility(entry);
+    applyDgsArcMetadata(entry);
   }
 
   function endpointUnchanged(
@@ -609,6 +741,7 @@ export function init(): void {
         old.language === cfg.language) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyArcStyle(old, cfg.color);
       try { board.update(); } catch (e) {}
       return true;
@@ -635,12 +768,12 @@ export function init(): void {
       const capLayer = Math.max(0, curveLayer - 1);
 
       if (cfg.startCap) {
-        const cap = createCap(board, startPoint, points, cfg.exitAngle, cfg.color, cfg.strokeWidth, capLayer);
+        const cap = createCap(board, startPoint, points, cfg.exitAngle, cfg.color, cfg.strokeWidth, capLayer, cfg.visible);
         capSegments.push(cap.segment);
         capPoints.push.apply(capPoints, cap.points);
       }
       if (cfg.endCap) {
-        const cap = createCap(board, endPoint, points, cfg.entryAngle, cfg.color, cfg.strokeWidth, capLayer);
+        const cap = createCap(board, endPoint, points, cfg.entryAngle, cfg.color, cfg.strokeWidth, capLayer, cfg.visible);
         capSegments.push(cap.segment);
         capPoints.push.apply(capPoints, cap.points);
       }
@@ -680,6 +813,7 @@ export function init(): void {
         strokeWidth: cfg.strokeWidth,
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
+        visible: cfg.visible,
         language: cfg.language,
         points,
         ownedPoints,

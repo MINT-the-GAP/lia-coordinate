@@ -89,6 +89,8 @@ interface Window {
   __plotFunctionReady: boolean | undefined;
   __plotFunctionEntries: Record<string, any>;
   __bootstrapPlotFunctions: (() => void) | undefined;
+  __bootstrapPlotFunctionsRAF: number | undefined;
+  __scheduleBootstrapPlotFunctions: (() => void) | undefined;
   renderPlotFunctionFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
   // Slider subsystem (@Slider/@Regler)

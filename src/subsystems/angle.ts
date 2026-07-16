@@ -16,6 +16,7 @@ interface AngleConfig {
   opacity: number;
   showValue: boolean;
   language: 'de' | 'en';
+  visible: boolean;
 }
 
 interface XY {
@@ -57,6 +58,9 @@ export function init(): void {
       return String(option || '').trim();
     });
     const name = parseMacroName(parts[1] || '');
+    const visible = !options.some(function(option) {
+      return /^(?:visible|sichtbar)\s*=\s*0$/i.test(option);
+    });
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -69,7 +73,8 @@ export function init(): void {
       showValue: options.some(function(option) {
         return /^(?:wert|value)\s*=\s*1$/i.test(option);
       }),
-      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
+      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
+      visible: visible
     };
   }
 
@@ -253,14 +258,59 @@ export function init(): void {
     } catch (e) {}
   }
 
+  function setElementVisibility(element: any, visible: boolean): void {
+    if (!element) return;
+    try {
+      if (typeof element.setAttribute === 'function') element.setAttribute({ visible: visible });
+      if (visible && typeof element.showElement === 'function') element.showElement();
+      if (!visible && typeof element.hideElement === 'function') element.hideElement();
+    } catch (e) {}
+  }
+
+  function applyAngleVisibility(angle: any, label: any, cfg: AngleConfig): void {
+    const visible = cfg.visible !== false;
+    setElementVisibility(angle, visible);
+    setElementVisibility(angle && angle.arc, visible);
+    setElementVisibility(label, visible && (cfg.showName || cfg.showValue));
+  }
+
+  function applyAngleDgsMetadata(
+    angle: any,
+    points: any[],
+    label: any,
+    cfg: AngleConfig
+  ): void {
+    if (!angle) return;
+    angle.__liaDgsMacroManaged = true;
+    angle.__liaDgsAngle = true;
+    angle.__liaDgsAngleName = cfg.name;
+    angle.__liaDgsAngleAutoName = false;
+    angle.__liaDgsAnglePoints = points.slice(0, 3);
+    angle.__liaDgsLanguage = cfg.language;
+    angle.__liaDgsColor = cfg.color;
+    angle.__liaDgsTextColor = cfg.color;
+    angle.__liaDgsLineColor = cfg.color;
+    angle.__liaDgsFillColor = cfg.color;
+    angle.__liaDgsShowName = cfg.showName;
+    angle.__liaDgsShowObject = cfg.visible;
+    angle.__liaDgsOpacity = cfg.opacity;
+    angle.__liaDgsShowAngle = cfg.showValue;
+    angle.__liaDgsAngleLabel = label || null;
+    if (label) {
+      label.__liaDgsMacroManaged = true;
+      label.__liaDgsOwner = angle;
+      angle.label = label;
+    }
+  }
+
   function createLabel(board: any, points: any[], cfg: AngleConfig): any {
-    if (!cfg.showName && !cfg.showValue) return null;
     const label = board.create('text', [
       function() { return labelPosition(board, points).x; },
       function() { return labelPosition(board, points).y; },
       function() { return labelText(cfg, points); }
     ], {
       fixed: true,
+      visible: cfg.visible && (cfg.showName || cfg.showValue),
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -328,8 +378,11 @@ export function init(): void {
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyAngleStyle(old.angle, cfg.color, cfg.opacity);
       applyLabelStyle(old.label, cfg.color, cfg.opacity);
+      applyAngleVisibility(old.angle, old.label, cfg);
+      applyAngleDgsMetadata(old.angle, old.points, old.label, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -343,6 +396,7 @@ export function init(): void {
         name: '',
         withLabel: false,
         fixed: true,
+        visible: cfg.visible,
         highlight: false,
         type: 'sector',
         orthoType: 'sectordot',
@@ -365,6 +419,8 @@ export function init(): void {
       label = createLabel(board, points, cfg);
       angle.__liaDgsShowName = cfg.showName;
       angle.__liaDgsShowAngle = cfg.showValue;
+      applyAngleDgsMetadata(angle, points, label, cfg);
+      applyAngleVisibility(angle, label, cfg);
 
       window.__angleEntries[key] = {
         uid: String(uid),
@@ -378,6 +434,7 @@ export function init(): void {
         opacity: cfg.opacity,
         showValue: cfg.showValue,
         language: cfg.language,
+        visible: cfg.visible,
         board: board,
         angle: angle,
         label: label
@@ -471,6 +528,7 @@ export function init(): void {
       if (!entry.hasExplicitColor) entry.color = getAccentColor();
       applyAngleStyle(entry.angle, entry.color, entry.opacity);
       applyLabelStyle(entry.label, entry.color, entry.opacity);
+      applyAngleVisibility(entry.angle, entry.label, entry as AngleConfig);
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });
   });

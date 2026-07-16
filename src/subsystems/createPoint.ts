@@ -1,7 +1,7 @@
 // Create-point subsystem (@CreatePoint and @Point macros).
 // Handles draggable student points and pre-placed static points on a JSXGraph board.
 
-import { isHiddenNameOption, parseMacroName, unquote } from '../shared/parser';
+import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
@@ -28,13 +28,20 @@ export function init(): void {
   initThemeSync();
 
   function splitSpec(spec) {
-    return unquote(spec)
-      .split(';')
+    return splitTopLevel(unquote(spec), ';')
       .map(function(s){ return s.trim(); });
   }
 
   function parseFixToken(v) {
     return /^fix$/i.test(String(v || '').trim());
+  }
+
+  function parseHelperToken(v) {
+    return /^(?:helper|hilfspunkt)\s*=\s*1$/i.test(String(v || '').trim());
+  }
+
+  function parseInternalPointOption(v) {
+    return /^(?:helper|hilfspunkt|xexpr|yexpr|parameter|param)\s*=/i.test(String(v || '').trim());
   }
 
   function texName(name) {
@@ -60,12 +67,25 @@ export function init(): void {
     const parsedName = parseMacroName(parts[1] || 'A', 'A');
     const rawOptions = parts.slice(4);
     const visualOptions = rawOptions.filter(function(option) {
-      return !isHiddenNameOption(option);
+      return !isHiddenNameOption(option) && !parseInternalPointOption(option);
     });
     const colorToken = String(visualOptions[0] || '').trim();
     const hasExplicitColor = !!colorToken && !parseFixToken(colorToken);
     const opacityToken = String(visualOptions[1] || '').trim();
     const parsedOpacity = parseFloat(opacityToken.replace(',', '.'));
+    const namedOption = function(names) {
+      const optionNames = Array.isArray(names) ? names : [names];
+      const option = rawOptions.find(function(value) {
+        return optionNames.some(function(name) {
+          return new RegExp('^' + name + '\\s*=', 'i').test(String(value || '').trim());
+        });
+      });
+      if (!option) return '';
+      const match = String(option).match(/^[^=]+=\s*([\s\S]*)$/);
+      return match ? unquote(String(match[1] || '').trim()) : '';
+    };
+    const parameterToken = namedOption(['parameter', 'param']).replace(',', '.');
+    const coordinateParameter = parameterToken === '' ? NaN : Number(parameterToken);
 
     return {
       boardId: parts[0] || '',
@@ -78,7 +98,11 @@ export function init(): void {
       opacity: Number.isFinite(parsedOpacity)
         ? Math.max(0, Math.min(1, parsedOpacity))
         : 1,
-      fixed: visualOptions.some(parseFixToken)
+      fixed: visualOptions.some(parseFixToken),
+      helper: rawOptions.some(parseHelperToken),
+      xExpression: namedOption('xexpr'),
+      yExpression: namedOption('yexpr'),
+      coordinateParameter: Number.isFinite(coordinateParameter) ? coordinateParameter : null
     };
   }
 
@@ -147,14 +171,57 @@ export function init(): void {
     const opacity = Number.isFinite(Number(target.opacity))
       ? Math.max(0, Math.min(1, Number(target.opacity)))
       : 1;
+    const labelColor = target.hasExplicitColor ? color : getNeutralColor();
 
     pt.__liaPointVisual = {
       color: color,
       opacity: opacity,
       hasExplicitColor: !!target.hasExplicitColor
     };
+    pt.__liaDgsMacroManaged = true;
+    pt.__liaDgsHelperPoint = !!target.helper;
     pt.__liaDgsPointName = String(target.name || '');
+    pt.__liaDgsLanguage = pt.__liaDgsLanguage ||
+      (/^de(?:-|$)/i.test(String(document.documentElement.lang || '')) ? 'de' : 'en');
+    pt.__liaDgsColor = color;
+    pt.__liaDgsTextColor = labelColor;
+    pt.__liaDgsLineColor = color;
+    pt.__liaDgsFillColor = color;
     pt.__liaDgsShowName = target.showName !== false;
+    pt.__liaDgsShowObject = opacity > 0;
+    pt.__liaDgsOpacity = opacity;
+    pt.__liaDgsFormatFontSize = 24;
+    if (target.xExpression && target.yExpression) {
+      const nextExpressions = {
+        x: String(target.xExpression).trim(),
+        y: String(target.yExpression).trim()
+      };
+      const previousExpressions = pt.__liaDgsCoordinateExpressions;
+      const sameBinding = !!previousExpressions &&
+        String(previousExpressions.x || '').trim() === nextExpressions.x &&
+        String(previousExpressions.y || '').trim() === nextExpressions.y;
+      const previousParameter = Number(pt.__liaDgsCoordinateParameter);
+      const requestedParameter = target.coordinateParameter == null
+        ? NaN
+        : Number(target.coordinateParameter);
+      pt.__liaDgsCoordinateExpressions = {
+        x: nextExpressions.x,
+        y: nextExpressions.y
+      };
+      pt.__liaDgsCoordinateCompiled = null;
+      let parameter = sameBinding && Number.isFinite(previousParameter)
+        ? previousParameter
+        : requestedParameter;
+      if (!Number.isFinite(parameter)) {
+        try { parameter = Number(pt.X()); } catch (e) { parameter = NaN; }
+      }
+      if (Number.isFinite(parameter)) pt.__liaDgsCoordinateParameter = parameter;
+      else delete pt.__liaDgsCoordinateParameter;
+    } else {
+      delete pt.__liaDgsCoordinateExpressions;
+      delete pt.__liaDgsCoordinateCompiled;
+      delete pt.__liaDgsCoordinateParameter;
+    }
 
     try {
       pt.setAttribute({

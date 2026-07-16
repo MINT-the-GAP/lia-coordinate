@@ -36,6 +36,7 @@ interface TangentConfig {
   lineShowName: boolean;
   pointShowName: boolean;
   language: 'de' | 'en';
+  visible: boolean;
 }
 
 interface SectorConfig {
@@ -49,6 +50,7 @@ interface SectorConfig {
   showArea: boolean;
   showPerimeter: boolean;
   language: 'de' | 'en';
+  visible: boolean;
 }
 
 export function init(): void {
@@ -90,6 +92,16 @@ export function init(): void {
     return pattern.test(String(option || '').trim());
   }
 
+  function isVisibilityOption(option: string): boolean {
+    return /^(?:visible|sichtbar)\s*=\s*[01]$/i.test(String(option || '').trim());
+  }
+
+  function optionVisibility(options: string[]): boolean {
+    return !options.some(function(option) {
+      return /^(?:visible|sichtbar)\s*=\s*0$/i.test(String(option || '').trim());
+    });
+  }
+
   function parseTangentSpec(spec: string, language?: string): TangentConfig {
     const parts = splitTopLevel(unquote(String(spec || '')), ';')
       .map(function(part) { return unquote(part).trim(); });
@@ -104,6 +116,7 @@ export function init(): void {
     let pointName = '';
     let hideAllNames = false;
     options.forEach(function(option) {
+      if (isVisibilityOption(option)) return;
       if (isHiddenNameOption(option)) {
         hideAllNames = true;
         return;
@@ -138,7 +151,8 @@ export function init(): void {
       pointName: parsedPointName.name,
       lineShowName: parsedLineName.showName && !hideAllNames,
       pointShowName: parsedPointName.showName && !hideAllNames,
-      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
+      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
+      visible: optionVisibility(options)
     };
   }
 
@@ -160,6 +174,7 @@ export function init(): void {
     }).find(Boolean) || '';
     const objectNameToken = namedOption || options.find(function(option) {
       return !isHiddenNameOption(option) &&
+        !isVisibilityOption(option) &&
         !/^name\s*=/i.test(option) &&
         !isTruthyOption(option, 'inhalt', 'area') &&
         !isTruthyOption(option, 'umfang', 'perimeter') &&
@@ -179,7 +194,8 @@ export function init(): void {
       showPerimeter: options.some(function(option) {
         return isTruthyOption(option, 'umfang', 'perimeter') || isTruthyOption(option, 'umfang', 'circumference');
       }),
-      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
+      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
+      visible: optionVisibility(options)
     };
   }
 
@@ -388,6 +404,25 @@ export function init(): void {
     } catch (e) {}
   }
 
+  function setElementVisibility(element: any, visible: boolean): void {
+    if (!element) return;
+    try {
+      if (typeof element.setAttribute === 'function') element.setAttribute({ visible: visible });
+      if (visible && typeof element.showElement === 'function') element.showElement();
+      if (!visible && typeof element.hideElement === 'function') element.hideElement();
+    } catch (e) {}
+  }
+
+  function applyTangentVisibility(tangent: any, cfg: TangentConfig): void {
+    const visible = cfg.visible !== false;
+    setElementVisibility(tangent, visible);
+    setElementVisibility(
+      tangent && tangent.label,
+      visible && cfg.lineShowName && !!cfg.lineName
+    );
+    if (tangent) tangent.__liaDgsShowObject = visible;
+  }
+
   function notifyDependentObjectBootstraps(boardId?: string): void {
     try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}
     try { if (window.__scheduleBootstrapObjectAnalysisPoints) window.__scheduleBootstrapObjectAnalysisPoints(); } catch (e) {}
@@ -454,7 +489,9 @@ export function init(): void {
       resolved.ownedObjects.forEach(function(object) { try { board.removeObject(object); } catch (e) {} });
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyTangentStyle(old.tangent, old.contactPoint, cfg.color);
+      applyTangentVisibility(old.tangent, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -515,6 +552,7 @@ export function init(): void {
         name: mathName(lineName),
         withLabel: !!lineName,
         fixed: true,
+        visible: cfg.visible,
         straightFirst: true,
         straightLast: true,
         strokeColor: cfg.color,
@@ -522,7 +560,7 @@ export function init(): void {
         strokeWidth: 3,
         highlightStrokeWidth: 4,
         label: {
-          visible: !!lineName && cfg.lineShowName,
+          visible: cfg.visible && !!lineName && cfg.lineShowName,
           strokeColor: cfg.color,
           fillColor: cfg.color,
           fontSize: 20,
@@ -546,6 +584,7 @@ export function init(): void {
       helperPoint.__liaDgsTangentLine = tangent;
       tangent.__liaDgsLine = true;
       tangent.__liaDgsTangent = true;
+      tangent.__liaDgsMacroManaged = true;
       tangent.__liaDgsLineName = lineName;
       tangent.__liaDgsTangentSource = resolved.source.object;
       tangent.__liaDgsTangentPoint = contactPoint;
@@ -555,9 +594,14 @@ export function init(): void {
       tangent.__liaDgsLineColor = cfg.color;
       tangent.__liaDgsTextColor = cfg.color;
       tangent.__liaDgsShowName = !!lineName && cfg.lineShowName;
-      tangent.__liaDgsShowObject = true;
+      tangent.__liaDgsShowObject = cfg.visible;
       tangent.__liaDgsOpacity = 1;
       tangent.__liaDgsShowEquation = false;
+      if (tangent.label) {
+        tangent.label.__liaDgsMacroManaged = true;
+        tangent.label.__liaDgsOwner = tangent;
+      }
+      applyTangentVisibility(tangent, cfg);
       resolved.source.object.__liaDgsTangents = Array.isArray(resolved.source.object.__liaDgsTangents)
         ? resolved.source.object.__liaDgsTangents
         : [];
@@ -581,6 +625,7 @@ export function init(): void {
         lineShowName: cfg.lineShowName,
         pointShowName: cfg.pointShowName,
         language: cfg.language,
+        visible: cfg.visible,
         board,
         source: resolved.source,
         contactPoint,
@@ -646,8 +691,12 @@ export function init(): void {
   }
 
   function applySectorStyle(sector: any, cfg: SectorConfig): void {
+    const visible = cfg.visible !== false;
+    const labelVisible = visible &&
+      !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter);
     try {
       if (sector && typeof sector.setAttribute === 'function') sector.setAttribute({
+        visible: visible,
         strokeColor: cfg.color,
         highlightStrokeColor: cfg.color,
         strokeWidth: 3,
@@ -662,9 +711,12 @@ export function init(): void {
         sector.label.setAttribute({
           strokeColor: cfg.color,
           fillColor: cfg.color,
-          visible: !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter)
+          visible: labelVisible
         });
       }
+      setElementVisibility(sector, visible);
+      setElementVisibility(sector && sector.label, labelVisible);
+      if (sector) sector.__liaDgsShowObject = visible;
     } catch (e) {}
   }
 
@@ -697,6 +749,7 @@ export function init(): void {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.opacity = cfg.opacity;
+      old.visible = cfg.visible;
       applySectorStyle(old.sector, cfg);
       try { board.update(); } catch (e) {}
       return true;
@@ -709,6 +762,7 @@ export function init(): void {
         name: '',
         withLabel: true,
         fixed: true,
+        visible: cfg.visible,
         strokeColor: cfg.color,
         highlightStrokeColor: cfg.color,
         strokeWidth: 3,
@@ -723,7 +777,7 @@ export function init(): void {
           fontSize: 18,
           parse: false,
           useMathJax: true,
-          visible: !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter)
+          visible: cfg.visible && !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter)
         }
       });
       sector.__liaDgsSector = true;
@@ -737,7 +791,7 @@ export function init(): void {
       sector.__liaDgsLineColor = cfg.color;
       sector.__liaDgsFillColor = cfg.color;
       sector.__liaDgsShowName = !!cfg.objectName && cfg.showName;
-      sector.__liaDgsShowObject = true;
+      sector.__liaDgsShowObject = cfg.visible;
       sector.__liaDgsOpacity = cfg.opacity;
       sector.__liaDgsShowArea = cfg.showArea;
       sector.__liaDgsShowPerimeter = cfg.showPerimeter;
@@ -757,6 +811,7 @@ export function init(): void {
         language: cfg.language,
         showArea: cfg.showArea,
         showPerimeter: cfg.showPerimeter,
+        visible: cfg.visible,
         board,
         points,
         sector
@@ -863,6 +918,7 @@ export function init(): void {
       if (!entry) return;
       if (!entry.hasExplicitColor) entry.color = getAccentColor();
       applyTangentStyle(entry.tangent, entry.contactPoint, entry.color);
+      applyTangentVisibility(entry.tangent, entry as TangentConfig);
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });
     Object.keys(window.__sectorEntries || {}).forEach(function(key) {

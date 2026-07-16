@@ -16,6 +16,7 @@ interface AreaConfig {
   showArea: boolean;
   showPerimeter: boolean;
   language: 'de' | 'en';
+  visible: boolean;
 }
 
 interface XY {
@@ -58,6 +59,9 @@ export function init(): void {
     const options = parts.slice(4).map(function(option) {
       return String(option || '').trim();
     });
+    const visible = !options.some(function(option) {
+      return /^(?:visible|sichtbar)\s*=\s*0$/i.test(option);
+    });
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -72,7 +76,8 @@ export function init(): void {
       showPerimeter: options.some(function(option) {
         return /^(?:umfang|perimeter)\s*=\s*1$/i.test(option);
       }),
-      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
+      language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
+      visible: visible
     };
   }
 
@@ -335,6 +340,93 @@ export function init(): void {
     try { label.setAttribute({ strokeColor: color, fillColor: color }); } catch (e) {}
   }
 
+  function setElementVisibility(element: any, visible: boolean): void {
+    if (!element) return;
+    try {
+      if (typeof element.setAttribute === 'function') element.setAttribute({ visible: visible });
+      if (visible && typeof element.showElement === 'function') element.showElement();
+      if (!visible && typeof element.hideElement === 'function') element.hideElement();
+    } catch (e) {}
+  }
+
+  function applyAreaVisibility(polygon: any, label: any, cfg: AreaConfig): void {
+    const visible = cfg.visible !== false;
+    setElementVisibility(polygon, visible);
+    const borders = polygon && Array.isArray(polygon.borders) ? polygon.borders : [];
+    borders.forEach(function(border: any) { setElementVisibility(border, visible); });
+    const vertices = polygon && Array.isArray(polygon.vertices) ? polygon.vertices : [];
+    vertices.forEach(function(vertex: any) {
+      setElementVisibility(vertex, !!vertex && vertex.__liaDgsShowObject !== false);
+    });
+    setElementVisibility(label, visible && (cfg.showArea || cfg.showPerimeter));
+  }
+
+  function applyAreaDgsMetadata(
+    polygon: any,
+    points: any[],
+    label: any,
+    cfg: AreaConfig
+  ): void {
+    if (!polygon) return;
+    const pointNames = points
+      .map(function(point) { return String(point && point.__liaDgsPointName || '').trim(); })
+      .filter(Boolean);
+    const polygonName = pointNames.length === points.length ? pointNames.join('') : '';
+    const textColor = getNeutralColor();
+    const borders = Array.isArray(polygon.borders) ? polygon.borders : [];
+
+    polygon.__liaDgsMacroManaged = true;
+    polygon.__liaDgsPolygon = true;
+    polygon.__liaDgsPolygonName = polygonName;
+    polygon.__liaDgsPolygonAutoName = true;
+    polygon.__liaDgsPolygonBorders = borders;
+    polygon.__liaDgsLanguage = cfg.language;
+    polygon.__liaDgsColor = cfg.color;
+    polygon.__liaDgsTextColor = textColor;
+    polygon.__liaDgsLineColor = cfg.color;
+    polygon.__liaDgsFillColor = cfg.color;
+    polygon.__liaDgsShowName = false;
+    polygon.__liaDgsShowObject = cfg.visible;
+    polygon.__liaDgsOpacity = cfg.opacity;
+    polygon.__liaDgsShowArea = cfg.showArea;
+    polygon.__liaDgsShowPerimeter = cfg.showPerimeter;
+    polygon.__liaDgsMeasurementLabel = label || null;
+    points.forEach(function(point) {
+      if (!point || point.__liaDgsPointName) return;
+      point.__liaDgsMacroManaged = true;
+      point.__liaDgsShowObject = false;
+      point.__liaDgsOpacity = 0;
+    });
+    if (label) {
+      label.__liaDgsMacroManaged = true;
+      label.__liaDgsOwner = polygon;
+    }
+
+    borders.forEach(function(border: any, index: number) {
+      if (!border) return;
+      border.__liaDgsMacroManaged = true;
+      border.__liaDgsSegment = true;
+      border.__liaDgsPolygonBorder = true;
+      border.__liaDgsPolygonBorderOwner = polygon;
+      border.__liaDgsPolygonBorderIndex = index;
+      border.__liaDgsSegmentName = String(border.__liaDgsSegmentName || '');
+      border.__liaDgsLanguage = cfg.language;
+      border.__liaDgsColor = cfg.color;
+      border.__liaDgsTextColor = cfg.color;
+      border.__liaDgsLineColor = cfg.color;
+      border.__liaDgsFillColor = cfg.color;
+      border.__liaDgsShowName = false;
+      border.__liaDgsShowObject = cfg.visible;
+      border.__liaDgsOpacity = 1;
+      border.__liaDgsShowLength = false;
+      border.__liaDgsPolygonBorderLabel = border.label || null;
+      if (border.label) {
+        border.label.__liaDgsMacroManaged = true;
+        border.label.__liaDgsOwner = border;
+      }
+    });
+  }
+
   function createMeasurementLabel(board: any, points: any[], cfg: AreaConfig): any {
     const color = getNeutralColor();
     const label = board.create('text', [
@@ -343,6 +435,7 @@ export function init(): void {
       function() { return measurementText(cfg, points); }
     ], {
       fixed: true,
+      visible: cfg.visible,
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -418,8 +511,11 @@ export function init(): void {
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
       applyPolygonStyle(old.polygon, cfg.color, cfg.opacity);
       applyLabelTheme(old.label);
+      applyAreaVisibility(old.polygon, old.label, cfg);
+      applyAreaDgsMetadata(old.polygon, old.points, old.label, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -439,6 +535,7 @@ export function init(): void {
         : namedPoints;
       polygon = board.create('polygon', points, {
         fixed: true,
+        visible: cfg.visible,
         highlight: false,
         fillColor: cfg.color,
         highlightFillColor: cfg.color,
@@ -460,6 +557,8 @@ export function init(): void {
       if (cfg.showArea || cfg.showPerimeter) {
         label = createMeasurementLabel(board, points, cfg);
       }
+      applyAreaDgsMetadata(polygon, points, label, cfg);
+      applyAreaVisibility(polygon, label, cfg);
 
       window.__areaEntries[key] = {
         uid: String(uid),
@@ -476,6 +575,7 @@ export function init(): void {
         language: cfg.language,
         showArea: cfg.showArea,
         showPerimeter: cfg.showPerimeter,
+        visible: cfg.visible,
         board: board,
         polygon: polygon,
         label: label
@@ -573,6 +673,7 @@ export function init(): void {
         applyPolygonStyle(entry.polygon, entry.color, entry.opacity);
       }
       applyLabelTheme(entry.label);
+      applyAreaVisibility(entry.polygon, entry.label, entry as AreaConfig);
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });
   });

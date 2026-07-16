@@ -123,6 +123,24 @@ export function init(): void {
     } catch (e) {}
   }
 
+  function applyDgsTextMetadata(text: any, cfg: CoordTextConfig): void {
+    if (!text) return;
+    text.__liaDgsMacroManaged = true;
+    text.__liaDgsText = true;
+    text.__liaDgsTextContent = cfg.content;
+    text.__liaDgsTextFontSize = 18;
+    text.__liaDgsFormatFontSize = 18;
+    text.__liaDgsShowName = true;
+    text.__liaDgsShowObject = cfg.opacity > 0;
+    text.__liaDgsOpacity = cfg.opacity;
+    text.__liaDgsColor = cfg.color;
+    text.__liaDgsTextColor = cfg.color;
+    text.__liaDgsLineColor = cfg.color;
+    text.__liaDgsFillColor = cfg.color;
+    text.__liaDgsLanguage = text.__liaDgsLanguage ||
+      (/^de(?:-|$)/i.test(String(document.documentElement.lang || '')) ? 'de' : 'en');
+  }
+
   window.renderCoordTextFromSpec = function(uid: string, spec: string): boolean {
     const cfg = parseCoordTextSpec(spec);
     const key = entryKey(uid);
@@ -151,6 +169,7 @@ export function init(): void {
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
       applyTextStyle(old.text, cfg.color, cfg.opacity);
+      applyDgsTextMetadata(old.text, cfg);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -178,6 +197,7 @@ export function init(): void {
         cssStyle: 'opacity:' + cfg.opacity + ';',
         fontSize: 18
       });
+      applyDgsTextMetadata(text, cfg);
 
       window.__coordTextEntries[key] = {
         uid: String(uid),
@@ -280,6 +300,17 @@ export function init(): void {
       if (!entry) return;
       if (!entry.hasExplicitColor) entry.color = getAccentColor();
       applyTextStyle(entry.text, entry.color, entry.opacity);
+      applyDgsTextMetadata(entry.text, {
+        boardId: entry.boardId,
+        x: entry.x,
+        y: entry.y,
+        content: entry.content,
+        renderedContent: entry.content,
+        useMathJax: false,
+        color: entry.color,
+        hasExplicitColor: entry.hasExplicitColor,
+        opacity: entry.opacity
+      });
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });
   });

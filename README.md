@@ -91,7 +91,7 @@ script:   ./dist/index.js
 @KoordText: @CoordText_(@uid,`@0`)
 
 @CoordText_
-<span class='lia-coord-text-spec' id='coord-text-spec-@0' data-spec='@1' style='display:none;'></span>
+<span class="lia-coord-text-spec" id="coord-text-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 
@@ -880,9 +880,11 @@ Creates dynamic analysis points for a named function: roots, extrema, or inflect
 
 Parameters: `<boardId>;<funcName>;<color>;<prefix>[=0];wert=1`
 
-Options: `names=[N_1;N_2;...]`, `wert=1` / `value=1`. A hidden
-prefix (for example `N=0`) hides every generated point name; individual
-entries such as `names=[N_1=0;N_2]` can be controlled separately.
+Options: `names=[N_1;N_2;...]`, `wert=1` / `value=1`,
+`werte=[1;0;...]` / `values=[1;0;...]`, and
+`sichtbar=[1;0;...]` / `visible=[1;0;...]`. A hidden prefix (for example
+`N=0`) hides every generated point name; names, value labels, and point
+visibility can also be controlled separately by index.
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=5;width=800;id=ex_function_analysis`)
@@ -916,7 +918,9 @@ Parameters:
 - `@Ordinatenabschnitt`: `<boardId>;<objectName>;<color>;<prefix>[=0];wert=1`
 - `@Schnittpunkt`: `<boardId>;<objectName1>;<objectName2>;<color>;<prefix>[=0];wert=1`
 
-Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`, and for sliders
+Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`,
+`werte=[1;0;...]` / `values=[1;0;...]`, and
+`sichtbar=[1;0;...]` / `visible=[1;0;...]`; for sliders additionally
 `visible=0`, `fontsize=...`, `lockposition=1`.
 
 ``` markdown
@@ -1093,6 +1097,12 @@ centered dialog using the same unit-circle convention as `@Arc` / `@Bogen`. The 
 cubic Bézier curve stays attached to both movable endpoints and receives the next free lowercase
 object name. Both tangent angles can later be changed on blur or Enter in the right-click object
 menu; invalid values remain marked for correction.
+The right-click menus of standalone segments and arcs also contain an Appearance section.
+Its Design selector offers the plain line plus all directional arrow and orthogonal end-cap
+combinations supported by the macros, including `|<->|`. Line width accepts values from
+`0.25` to `20` with or without the `px` suffix and is applied on blur or Enter. Arrowheads
+and end caps stay attached while endpoints move or the board is zoomed. Both settings participate
+in DGS persistence and undo/redo and are included in the object-list macro export.
 The line-relations submenu sits between the line and shape tools and provides perpendicular,
 parallel, midpoint, and angle-bisector constructions. For a perpendicular or parallel, select a
 segment, ray, vector, or straight line and a point in either order; it creates the dynamically
@@ -1188,6 +1198,11 @@ points, ordinate-axis intercepts, intersections, segments, straight lines, rays,
 perpendiculars, parallels, midpoints, polygons/areas, circles, circular sectors/segments,
 tangents, and angles. Objects without standalone macros are listed in a short HTML comment so
 the exported block stays pasteable.
+The exported block is roundtrip-safe: importing and exporting it again keeps the construction
+order, hidden dependency objects, point-coordinate expressions, polygon-side references, names,
+visibility, the logical viewport, and the supported appearance settings. Automatically responsive coordinate systems
+remain responsive instead of turning their currently measured LiveEditor width into a new pixel
+limit on every export; only an explicitly capped or manually resized width is serialized.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and
@@ -1512,7 +1527,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 @KoordText: @CoordText_(@uid,`@0`)
 
 @CoordText_
-<span class='lia-coord-text-spec' id='coord-text-spec-@0' data-spec='@1' style='display:none;'></span>
+<span class="lia-coord-text-spec" id="coord-text-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 

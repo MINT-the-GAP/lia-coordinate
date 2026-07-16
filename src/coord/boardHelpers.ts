@@ -34,6 +34,8 @@ export interface StoredBoardState {
   height: number;
   bbox: number[];
   sizeMode: BoardSizeMode;
+  maxStartWidth?: number | null;
+  exportBBox?: number[] | null;
 }
 
 export function loadStoredBoardState(id: string): StoredBoardState | null {
@@ -54,7 +56,13 @@ export function loadStoredBoardState(id: string): StoredBoardState | null {
       ? 'capped'
       : 'auto';
 
-  return { width, height, bbox, sizeMode };
+  const parsedMaxStartWidth = Number(st.maxStartWidth);
+  const maxStartWidth = Number.isFinite(parsedMaxStartWidth) && parsedMaxStartWidth > 0
+    ? parsedMaxStartWidth
+    : null;
+  const exportBBox = isValidBBox(st.exportBBox) ? st.exportBBox.slice() : null;
+
+  return { width, height, bbox, sizeMode, maxStartWidth, exportBBox };
 }
 
 function readRenderedOuterSize(container: HTMLElement, dimension: 'width' | 'height'): number {
@@ -97,17 +105,27 @@ export function saveBoardState(board: any, id: string, initialBBox: number[]): v
     : board.__coordSizeMode === 'capped'
       ? 'capped'
       : 'auto';
+  const configuredMaxStartWidth = Number(board.__coordMaxStartWidth);
+  const maxStartWidth = sizeMode === 'capped' &&
+    Number.isFinite(configuredMaxStartWidth) && configuredMaxStartWidth > 0
+    ? configuredMaxStartWidth
+    : null;
 
   if (!(width > 0) || !(height > 0) || !isValidBBox(bbox)) return;
 
   const store = getBoardStateStore();
   const previous = store[id] || {};
+  const exportBBox = isValidBBox(board.__coordExportBBox)
+    ? board.__coordExportBBox.slice()
+    : bbox.slice();
   store[id] = {
     ...previous,
     width,
     height,
     bbox: bbox.slice(),
+    exportBBox,
     sizeMode,
+    maxStartWidth,
     manualSize: sizeMode === 'manual',
     zoomMode: board.__liaDgsZoomMode || previous.zoomMode || previous.panMode || 'both'
   };
@@ -830,6 +848,32 @@ function splitTopLevelLocal(str: string): string[] {
       continue;
     }
 
+    if (ch === String.fromCharCode(39)) {
+      let previous = i - 1;
+      while (previous >= 0 && /\s/.test(str[previous])) previous -= 1;
+      const atValueStart = previous < 0 || ';,([{=:'.includes(str[previous]);
+      let hasClosingQuote = false;
+      let escapedQuote = false;
+      for (let next = i + 1; atValueStart && next < str.length; next += 1) {
+        if (escapedQuote) {
+          escapedQuote = false;
+          continue;
+        }
+        if (str[next] === String.fromCharCode(92)) {
+          escapedQuote = true;
+          continue;
+        }
+        if (str[next] === ch) {
+          hasClosingQuote = true;
+          break;
+        }
+      }
+      if (!atValueStart || !hasClosingQuote) {
+        cur += ch;
+        continue;
+      }
+    }
+
     if (ch === '"' || ch === "'" || ch === '`') { cur += ch; quote = ch; continue; }
     if (ch === '(' || ch === '[') { cur += ch; depth++; continue; }
     if (ch === ')' || ch === ']') { cur += ch; depth--; continue; }
@@ -950,10 +994,76 @@ export function createBoardDecorations(
  */
 export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], initialRatio: number): void {
   window.__boards = window.__boards || {};
+  const previousBoard = window.__boards[cfg.id];
+  try {
+    if (previousBoard && typeof previousBoard.__coordViewportCleanup === 'function') {
+      previousBoard.__coordViewportCleanup();
+    }
+  } catch (e) {}
   window.__boards[cfg.id] = board;
+  const storedBoardState = loadStoredBoardState(cfg.id);
   board.__manualWidth = null;
   board.__manualHeight = null;
   board.__coordSizeMode = cfg.width == null ? 'auto' : 'capped';
+  board.__coordMaxStartWidth = cfg.width == null ? null : cfg.width;
+  board.__coordExportBBox = (
+    storedBoardState && (
+      isValidBBox(storedBoardState.exportBBox) ? storedBoardState.exportBBox :
+      (isValidBBox(storedBoardState.bbox) ? storedBoardState.bbox : null)
+    ) ||
+    initialBBox
+  ).slice();
+
+  // JSXGraph slightly expands the requested bounding box to account for
+  // aspect ratio and rendered borders. Keep the logical source viewport for
+  // export until the learner actually pans or zooms the board.
+  let userViewportPointerActive = false;
+  let userViewportIntentUntil = 0;
+  const isBoardUiControl = function(target: EventTarget | null): boolean {
+    const element = target && (target as Element);
+    if (!element || typeof element.closest !== 'function') return false;
+    return !!element.closest('button,input,select,textarea,.lia-dgs-menu-bar,.lia-dgs-side-menu,.lia-dgs-object-list-panel');
+  };
+  const markUserViewportIntent = function(duration = 800): void {
+    userViewportIntentUntil = Math.max(userViewportIntentUntil, Date.now() + duration);
+  };
+  const handleViewportWheel = function(event: WheelEvent): void {
+    if (!isBoardUiControl(event.target)) markUserViewportIntent();
+  };
+  const handleViewportPointerDown = function(event: PointerEvent): void {
+    if (isBoardUiControl(event.target)) return;
+    userViewportPointerActive = true;
+    markUserViewportIntent(1200);
+  };
+  const handleViewportPointerUp = function(): void {
+    if (!isCurrentBoard()) {
+      cleanupViewportIntentListeners();
+      return;
+    }
+    if (!userViewportPointerActive) return;
+    userViewportPointerActive = false;
+    markUserViewportIntent(300);
+  };
+  const handleViewportPointerCancel = function(): void {
+    userViewportPointerActive = false;
+    if (!isCurrentBoard()) cleanupViewportIntentListeners();
+  };
+  const handleViewportKeyDown = function(event: KeyboardEvent): void {
+    if (!isBoardUiControl(event.target)) markUserViewportIntent();
+  };
+  const cleanupViewportIntentListeners = function(): void {
+    try { board.containerObj.removeEventListener('wheel', handleViewportWheel, true); } catch (e) {}
+    try { board.containerObj.removeEventListener('pointerdown', handleViewportPointerDown, true); } catch (e) {}
+    try { board.containerObj.removeEventListener('keydown', handleViewportKeyDown, true); } catch (e) {}
+    try { window.removeEventListener('pointerup', handleViewportPointerUp, true); } catch (e) {}
+    try { window.removeEventListener('pointercancel', handleViewportPointerCancel, true); } catch (e) {}
+  };
+  board.containerObj.addEventListener('wheel', handleViewportWheel, { capture: true, passive: true });
+  board.containerObj.addEventListener('pointerdown', handleViewportPointerDown, true);
+  window.addEventListener('pointerup', handleViewportPointerUp, true);
+  window.addEventListener('pointercancel', handleViewportPointerCancel, true);
+  board.containerObj.addEventListener('keydown', handleViewportKeyDown, true);
+  board.__coordViewportCleanup = cleanupViewportIntentListeners;
 
   function isCurrentBoard(): boolean {
     return !!board && !!board.containerObj && board.containerObj.isConnected !== false &&
@@ -1094,6 +1204,9 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     if (bboxRAF) return;
     bboxRAF = requestAnimationFrame(function() {
       bboxRAF = 0;
+      if (userViewportPointerActive || Date.now() <= userViewportIntentUntil) {
+        board.__coordExportBBox = getSafeBBox(board, initialBBox);
+      }
       saveBoardState(board, cfg.id, initialBBox);
 
       // Suspend all internal updates during pan/zoom for massive performance boost
