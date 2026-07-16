@@ -8,6 +8,7 @@ import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getBoardObjects } from '../shared/boardObjects';
 import { formatNumber } from '../shared/format';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 type ObjectAnalysisKind = 'ordinate-intercept' | 'intersections';
 type SourceKind = 'function' | 'linear' | 'circle';
@@ -231,6 +232,10 @@ export function init(): void {
     return entry.showValue;
   }
 
+  function pointValueRendered(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): boolean {
+    return mayDisplayDgsValues(entry.boardId) && pointValueVisible(entry, index);
+  }
+
   function pointObjectVisible(entry: ObjectAnalysisEntry | ObjectAnalysisConfig, index: number): boolean {
     if (Array.isArray(entry.explicitObjectVisibility) &&
         typeof entry.explicitObjectVisibility[index] === 'boolean') {
@@ -242,7 +247,7 @@ export function init(): void {
   function pointLabelText(entry: ObjectAnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
     const showName = pointNameVisible(entry, index);
-    if (!pointValueVisible(entry, index)) return showName ? '\\(' + name + '\\)' : '';
+    if (!pointValueRendered(entry, index)) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
     return '\\(' + (showName ? name + '\\; ' : '') + '(' + formatNumber(holder.x, entry.language) + '\\mid ' +
       formatNumber(holder.y, entry.language) + ')\\)';
@@ -780,7 +785,8 @@ export function init(): void {
   function applyPointVisual(entry: ObjectAnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
     const objectVisible = pointObjectVisible(entry, index);
-    const labelVisible = objectVisible && (pointNameVisible(entry, index) || pointValueVisible(entry, index));
+    const labelVisible = objectVisible &&
+      (pointNameVisible(entry, index) || pointValueRendered(entry, index));
     try {
       point.setAttribute({
         visible: objectVisible,
@@ -853,7 +859,7 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: pointNameVisible(entry, index) || pointValueVisible(entry, index),
+        withLabel: pointNameVisible(entry, index) || pointValueRendered(entry, index),
         visible: pointObjectVisible(entry, index),
         showInfobox: false,
         strokeColor: entry.color,

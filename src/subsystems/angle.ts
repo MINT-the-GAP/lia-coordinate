@@ -5,6 +5,7 @@ import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../s
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint } from '../shared/boardObjects';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 interface AngleConfig {
   boardId: string;
@@ -215,7 +216,9 @@ export function init(): void {
 
   function labelText(cfg: AngleConfig, points: any[]): string {
     const name = cfg.showName ? (texName(cfg.name) || fallbackAngleName(cfg)) : '';
-    if (!cfg.showValue) return name ? '\\(' + name + '\\)' : '';
+    if (!cfg.showValue || !mayDisplayDgsValues(cfg.boardId)) {
+      return name ? '\\(' + name + '\\)' : '';
+    }
 
     const value = angleMeasure(points);
     if (!Number.isFinite(value)) return name ? '\\(' + name + '\\)' : '';
@@ -271,7 +274,8 @@ export function init(): void {
     const visible = cfg.visible !== false;
     setElementVisibility(angle, visible);
     setElementVisibility(angle && angle.arc, visible);
-    setElementVisibility(label, visible && (cfg.showName || cfg.showValue));
+    setElementVisibility(label, visible &&
+      (cfg.showName || (mayDisplayDgsValues(cfg.boardId) && cfg.showValue)));
   }
 
   function applyAngleDgsMetadata(
@@ -310,7 +314,8 @@ export function init(): void {
       function() { return labelText(cfg, points); }
     ], {
       fixed: true,
-      visible: cfg.visible && (cfg.showName || cfg.showValue),
+      visible: cfg.visible &&
+        (cfg.showName || (mayDisplayDgsValues(cfg.boardId) && cfg.showValue)),
       highlight: false,
       parse: false,
       useMathJax: true,

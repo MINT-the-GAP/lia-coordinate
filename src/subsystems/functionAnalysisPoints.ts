@@ -6,6 +6,7 @@ import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../s
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { formatNumber } from '../shared/format';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 type AnalysisKind = 'roots' | 'extrema' | 'inflections';
 
@@ -183,7 +184,7 @@ export function init(): void {
   function pointLabelText(entry: AnalysisEntry, index: number): string {
     const name = texName(entry.names[index] || pointNameForIndex(entry, index));
     const showName = pointNameVisible(entry, index);
-    if (!pointValueVisible(entry, index)) return showName ? '\\(' + name + '\\)' : '';
+    if (!pointValueRendered(entry, index)) return showName ? '\\(' + name + '\\)' : '';
     const holder = entry.holders[index] || { x: NaN, y: NaN };
     if (entry.kind === 'roots') {
       return '\\(' + (showName ? name + '\\; ' : '') + 'x = ' + formatNumber(holder.x, entry.language) + '\\)';
@@ -204,6 +205,10 @@ export function init(): void {
       return entry.explicitValueVisibility[index];
     }
     return entry.showValue;
+  }
+
+  function pointValueRendered(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
+    return mayDisplayDgsValues(entry.boardId) && pointValueVisible(entry, index);
   }
 
   function pointObjectVisible(entry: AnalysisEntry | AnalysisPointConfig, index: number): boolean {
@@ -472,7 +477,8 @@ export function init(): void {
   function applyPointVisual(entry: AnalysisEntry, point: any, index: number): void {
     const labelColor = getNeutralColor();
     const objectVisible = pointObjectVisible(entry, index);
-    const labelVisible = objectVisible && (pointNameVisible(entry, index) || pointValueVisible(entry, index));
+    const labelVisible = objectVisible &&
+      (pointNameVisible(entry, index) || pointValueRendered(entry, index));
     try {
       point.setAttribute({
         visible: objectVisible,
@@ -546,7 +552,7 @@ export function init(): void {
       ], {
         name: '\\(' + texName(name) + '\\)',
         fixed: true,
-        withLabel: pointNameVisible(entry, index) || pointValueVisible(entry, index),
+        withLabel: pointNameVisible(entry, index) || pointValueRendered(entry, index),
         visible: pointObjectVisible(entry, index),
         showInfobox: false,
         strokeColor: entry.color,

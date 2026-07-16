@@ -7659,6 +7659,7 @@ function applyLayout(state: RegressionState): void {
   updateButtonStates(state);
   redrawCanvas(state);
   relayoutAnalysisPanels(state);
+  try { window.__refreshDgsToolAvailabilityForBoard?.(state.boardId); } catch (e) {}
 }
 
 window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boolean): void {

@@ -6,6 +6,7 @@ import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme'
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint } from '../shared/boardObjects';
 import { subscriptTexName as texName } from '../shared/texName';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 interface CircleConfig {
   boardId: string;
@@ -137,6 +138,7 @@ export function init(): void {
   }
 
   function measurementText(cfg: CircleConfig, center: any, radiusPoint: any): string {
+    if (!mayDisplayDgsValues(cfg.boardId)) return '';
     const radius = currentRadius(cfg, center, radiusPoint);
     if (!Number.isFinite(radius)) return '';
     const lines: string[] = [];
@@ -204,7 +206,8 @@ export function init(): void {
     const visible = cfg.visible !== false;
     setElementVisibility(circle, visible);
     setElementVisibility(nameLabel, visible && cfg.showName && !!cfg.name);
-    setElementVisibility(measurementLabel, visible && (cfg.showArea || cfg.showCircumference));
+    setElementVisibility(measurementLabel, visible && mayDisplayDgsValues(cfg.boardId) &&
+      (cfg.showArea || cfg.showCircumference));
   }
 
   function createNameLabel(board: any, center: any, radiusPoint: any, cfg: CircleConfig): any {
@@ -281,7 +284,7 @@ export function init(): void {
       function() { return measurementText(cfg, center, radiusPoint); }
     ], {
       fixed: true,
-      visible: cfg.visible,
+      visible: cfg.visible && mayDisplayDgsValues(cfg.boardId),
       highlight: false,
       parse: false,
       useMathJax: true,

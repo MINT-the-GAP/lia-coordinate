@@ -1203,10 +1203,37 @@ order, hidden dependency objects, point-coordinate expressions, polygon-side ref
 visibility, the logical viewport, and the supported appearance settings. Automatically responsive coordinate systems
 remain responsive instead of turning their currently measured LiveEditor width into a new pixel
 limit on every export; only an explicitly capped or manually resized width is serialized.
+The export dialog first shows a grouped overview of the DGS tools. Every included tool has a
+green check badge; clicking it excludes the tool, dims its icon, and changes the badge to a red
+cross. Continue opens the generated macro block. This selection only configures the imported
+toolbar and does not remove existing objects or change the currently open DGS.
+Below the tool overview, four checkmark options configure permissions in the imported DGS. They
+are serialized independently as `restrictions=[...]`: `100` disables object properties from the
+board, object list, and keyboard context-menu shortcut; `200` limits object properties to colors,
+opacity, and point traces; `300` removes and locks the checkmarks for lengths, equations, areas,
+perimeters, angles, function terms, coordinates, and analysis values; and `400` hides and disables
+the Export button in the object list. Restriction `300` also suppresses values that were already
+visible or would normally be shown automatically; the underlying author settings are preserved
+and reappear if the restriction is removed. The two object-property modes are mutually exclusive
+in the dialog. The complete lock (`100`) takes precedence if `100` and `200` are written by hand.
+Missing, empty, or nonnumeric `restrictions` mean unrestricted behavior. Unknown positive
+restriction ids are preserved during re-export so future permissions remain roundtrip-safe.
+Tool profiles use immutable numeric capability ids rather than toolbar positions:
+`@DGS(`boardId;tools=[100;200;310;700]`)`. Therefore, a future tool can be inserted anywhere in
+the visual toolbar without changing the meaning of an older export. Missing `tools`, an empty
+list, or a list without numbers retains the complete legacy DGS; `tools=[0]` explicitly keeps
+only the permanent infrastructure. Hamburger, normal mouse mode, undo/redo, fullscreen, and the
+object list remain permanently available; export remains available unless restriction `400` is set.
+The currently assigned ids are: `100` formatting, `200` point, `310` segment, `320` ray,
+`330` line, `340` vector, `350` arc, `410` perpendicular, `420` parallel, `430` midpoint,
+`440` angle bisector, `510` polygon, `520` circle, `530` circular sector, `610` angle,
+`620` measured angle, `700` function, `810` zeros, `820` extrema, `830` inflection points,
+`840` ordinate-axis intercept, `850` tangent, `860` intersection, `910` freehand drawing,
+`920` eraser, `930` regression tools, `1000` slider, `1010` text, `1110` zoom mode, and
+`1120` axis scaling. These ids are reserved permanently and are never derived from display order.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
-modes. The zero and
-ordinate-axis-intercept tools accept a function graph, segment, ray, vector, or straight line;
+modes. The zero and ordinate-axis-intercept tools accept a function graph, segment, ray, vector, or straight line;
 the extrema and inflection tools accept a function graph. Tangents can be attached to function
 graphs, segments, rays, vectors, straight lines, and circles. The point tools create
 alphabetically named dependent points at all isolated zeros, local extrema, actual changes of
@@ -1233,12 +1260,25 @@ undo and redo remain permanently stacked below the hamburger button, so no addit
 `@Regression` macro is required.
 Regression analysis panels are stacked below these permanent controls.
 
-Parameters: `<boardId>`
+Parameters: `<boardId>[;tools=[<stableToolId>;...]][;restrictions=[<stableRestrictionId>;...]]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=;ymax=;width=;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
+```
+
+A restricted toolbar containing only the point, segment, and function tools can be embedded as:
+
+``` markdown
+@DGS(`ex_dgs;tools=[200;310;700]`)
+```
+
+The same toolbar can allow only color and trace changes, lock value-display checkmarks, and hide
+the Export button with:
+
+``` markdown
+@DGS(`ex_dgs;tools=[200;310;700];restrictions=[200;300;400]`)
 ```
 
 ---

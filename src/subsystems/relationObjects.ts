@@ -15,6 +15,7 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, getBoardObjects, sameCoordinates } from '../shared/boardObjects';
 import { normalizeName, namesEqual } from '../shared/format';
 import { normalizedTexName as texName } from '../shared/texName';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 type RelationKind = 'orthogonal' | 'parallel' | 'midpoint';
 
@@ -314,7 +315,9 @@ export function init(): void {
 
   function midpointLabelText(point: any, cfg: RelationConfig): string {
     const name = cfg.showName ? texName(cfg.objectName || 'M') : '';
-    if (!cfg.showValue) return name ? '\\(' + name + '\\)' : '';
+    if (!cfg.showValue || !mayDisplayDgsValues(cfg.boardId)) {
+      return name ? '\\(' + name + '\\)' : '';
+    }
     let x = '?';
     let y = '?';
     try {
@@ -444,7 +447,8 @@ export function init(): void {
   function applyMidpointVisual(point: any, cfg: RelationConfig): void {
     if (!point || typeof point.setAttribute !== 'function') return;
     const labelColor = midpointLabelColor(cfg);
-    const labelVisible = cfg.visible && (cfg.showName || cfg.showValue);
+    const labelVisible = cfg.visible &&
+      (cfg.showName || (mayDisplayDgsValues(cfg.boardId) && cfg.showValue));
     try {
       point.setAttribute({
         visible: cfg.visible,
@@ -696,7 +700,8 @@ export function init(): void {
           name: mathName(cfg.objectName),
           fixed: true,
           visible: cfg.visible,
-          withLabel: cfg.showName || cfg.showValue,
+          withLabel: cfg.showName ||
+            (mayDisplayDgsValues(cfg.boardId) && cfg.showValue),
           showInfobox: false,
           strokeColor: cfg.color,
           fillColor: cfg.color,

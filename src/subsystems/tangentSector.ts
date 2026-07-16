@@ -14,6 +14,7 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, getBoardObjects } from '../shared/boardObjects';
 import { normalizeName, namesEqual } from '../shared/format';
 import { normalizedTexName as texName } from '../shared/texName';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 type SourceKind = 'function' | 'linear' | 'circle';
 
@@ -679,10 +680,11 @@ export function init(): void {
     const lines: string[] = [];
     if (cfg.showName && cfg.objectName) lines.push('\\mathrm{' + texName(cfg.objectName) + '}');
     const metrics = sectorMetrics(center, radiusPoint, anglePoint);
-    if (cfg.showArea) {
+    const valuesVisible = mayDisplayDgsValues(cfg.boardId);
+    if (valuesVisible && cfg.showArea) {
       lines.push('A ' + measurementRelation(metrics.area) + ' ' + formatMeasurement(metrics.area, cfg.language) + '\\,\\mathrm{' + (cfg.language === 'de' ? 'FE' : 'AU') + '}');
     }
-    if (cfg.showPerimeter) {
+    if (valuesVisible && cfg.showPerimeter) {
       lines.push('u ' + measurementRelation(metrics.perimeter) + ' ' + formatMeasurement(metrics.perimeter, cfg.language) + '\\,\\mathrm{' + (cfg.language === 'de' ? 'LE' : 'LU') + '}');
     }
     if (!lines.length) return '';
@@ -693,7 +695,8 @@ export function init(): void {
   function applySectorStyle(sector: any, cfg: SectorConfig): void {
     const visible = cfg.visible !== false;
     const labelVisible = visible &&
-      !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter);
+      !!((cfg.showName && cfg.objectName) ||
+        (mayDisplayDgsValues(cfg.boardId) && (cfg.showArea || cfg.showPerimeter)));
     try {
       if (sector && typeof sector.setAttribute === 'function') sector.setAttribute({
         visible: visible,
@@ -777,7 +780,8 @@ export function init(): void {
           fontSize: 18,
           parse: false,
           useMathJax: true,
-          visible: cfg.visible && !!((cfg.showName && cfg.objectName) || cfg.showArea || cfg.showPerimeter)
+          visible: cfg.visible && !!((cfg.showName && cfg.objectName) ||
+            (mayDisplayDgsValues(cfg.boardId) && (cfg.showArea || cfg.showPerimeter)))
         }
       });
       sector.__liaDgsSector = true;

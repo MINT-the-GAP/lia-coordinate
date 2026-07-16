@@ -5,6 +5,7 @@ import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 interface AreaConfig {
   boardId: string;
@@ -282,6 +283,7 @@ export function init(): void {
   }
 
   function measurementText(cfg: AreaConfig, points: any[]): string {
+    if (!mayDisplayDgsValues(cfg.boardId)) return '';
     const coordinates = pointCoordinates(points);
     if (coordinates.length < 3) return '';
 
@@ -358,7 +360,8 @@ export function init(): void {
     vertices.forEach(function(vertex: any) {
       setElementVisibility(vertex, !!vertex && vertex.__liaDgsShowObject !== false);
     });
-    setElementVisibility(label, visible && (cfg.showArea || cfg.showPerimeter));
+    setElementVisibility(label, visible && mayDisplayDgsValues(cfg.boardId) &&
+      (cfg.showArea || cfg.showPerimeter));
   }
 
   function applyAreaDgsMetadata(
@@ -435,7 +438,7 @@ export function init(): void {
       function() { return measurementText(cfg, points); }
     ], {
       fixed: true,
-      visible: cfg.visible,
+      visible: cfg.visible && mayDisplayDgsValues(cfg.boardId),
       highlight: false,
       parse: false,
       useMathJax: true,

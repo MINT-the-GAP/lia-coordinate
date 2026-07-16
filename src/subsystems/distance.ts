@@ -12,6 +12,7 @@ import {
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
+import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
 interface DistanceDesign {
   normalizedDesign: string;
@@ -408,6 +409,7 @@ export function init(): void {
 
   function applyDistanceVisibility(entry: any, cfg: DistanceConfig): void {
     const visible = cfg.visible !== false;
+    const valuesVisible = mayDisplayDgsValues(cfg.boardId);
     const segments = Array.isArray(entry && entry.segments) ? entry.segments : [];
     segments.forEach(function(segment: any) {
       try {
@@ -435,7 +437,8 @@ export function init(): void {
     try {
       if (entry && entry.label && typeof entry.label.setAttribute === 'function') {
         entry.label.setAttribute({
-          visible: visible && !!(cfg.showLength || (cfg.showName && cfg.segmentName))
+          visible: visible && !!((valuesVisible && cfg.showLength) ||
+            (cfg.showName && cfg.segmentName))
         });
       }
     } catch (e) {}
@@ -498,7 +501,9 @@ export function init(): void {
     const visibleName = cfg.showName && cfg.segmentName
       ? texPointName(cfg.segmentName)
       : '';
-    if (!cfg.showLength) return visibleName ? '\\(' + visibleName + '\\)' : '';
+    if (!cfg.showLength || !mayDisplayDgsValues(cfg.boardId)) {
+      return visibleName ? '\\(' + visibleName + '\\)' : '';
+    }
 
     let distance = 0;
     try {
@@ -669,7 +674,8 @@ export function init(): void {
       strokeColor: cfg.color,
       fillColor: cfg.color,
       fontSize: 14,
-      visible: cfg.visible
+      visible: cfg.visible && !!((mayDisplayDgsValues(cfg.boardId) && cfg.showLength) ||
+        (cfg.showName && cfg.segmentName))
     });
 
     // MathJax changes the DOM bounds asynchronously. Re-run the position after

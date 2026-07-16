@@ -13,6 +13,186 @@ import {
 
 type DgsAxisScaleMode = 'cartesian' | 'log-x' | 'log-y' | 'log-log';
 
+const DGS_TOOL_IDS = {
+  formatCopy: 100,
+  point: 200,
+  segment: 310,
+  ray: 320,
+  line: 330,
+  vector: 340,
+  arc: 350,
+  orthogonal: 410,
+  parallel: 420,
+  midpoint: 430,
+  angleBisector: 440,
+  polygon: 510,
+  circle: 520,
+  sector: 530,
+  angle: 610,
+  measuredAngle: 620,
+  function: 700,
+  roots: 810,
+  extrema: 820,
+  inflections: 830,
+  ordinateIntercept: 840,
+  tangent: 850,
+  intersection: 860,
+  regressionDraw: 910,
+  regressionErase: 920,
+  regressionTools: 930,
+  slider: 1000,
+  text: 1010,
+  zoom: 1110,
+  axisScale: 1120
+} as const;
+
+type DgsToolId = typeof DGS_TOOL_IDS[keyof typeof DGS_TOOL_IDS];
+
+// These are immutable capability identifiers, not visual positions. New tools
+// may be placed anywhere in the UI, but existing ids must never be changed or
+// reused. This keeps old restricted exports stable when the toolbar grows.
+const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
+  DGS_TOOL_IDS.formatCopy,
+  DGS_TOOL_IDS.point,
+  DGS_TOOL_IDS.segment,
+  DGS_TOOL_IDS.ray,
+  DGS_TOOL_IDS.line,
+  DGS_TOOL_IDS.vector,
+  DGS_TOOL_IDS.arc,
+  DGS_TOOL_IDS.orthogonal,
+  DGS_TOOL_IDS.parallel,
+  DGS_TOOL_IDS.midpoint,
+  DGS_TOOL_IDS.angleBisector,
+  DGS_TOOL_IDS.polygon,
+  DGS_TOOL_IDS.circle,
+  DGS_TOOL_IDS.sector,
+  DGS_TOOL_IDS.angle,
+  DGS_TOOL_IDS.measuredAngle,
+  DGS_TOOL_IDS.function,
+  DGS_TOOL_IDS.roots,
+  DGS_TOOL_IDS.extrema,
+  DGS_TOOL_IDS.inflections,
+  DGS_TOOL_IDS.ordinateIntercept,
+  DGS_TOOL_IDS.tangent,
+  DGS_TOOL_IDS.intersection,
+  DGS_TOOL_IDS.regressionDraw,
+  DGS_TOOL_IDS.regressionErase,
+  DGS_TOOL_IDS.regressionTools,
+  DGS_TOOL_IDS.slider,
+  DGS_TOOL_IDS.text,
+  DGS_TOOL_IDS.zoom,
+  DGS_TOOL_IDS.axisScale
+];
+
+const DGS_RESTRICTION_IDS = {
+  objectPropertiesLocked: 100,
+  objectPropertiesColorsTraceOnly: 200,
+  valueControlsLocked: 300,
+  exportLocked: 400
+} as const;
+
+type DgsRestrictionId = typeof DGS_RESTRICTION_IDS[keyof typeof DGS_RESTRICTION_IDS];
+
+// Restriction ids are immutable capabilities as well. They are deliberately
+// independent of checkbox order so future restrictions can be inserted in the
+// export dialog without changing older profiles.
+const DGS_KNOWN_RESTRICTION_IDS: DgsRestrictionId[] = [
+  DGS_RESTRICTION_IDS.objectPropertiesLocked,
+  DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly,
+  DGS_RESTRICTION_IDS.valueControlsLocked,
+  DGS_RESTRICTION_IDS.exportLocked
+];
+
+type DgsMacroConfig = {
+  boardId: string;
+  toolIds: Set<number> | null;
+  toolSelectionKey: string;
+  restrictionIds: Set<number>;
+  restrictionSelectionKey: string;
+};
+
+function canonicalDgsToolIds(ids: Iterable<number>): number[] {
+  return Array.from(new Set(Array.from(ids)
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)))
+    .sort((a, b) => a - b);
+}
+
+function dgsToolSelectionKey(ids: Set<number> | null): string {
+  if (ids == null) return '*';
+  const values = canonicalDgsToolIds(ids);
+  return values.length ? values.join(',') : '0';
+}
+
+function canonicalDgsRestrictionIds(ids: Iterable<number>): number[] {
+  return Array.from(new Set(Array.from(ids)
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)))
+    .sort((a, b) => a - b);
+}
+
+function dgsRestrictionSelectionKey(ids: Iterable<number>): string {
+  const values = canonicalDgsRestrictionIds(ids);
+  return values.length ? values.join(',') : '0';
+}
+
+function parseDgsNumericIdList(raw: string | null): number[] {
+  if (raw == null) return [];
+  const listSource = raw.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+  return listSource.split(/[;,\s]+/)
+    .map((token) => token.trim())
+    .filter((token) => /^\d+$/.test(token))
+    .map((token) => Number(token))
+    .filter((value) => Number.isSafeInteger(value) && value >= 0);
+}
+
+function parseDgsMacroSpec(spec: string): DgsMacroConfig {
+  const parts = splitTopLevel(unquote(String(spec || '').trim()), ';');
+  const boardId = unquote(String(parts[0] || '').trim());
+  let rawTools: string | null = null;
+  let rawRestrictions: string | null = null;
+
+  parts.slice(1).forEach((part) => {
+    const value = String(part || '').trim();
+    const toolsMatch = value.match(/^tools\s*=\s*([\s\S]*)$/i);
+    const restrictionsMatch = value.match(/^restrictions\s*=\s*([\s\S]*)$/i);
+    if (toolsMatch) rawTools = unquote(String(toolsMatch[1] || '').trim());
+    if (restrictionsMatch) rawRestrictions = unquote(String(restrictionsMatch[1] || '').trim());
+  });
+
+  // Legacy macros, empty lists and malformed lists intentionally mean the
+  // complete DGS. tools=[0] is the explicit empty allowlist.
+  const numericToolValues = parseDgsNumericIdList(rawTools);
+  const toolIds = rawTools == null || !numericToolValues.length
+    ? null
+    : new Set<number>(numericToolValues.filter((value) => value > 0));
+  // Missing, empty and malformed restriction lists are unrestricted. A zero
+  // can be used as an explicit empty list without affecting legacy macros.
+  const restrictionIds = new Set<number>(
+    parseDgsNumericIdList(rawRestrictions).filter((value) => value > 0)
+  );
+  if (restrictionIds.has(DGS_RESTRICTION_IDS.objectPropertiesLocked)) {
+    restrictionIds.delete(DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly);
+  }
+  return {
+    boardId,
+    toolIds,
+    toolSelectionKey: dgsToolSelectionKey(toolIds),
+    restrictionIds,
+    restrictionSelectionKey: dgsRestrictionSelectionKey(restrictionIds)
+  };
+}
+
+function formatDgsToolSelection(ids: Iterable<number>): string {
+  const values = canonicalDgsToolIds(ids);
+  return '[' + (values.length ? values.join(';') : '0') + ']';
+}
+
+function formatDgsRestrictionSelection(ids: Iterable<number>): string {
+  const values = canonicalDgsRestrictionIds(ids);
+  return '[' + (values.length ? values.join(';') : '0') + ']';
+}
+
 type DgsState = {
   uid: string;
   boardId: string;
@@ -36,8 +216,17 @@ type DgsState = {
   objectListCloseButton: HTMLButtonElement;
   objectListExportButton: HTMLButtonElement;
   exportDialog: HTMLDivElement;
+  exportDialogTitle: HTMLDivElement;
+  exportToolsStep: HTMLDivElement;
+  exportMacroStep: HTMLDivElement;
+  exportToolButtons: Map<number, HTMLButtonElement>;
+  exportSelectedToolIds: Set<number>;
+  exportRestrictionInputs: Map<number, HTMLInputElement>;
+  exportSelectedRestrictionIds: Set<number>;
+  exportDialogStep: 'tools' | 'macro';
   exportTextarea: HTMLTextAreaElement;
   exportCopyButton: HTMLButtonElement;
+  exportBackButton: HTMLButtonElement;
   exportCloseButton: HTMLButtonElement;
   nameOption: HTMLLabelElement;
   objectOption: HTMLLabelElement;
@@ -169,6 +358,7 @@ type DgsState = {
   logLogScaleButton: HTMLButtonElement;
   fullscreenButton: HTMLButtonElement;
   objectListButton: HTMLButtonElement;
+  menuScrollSpacer: HTMLSpanElement;
   textDialog: HTMLDivElement;
   textDialogInput: HTMLInputElement;
   textDialogConfirmButton: HTMLButtonElement;
@@ -194,6 +384,10 @@ type DgsState = {
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
   exportDialogOpen: boolean;
+  availableToolIds: Set<number> | null;
+  toolSelectionKey: string;
+  restrictionIds: Set<number>;
+  restrictionSelectionKey: string;
   sideMenuOpen: boolean;
   objectListOpen: boolean;
   objectListSignature: string;
@@ -248,8 +442,33 @@ type DgsState = {
   xAxisSyncRAF?: number;
 };
 
+type DgsObjectPropertiesMode = 'full' | 'colors-trace' | 'locked';
+
+function hasDgsRestriction(state: DgsState, id: DgsRestrictionId): boolean {
+  return state.restrictionIds.has(id);
+}
+
+function getDgsObjectPropertiesMode(state: DgsState): DgsObjectPropertiesMode {
+  if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.objectPropertiesLocked)) return 'locked';
+  if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly)) {
+    return 'colors-trace';
+  }
+  return 'full';
+}
+
 const DGS_TEXT = {
   de: {
+    exportToolsTitle: 'Werkzeuge f\u00fcr den Import ausw\u00e4hlen',
+    exportToolsHint: 'Nur gr\u00fcn markierte Werkzeuge stehen im importierten DGS zur Verf\u00fcgung.',
+    exportRestrictionsTitle: 'Einschr\u00e4nkungen im importierten DGS',
+    lockObjectProperties: 'Rechtsklick f\u00fcr bestehende Objekte sperren',
+    colorsTracePropertiesOnly: 'Im Rechtsklickmen\u00fc nur Farben und Spuren anzeigen',
+    lockValueControls: 'Das Anzeigen von Werten sperren',
+    lockExport: 'Export in der Objektliste sperren',
+    objectPropertiesLocked: 'Objekteigenschaften sind in diesem DGS gesperrt',
+    colorTraceProperties: 'Farb- und Spureinstellungen \u00f6ffnen',
+    nextExport: 'Weiter', backExport: 'Zur\u00fcck',
+    toolAvailable: 'verf\u00fcgbar', toolUnavailable: 'nicht verf\u00fcgbar',
     arc: 'Bogen', showArc: 'Bogen anzeigen', createArc: 'Bogen erzeugen',
     exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
     appearance: 'Darstellung', design: 'Design', strokeWidth: 'Linienstärke',
@@ -267,6 +486,17 @@ const DGS_TEXT = {
     enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
+    exportToolsTitle: 'Choose tools for the imported DGS',
+    exportToolsHint: 'Only tools marked in green are available in the imported DGS.',
+    exportRestrictionsTitle: 'Restrictions in the imported DGS',
+    lockObjectProperties: 'Disable right-click for existing objects',
+    colorsTracePropertiesOnly: 'Show only colors and traces in the object menu',
+    lockValueControls: 'Disable displaying values',
+    lockExport: 'Disable export in the object list',
+    objectPropertiesLocked: 'Object properties are disabled in this DGS',
+    colorTraceProperties: 'Open color and trace settings',
+    nextExport: 'Continue', backExport: 'Back',
+    toolAvailable: 'available', toolUnavailable: 'not available',
     arc: 'Arc', showArc: 'Show arc', createArc: 'Create arc',
     exitAngle: 'Exit angle', entryAngle: 'Entry angle',
     appearance: 'Appearance', design: 'Design', strokeWidth: 'Line width',
@@ -674,6 +904,15 @@ function setDgsAxisScaleMode(state: DgsState, modeValue: unknown, save = true): 
 }
 
 const states: Record<string, DgsState> = {};
+
+function dgsMayDisplayObjectValues(object: any): boolean {
+  return !(object && object.board && object.board.__liaDgsValueDisplayLocked);
+}
+
+window.__dgsMayDisplayValuesForBoard = function(boardId: string): boolean {
+  const board = window.__boards && window.__boards[boardId];
+  return !(board && board.__liaDgsValueDisplayLocked);
+};
 const dgsConstructionStates: Record<string, any> =
   ((window as any).__dgsConstructionStates = (window as any).__dgsConstructionStates || {});
 const dgsConstructionBoards: Record<string, any> =
@@ -692,7 +931,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-07-15-1';
+const DGS_STYLE_VERSION = '2026-07-16-2';
 
 function hasExternalDgsMacroSpecs(boardId: string): boolean {
   const objectSpecId = /^(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-/;
@@ -1334,6 +1573,11 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-context-option[hidden] {
       display: none;
+    }
+
+    .lia-dgs-side-menu [hidden],
+    .lia-dgs-object-list-footer[hidden] {
+      display: none !important;
     }
 
     .lia-dgs-color-section {
@@ -2041,15 +2285,197 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-export-dialog {
-      width: min(620px, calc(100% - 32px));
+      width: min(920px, calc(100% - 32px));
       max-width: calc(100% - 32px);
+      max-height: min(82vh, calc(100% - 32px));
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+    }
+
+    .lia-dgs-export-step {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .lia-dgs-export-step[hidden],
+    .lia-dgs-export-dialog [hidden],
+    .lia-dgs-top-menu [hidden] {
+      display: none !important;
+    }
+
+    .lia-dgs-export-tools-step {
+      display: grid;
+      gap: 10px;
+      min-height: 0;
+      padding-right: 3px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .lia-dgs-export-tools-hint {
+      font-size: 13px;
+      line-height: 1.35;
+      opacity: .82;
+    }
+
+    .lia-dgs-export-tool-groups {
+      min-width: 0;
+      max-height: min(42vh, 360px);
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      padding: 2px 8px 8px 2px;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .lia-dgs-export-restrictions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+      gap: 7px 18px;
+      padding-top: 10px;
+      border-top: 2px solid var(--lia-dgs-theme-color, currentColor);
+    }
+
+    .lia-dgs-export-restrictions-title {
+      grid-column: 1 / -1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-export-restriction-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+      font-size: 13px;
+      line-height: 1.3;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .lia-dgs-export-restriction-option input {
+      flex: 0 0 auto;
+      width: 17px;
+      height: 17px;
+      margin: 0;
+      accent-color: var(--lia-dgs-theme-color, currentColor);
+      cursor: pointer;
+    }
+
+    .lia-dgs-export-tool-group {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      min-height: 44px;
+    }
+
+    .lia-dgs-export-tool-group + .lia-dgs-export-tool-group {
+      padding-left: 10px;
+      border-left: 2px solid var(--lia-dgs-theme-color, currentColor);
+    }
+
+    .lia-dgs-export-tool-column {
+      display: grid;
+      grid-auto-rows: 44px;
+      gap: 8px;
+    }
+
+    .lia-dgs-export-tool.lia-dgs-geometry-button {
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      right: auto !important;
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: 11px;
+      overflow: visible;
+    }
+
+    .lia-dgs-export-tool-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      transition: opacity 140ms ease, filter 140ms ease;
+      pointer-events: none;
+    }
+
+    .lia-dgs-export-tool-icon > svg {
+      width: 32px;
+      height: 32px;
+      display: block;
+      overflow: visible;
+    }
+
+    .lia-dgs-export-tool[data-enabled="0"] .lia-dgs-export-tool-icon {
+      opacity: .32;
+      filter: grayscale(1);
+    }
+
+    .lia-dgs-export-tool[data-enabled="0"] {
+      border-color: color-mix(
+        in srgb,
+        var(--lia-dgs-neutral-color, currentColor) 34%,
+        transparent
+      );
+    }
+
+    .lia-dgs-export-tool-status {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      z-index: 2;
+      width: 17px;
+      height: 17px;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      border: 1.5px solid #fff;
+      border-radius: 50%;
+      background: #24a148;
+      color: #fff;
+      font: 700 13px/1 Arial, sans-serif;
+      pointer-events: none;
+    }
+
+    .lia-dgs-export-tool[data-enabled="0"] .lia-dgs-export-tool-status {
+      background: #d32f2f;
+    }
+
+    .lia-dgs-export-tool:hover,
+    .lia-dgs-export-tool:focus-visible {
+      border-color: var(--lia-dgs-theme-color, currentColor);
+      outline: 2px solid color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 55%, transparent);
+      outline-offset: 2px;
+    }
+
+    .lia-dgs-export-tool .ico-color-dot {
+      fill: #ff00ff !important;
+      stroke: none !important;
+    }
+
+    .lia-dgs-export-regression-tool path,
+    .lia-dgs-export-regression-tool .ico-stroke {
+      fill: none !important;
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
+    }
+
+    .lia-dgs-export-macro-step {
+      display: grid;
+      gap: 10px;
+      min-height: 0;
+      overflow: auto;
     }
 
     .lia-dgs-export-textarea {
       min-width: 0;
       width: 100%;
       height: min(42vh, 320px);
-      min-height: 180px;
+      min-height: 150px;
       box-sizing: border-box;
       border: 1.5px solid currentColor;
       border-radius: 8px;
@@ -2100,6 +2526,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-angle-dialog-actions {
       display: flex;
+      flex-wrap: wrap;
       justify-content: flex-end;
       gap: 8px;
     }
@@ -6721,14 +7148,15 @@ function getDgsPolygonMeasurementText(polygon: any): string {
   if (coordinates.length < 3) return '';
   const language = getDgsGeometryLanguage(null, polygon.__liaDgsLanguage);
   const lines: string[] = [];
+  const mayDisplayValues = dgsMayDisplayObjectValues(polygon);
   const name = getDgsObjectName(polygon);
   if (polygon.__liaDgsShowName !== false && name) lines.push('\\mathrm{' + name + '}');
-  if (polygon.__liaDgsShowArea) {
+  if (mayDisplayValues && polygon.__liaDgsShowArea) {
     const area = getDgsPolygonArea(coordinates);
     lines.push('A ' + dgsMeasurementRelation(area) + ' ' + formatDgsMeasurement(area, language) +
       '\\,\\mathrm{' + (language === 'de' ? 'FE' : 'AU') + '}');
   }
-  if (polygon.__liaDgsShowPerimeter) {
+  if (mayDisplayValues && polygon.__liaDgsShowPerimeter) {
     const perimeter = getDgsPolygonPerimeter(coordinates);
     lines.push('u ' + dgsMeasurementRelation(perimeter) + ' ' + formatDgsMeasurement(perimeter, language) +
       '\\,\\mathrm{' + (language === 'de' ? 'LE' : 'LU') + '}');
@@ -6740,8 +7168,9 @@ function getDgsPolygonMeasurementText(polygon: any): string {
 
 function refreshDgsPolygonMeasurementLabel(polygon: any): void {
   if (!isDgsPolygon(polygon) || !polygon.board) return;
+  const mayDisplayValues = dgsMayDisplayObjectValues(polygon);
   const requested = polygon.__liaDgsShowName !== false ||
-    !!(polygon.__liaDgsShowArea || polygon.__liaDgsShowPerimeter);
+    !!(mayDisplayValues && (polygon.__liaDgsShowArea || polygon.__liaDgsShowPerimeter));
   const visible = polygon.__liaDgsShowObject !== false && requested;
   let label = polygon.__liaDgsMeasurementLabel;
 
@@ -7052,6 +7481,24 @@ function getDgsObjectListEntries(state: DgsState): any[] {
   return getDgsBoardObjects(state.board).filter(isDgsObjectListEntry);
 }
 
+function openDgsObjectProperties(state: DgsState, object: any, evt: Event): boolean {
+  const mode = getDgsObjectPropertiesMode(state);
+  const axisKey = getDgsAxisKey(state, object);
+  evt.preventDefault();
+  evt.stopImmediatePropagation();
+
+  if (mode === 'locked' || (mode === 'colors-trace' && !!axisKey)) {
+    if (state.sideMenuOpen) setSideMenuOpen(state, false);
+    return false;
+  }
+
+  setActiveTool(state, '', false);
+  updateSideMenuControls(state, object);
+  setSideMenuOpen(state, true);
+  refreshDgsObjectList(state, true);
+  return true;
+}
+
 function refreshDgsObjectList(state: DgsState, force = false): void {
   if (!state.objectListOpen && !force) return;
   const objects = getDgsObjectListEntries(state);
@@ -7063,7 +7510,8 @@ function refreshDgsObjectList(state: DgsState, force = false): void {
     object.__liaDgsShowObject === false ? '0' : '1',
     getDgsObjectLayer(object),
     getDgsObjectColor(object, isDgsText(object) ? 'text' : 'line')
-  ].join(':')).join('|') + '#selected=' + selectedId;
+  ].join(':')).join('|') + '#selected=' + selectedId +
+    '#properties=' + getDgsObjectPropertiesMode(state);
   if (!force && signature === state.objectListSignature) return;
   state.objectListSignature = signature;
   state.objectListContent.replaceChildren();
@@ -7084,10 +7532,20 @@ function refreshDgsObjectList(state: DgsState, force = false): void {
     entry.classList.toggle('is-selected', state.contextObject === object && state.sideMenuOpen);
     const typeLabel = getDgsObjectTypeLabel(state, object);
     const name = getDgsObjectName(object).trim() || typeLabel + ' ' + String(index + 1);
-    entry.setAttribute('aria-label', name + ', ' + typeLabel);
-    entry.title = state.language === 'de'
-      ? 'Rechtsklick: Eigenschaften von ' + name
-      : 'Right-click: properties of ' + name;
+    const propertiesMode = getDgsObjectPropertiesMode(state);
+    const propertiesLocked = propertiesMode === 'locked';
+    entry.setAttribute(
+      'aria-label',
+      name + ', ' + typeLabel + (propertiesLocked ? ', ' + dgsText(state.language).objectPropertiesLocked : '')
+    );
+    entry.setAttribute('aria-disabled', propertiesLocked ? 'true' : 'false');
+    entry.title = propertiesLocked
+      ? dgsText(state.language).objectPropertiesLocked
+      : (propertiesMode === 'colors-trace'
+        ? dgsText(state.language).colorTraceProperties
+        : (state.language === 'de'
+          ? 'Rechtsklick: Eigenschaften von ' + name
+          : 'Right-click: properties of ' + name));
 
     const swatch = document.createElement('span');
     swatch.className = 'lia-dgs-object-list-swatch';
@@ -7110,12 +7568,7 @@ function refreshDgsObjectList(state: DgsState, force = false): void {
     entry.appendChild(copy);
 
     const openProperties = (evt: Event) => {
-      evt.preventDefault();
-      evt.stopPropagation();
-      setActiveTool(state, '', false);
-      updateSideMenuControls(state, object);
-      setSideMenuOpen(state, true);
-      refreshDgsObjectList(state, true);
+      openDgsObjectProperties(state, object, evt);
     };
     entry.addEventListener('click', openProperties);
     entry.addEventListener('contextmenu', openProperties);
@@ -7281,7 +7734,11 @@ function getDgsIntersectionConstructionsForExport(state: DgsState): any[] {
   return constructions;
 }
 
-function buildDgsExportMacroBlock(state: DgsState): string {
+function buildDgsExportMacroBlock(
+  state: DgsState,
+  selectedToolIds: Iterable<number> = state.exportSelectedToolIds,
+  selectedRestrictionIds: Iterable<number> = state.exportSelectedRestrictionIds
+): string {
   const exportId = randomDgsExportId();
   const useGerman = state.language === 'de';
   const macros = {
@@ -7819,7 +8276,25 @@ function buildDgsExportMacroBlock(state: DgsState): string {
       );
     });
 
-  lines.push(...pointLines, ...midpointLines, ...sliderLines, ...objectLines, macroDgsExportLine(macros.dgs, exportId));
+  const dgsProfileParts = [
+    exportId,
+    'tools=' + formatDgsToolSelection(selectedToolIds)
+  ];
+  const restrictions = canonicalDgsRestrictionIds(selectedRestrictionIds);
+  if (restrictions.length) {
+    dgsProfileParts.push('restrictions=' + formatDgsRestrictionSelection(restrictions));
+  }
+
+  lines.push(
+    ...pointLines,
+    ...midpointLines,
+    ...sliderLines,
+    ...objectLines,
+    macroDgsExportLine(
+      macros.dgs,
+      dgsProfileParts.join(';')
+    )
+  );
   if (unsupported.length) {
     lines.push('', '<!-- ' + dgsText(state.language).exportUnsupported + ': ' + unsupported.join(', ') + ' -->');
   }
@@ -8083,6 +8558,7 @@ function getDgsSectorMetrics(object: any): { radius: number; angle: number; area
 function dgsObjectLabelText(object: any): string {
   const name = getDgsObjectName(object);
   const showName = object && object.__liaDgsShowName !== false;
+  const mayDisplayValues = dgsMayDisplayObjectValues(object);
 
   if (isDgsSlider(object)) {
     return showName && name
@@ -8092,7 +8568,7 @@ function dgsObjectLabelText(object: any): string {
   }
 
   if (object && object.__liaDgsMidpoint) {
-    const showValue = !!object.__liaDgsShowValue;
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
     if (!showName && !showValue) return '';
     if (!showValue) return '\\(' + name + '\\)';
     const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
@@ -8104,7 +8580,7 @@ function dgsObjectLabelText(object: any): string {
   if (object && (object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
       object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
       object.__liaDgsIntersectionPoint)) {
-    const showValue = !!object.__liaDgsShowValue;
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
     if (!showName && !showValue) return '';
     if (!showValue) return '\\(' + name + '\\)';
     const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
@@ -8122,7 +8598,7 @@ function dgsObjectLabelText(object: any): string {
   }
 
   if (isDgsFunction(object)) {
-    const showExpression = !!object.__liaDgsShowExpression;
+    const showExpression = mayDisplayValues && !!object.__liaDgsShowExpression;
     if (!showName && !showExpression) return '';
     const leftSide = showName && name ? name + '(x)' : 'y';
     if (showExpression) {
@@ -8141,12 +8617,12 @@ function dgsObjectLabelText(object: any): string {
     const metrics = getDgsSectorMetrics(object);
     const lines: string[] = [];
     if (showName && name) lines.push('\\mathrm{' + name + '}');
-    if (object.__liaDgsShowArea) {
+    if (mayDisplayValues && object.__liaDgsShowArea) {
       lines.push('A ' + dgsMeasurementRelation(metrics.area) + ' ' +
         formatDgsMeasurement(metrics.area, language) + '\\,\\mathrm{' +
         (language === 'de' ? 'FE' : 'AU') + '}');
     }
-    if (object.__liaDgsShowPerimeter) {
+    if (mayDisplayValues && object.__liaDgsShowPerimeter) {
       lines.push('u ' + dgsMeasurementRelation(metrics.perimeter) + ' ' +
         formatDgsMeasurement(metrics.perimeter, language) + '\\,\\mathrm{' +
         (language === 'de' ? 'LE' : 'LU') + '}');
@@ -8167,12 +8643,12 @@ function dgsObjectLabelText(object: any): string {
     } catch (e) {}
     const lines: string[] = [];
     if (showName && name) lines.push('\\mathrm{' + name + '}');
-    if (object.__liaDgsShowArea) {
+    if (mayDisplayValues && object.__liaDgsShowArea) {
       const area = Math.PI * radius * radius;
       lines.push('A ' + dgsMeasurementRelation(area) + ' ' + formatDgsMeasurement(area, language) +
         '\\,\\mathrm{' + (language === 'de' ? 'FE' : 'AU') + '}');
     }
-    if (object.__liaDgsShowPerimeter) {
+    if (mayDisplayValues && object.__liaDgsShowPerimeter) {
       const perimeter = 2 * Math.PI * radius;
       lines.push('u ' + dgsMeasurementRelation(perimeter) + ' ' + formatDgsMeasurement(perimeter, language) +
         '\\,\\mathrm{' + (language === 'de' ? 'LE' : 'LU') + '}');
@@ -8182,19 +8658,19 @@ function dgsObjectLabelText(object: any): string {
     return '\\(\\begin{gathered}' + lines.join('\\\\[2pt]') + '\\end{gathered}\\)';
   }
 
-  if (isDgsLine(object) && object.__liaDgsShowEquation) {
+  if (mayDisplayValues && isDgsLine(object) && object.__liaDgsShowEquation) {
     const equation = getDgsLineEquation(object);
     return '\\(' + (showName && name ? name + ': ' : '') + equation + '\\)';
   }
 
-  if (isDgsAngle(object) && object.__liaDgsShowAngle) {
+  if (mayDisplayValues && isDgsAngle(object) && object.__liaDgsShowAngle) {
     const degrees = getDgsAngleRadians(object) * 180 / Math.PI;
     const prefix = showName && name ? name + ' ' + dgsMeasurementRelation(degrees) + ' ' : '';
     const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
     return '\\(' + prefix + formatDgsMeasurement(degrees, language) + '^{\\circ}\\)';
   }
 
-  if (object && object.__liaDgsSegment && object.__liaDgsShowLength) {
+  if (mayDisplayValues && object && object.__liaDgsSegment && object.__liaDgsShowLength) {
     let length = NaN;
     try { length = Math.hypot(object.point2.X() - object.point1.X(), object.point2.Y() - object.point1.Y()); } catch (e) {}
     const prefix = showName && name ? name + ' ' + dgsMeasurementRelation(length) + ' ' : '';
@@ -8208,7 +8684,9 @@ function dgsObjectLabelText(object: any): string {
 
 function refreshDgsObjectLabel(object: any): void {
   if (!object || !object.label) return;
+  const mayDisplayValues = dgsMayDisplayObjectValues(object);
   const measurementVisible = !!(
+    mayDisplayValues && (
     (object.__liaDgsSegment && object.__liaDgsShowLength) ||
     (object.__liaDgsLine && object.__liaDgsShowEquation) ||
     (object.__liaDgsAngle && object.__liaDgsShowAngle) ||
@@ -8218,7 +8696,7 @@ function refreshDgsObjectLabel(object: any): void {
     (object.__liaDgsMidpoint && object.__liaDgsShowValue) ||
     ((object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
       object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
-      object.__liaDgsIntersectionPoint) && object.__liaDgsShowValue)
+      object.__liaDgsIntersectionPoint) && object.__liaDgsShowValue))
   );
   const visible = object.__liaDgsShowName !== false || measurementVisible;
 
@@ -8363,7 +8841,8 @@ function applyDgsObjectOpacity(object: any): void {
   if (polygon && object.__liaDgsMeasurementLabel) {
     const labelVisible = visible && (
       object.__liaDgsShowName !== false ||
-      !!(object.__liaDgsShowArea || object.__liaDgsShowPerimeter)
+      !!(dgsMayDisplayObjectValues(object) &&
+        (object.__liaDgsShowArea || object.__liaDgsShowPerimeter))
     );
     try { object.__liaDgsMeasurementLabel.setAttribute({ visible: labelVisible, strokeOpacity: labelVisible ? 1 : 0, fillOpacity: labelVisible ? 1 : 0 }); } catch (e) {}
   }
@@ -9331,6 +9810,50 @@ function updateAxisSideMenuControls(state: DgsState, axis: any, key: 'x' | 'y'):
   resetDeleteButton(state);
 }
 
+function applyDgsSideMenuRestrictions(state: DgsState, object: any): void {
+  const propertiesMode = getDgsObjectPropertiesMode(state);
+  const valueControlsLocked = hasDgsRestriction(
+    state,
+    DGS_RESTRICTION_IDS.valueControlsLocked
+  );
+
+  if (valueControlsLocked || propertiesMode === 'colors-trace') {
+    state.measurementOption.hidden = true;
+    state.measurementCheckbox.disabled = true;
+    state.areaOption.hidden = true;
+    state.areaCheckbox.disabled = true;
+    state.perimeterOption.hidden = true;
+    state.perimeterCheckbox.disabled = true;
+  }
+
+  if (propertiesMode !== 'colors-trace') return;
+
+  const point = isDgsPoint(object);
+  state.sideMenuNameInput.hidden = true;
+  state.coordinateSection.hidden = true;
+  state.angleMeasureSection.hidden = true;
+  state.arcSettingsSection.hidden = true;
+  state.strokeStyleSection.hidden = true;
+  state.functionExpressionSection.hidden = true;
+  state.sliderSettingsSection.hidden = true;
+  state.textFontSizeSection.hidden = true;
+  state.axisLabelSection.hidden = true;
+  state.fixedOption.hidden = true;
+  state.fixedCheckbox.disabled = true;
+  state.nameOption.hidden = true;
+  state.nameCheckbox.disabled = true;
+  state.objectOption.hidden = true;
+  state.objectCheckbox.disabled = true;
+  state.layerRow.hidden = true;
+  state.deleteButton.hidden = true;
+  state.traceOption.hidden = !point;
+  state.traceCheckbox.disabled = !point;
+  state.traceColorButton.hidden = !point;
+  state.clearTraceButton.hidden = !point || getDgsPointTraceMarkers(object).length === 0;
+  state.colorSection.hidden = false;
+  resetDeleteButton(state);
+}
+
 function updateSideMenuControls(state: DgsState, object: any): void {
   const text = dgsText(state.language);
   const axisKey = getDgsAxisKey(state, object);
@@ -9339,6 +9862,11 @@ function updateSideMenuControls(state: DgsState, object: any): void {
     return;
   }
   state.sideMenuNameInput.hidden = false;
+  state.nameCheckbox.disabled = false;
+  state.objectCheckbox.disabled = false;
+  state.measurementCheckbox.disabled = false;
+  state.areaCheckbox.disabled = false;
+  state.perimeterCheckbox.disabled = false;
   state.axisLabelSection.hidden = true;
   state.objectOption.hidden = false;
   state.colorSection.hidden = false;
@@ -9468,6 +9996,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
       : String(opacityPercent / 100));
   });
   state.layerInput.value = String(getDgsObjectLayer(object));
+  applyDgsSideMenuRestrictions(state, object);
 }
 
 function notifyRegressionLayout(state: DgsState, dgsOpen?: boolean): void {
@@ -9595,11 +10124,42 @@ function renderToolState(state: DgsState): void {
   refreshConstructionModeCursor(state.boardContainer);
 }
 
+function getDgsActiveToolId(tool: DgsState['activeTool']): number | null {
+  switch (tool) {
+    case 'format-copy': return DGS_TOOL_IDS.formatCopy;
+    case 'point': return DGS_TOOL_IDS.point;
+    case 'segment': return DGS_TOOL_IDS.segment;
+    case 'ray': return DGS_TOOL_IDS.ray;
+    case 'line': return DGS_TOOL_IDS.line;
+    case 'vector': return DGS_TOOL_IDS.vector;
+    case 'arc': return DGS_TOOL_IDS.arc;
+    case 'orthogonal': return DGS_TOOL_IDS.orthogonal;
+    case 'parallel': return DGS_TOOL_IDS.parallel;
+    case 'midpoint': return DGS_TOOL_IDS.midpoint;
+    case 'angle-bisector': return DGS_TOOL_IDS.angleBisector;
+    case 'polygon': return DGS_TOOL_IDS.polygon;
+    case 'circle': return DGS_TOOL_IDS.circle;
+    case 'sector': return DGS_TOOL_IDS.sector;
+    case 'angle': return DGS_TOOL_IDS.angle;
+    case 'angle-measured': return DGS_TOOL_IDS.measuredAngle;
+    case 'roots': return DGS_TOOL_IDS.roots;
+    case 'extrema': return DGS_TOOL_IDS.extrema;
+    case 'inflections': return DGS_TOOL_IDS.inflections;
+    case 'ordinate-intercept': return DGS_TOOL_IDS.ordinateIntercept;
+    case 'tangent': return DGS_TOOL_IDS.tangent;
+    case 'intersection': return DGS_TOOL_IDS.intersection;
+    case 'text': return DGS_TOOL_IDS.text;
+    default: return null;
+  }
+}
+
 function setActiveTool(
   state: DgsState,
   tool: '' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
   deactivateRegression = true
 ): void {
+  const requestedToolId = getDgsActiveToolId(tool);
+  if (requestedToolId != null && !isDgsToolAvailable(state, requestedToolId)) tool = '';
   if (tool) {
     if (state.functionDialogOpen) setFunctionDialogOpen(state, false);
     if (state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
@@ -9674,6 +10234,226 @@ function releaseRegressionControls(state: DgsState): void {
     .forEach((button) => state.boardContainer.appendChild(button));
 }
 
+function isDgsToolAvailable(state: DgsState, toolId: number): boolean {
+  return state.availableToolIds == null || state.availableToolIds.has(toolId);
+}
+
+function setDgsButtonTabIndex(button: HTMLButtonElement, enabled: boolean): void {
+  button.tabIndex = enabled && !button.hidden && !button.disabled ? 0 : -1;
+}
+
+function applyDgsToolAvailability(state: DgsState): void {
+  const setLeaf = (button: HTMLButtonElement, toolId: number): boolean => {
+    const enabled = isDgsToolAvailable(state, toolId);
+    button.dataset.dgsToolId = String(toolId);
+    button.hidden = !enabled;
+    button.disabled = !enabled;
+    if (!enabled) button.tabIndex = -1;
+    return enabled;
+  };
+  const setGroup = (
+    parent: HTMLButtonElement,
+    entries: Array<[HTMLButtonElement, number]>
+  ): boolean => {
+    const enabledEntries = entries.filter(([button, id]) => setLeaf(button, id));
+    const enabled = enabledEntries.length > 0;
+    parent.hidden = !enabled;
+    parent.disabled = !enabled;
+    parent.dataset.dgsToolGroup = entries.map(([, id]) => String(id)).join(',');
+    if (enabled) {
+      const currentToolId = Number(parent.dataset.dgsCurrentToolId);
+      if (!enabledEntries.some(([, id]) => id === currentToolId)) {
+        const [firstButton, firstId] = enabledEntries[0];
+        const icon = firstButton.firstElementChild;
+        if (icon) parent.innerHTML = icon.outerHTML;
+        parent.dataset.dgsCurrentToolId = String(firstId);
+      }
+    }
+    if (!enabled) parent.tabIndex = -1;
+    return enabled;
+  };
+
+  const formatVisible = setLeaf(state.formatButton, DGS_TOOL_IDS.formatCopy);
+  const pointVisible = setLeaf(state.pointButton, DGS_TOOL_IDS.point);
+  const lineGroupVisible = setGroup(state.segmentButton, [
+    [state.segmentToolButton, DGS_TOOL_IDS.segment],
+    [state.rayToolButton, DGS_TOOL_IDS.ray],
+    [state.lineToolButton, DGS_TOOL_IDS.line],
+    [state.vectorToolButton, DGS_TOOL_IDS.vector],
+    [state.arcToolButton, DGS_TOOL_IDS.arc]
+  ]);
+  const relationGroupVisible = setGroup(state.orthogonalButton, [
+    [state.orthogonalToolButton, DGS_TOOL_IDS.orthogonal],
+    [state.parallelToolButton, DGS_TOOL_IDS.parallel],
+    [state.midpointToolButton, DGS_TOOL_IDS.midpoint],
+    [state.angleBisectorToolButton, DGS_TOOL_IDS.angleBisector]
+  ]);
+  const shapeGroupVisible = setGroup(state.polygonButton, [
+    [state.polygonToolButton, DGS_TOOL_IDS.polygon],
+    [state.circleToolButton, DGS_TOOL_IDS.circle],
+    [state.sectorToolButton, DGS_TOOL_IDS.sector]
+  ]);
+  const angleGroupVisible = setGroup(state.angleButton, [
+    [state.angleToolButton, DGS_TOOL_IDS.angle],
+    [state.measuredAngleToolButton, DGS_TOOL_IDS.measuredAngle]
+  ]);
+  const functionVisible = setLeaf(state.functionButton, DGS_TOOL_IDS.function);
+  const analysisGroupVisible = setGroup(state.rootButton, [
+    [state.rootToolButton, DGS_TOOL_IDS.roots],
+    [state.extremaToolButton, DGS_TOOL_IDS.extrema],
+    [state.inflectionToolButton, DGS_TOOL_IDS.inflections],
+    [state.yInterceptToolButton, DGS_TOOL_IDS.ordinateIntercept],
+    [state.tangentToolButton, DGS_TOOL_IDS.tangent],
+    [state.intersectionToolButton, DGS_TOOL_IDS.intersection]
+  ]);
+  const sliderVisible = setLeaf(state.sliderButton, DGS_TOOL_IDS.slider);
+  const textVisible = setLeaf(state.textButton, DGS_TOOL_IDS.text);
+  const zoomVisible = setLeaf(state.zoomModeButton, DGS_TOOL_IDS.zoom);
+  const axisScaleVisible = setLeaf(state.axisScaleButton, DGS_TOOL_IDS.axisScale);
+  [
+    state.cartesianScaleButton,
+    state.logXScaleButton,
+    state.logYScaleButton,
+    state.logLogScaleButton
+  ].forEach((button) => {
+    button.hidden = !axisScaleVisible;
+    button.disabled = !axisScaleVisible;
+    if (!axisScaleVisible) button.tabIndex = -1;
+  });
+
+  const regressionEntries: Array<[HTMLButtonElement | null, number]> = [
+    [state.menuBar.querySelector<HTMLButtonElement>('.lia-plot-draw-btn'), DGS_TOOL_IDS.regressionDraw],
+    [state.menuBar.querySelector<HTMLButtonElement>('.lia-plot-erase-toggle'), DGS_TOOL_IDS.regressionErase],
+    [state.menuBar.querySelector<HTMLButtonElement>('.lia-plot-regression-toggle'), DGS_TOOL_IDS.regressionTools]
+  ];
+  const visibleRegressionButtons: HTMLButtonElement[] = [];
+  regressionEntries.forEach(([button, id]) => {
+    if (!button) return;
+    const enabled = isDgsToolAvailable(state, id);
+    button.dataset.dgsToolId = String(id);
+    button.hidden = !enabled;
+    button.disabled = !enabled;
+    button.tabIndex = enabled && state.open ? 0 : -1;
+    if (enabled) visibleRegressionButtons.push(button);
+  });
+
+  const geometryVisible = pointVisible || lineGroupVisible || relationGroupVisible ||
+    shapeGroupVisible || angleGroupVisible;
+  const functionsVisible = functionVisible || analysisGroupVisible;
+  const contentVisible = sliderVisible || textVisible;
+  const viewVisible = zoomVisible || axisScaleVisible;
+
+  let left = 52;
+  const placeButton = (button: HTMLButtonElement, visible: boolean) => {
+    if (!visible) return;
+    button.style.left = left + 'px';
+    button.style.top = '7.5px';
+    left += 43;
+  };
+  const placeDivider = (divider: HTMLElement, visible: boolean) => {
+    divider.hidden = !visible;
+    if (!visible) return;
+    divider.style.left = left + 'px';
+    left += 9;
+  };
+
+  placeButton(state.selectButton, true);
+  placeButton(state.formatButton, formatVisible);
+  placeDivider(state.toolsDivider, geometryVisible);
+  placeButton(state.pointButton, pointVisible);
+  placeButton(state.segmentButton, lineGroupVisible);
+  placeButton(state.orthogonalButton, relationGroupVisible);
+  placeButton(state.polygonButton, shapeGroupVisible);
+  placeButton(state.angleButton, angleGroupVisible);
+  placeDivider(state.functionDivider, functionsVisible);
+  placeButton(state.functionButton, functionVisible);
+  placeButton(state.rootButton, analysisGroupVisible);
+
+  const regressionVisible = visibleRegressionButtons.length > 0;
+  state.regressionDivider.dataset.visible = regressionVisible ? '1' : '0';
+  placeDivider(state.regressionDivider, regressionVisible);
+  visibleRegressionButtons.forEach((button) => placeButton(button, true));
+
+  placeDivider(state.textDivider, contentVisible);
+  placeButton(state.sliderButton, sliderVisible);
+  placeButton(state.textButton, textVisible);
+  placeDivider(state.zoomDivider, viewVisible);
+  placeButton(state.zoomModeButton, zoomVisible);
+  placeButton(state.axisScaleButton, axisScaleVisible);
+  state.menuScrollSpacer.style.left = (left + 97) + 'px';
+
+  setDgsButtonTabIndex(state.selectButton, state.open);
+  [
+    state.formatButton,
+    state.pointButton,
+    state.segmentButton,
+    state.orthogonalButton,
+    state.polygonButton,
+    state.angleButton,
+    state.functionButton,
+    state.rootButton,
+    state.sliderButton,
+    state.textButton,
+    state.zoomModeButton,
+    state.axisScaleButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.open));
+  setDgsButtonTabIndex(state.fullscreenButton, state.open);
+  setDgsButtonTabIndex(state.objectListButton, state.open);
+
+  [
+    state.segmentToolButton,
+    state.rayToolButton,
+    state.lineToolButton,
+    state.vectorToolButton,
+    state.arcToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.geometrySubmenuOpen));
+  [
+    state.orthogonalToolButton,
+    state.parallelToolButton,
+    state.midpointToolButton,
+    state.angleBisectorToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.relationSubmenuOpen));
+  [state.polygonToolButton, state.circleToolButton, state.sectorToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, state.shapeSubmenuOpen));
+  [state.angleToolButton, state.measuredAngleToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, state.angleSubmenuOpen));
+  [
+    state.rootToolButton,
+    state.extremaToolButton,
+    state.inflectionToolButton,
+    state.yInterceptToolButton,
+    state.tangentToolButton,
+    state.intersectionToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.rootSubmenuOpen));
+  [
+    state.cartesianScaleButton,
+    state.logXScaleButton,
+    state.logYScaleButton,
+    state.logLogScaleButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.axisScaleSubmenuOpen));
+
+  const boardWidth = Math.max(0, state.boardContainer.clientWidth || 0);
+  const popupMaxLeft = Math.max(4, boardWidth - 196);
+  const drawButton = regressionEntries[0][0];
+  const toolsButton = regressionEntries[2][0];
+  const drawColorMenu = state.boardContainer.querySelector<HTMLElement>('.lia-plot-color-menu:not(.lia-plot-reg-menu)');
+  const regressionMenu = state.boardContainer.querySelector<HTMLElement>('.lia-plot-reg-menu');
+  if (drawButton && drawColorMenu && !drawButton.hidden) {
+    drawColorMenu.style.left = Math.min(parseFloat(drawButton.style.left) || 0, popupMaxLeft) + 'px';
+  }
+  if (toolsButton && regressionMenu && !toolsButton.hidden) {
+    regressionMenu.style.left = Math.min(parseFloat(toolsButton.style.left) || 0, popupMaxLeft) + 'px';
+  }
+  positionOpenDgsSubmenu(state);
+}
+
+window.__refreshDgsToolAvailabilityForBoard = function(boardId: string): void {
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    if (state && state.boardId === boardId) applyDgsToolAvailability(state);
+  });
+};
+
 function applyLayout(state: DgsState): void {
   const tone = getNeutralColor();
   const accent = getAccentColor();
@@ -9716,7 +10496,7 @@ function applyLayout(state: DgsState): void {
   if (state.axisAdjusted) scheduleAxisSync(state);
   if (state.xAxisAdjusted) scheduleXAxisSync(state);
   notifyRegressionLayout(state);
-  state.regressionDivider.dataset.visible = state.menuBar.querySelector('.lia-plot-draw-btn') ? '1' : '0';
+  applyDgsToolAvailability(state);
   positionOpenDgsSubmenu(state);
 }
 
@@ -10009,6 +10789,15 @@ function setColorPopupOpen(state: DgsState, open: boolean): void {
 }
 
 function setSideMenuOpen(state: DgsState, open: boolean): void {
+  if (open) {
+    const propertiesMode = getDgsObjectPropertiesMode(state);
+    const axisKey = getDgsAxisKey(state, state.contextObject);
+    if (propertiesMode === 'locked' || (propertiesMode === 'colors-trace' && !!axisKey)) {
+      open = false;
+    } else if (state.contextObject) {
+      applyDgsSideMenuRestrictions(state, state.contextObject);
+    }
+  }
   const changed = state.sideMenuOpen !== open;
   state.sideMenuOpen = open;
   state.sideMenu.dataset.open = open ? '1' : '0';
@@ -10054,6 +10843,7 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   if (changed) {
     try { window.__refreshAllAxisTitles?.(); } catch (e) {}
   }
+  applyDgsToolAvailability(state);
 }
 
 function setObjectListOpen(state: DgsState, open: boolean): void {
@@ -10067,7 +10857,7 @@ function setObjectListOpen(state: DgsState, open: boolean): void {
   state.sideMenu.dataset.objectListOpen = open ? '1' : '0';
   state.sideMenu.classList.toggle('has-object-list', open);
   state.objectListCloseButton.tabIndex = open ? 0 : -1;
-  state.objectListExportButton.tabIndex = open ? 0 : -1;
+  state.objectListExportButton.tabIndex = open && !state.objectListExportButton.hidden ? 0 : -1;
   if (open) refreshDgsObjectList(state, true);
   else state.objectListSignature = '';
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
@@ -10075,6 +10865,45 @@ function setObjectListOpen(state: DgsState, open: boolean): void {
   if (changed) {
     try { window.__refreshAllAxisTitles?.(); } catch (e) {}
   }
+}
+
+function refreshDgsValueDisplayRestriction(state: DgsState): void {
+  getDgsBoardObjects(state.board).forEach((object) => {
+    if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
+    else refreshDgsObjectLabel(object);
+  });
+  try {
+    if (state.board && typeof state.board.fullUpdate === 'function') state.board.fullUpdate();
+    else if (state.board && typeof state.board.update === 'function') state.board.update();
+  } catch (e) {}
+}
+
+function applyDgsProfileRestrictions(state: DgsState): void {
+  const exportLocked = hasDgsRestriction(state, DGS_RESTRICTION_IDS.exportLocked);
+  const valueDisplayLocked = hasDgsRestriction(
+    state,
+    DGS_RESTRICTION_IDS.valueControlsLocked
+  );
+  if (state.board) state.board.__liaDgsValueDisplayLocked = valueDisplayLocked;
+  state.objectListFooter.hidden = exportLocked;
+  state.objectListExportButton.hidden = exportLocked;
+  state.objectListExportButton.disabled = exportLocked;
+  state.objectListExportButton.tabIndex = state.objectListOpen && !exportLocked ? 0 : -1;
+
+  if (exportLocked && state.exportDialogOpen) setExportDialogOpen(state, false);
+
+  if (state.sideMenuOpen) {
+    const propertiesMode = getDgsObjectPropertiesMode(state);
+    const axisKey = getDgsAxisKey(state, state.contextObject);
+    if (propertiesMode === 'locked' || (propertiesMode === 'colors-trace' && !!axisKey)) {
+      setSideMenuOpen(state, false);
+    } else if (state.contextObject) {
+      updateSideMenuControls(state, state.contextObject);
+      setSideMenuOpen(state, true);
+    }
+  }
+  if (state.objectListOpen) refreshDgsObjectList(state, true);
+  refreshDgsValueDisplayRestriction(state);
 }
 
 function setMenuOpen(state: DgsState, open: boolean): void {
@@ -10181,11 +11010,13 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.segmentButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.segmentToolButton.tabIndex = open ? 0 : -1;
-  state.rayToolButton.tabIndex = open ? 0 : -1;
-  state.lineToolButton.tabIndex = open ? 0 : -1;
-  state.vectorToolButton.tabIndex = open ? 0 : -1;
-  state.arcToolButton.tabIndex = open ? 0 : -1;
+  [
+    state.segmentToolButton,
+    state.rayToolButton,
+    state.lineToolButton,
+    state.vectorToolButton,
+    state.arcToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
@@ -10199,10 +11030,12 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
   state.relationSubmenu.dataset.open = open ? '1' : '0';
   state.relationSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.orthogonalButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.orthogonalToolButton.tabIndex = open ? 0 : -1;
-  state.parallelToolButton.tabIndex = open ? 0 : -1;
-  state.midpointToolButton.tabIndex = open ? 0 : -1;
-  state.angleBisectorToolButton.tabIndex = open ? 0 : -1;
+  [
+    state.orthogonalToolButton,
+    state.parallelToolButton,
+    state.midpointToolButton,
+    state.angleBisectorToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
@@ -10226,9 +11059,8 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
   state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.polygonButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.polygonToolButton.tabIndex = open ? 0 : -1;
-  state.circleToolButton.tabIndex = open ? 0 : -1;
-  state.sectorToolButton.tabIndex = open ? 0 : -1;
+  [state.polygonToolButton, state.circleToolButton, state.sectorToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
@@ -10242,8 +11074,8 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
   state.angleSubmenu.dataset.open = open ? '1' : '0';
   state.angleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.angleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.angleToolButton.tabIndex = open ? 0 : -1;
-  state.measuredAngleToolButton.tabIndex = open ? 0 : -1;
+  [state.angleToolButton, state.measuredAngleToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setRootSubmenuOpen(state: DgsState, open: boolean): void {
@@ -10257,12 +11089,14 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
   state.rootSubmenu.dataset.open = open ? '1' : '0';
   state.rootSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.rootButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.rootToolButton.tabIndex = open ? 0 : -1;
-  state.extremaToolButton.tabIndex = open ? 0 : -1;
-  state.inflectionToolButton.tabIndex = open ? 0 : -1;
-  state.yInterceptToolButton.tabIndex = open ? 0 : -1;
-  state.tangentToolButton.tabIndex = open ? 0 : -1;
-  state.intersectionToolButton.tabIndex = open ? 0 : -1;
+  [
+    state.rootToolButton,
+    state.extremaToolButton,
+    state.inflectionToolButton,
+    state.yInterceptToolButton,
+    state.tangentToolButton,
+    state.intersectionToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
@@ -10276,10 +11110,12 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
   state.axisScaleSubmenu.dataset.open = open ? '1' : '0';
   state.axisScaleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.axisScaleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  state.cartesianScaleButton.tabIndex = open ? 0 : -1;
-  state.logXScaleButton.tabIndex = open ? 0 : -1;
-  state.logYScaleButton.tabIndex = open ? 0 : -1;
-  state.logLogScaleButton.tabIndex = open ? 0 : -1;
+  [
+    state.cartesianScaleButton,
+    state.logXScaleButton,
+    state.logYScaleButton,
+    state.logLogScaleButton
+  ].forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setAngleDialogOpen(state: DgsState, open: boolean): void {
@@ -10398,22 +11234,91 @@ function setTextDialogOpen(state: DgsState, open: boolean): void {
   }
 }
 
+function renderDgsExportToolSelection(state: DgsState): void {
+  const text = dgsText(state.language);
+  state.exportToolButtons.forEach((button, id) => {
+    const enabled = state.exportSelectedToolIds.has(id);
+    button.dataset.enabled = enabled ? '1' : '0';
+    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    button.setAttribute(
+      'aria-label',
+      String(button.title || '') + ': ' + (enabled ? text.toolAvailable : text.toolUnavailable)
+    );
+    const status = button.querySelector<HTMLElement>('.lia-dgs-export-tool-status');
+    if (status) status.textContent = enabled ? '\u2713' : '\u00d7';
+    button.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
+  });
+}
+
+function renderDgsExportRestrictionSelection(state: DgsState): void {
+  state.exportRestrictionInputs.forEach((input, id) => {
+    input.checked = state.exportSelectedRestrictionIds.has(id);
+    input.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
+  });
+}
+
+function setDgsExportDialogStep(state: DgsState, step: 'tools' | 'macro'): void {
+  const text = dgsText(state.language);
+  state.exportDialogStep = step;
+  const toolsStep = step === 'tools';
+  state.exportToolsStep.hidden = !toolsStep;
+  state.exportMacroStep.hidden = toolsStep;
+  state.exportBackButton.hidden = toolsStep;
+  state.exportDialogTitle.textContent = toolsStep ? text.exportToolsTitle : text.exportMacrosTitle;
+  state.exportCopyButton.textContent = toolsStep ? text.nextExport : text.copyExport;
+  state.exportTextarea.tabIndex = state.exportDialogOpen && !toolsStep ? 0 : -1;
+  state.exportBackButton.tabIndex = state.exportDialogOpen && !toolsStep ? 0 : -1;
+  renderDgsExportToolSelection(state);
+  renderDgsExportRestrictionSelection(state);
+
+  if (!state.exportDialogOpen) return;
+  if (!toolsStep) {
+    state.exportTextarea.value = buildDgsExportMacroBlock(
+      state,
+      state.exportSelectedToolIds,
+      state.exportSelectedRestrictionIds
+    );
+  }
+  window.setTimeout(() => {
+    try {
+      if (toolsStep) {
+        const first = Array.from(state.exportToolButtons.values())[0];
+        first?.focus();
+      } else {
+        state.exportTextarea.focus();
+        state.exportTextarea.select();
+      }
+    } catch (e) {}
+  }, 0);
+}
+
 function setExportDialogOpen(state: DgsState, open: boolean): void {
+  if (open && hasDgsRestriction(state, DGS_RESTRICTION_IDS.exportLocked)) return;
+  const wasOpen = state.exportDialogOpen;
   state.exportDialogOpen = open;
   state.exportDialog.dataset.open = open ? '1' : '0';
   state.exportDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
-  state.exportTextarea.tabIndex = open ? 0 : -1;
   state.exportCopyButton.tabIndex = open ? 0 : -1;
   state.exportCloseButton.tabIndex = open ? 0 : -1;
-  state.exportCopyButton.textContent = dgsText(state.language).copyExport;
   if (open) {
-    state.exportTextarea.value = buildDgsExportMacroBlock(state);
-    window.setTimeout(() => {
-      try {
-        state.exportTextarea.focus();
-        state.exportTextarea.select();
-      } catch (e) {}
-    }, 0);
+    state.exportSelectedToolIds = new Set<number>(
+      state.availableToolIds == null ? DGS_KNOWN_TOOL_IDS : state.availableToolIds
+    );
+    state.exportSelectedRestrictionIds = new Set<number>(state.restrictionIds);
+    setDgsExportDialogStep(state, 'tools');
+  } else {
+    state.exportTextarea.tabIndex = -1;
+    state.exportBackButton.tabIndex = -1;
+    state.exportToolButtons.forEach((button) => { button.tabIndex = -1; });
+    state.exportRestrictionInputs.forEach((input) => { input.tabIndex = -1; });
+    if (wasOpen) {
+      window.setTimeout(() => {
+        try {
+          if (!state.objectListExportButton.hidden) state.objectListExportButton.focus();
+          else state.objectListCloseButton.focus();
+        } catch (e) {}
+      }, 0);
+    }
   }
 }
 
@@ -10518,7 +11423,9 @@ function ensureDgsRegression(uid: string, boardId: string): void {
   } catch (e) {}
 }
 
-function setupDGS(uid: string, boardId: string, languageCode?: string): void {
+function setupDGS(uid: string, spec: string, languageCode?: string): void {
+  const config = parseDgsMacroSpec(spec);
+  const boardId = config.boardId;
   if (!uid || !boardId) return;
 
   const boardContainer = getBoardContainer(boardId);
@@ -10527,12 +11434,14 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     pendingRetries[uid] = retries;
 
     if (retries <= MAX_RETRIES) {
-      window.setTimeout(() => setupDGS(uid, boardId, languageCode), RETRY_DELAY_MS);
+      window.setTimeout(() => setupDGS(uid, spec, languageCode), RETRY_DELAY_MS);
     }
     return;
   }
 
   pendingRetries[uid] = 0;
+  boardContainer.dataset.liaDgsTools = config.toolSelectionKey;
+  boardContainer.dataset.liaDgsRestrictions = config.restrictionSelectionKey;
   ensureDgsRegression(uid, boardId);
   const currentBoard = window.__boards && window.__boards[boardId];
   discardStaleMacroBackedDgsSnapshot(boardId, currentBoard);
@@ -10558,6 +11467,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.menuClip?.isConnected &&
     !!existing.menuBar?.isConnected &&
     !!existing.menuEndGroup?.isConnected &&
+    !!existing.menuScrollSpacer?.isConnected &&
     existing.geometrySubmenu?.parentElement === existing.menuClip &&
     existing.relationSubmenu?.parentElement === existing.menuClip &&
     existing.shapeSubmenu?.parentElement === existing.menuClip &&
@@ -10663,8 +11573,18 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     !!existing.textDialogConfirmButton?.isConnected &&
     !!existing.textDialogCancelButton?.isConnected &&
     !!existing.exportDialog?.isConnected &&
+    !!existing.exportDialogTitle?.isConnected &&
+    !!existing.exportToolsStep?.isConnected &&
+    !!existing.exportMacroStep?.isConnected &&
+    existing.exportToolButtons instanceof Map &&
+    existing.exportToolButtons.size === DGS_KNOWN_TOOL_IDS.length &&
+    existing.exportRestrictionInputs instanceof Map &&
+    existing.exportRestrictionInputs.size === DGS_KNOWN_RESTRICTION_IDS.length &&
+    Array.from(existing.exportRestrictionInputs.values()).every((input) => input.isConnected) &&
+    existing.restrictionIds instanceof Set &&
     !!existing.exportTextarea?.isConnected &&
     !!existing.exportCopyButton?.isConnected &&
+    !!existing.exportBackButton?.isConnected &&
     !!existing.exportCloseButton?.isConnected &&
     !!existing.measurementOption?.isConnected &&
     !!existing.measurementCheckbox?.isConnected &&
@@ -10689,6 +11609,38 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     typeof existing.onDocumentPointerDown === 'function' &&
     typeof existing.onFullscreenChange === 'function'
   ) {
+    const toolSelectionChanged = existing.toolSelectionKey !== config.toolSelectionKey;
+    const restrictionSelectionChanged =
+      existing.restrictionSelectionKey !== config.restrictionSelectionKey;
+    existing.availableToolIds = config.toolIds == null ? null : new Set<number>(config.toolIds);
+    existing.toolSelectionKey = config.toolSelectionKey;
+    existing.restrictionIds = new Set<number>(config.restrictionIds);
+    existing.restrictionSelectionKey = config.restrictionSelectionKey;
+    if (toolSelectionChanged) {
+      existing.exportSelectedToolIds = new Set<number>(
+        config.toolIds == null ? DGS_KNOWN_TOOL_IDS : config.toolIds
+      );
+    }
+    if (restrictionSelectionChanged) {
+      existing.exportSelectedRestrictionIds = new Set<number>(config.restrictionIds);
+    }
+    if (toolSelectionChanged || restrictionSelectionChanged) {
+      setGeometrySubmenuOpen(existing, false);
+      setRelationSubmenuOpen(existing, false);
+      setShapeSubmenuOpen(existing, false);
+      setAngleSubmenuOpen(existing, false);
+      setRootSubmenuOpen(existing, false);
+      setAxisScaleSubmenuOpen(existing, false);
+      setAngleDialogOpen(existing, false);
+      setArcDialogOpen(existing, false);
+      setFunctionDialogOpen(existing, false);
+      setTextDialogOpen(existing, false);
+      setExportDialogOpen(existing, false);
+      setActiveTool(existing, '', false);
+      existing.externalToolActive = false;
+      notifyRegressionLayout(existing, false);
+    }
+    applyDgsProfileRestrictions(existing);
     applyLayout(existing);
     return;
   }
@@ -11772,8 +12724,155 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   exportDialog.setAttribute('aria-hidden', 'true');
   exportDialog.dataset.open = '0';
   const exportDialogTitle = document.createElement('div');
+  exportDialogTitle.id = 'dgs-export-dialog-title-' + uid;
   exportDialogTitle.className = 'lia-dgs-angle-dialog-title';
-  exportDialogTitle.textContent = text.exportMacrosTitle;
+  exportDialogTitle.textContent = text.exportToolsTitle;
+  exportDialog.setAttribute('aria-labelledby', exportDialogTitle.id);
+  const exportToolsStep = document.createElement('div');
+  exportToolsStep.className = 'lia-dgs-export-step lia-dgs-export-tools-step';
+  const exportToolsHint = document.createElement('div');
+  exportToolsHint.className = 'lia-dgs-export-tools-hint';
+  exportToolsHint.textContent = text.exportToolsHint;
+  const exportToolGroups = document.createElement('div');
+  exportToolGroups.className = 'lia-dgs-export-tool-groups';
+  exportToolGroups.setAttribute('role', 'group');
+  exportToolGroups.setAttribute('aria-label', text.exportToolsTitle);
+  const exportToolButtons = new Map<number, HTMLButtonElement>();
+  type ExportToolDefinition = {
+    id: number;
+    label: string;
+    icon: string;
+    className?: string;
+  };
+  const appendExportToolGroup = (
+    label: string,
+    columns: ExportToolDefinition[][]
+  ) => {
+    const group = document.createElement('div');
+    group.className = 'lia-dgs-export-tool-group';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', label);
+    columns.forEach((definitions) => {
+      const column = document.createElement('div');
+      column.className = 'lia-dgs-export-tool-column';
+      definitions.forEach((definition) => {
+        const toolButton = document.createElement('button');
+        toolButton.type = 'button';
+        toolButton.className = 'lia-dgs-geometry-button lia-dgs-export-tool ' +
+          String(definition.className || '');
+        toolButton.dataset.toolId = String(definition.id);
+        toolButton.dataset.enabled = '1';
+        toolButton.setAttribute('aria-pressed', 'true');
+        toolButton.setAttribute('aria-label', definition.label + ': ' + text.toolAvailable);
+        toolButton.title = definition.label;
+        toolButton.innerHTML =
+          '<span class="lia-dgs-export-tool-icon" aria-hidden="true">' +
+          definition.icon +
+          '</span><span class="lia-dgs-export-tool-status" aria-hidden="true">\u2713</span>';
+        column.appendChild(toolButton);
+        exportToolButtons.set(definition.id, toolButton);
+      });
+      group.appendChild(column);
+    });
+    exportToolGroups.appendChild(group);
+  };
+  const regressionDrawIcon = boardContainer
+    .querySelector<HTMLButtonElement>('.lia-plot-draw-btn')?.innerHTML ||
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4.7-1.1L19 8.6 15.4 5 5.1 15.3zM13.9 6.5l3.6 3.6"></path><circle class="ico-color-dot" cx="16.5" cy="16.5" r="4.5"></circle></svg>';
+  const regressionEraseIcon = boardContainer
+    .querySelector<HTMLButtonElement>('.lia-plot-erase-toggle')?.innerHTML ||
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 15.7l8-8a2 2 0 0 1 2.8 0l3.1 3.1a2 2 0 0 1 0 2.8l-6.7 6.7H9.3l-3.1-3.1a2 2 0 0 1 0-1.5zM9.2 20.3h8M10 13.9l5.7 5.7"></path></svg>';
+  const regressionToolsIcon = boardContainer
+    .querySelector<HTMLButtonElement>('.lia-plot-regression-toggle')?.innerHTML ||
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h4M7 16v4M12.8 4.5l1.7 3.5 3.9.5-2.8 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8-2.8-2.7 3.9-.5z"></path></svg>';
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Format' : 'Formatting', [[
+    { id: DGS_TOOL_IDS.formatCopy, label: text.copyFormat, icon: formatButton.innerHTML, className: 'lia-dgs-format-button' }
+  ]]);
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Geometrie' : 'Geometry', [
+    [{ id: DGS_TOOL_IDS.point, label: text.point, icon: pointButton.innerHTML, className: 'lia-dgs-point-button' }],
+    [
+      { id: DGS_TOOL_IDS.segment, label: text.segment, icon: segmentIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.ray, label: text.ray, icon: rayIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.line, label: text.line, icon: lineIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.vector, label: text.vector, icon: vectorIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.arc, label: text.arc, icon: arcIcon, className: 'lia-dgs-segment-button' }
+    ],
+    [
+      { id: DGS_TOOL_IDS.orthogonal, label: text.orthogonal, icon: orthogonalIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.parallel, label: text.parallel, icon: parallelIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.midpoint, label: text.midpoint, icon: midpointIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.angleBisector, label: text.angleBisector, icon: angleBisectorIcon, className: 'lia-dgs-orthogonal-button' }
+    ],
+    [
+      { id: DGS_TOOL_IDS.polygon, label: text.polygon, icon: polygonIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.circle, label: text.circle, icon: circleIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.sector, label: text.sector, icon: sectorIcon, className: 'lia-dgs-polygon-button' }
+    ],
+    [
+      { id: DGS_TOOL_IDS.angle, label: text.angle, icon: angleIcon, className: 'lia-dgs-angle-button' },
+      { id: DGS_TOOL_IDS.measuredAngle, label: text.createMeasuredAngle, icon: measuredAngleIcon, className: 'lia-dgs-angle-button' }
+    ]
+  ]);
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Funktionen' : 'Functions', [
+    [{ id: DGS_TOOL_IDS.function, label: text.function, icon: functionButton.innerHTML, className: 'lia-dgs-function-button' }],
+    [
+      { id: DGS_TOOL_IDS.roots, label: text.root, icon: rootIcon, className: 'lia-dgs-root-button' },
+      { id: DGS_TOOL_IDS.extrema, label: text.extremum, icon: extremaIcon, className: 'lia-dgs-root-button' },
+      { id: DGS_TOOL_IDS.inflections, label: text.inflection, icon: inflectionIcon, className: 'lia-dgs-root-button' },
+      { id: DGS_TOOL_IDS.ordinateIntercept, label: text.yIntercept, icon: yInterceptIcon, className: 'lia-dgs-root-button' },
+      { id: DGS_TOOL_IDS.tangent, label: text.tangent, icon: tangentIcon, className: 'lia-dgs-root-button' },
+      { id: DGS_TOOL_IDS.intersection, label: text.intersection, icon: intersectionIcon, className: 'lia-dgs-root-button' }
+    ]
+  ]);
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Zeichnen und Regression' : 'Drawing and regression', [
+    [{ id: DGS_TOOL_IDS.regressionDraw, label: geometryLanguage === 'de' ? 'Freihandzeichnen' : 'Freehand drawing', icon: regressionDrawIcon, className: 'lia-dgs-export-regression-tool' }],
+    [{ id: DGS_TOOL_IDS.regressionErase, label: geometryLanguage === 'de' ? 'Radierer' : 'Eraser', icon: regressionEraseIcon, className: 'lia-dgs-export-regression-tool' }],
+    [{ id: DGS_TOOL_IDS.regressionTools, label: geometryLanguage === 'de' ? 'Regression' : 'Regression', icon: regressionToolsIcon, className: 'lia-dgs-export-regression-tool' }]
+  ]);
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Inhalte' : 'Content', [
+    [{ id: DGS_TOOL_IDS.slider, label: text.slider, icon: sliderButton.innerHTML, className: 'lia-dgs-slider-button' }],
+    [{ id: DGS_TOOL_IDS.text, label: text.text, icon: textButton.innerHTML, className: 'lia-dgs-text-button' }]
+  ]);
+  appendExportToolGroup(geometryLanguage === 'de' ? 'Ansicht' : 'View', [
+    [{ id: DGS_TOOL_IDS.zoom, label: text.zoomBoth, icon: zoomModeButton.innerHTML, className: 'lia-dgs-zoom-mode-button' }],
+    [{ id: DGS_TOOL_IDS.axisScale, label: text.axisScale, icon: axisScaleButton.innerHTML, className: 'lia-dgs-axis-scale-button' }]
+  ]);
+  const exportRestrictions = document.createElement('div');
+  exportRestrictions.className = 'lia-dgs-export-restrictions';
+  exportRestrictions.setAttribute('role', 'group');
+  const exportRestrictionsTitle = document.createElement('div');
+  exportRestrictionsTitle.id = 'dgs-export-restrictions-title-' + uid;
+  exportRestrictionsTitle.className = 'lia-dgs-export-restrictions-title';
+  exportRestrictionsTitle.textContent = text.exportRestrictionsTitle;
+  exportRestrictions.setAttribute('aria-labelledby', exportRestrictionsTitle.id);
+  exportRestrictions.appendChild(exportRestrictionsTitle);
+  const exportRestrictionInputs = new Map<number, HTMLInputElement>();
+  const exportRestrictionLabels: Record<DgsRestrictionId, string> = {
+    [DGS_RESTRICTION_IDS.objectPropertiesLocked]: text.lockObjectProperties,
+    [DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly]: text.colorsTracePropertiesOnly,
+    [DGS_RESTRICTION_IDS.valueControlsLocked]: text.lockValueControls,
+    [DGS_RESTRICTION_IDS.exportLocked]: text.lockExport
+  };
+  DGS_KNOWN_RESTRICTION_IDS.forEach((restrictionId) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-export-restriction-option';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.dataset.restrictionId = String(restrictionId);
+    input.tabIndex = -1;
+    const caption = document.createElement('span');
+    caption.textContent = exportRestrictionLabels[restrictionId];
+    label.appendChild(input);
+    label.appendChild(caption);
+    exportRestrictions.appendChild(label);
+    exportRestrictionInputs.set(restrictionId, input);
+  });
+  exportToolsStep.appendChild(exportToolsHint);
+  exportToolsStep.appendChild(exportToolGroups);
+  exportToolsStep.appendChild(exportRestrictions);
+  const exportMacroStep = document.createElement('div');
+  exportMacroStep.className = 'lia-dgs-export-step lia-dgs-export-macro-step';
+  exportMacroStep.hidden = true;
   const exportTextarea = document.createElement('textarea');
   exportTextarea.className = 'lia-dgs-export-textarea';
   exportTextarea.setAttribute('aria-label', text.exportMacrosTitle);
@@ -11783,8 +12882,16 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   const exportDialogHint = document.createElement('div');
   exportDialogHint.className = 'lia-dgs-function-dialog-hint';
   exportDialogHint.textContent = text.exportHint;
+  exportMacroStep.appendChild(exportTextarea);
+  exportMacroStep.appendChild(exportDialogHint);
   const exportDialogActions = document.createElement('div');
   exportDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const exportBackButton = document.createElement('button');
+  exportBackButton.type = 'button';
+  exportBackButton.className = 'lia-dgs-angle-dialog-button';
+  exportBackButton.textContent = text.backExport;
+  exportBackButton.hidden = true;
+  exportBackButton.tabIndex = -1;
   const exportCloseButton = document.createElement('button');
   exportCloseButton.type = 'button';
   exportCloseButton.className = 'lia-dgs-angle-dialog-button';
@@ -11794,13 +12901,14 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   exportCopyButton.type = 'button';
   exportCopyButton.className = 'lia-dgs-angle-dialog-button';
   exportCopyButton.dataset.primary = '1';
-  exportCopyButton.textContent = text.copyExport;
+  exportCopyButton.textContent = text.nextExport;
   exportCopyButton.tabIndex = -1;
+  exportDialogActions.appendChild(exportBackButton);
   exportDialogActions.appendChild(exportCloseButton);
   exportDialogActions.appendChild(exportCopyButton);
   exportDialog.appendChild(exportDialogTitle);
-  exportDialog.appendChild(exportTextarea);
-  exportDialog.appendChild(exportDialogHint);
+  exportDialog.appendChild(exportToolsStep);
+  exportDialog.appendChild(exportMacroStep);
   exportDialog.appendChild(exportDialogActions);
 
   const button = document.createElement('button');
@@ -11853,6 +12961,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   boardContainer.appendChild(button);
   boardContainer.classList.add('lia-dgs-fullscreen-host');
   typesetDgsMath(pointButton);
+  typesetDgsMath(exportToolGroups);
 
   const board = window.__boards && window.__boards[boardId];
   const storedZoomMode = normalizeDgsZoomMode(
@@ -11890,8 +12999,19 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     objectListCloseButton,
     objectListExportButton,
     exportDialog,
+    exportDialogTitle,
+    exportToolsStep,
+    exportMacroStep,
+    exportToolButtons,
+    exportSelectedToolIds: new Set<number>(
+      config.toolIds == null ? DGS_KNOWN_TOOL_IDS : config.toolIds
+    ),
+    exportRestrictionInputs,
+    exportSelectedRestrictionIds: new Set<number>(config.restrictionIds),
+    exportDialogStep: 'tools',
     exportTextarea,
     exportCopyButton,
+    exportBackButton,
     exportCloseButton,
     nameOption: nameOption.label,
     coordinateSection,
@@ -12023,6 +13143,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     logLogScaleButton,
     fullscreenButton,
     objectListButton,
+    menuScrollSpacer,
     textDialog,
     textDialogInput,
     textDialogConfirmButton,
@@ -12048,6 +13169,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     functionDialogOpen: false,
     textDialogOpen: false,
     exportDialogOpen: false,
+    availableToolIds: config.toolIds == null ? null : new Set<number>(config.toolIds),
+    toolSelectionKey: config.toolSelectionKey,
+    restrictionIds: new Set<number>(config.restrictionIds),
+    restrictionSelectionKey: config.restrictionSelectionKey,
     sideMenuOpen: false,
     objectListOpen: false,
     objectListSignature: '',
@@ -12080,6 +13205,33 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     coordinateSyncing: false
   };
   states[uid] = state;
+  exportToolButtons.forEach((toolButton, toolId) => {
+    toolButton.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (state.exportSelectedToolIds.has(toolId)) state.exportSelectedToolIds.delete(toolId);
+      else state.exportSelectedToolIds.add(toolId);
+      renderDgsExportToolSelection(state);
+    });
+  });
+  exportRestrictionInputs.forEach((input, restrictionId) => {
+    input.addEventListener('change', (evt) => {
+      evt.stopPropagation();
+      if (input.checked) {
+        if (restrictionId === DGS_RESTRICTION_IDS.objectPropertiesLocked) {
+          state.exportSelectedRestrictionIds.delete(
+            DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly
+          );
+        } else if (restrictionId === DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly) {
+          state.exportSelectedRestrictionIds.delete(DGS_RESTRICTION_IDS.objectPropertiesLocked);
+        }
+        state.exportSelectedRestrictionIds.add(restrictionId);
+      } else {
+        state.exportSelectedRestrictionIds.delete(restrictionId);
+      }
+      renderDgsExportRestrictionSelection(state);
+    });
+  });
   menuBar.addEventListener('scroll', () => positionOpenDgsSubmenu(state), { passive: true });
   setDgsZoomMode(state, storedZoomMode, false);
   setDgsAxisScaleMode(state, storedAxisScaleMode, false);
@@ -12095,8 +13247,10 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   setArcDialogOpen(state, false);
   setFunctionDialogOpen(state, false);
   setTextDialogOpen(state, false);
+  setExportDialogOpen(state, false);
   setObjectListOpen(state, false);
   setSideMenuOpen(state, false);
+  applyDgsProfileRestrictions(state);
   applyLayout(state);
   renderDgsFullscreenButton(state);
 
@@ -12152,6 +13306,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = segmentIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.segment);
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'segment' ? '' : 'segment');
   });
@@ -12160,6 +13315,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = rayIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.ray);
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'ray' ? '' : 'ray');
   });
@@ -12168,6 +13324,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = lineIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.line);
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'line' ? '' : 'line');
   });
@@ -12176,6 +13333,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = vectorIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.vector);
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'vector' ? '' : 'vector');
   });
@@ -12184,6 +13342,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     segmentButton.innerHTML = arcIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.arc);
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'arc' ? '' : 'arc');
   });
@@ -12198,6 +13357,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     orthogonalButton.innerHTML = orthogonalIcon;
+    orthogonalButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.orthogonal);
     setRelationSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'orthogonal' ? '' : 'orthogonal');
   });
@@ -12206,6 +13366,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     orthogonalButton.innerHTML = parallelIcon;
+    orthogonalButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.parallel);
     setRelationSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'parallel' ? '' : 'parallel');
   });
@@ -12214,6 +13375,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     orthogonalButton.innerHTML = midpointIcon;
+    orthogonalButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.midpoint);
     setRelationSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'midpoint' ? '' : 'midpoint');
   });
@@ -12222,6 +13384,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     orthogonalButton.innerHTML = angleBisectorIcon;
+    orthogonalButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.angleBisector);
     setRelationSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'angle-bisector' ? '' : 'angle-bisector');
   });
@@ -12237,6 +13400,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     polygonButton.innerHTML = polygonIcon;
+    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.polygon);
     setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'polygon' ? '' : 'polygon');
   });
@@ -12245,6 +13409,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     polygonButton.innerHTML = circleIcon;
+    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.circle);
     setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'circle' ? '' : 'circle');
   });
@@ -12253,6 +13418,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     polygonButton.innerHTML = sectorIcon;
+    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.sector);
     setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'sector' ? '' : 'sector');
   });
@@ -12269,6 +13435,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     angleButton.innerHTML = angleIcon;
+    angleButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.angle);
     setAngleSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'angle' ? '' : 'angle');
   });
@@ -12277,6 +13444,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     angleButton.innerHTML = measuredAngleIcon;
+    angleButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.measuredAngle);
     setAngleSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'angle-measured' ? '' : 'angle-measured');
   });
@@ -12402,6 +13570,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = rootIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.roots);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'roots' ? '' : 'roots');
   });
@@ -12410,6 +13579,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = extremaIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.extrema);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'extrema' ? '' : 'extrema');
   });
@@ -12418,6 +13588,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = inflectionIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.inflections);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'inflections' ? '' : 'inflections');
   });
@@ -12426,6 +13597,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = yInterceptIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.ordinateIntercept);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'ordinate-intercept' ? '' : 'ordinate-intercept');
   });
@@ -12434,6 +13606,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = tangentIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.tangent);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'tangent' ? '' : 'tangent');
   });
@@ -12442,6 +13615,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     rootButton.innerHTML = intersectionIcon;
+    rootButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.intersection);
     setRootSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'intersection' ? '' : 'intersection');
   });
@@ -12479,6 +13653,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   objectListExportButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.exportLocked)) return;
     setGeometrySubmenuOpen(state, false);
     setRelationSubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
@@ -12500,7 +13675,17 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   exportCopyButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
-    copyDgsExportToClipboard(state);
+    if (state.exportDialogStep === 'tools') {
+      setDgsExportDialogStep(state, 'macro');
+    } else {
+      copyDgsExportToClipboard(state);
+    }
+  });
+
+  exportBackButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setDgsExportDialogStep(state, 'tools');
   });
 
   exportTextarea.addEventListener('keydown', (evt) => {
@@ -12547,6 +13732,37 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     if (applyAngleMeasureInput()) angleMeasureInput.blur();
+  });
+
+  exportDialog.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setExportDialogOpen(state, false);
+      return;
+    }
+    if (evt.key !== 'Tab' || !state.exportDialogOpen) return;
+    const focusable = Array.from(
+      exportDialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled])'
+      )
+    ).filter((element) =>
+      element.tabIndex >= 0 &&
+      !element.hidden &&
+      !element.closest('[hidden]') &&
+      element.getClientRects().length > 0
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (evt.shiftKey && (active === first || !exportDialog.contains(active))) {
+      evt.preventDefault();
+      last.focus();
+    } else if (!evt.shiftKey && (active === last || !exportDialog.contains(active))) {
+      evt.preventDefault();
+      first.focus();
+    }
   });
 
   const applyArcSettingsInputs = () => {
@@ -13020,6 +14236,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   });
 
   measurementOption.input.addEventListener('change', () => {
+    if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.valueControlsLocked)) return;
     const object = state.contextObject;
     const analysisPoint = object && (object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
       object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
@@ -13042,6 +14259,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   });
 
   areaOption.input.addEventListener('change', () => {
+    if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.valueControlsLocked)) return;
     const object = state.contextObject;
     if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsSector(object)) return;
     object.__liaDgsShowArea = areaOption.input.checked;
@@ -13051,6 +14269,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
   });
 
   perimeterOption.input.addEventListener('change', () => {
+    if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.valueControlsLocked)) return;
     const object = state.contextObject;
     if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsSector(object)) return;
     object.__liaDgsShowPerimeter = perimeterOption.input.checked;
@@ -13193,12 +14412,7 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
       }
       return;
     }
-
-    evt.preventDefault();
-    evt.stopImmediatePropagation();
-    setActiveTool(state, '', false);
-    updateSideMenuControls(state, object);
-    setSideMenuOpen(state, true);
+    openDgsObjectProperties(state, object, evt);
   };
   boardContainer.addEventListener('contextmenu', state.onBoardContextMenu, true);
 
@@ -13560,8 +14774,8 @@ function setupDGS(uid: string, boardId: string, languageCode?: string): void {
 }
 
 window.__setupDGS = function (uid: string, spec: string, language?: string): void {
-  const boardId = unquote(String(spec || '').trim());
-  scheduleBootstrap(() => setupDGS(uid, boardId, language));
+  const rawSpec = String(spec || '').trim();
+  scheduleBootstrap(() => setupDGS(uid, rawSpec, language));
 };
 
 export function bootstrapDGS(): void {
@@ -13572,8 +14786,8 @@ export function bootstrapDGS(): void {
     if (!match) return;
 
     const uid = match[1];
-    const boardId = unquote(String((el as HTMLElement).dataset.spec || '').trim());
-    setupDGS(uid, boardId, (el as HTMLElement).dataset.language);
+    const spec = String((el as HTMLElement).dataset.spec || '').trim();
+    setupDGS(uid, spec, (el as HTMLElement).dataset.language);
   });
 }
 
