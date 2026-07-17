@@ -296,6 +296,7 @@ interface Window {
   __dgsReady: boolean | undefined;
   __bootstrapDGS: (() => void) | undefined;
   __prepareDgsBoardReplacement: (() => void) | undefined;
+  __syncDgsFixedCompassPoint: ((boardId: string, point: any) => boolean) | undefined;
   __persistDgsBoardState: ((boardId: string, recordHistory?: boolean) => void) | undefined;
   __detachDgsAnalysisFunctionTarget: ((boardId: string, target: any) => void) | undefined;
   __setupDGS: ((uid: string, spec: string, language?: string) => void) | undefined;

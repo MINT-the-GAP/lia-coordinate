@@ -1223,8 +1223,16 @@ Tool profiles use immutable numeric capability ids rather than toolbar positions
 the visual toolbar without changing the meaning of an older export. Missing `tools`, an empty
 list, or a list without numbers retains the complete legacy DGS; `tools=[0]` explicitly keeps
 only the permanent infrastructure. Hamburger, normal mouse mode, undo/redo, fullscreen, and the
-object list remain permanently available; export remains available unless restriction `400` is set.
-The currently assigned ids are: `100` formatting, `200` point, `310` segment, `320` ray,
+object list remain permanently available; the compass is also always present and is intentionally
+not part of the export-tool selection. Export remains available unless restriction `400` is set.
+The compass submenu offers the ordinary two-point radius and a fixed-radius mode. In fixed-radius
+mode, enter a positive radius, click the center, and use the second click to choose the drawing
+direction. The drawing point is created at exactly that radius and can immediately be dragged
+around the center to draw the arc. Once the fixed-radius arc is finished, moving either of its
+points translates the complete compass construction; the direction vector and radius remain
+unchanged. Connected fixed-radius compass constructions move as one unit.
+The currently assigned ids are: `100` formatting, reserved always-on id `150` for the compass,
+`200` point, `310` segment, `320` ray,
 `330` line, `340` vector, `350` arc, `410` perpendicular, `420` parallel, `430` midpoint,
 `440` angle bisector, `510` polygon, `520` circle, `530` circular sector, `610` angle,
 `620` measured angle, `700` function, `810` zeros, `820` extrema, `830` inflection points,
@@ -1244,7 +1252,10 @@ contact point, constrains a movable glider to that object, and adds the dependen
 For circles its direction remains perpendicular to the radius at the contact point. The points
 and tangent move with term or geometry changes. The intersection tool takes two objects in
 sequence and supports every combination of function graphs, segments, rays, vectors, straight
-lines, tangents, and circles; it creates every isolated visible crossing or contact point.
+lines, tangents, circles, and compass arcs; it creates every isolated visible crossing or contact
+point. Compass-arc intersections are restricted to the actually drawn sweep rather than the
+invisible remainder of the carrier circle, and the resulting points can be used in later DGS
+constructions like ordinary dependent points.
 Viewport changes also
 add or remove visible analysis points. All constructions participate in DGS undo/redo and can be
 removed from their object menus.

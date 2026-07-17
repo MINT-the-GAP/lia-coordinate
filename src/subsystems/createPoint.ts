@@ -337,6 +337,11 @@ export function init(): void {
     pt.__liaStateBound = true;
 
     const persist = function(recordHistory) {
+      try {
+        if (typeof window.__syncDgsFixedCompassPoint === 'function') {
+          window.__syncDgsFixedCompassPoint(boardId, pt);
+        }
+      } catch (e) {}
       savePointState(boardId, name, pt);
       try {
         if (typeof window.__persistDgsBoardState === 'function') {

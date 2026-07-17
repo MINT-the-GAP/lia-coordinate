@@ -86,6 +86,21 @@ const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
   DGS_TOOL_IDS.axisScale
 ];
 
+// Some foundational controls are deliberately present in every DGS. Keep
+// their immutable capability ids in the registry for backwards compatibility,
+// but do not expose them in the export profile: an old or restricted profile
+// must never be able to hide these controls.
+const DGS_ALWAYS_AVAILABLE_TOOL_IDS = new Set<number>([
+  DGS_TOOL_IDS.compass
+]);
+const DGS_EXPORT_SELECTABLE_TOOL_IDS: DgsToolId[] = DGS_KNOWN_TOOL_IDS.filter(
+  (toolId) => !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId)
+);
+
+function dgsExportSelectableToolIds(toolIds: Iterable<number>): number[] {
+  return Array.from(toolIds).filter((toolId) => !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId));
+}
+
 const DGS_RESTRICTION_IDS = {
   objectPropertiesLocked: 100,
   objectPropertiesColorsTraceOnly: 200,
@@ -300,6 +315,13 @@ type DgsState = {
   colorValue: number;
   selectButton: HTMLButtonElement;
   compassButton: HTMLButtonElement;
+  compassSubmenu: HTMLDivElement;
+  compassToolButton: HTMLButtonElement;
+  fixedRadiusCompassToolButton: HTMLButtonElement;
+  compassRadiusDialog: HTMLDivElement;
+  compassRadiusDialogInput: HTMLInputElement;
+  compassRadiusDialogConfirmButton: HTMLButtonElement;
+  compassRadiusDialogCancelButton: HTMLButtonElement;
   formatButton: HTMLButtonElement;
   toolsDivider: HTMLSpanElement;
   pointButton: HTMLButtonElement;
@@ -377,6 +399,7 @@ type DgsState = {
   axisAdjusted: boolean;
   axisSyncing: boolean;
   open: boolean;
+  compassSubmenuOpen: boolean;
   geometrySubmenuOpen: boolean;
   relationSubmenuOpen: boolean;
   shapeSubmenuOpen: boolean;
@@ -384,6 +407,7 @@ type DgsState = {
   rootSubmenuOpen: boolean;
   axisScaleSubmenuOpen: boolean;
   angleDialogOpen: boolean;
+  compassRadiusDialogOpen: boolean;
   arcDialogOpen: boolean;
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
@@ -420,6 +444,8 @@ type DgsState = {
   compassSweep: number;
   compassRadius: number;
   compassMoved: boolean;
+  compassMode: 'free' | 'fixed';
+  compassPresetRadius: number;
   pendingArcPoints: any[];
   selectedRelationLine: any | null;
   selectedRelationPoint: any | null;
@@ -441,6 +467,10 @@ type DgsState = {
   restoreTimer?: number;
   coordinateSyncRAF?: number;
   coordinateSyncing?: boolean;
+  fixedCompassSyncRAF?: number;
+  fixedCompassSyncing?: boolean;
+  fixedCompassPersistPending?: boolean;
+  fixedCompassPersistHistory?: boolean;
   onBoardViewportChange?: () => void;
   onBoardRootUpdate?: () => void;
   onBoardPointerDown?: (evt: PointerEvent) => void;
@@ -487,7 +517,7 @@ const DGS_TEXT = {
     colorTraceProperties: 'Farb- und Spureinstellungen \u00f6ffnen',
     nextExport: 'Weiter', backExport: 'Zur\u00fcck',
     toolAvailable: 'verf\u00fcgbar', toolUnavailable: 'nicht verf\u00fcgbar',
-    compass: 'Zirkel', compassArc: 'Zirkelbogen', showCompassArc: 'Zirkelbogen anzeigen',
+    compass: 'Zirkel', compassTools: 'Zirkelmodi', freeCompass: 'Radius durch zwei Punkte', fixedRadiusCompass: 'Radius eingeben', enterCompassRadius: 'Zirkelradius eingeben', radius: 'Radius', compassArc: 'Zirkelbogen', showCompassArc: 'Zirkelbogen anzeigen',
     arc: 'Bogen', showArc: 'Bogen anzeigen', createArc: 'Bogen erzeugen',
     exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
     appearance: 'Darstellung', design: 'Design', strokeWidth: 'Linienstärke',
@@ -516,7 +546,7 @@ const DGS_TEXT = {
     colorTraceProperties: 'Open color and trace settings',
     nextExport: 'Continue', backExport: 'Back',
     toolAvailable: 'available', toolUnavailable: 'not available',
-    compass: 'Compass', compassArc: 'Compass arc', showCompassArc: 'Show compass arc',
+    compass: 'Compass', compassTools: 'Compass modes', freeCompass: 'Radius through two points', fixedRadiusCompass: 'Enter radius', enterCompassRadius: 'Enter compass radius', radius: 'Radius', compassArc: 'Compass arc', showCompassArc: 'Show compass arc',
     arc: 'Arc', showArc: 'Show arc', createArc: 'Create arc',
     exitAngle: 'Exit angle', entryAngle: 'Entry angle',
     appearance: 'Appearance', design: 'Design', strokeWidth: 'Line width',
@@ -951,7 +981,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-07-16-2';
+const DGS_STYLE_VERSION = '2026-07-17-1';
 
 function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   if (!board) return;
@@ -2244,6 +2274,10 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 268px;
     }
 
+    .lia-dgs-compass-submenu {
+      min-width: min(270px, calc(100% - 16px));
+    }
+
     .lia-dgs-relation-submenu {
       left: 225px;
     }
@@ -2398,6 +2432,30 @@ function ensureStyles(root: Document | ShadowRoot): void {
       stroke: none;
       font-size: 10px;
       font-weight: 700;
+    }
+
+    .lia-dgs-compass-radius-label {
+      fill: #ff00ff;
+      stroke: none;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 5.5px;
+      font-style: italic;
+      font-weight: 700;
+    }
+
+    .lia-dgs-compass-icon .lia-dgs-compass-body {
+      stroke: var(--lia-dgs-neutral-color, currentColor);
+      stroke-width: 1.45;
+    }
+
+    .lia-dgs-compass-icon .lia-dgs-compass-joint {
+      fill: var(--lia-dgs-neutral-color, currentColor);
+      stroke: var(--lia-dgs-neutral-color, currentColor);
+      stroke-width: 1;
+    }
+
+    .lia-dgs-compass-icon .lia-dgs-compass-accent {
+      stroke-width: 1.75;
     }
 
     .lia-dgs-angle-dialog {
@@ -2945,6 +3003,7 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
     try {
       point.on('drag', () => {
         syncDependentCoordinates(true);
+        translateDgsFixedCompassComponent(state, point);
         recordDgsPointTraceMotion(state, point);
         savePosition(false);
       });
@@ -2952,6 +3011,7 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
     try {
       point.on('up', () => {
         syncDependentCoordinates(false);
+        translateDgsFixedCompassComponent(state, point);
         recordDgsPointTraceMotion(state, point);
         savePosition(true);
       });
@@ -3218,6 +3278,11 @@ function isDgsTangentTarget(object: any): boolean {
   return isDgsFunctionTarget(object) || isDgsLinearObject(object) || isDgsCircle(object);
 }
 
+function isDgsIntersectionTarget(object: any): boolean {
+  return isDgsTangentTarget(object) ||
+    (isDgsCompassArc(object) && !object.__liaDgsCompassDraft);
+}
+
 function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
   const context = findDgsContextObject(state, evt as any);
   if (isDgsTangentTarget(context)) return context;
@@ -3228,6 +3293,32 @@ function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
   let layer = -1;
   getDgsBoardObjects(state.board).forEach((object) => {
     if (!isDgsFunctionTarget(object) && !isDgsCircle(object)) return;
+    let hit = false;
+    try {
+      hit = isDgsCircle(object)
+        ? dgsCircleContainsPointer(state, object, localX, localY)
+        : (typeof object.hasPoint === 'function' && object.hasPoint(localX, localY));
+    } catch (e) {}
+    const objectLayer = getDgsObjectLayer(object);
+    if (hit && objectLayer >= layer) {
+      nearest = object;
+      layer = objectLayer;
+    }
+  });
+  return nearest || findNearestDgsLinearObject(state, evt);
+}
+
+function findDgsIntersectionTarget(state: DgsState, evt: PointerEvent): any | null {
+  const context = findDgsContextObject(state, evt as any);
+  if (isDgsIntersectionTarget(context)) return context;
+  const rect = state.boardContainer.getBoundingClientRect();
+  const localX = evt.clientX - rect.left;
+  const localY = evt.clientY - rect.top;
+  let nearest: any | null = null;
+  let layer = -1;
+  getDgsBoardObjects(state.board).forEach((object) => {
+    if (!isDgsFunctionTarget(object) && !isDgsCircle(object) && !isDgsCompassArc(object)) return;
+    if (object.__liaDgsCompassDraft || object.__liaDgsShowObject === false) return;
     let hit = false;
     try {
       hit = isDgsCircle(object)
@@ -3449,12 +3540,56 @@ function getDgsCircleData(source: any): { x: number; y: number; radius: number }
   } catch (e) { return null; }
 }
 
+function getDgsIntersectionCircleData(
+  source: any
+): { x: number; y: number; radius: number } | null {
+  const circle = getDgsCircleData(source);
+  if (circle) return circle;
+  if (!isDgsCompassArc(source) || source.__liaDgsCompassDraft) return null;
+  const geometry = getDgsCompassArcGeometry(source);
+  return [geometry.cx, geometry.cy, geometry.radius].every(Number.isFinite) &&
+    geometry.radius > 1e-12
+    ? { x: geometry.cx, y: geometry.cy, radius: geometry.radius }
+    : null;
+}
+
+function normalizeDgsPositiveAngle(angle: number): number {
+  const fullTurn = Math.PI * 2;
+  const normalized = angle % fullTurn;
+  return normalized < 0 ? normalized + fullTurn : normalized;
+}
+
+function isPointOnDgsCompassArc(
+  arc: any,
+  x: number,
+  y: number,
+  tolerance: number
+): boolean {
+  if (!isDgsCompassArc(arc) || arc.__liaDgsCompassDraft) return false;
+  const geometry = getDgsCompassArcGeometry(arc);
+  if (![geometry.cx, geometry.cy, geometry.radius, geometry.startAngle, geometry.sweepAngle, x, y]
+      .every(Number.isFinite) || geometry.radius <= 1e-12) return false;
+  const radialTolerance = Math.max(Math.abs(tolerance) * 8, geometry.radius * 1e-7, 1e-9);
+  if (Math.abs(Math.hypot(x - geometry.cx, y - geometry.cy) - geometry.radius) > radialTolerance) {
+    return false;
+  }
+  const fullTurn = Math.PI * 2;
+  const angularTolerance = Math.max(1e-8, radialTolerance / geometry.radius);
+  const sweep = Math.abs(geometry.sweepAngle);
+  if (sweep >= fullTurn - angularTolerance) return true;
+  const angle = Math.atan2(y - geometry.cy, x - geometry.cx);
+  const progress = geometry.sweepAngle >= 0
+    ? normalizeDgsPositiveAngle(angle - geometry.startAngle)
+    : normalizeDgsPositiveAngle(geometry.startAngle - angle);
+  return progress <= sweep + angularTolerance || fullTurn - progress <= angularTolerance;
+}
+
 function getDgsIntersectionPositions(
   state: DgsState,
   first: any,
   second: any
 ): DgsAnalysisPosition[] {
-  if (!isDgsTangentTarget(first) || !isDgsTangentTarget(second) || first === second) return [];
+  if (!isDgsIntersectionTarget(first) || !isDgsIntersectionTarget(second) || first === second) return [];
   let bbox = [-5, 5, 5, -5];
   try {
     const current = state.board.getBoundingBox();
@@ -3467,6 +3602,8 @@ function getDgsIntersectionPositions(
     if (!Number.isFinite(x) || !Number.isFinite(y) ||
         x < Number(bbox[0]) - tolerance || x > Number(bbox[2]) + tolerance ||
         y > Number(bbox[1]) + tolerance || y < Number(bbox[3]) - tolerance) return;
+    if ((isDgsCompassArc(first) && !isPointOnDgsCompassArc(first, x, y, tolerance)) ||
+        (isDgsCompassArc(second) && !isPointOnDgsCompassArc(second, x, y, tolerance))) return;
     if (!positions.some((point) => Math.hypot(point.x - x, point.y - y) <= tolerance * 4)) {
       positions.push({ x, y });
     }
@@ -3478,7 +3615,7 @@ function getDgsIntersectionPositions(
     const graph = firstFunction ? first : second;
     const other = firstFunction ? second : first;
     const otherLine = getDgsLineData(other);
-    const otherCircle = getDgsCircleData(other);
+    const otherCircle = getDgsIntersectionCircleData(other);
     const evaluateGraph = (x: number) => {
       try {
         const y = Number(graph.Y(x));
@@ -3516,8 +3653,8 @@ function getDgsIntersectionPositions(
 
   const firstLine = getDgsLineData(first);
   const secondLine = getDgsLineData(second);
-  const firstCircle = getDgsCircleData(first);
-  const secondCircle = getDgsCircleData(second);
+  const firstCircle = getDgsIntersectionCircleData(first);
+  const secondCircle = getDgsIntersectionCircleData(second);
   if (firstLine && secondLine) {
     const determinant = firstLine.dx * secondLine.dy - firstLine.dy * secondLine.dx;
     if (Math.abs(determinant) <= 1e-12) return [];
@@ -3864,7 +4001,7 @@ function createDgsRootConstruction(state: DgsState, source: any): any | null {
 }
 
 function createDgsIntersectionConstruction(state: DgsState, first: any, second: any): any | null {
-  if (!isDgsTangentTarget(first) || !isDgsTangentTarget(second) || first === second) return null;
+  if (!isDgsIntersectionTarget(first) || !isDgsIntersectionTarget(second) || first === second) return null;
   const candidates = state.rootConstructions.concat(
     Array.isArray(first.__liaDgsIntersectionConstructions)
       ? first.__liaDgsIntersectionConstructions
@@ -4955,9 +5092,16 @@ function getDgsCompassArcGeometry(arc: any): DgsCompassArcGeometry {
     px = Number(point.X());
     py = Number(point.Y());
   } catch (e) {}
-  const radius = Math.hypot(px - cx, py - cy);
+  const storedDx = Number(arc && arc.__liaDgsCompassFixedDx);
+  const storedDy = Number(arc && arc.__liaDgsCompassFixedDy);
+  const usesFixedVector = arc && arc.__liaDgsCompassFixedRadius === true &&
+    Number.isFinite(storedDx) && Number.isFinite(storedDy) &&
+    Math.hypot(storedDx, storedDy) > 1e-12;
+  const radiusDx = usesFixedVector ? storedDx : px - cx;
+  const radiusDy = usesFixedVector ? storedDy : py - cy;
+  const radius = Math.hypot(radiusDx, radiusDy);
   const sweepAngle = Number(arc && arc.__liaDgsCompassSweepAngle);
-  const endAngle = Math.atan2(py - cy, px - cx);
+  const endAngle = Math.atan2(radiusDy, radiusDx);
   const geometry = {
     cx,
     cy,
@@ -5129,8 +5273,18 @@ function finalizeDgsCompassArc(state: DgsState, arc: any): boolean {
   if (!Number.isFinite(geometry.radius) || geometry.radius <= 1e-12 ||
       !Number.isFinite(geometry.sweepAngle) || Math.abs(geometry.sweepAngle) <= 1e-7) return false;
   arc.__liaDgsCompassDraft = false;
+  arc.__liaDgsCompassFixedRadius = state.compassMode === 'fixed';
+  if (arc.__liaDgsCompassFixedRadius) {
+    const center = readDgsPointPosition(arc.__liaDgsCompassCenterPoint);
+    const point = readDgsPointPosition(arc.__liaDgsCompassRadiusPoint);
+    if (center && point) {
+      arc.__liaDgsCompassFixedDx = point.x - center.x;
+      arc.__liaDgsCompassFixedDy = point.y - center.y;
+    }
+  }
   arc.__liaDgsCompassRadius = geometry.radius;
   arc.__liaDgsCompassStartAngle = geometry.startAngle;
+  resetDgsFixedCompassTranslationSnapshot(arc);
   ensureDgsCompassArcLabel(state, arc);
   refreshDgsObjectLabel(arc);
   try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
@@ -6044,6 +6198,217 @@ function setDgsPointPosition(point: any, x: number, y: number): boolean {
   return false;
 }
 
+type DgsCompassTranslationSnapshot = {
+  centerX: number;
+  centerY: number;
+  pointX: number;
+  pointY: number;
+};
+
+function readDgsPointPosition(point: any): { x: number; y: number } | null {
+  if (!point) return null;
+  try {
+    const x = Number(point.X());
+    const y = Number(point.Y());
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function resetDgsFixedCompassTranslationSnapshot(arc: any): void {
+  if (!isDgsCompassArc(arc)) return;
+  const center = readDgsPointPosition(arc.__liaDgsCompassCenterPoint);
+  const point = readDgsPointPosition(arc.__liaDgsCompassRadiusPoint);
+  arc.__liaDgsCompassTranslationSnapshot = center && point
+    ? {
+        centerX: center.x,
+        centerY: center.y,
+        pointX: point.x,
+        pointY: point.y
+      } satisfies DgsCompassTranslationSnapshot
+    : null;
+}
+
+function scheduleDgsFixedCompassRefresh(state: DgsState): void {
+  if (!state || state.fixedCompassSyncRAF != null) return;
+  state.fixedCompassSyncRAF = requestAnimationFrame(() => {
+    state.fixedCompassSyncRAF = undefined;
+    try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    refreshSideMenuCoordinates(state);
+  });
+}
+
+function flushDgsFixedCompassPersistence(state: DgsState): void {
+  if (!state || !state.fixedCompassPersistPending || state.fixedCompassSyncing) return;
+  const recordHistory = state.fixedCompassPersistHistory === true;
+  state.fixedCompassPersistPending = false;
+  state.fixedCompassPersistHistory = false;
+  persistDgsConstruction(state, recordHistory);
+}
+
+function fixedCompassSnapshotPosition(
+  arc: any,
+  point: any
+): { x: number; y: number } | null {
+  const snapshot = arc && arc.__liaDgsCompassTranslationSnapshot as
+    DgsCompassTranslationSnapshot | null;
+  if (!snapshot) return null;
+  if (arc.__liaDgsCompassCenterPoint === point) {
+    return Number.isFinite(snapshot.centerX) && Number.isFinite(snapshot.centerY)
+      ? { x: snapshot.centerX, y: snapshot.centerY }
+      : null;
+  }
+  if (arc.__liaDgsCompassRadiusPoint === point) {
+    return Number.isFinite(snapshot.pointX) && Number.isFinite(snapshot.pointY)
+      ? { x: snapshot.pointX, y: snapshot.pointY }
+      : null;
+  }
+  return null;
+}
+
+function isDgsFixedCompassFollowerBlocked(point: any): boolean {
+  return !point || getDgsObjectFixed(point) || !!point.__liaDgsCoordinateExpressions ||
+    String(point.elType || '').toLowerCase() === 'glider' ||
+    point.__liaDgsMidpoint === true || point.__liaDgsRootPoint === true ||
+    point.__liaDgsExtremumPoint === true || point.__liaDgsInflectionPoint === true ||
+    point.__liaDgsYInterceptPoint === true || point.__liaDgsIntersectionPoint === true ||
+    point.__liaDgsTangentPoint === true || point.__liaDgsGeneratedPoint === true ||
+    point.__liaDgsHelperPoint === true;
+}
+
+function translateDgsFixedCompassComponent(state: DgsState, driver: any): boolean {
+  if (!state || !state.board || !driver || state.restoring || state.fixedCompassSyncing) return false;
+  const availableArcs = getDgsBoardObjects(state.board).filter((object) =>
+    isDgsCompassArc(object) && !object.__liaDgsCompassDraft &&
+    object.__liaDgsCompassFixedRadius === true
+  );
+  const componentPoints = new Set<any>([driver]);
+  const componentArcs = new Set<any>();
+  const queue = [driver];
+  while (queue.length) {
+    const point = queue.shift();
+    availableArcs.forEach((arc) => {
+      if (componentArcs.has(arc) ||
+          (arc.__liaDgsCompassCenterPoint !== point &&
+           arc.__liaDgsCompassRadiusPoint !== point)) return;
+      componentArcs.add(arc);
+      [arc.__liaDgsCompassCenterPoint, arc.__liaDgsCompassRadiusPoint].forEach((candidate) => {
+        if (!candidate || componentPoints.has(candidate)) return;
+        componentPoints.add(candidate);
+        queue.push(candidate);
+      });
+    });
+  }
+  if (!componentArcs.size) return false;
+
+  const baseline = new Map<any, { x: number; y: number }>();
+  componentArcs.forEach((arc) => {
+    [arc.__liaDgsCompassCenterPoint, arc.__liaDgsCompassRadiusPoint].forEach((point) => {
+      if (baseline.has(point)) return;
+      const position = fixedCompassSnapshotPosition(arc, point);
+      if (position) baseline.set(point, position);
+    });
+  });
+  const previousDriver = baseline.get(driver);
+  const currentDriver = readDgsPointPosition(driver);
+  if (!previousDriver || !currentDriver || baseline.size !== componentPoints.size) {
+    componentArcs.forEach(resetDgsFixedCompassTranslationSnapshot);
+    return false;
+  }
+  const dx = currentDriver.x - previousDriver.x;
+  const dy = currentDriver.y - previousDriver.y;
+  const scale = Math.max(1, Math.abs(currentDriver.x), Math.abs(currentDriver.y));
+  if (Math.hypot(dx, dy) <= 1e-9 * scale) return false;
+
+  const followers = Array.from(componentPoints).filter((point) => point !== driver);
+  const alreadyTranslated = followers.every((point) => {
+    const previous = baseline.get(point);
+    const current = readDgsPointPosition(point);
+    if (!previous || !current) return false;
+    const followerScale = Math.max(1, Math.abs(current.x), Math.abs(current.y));
+    return Math.hypot(
+      current.x - previous.x - dx,
+      current.y - previous.y - dy
+    ) <= 1e-9 * followerScale;
+  });
+  if (alreadyTranslated) {
+    componentPoints.forEach((point) => updateDgsCoordinatePointState(state, point));
+    componentArcs.forEach(resetDgsFixedCompassTranslationSnapshot);
+    return true;
+  }
+  const blocked = followers.some(isDgsFixedCompassFollowerBlocked);
+  state.fixedCompassSyncing = true;
+  try {
+    if (blocked) {
+      setDgsPointPosition(driver, previousDriver.x, previousDriver.y);
+    } else {
+      let translated = true;
+      followers.forEach((point) => {
+        const previous = baseline.get(point);
+        if (!previous) {
+          translated = false;
+          return;
+        }
+        const targetX = previous.x + dx;
+        const targetY = previous.y + dy;
+        translated = setDgsPointPosition(point, targetX, targetY) && translated;
+        const current = readDgsPointPosition(point);
+        const scale = current ? Math.max(1, Math.abs(current.x), Math.abs(current.y)) : 1;
+        translated = !!current &&
+          Math.hypot(current.x - targetX, current.y - targetY) <= 1e-8 * scale &&
+          translated;
+      });
+      if (!translated) {
+        componentPoints.forEach((point) => {
+          const previous = baseline.get(point);
+          if (previous) setDgsPointPosition(point, previous.x, previous.y);
+        });
+      } else {
+        followers.forEach((point) => recordDgsPointTraceMotion(state, point));
+      }
+    }
+    componentPoints.forEach((point) => updateDgsCoordinatePointState(state, point));
+    componentArcs.forEach(resetDgsFixedCompassTranslationSnapshot);
+  } finally {
+    state.fixedCompassSyncing = false;
+  }
+  flushDgsFixedCompassPersistence(state);
+  scheduleDgsFixedCompassRefresh(state);
+  return true;
+}
+
+function syncDgsFixedCompassConstructions(state: DgsState): boolean {
+  if (!state || !state.board || state.restoring || state.fixedCompassSyncing) return false;
+  const arcs = getDgsBoardObjects(state.board).filter((object) =>
+    isDgsCompassArc(object) && !object.__liaDgsCompassDraft &&
+    object.__liaDgsCompassFixedRadius === true
+  );
+  if (!arcs.length) return false;
+
+  const movedPoints = new Set<any>();
+  arcs.forEach((arc) => {
+    [arc.__liaDgsCompassCenterPoint, arc.__liaDgsCompassRadiusPoint].forEach((point) => {
+      const previous = fixedCompassSnapshotPosition(arc, point);
+      const current = readDgsPointPosition(point);
+      if (!previous || !current) {
+        resetDgsFixedCompassTranslationSnapshot(arc);
+        return;
+      }
+      const scale = Math.max(1, Math.abs(current.x), Math.abs(current.y));
+      if (Math.hypot(current.x - previous.x, current.y - previous.y) > 1e-9 * scale) {
+        movedPoints.add(point);
+      }
+    });
+  });
+  let changed = false;
+  movedPoints.forEach((point) => {
+    changed = translateDgsFixedCompassComponent(state, point) || changed;
+  });
+  flushDgsFixedCompassPersistence(state);
+  return changed;
+}
+
 function applyDgsMeasuredAngle(
   state: DgsState,
   angle: any,
@@ -6944,6 +7309,13 @@ function dgsPolygonBorderRecord(border: any): any {
 
 function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   if (!state || state.restoring || !state.board) return;
+  if (state.fixedCompassSyncing) {
+    state.fixedCompassPersistPending = true;
+    state.fixedCompassPersistHistory =
+      state.fixedCompassPersistHistory === true || recordHistory !== false;
+    return;
+  }
+  syncDgsFixedCompassConstructions(state);
   assignDgsMacroPersistentIds(state.boardId, state.board);
   const records: any[] = [];
   getDgsBoardObjects(state.board).forEach((object) => {
@@ -7080,6 +7452,11 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.radius = geometry.radius;
       record.startAngle = geometry.startAngle;
       record.sweepAngle = geometry.sweepAngle;
+      record.fixedRadius = object.__liaDgsCompassFixedRadius === true;
+      if (record.fixedRadius) {
+        record.fixedDx = Number(object.__liaDgsCompassFixedDx);
+        record.fixedDy = Number(object.__liaDgsCompassFixedDy);
+      }
     } else if (type === 'arc') {
       record.points = [
         dgsPointReference(object.__liaDgsArcStartPoint),
@@ -7225,6 +7602,26 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
     if (Number.isFinite(Number(record.radius))) object.__liaDgsCompassRadius = Number(record.radius);
     if (Number.isFinite(Number(record.startAngle))) object.__liaDgsCompassStartAngle = Number(record.startAngle);
     object.__liaDgsCompassDraft = false;
+    object.__liaDgsCompassFixedRadius = record.fixedRadius === true;
+    if (object.__liaDgsCompassFixedRadius) {
+      let fixedDx = Number(record.fixedDx);
+      let fixedDy = Number(record.fixedDy);
+      if (!Number.isFinite(fixedDx) || !Number.isFinite(fixedDy) ||
+          Math.hypot(fixedDx, fixedDy) <= 1e-12) {
+        const center = readDgsPointPosition(object.__liaDgsCompassCenterPoint);
+        const point = readDgsPointPosition(object.__liaDgsCompassRadiusPoint);
+        if (center && point) {
+          fixedDx = point.x - center.x;
+          fixedDy = point.y - center.y;
+        }
+      }
+      object.__liaDgsCompassFixedDx = fixedDx;
+      object.__liaDgsCompassFixedDy = fixedDy;
+    } else {
+      delete object.__liaDgsCompassFixedDx;
+      delete object.__liaDgsCompassFixedDy;
+    }
+    resetDgsFixedCompassTranslationSnapshot(object);
     ensureDgsCompassArcLabel(state, object);
   }
   if (isDgsArc(object)) {
@@ -7264,6 +7661,12 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
   else refreshDgsObjectLabel(object);
 }
+
+window.__syncDgsFixedCompassPoint = function(boardId: string, point: any): boolean {
+  const state = getDgsStateForBoard(String(boardId || ''));
+  if (!state || !point) return false;
+  return translateDgsFixedCompassComponent(state, point);
+};
 
 window.__prepareDgsBoardReplacement = function(): void {
   Object.keys(states).forEach((uid) => {
@@ -10213,6 +10616,7 @@ function syncDgsCoordinatePoint(state: DgsState, point: any): boolean {
   if (moved) {
     point.__liaDgsCoordinateSyncing = true;
     try { setDgsPointPosition(point, x, y); } finally { point.__liaDgsCoordinateSyncing = false; }
+    translateDgsFixedCompassComponent(state, point);
   }
   updateDgsCoordinatePointState(state, point);
   if (moved) refreshSideMenusForObject(point);
@@ -10298,6 +10702,7 @@ function applyCoordinateInputs(state: DgsState): boolean {
   } catch (e) {}
   if (!moved) return false;
 
+  translateDgsFixedCompassComponent(state, point);
   updateDgsCoordinatePointState(state, point);
   try { if (state.board && typeof state.board.fullUpdate === 'function') state.board.fullUpdate(); } catch (e) {
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e2) {}
@@ -10893,8 +11298,9 @@ function refreshConstructionModeCursor(boardContainer: HTMLElement): void {
 
 function renderToolState(state: DgsState): void {
   const text = dgsText(state.language);
-  const normalActive = state.activeTool === '' && !state.functionDialogOpen && !state.externalToolActive;
-  const compassActive = state.activeTool === 'compass';
+  const normalActive = state.activeTool === '' && !state.functionDialogOpen &&
+    !state.compassRadiusDialogOpen && !state.externalToolActive;
+  const compassActive = state.activeTool === 'compass' || state.compassRadiusDialogOpen;
   const formatActive = state.activeTool === 'format-copy';
   const pointActive = state.activeTool === 'point';
   const segmentActive = state.activeTool === 'segment';
@@ -10922,6 +11328,13 @@ function renderToolState(state: DgsState): void {
   state.selectButton.setAttribute('aria-pressed', normalActive ? 'true' : 'false');
   state.compassButton.classList.toggle('is-active', compassActive);
   state.compassButton.setAttribute('aria-pressed', compassActive ? 'true' : 'false');
+  const freeCompassActive = state.activeTool === 'compass' && state.compassMode === 'free';
+  const fixedCompassActive = (state.activeTool === 'compass' || state.compassRadiusDialogOpen) &&
+    state.compassMode === 'fixed';
+  state.compassToolButton.classList.toggle('is-active', freeCompassActive);
+  state.compassToolButton.setAttribute('aria-pressed', freeCompassActive ? 'true' : 'false');
+  state.fixedRadiusCompassToolButton.classList.toggle('is-active', fixedCompassActive);
+  state.fixedRadiusCompassToolButton.setAttribute('aria-pressed', fixedCompassActive ? 'true' : 'false');
   state.formatButton.classList.toggle('is-active', formatActive);
   state.formatButton.setAttribute('aria-pressed', formatActive ? 'true' : 'false');
   const formatLabel = formatActive && state.selectedFormatSource
@@ -11038,8 +11451,12 @@ function setActiveTool(
   tool: '' | 'compass' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
   deactivateRegression = true
 ): void {
+  if (state.compassSubmenuOpen) setCompassSubmenuOpen(state, false);
   const requestedToolId = getDgsActiveToolId(tool);
   if (requestedToolId != null && !isDgsToolAvailable(state, requestedToolId)) tool = '';
+  if (tool !== 'compass' && state.compassRadiusDialogOpen) {
+    setCompassRadiusDialogOpen(state, false);
+  }
   if (tool) {
     if (state.functionDialogOpen) setFunctionDialogOpen(state, false);
     if (state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
@@ -11119,7 +11536,8 @@ function releaseRegressionControls(state: DgsState): void {
 }
 
 function isDgsToolAvailable(state: DgsState, toolId: number): boolean {
-  return state.availableToolIds == null || state.availableToolIds.has(toolId);
+  return DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId) ||
+    state.availableToolIds == null || state.availableToolIds.has(toolId);
 }
 
 function setDgsButtonTabIndex(button: HTMLButtonElement, enabled: boolean): void {
@@ -11158,6 +11576,8 @@ function applyDgsToolAvailability(state: DgsState): void {
   };
 
   const compassVisible = setLeaf(state.compassButton, DGS_TOOL_IDS.compass);
+  setLeaf(state.compassToolButton, DGS_TOOL_IDS.compass);
+  setLeaf(state.fixedRadiusCompassToolButton, DGS_TOOL_IDS.compass);
   const formatVisible = setLeaf(state.formatButton, DGS_TOOL_IDS.formatCopy);
   const pointVisible = setLeaf(state.pointButton, DGS_TOOL_IDS.point);
   const lineGroupVisible = setGroup(state.segmentButton, [
@@ -11288,6 +11708,10 @@ function applyDgsToolAvailability(state: DgsState): void {
   setDgsButtonTabIndex(state.objectListButton, state.open);
 
   [
+    state.compassToolButton,
+    state.fixedRadiusCompassToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.compassSubmenuOpen));
+  [
     state.segmentToolButton,
     state.rayToolButton,
     state.lineToolButton,
@@ -11352,6 +11776,7 @@ function applyLayout(state: DgsState): void {
   state.objectListPanel.style.color = tone;
   state.colorPopup.style.color = tone;
   state.angleDialog.style.color = tone;
+  state.compassRadiusDialog.style.color = tone;
   state.arcDialog.style.color = tone;
   state.functionDialog.style.color = tone;
   state.textDialog.style.color = tone;
@@ -11367,6 +11792,8 @@ function applyLayout(state: DgsState): void {
   state.colorPopup.style.setProperty('--lia-dgs-theme-color', accent);
   state.angleDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.angleDialog.style.setProperty('--lia-dgs-theme-color', accent);
+  state.compassRadiusDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.compassRadiusDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.arcDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.arcDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.functionDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
@@ -11821,6 +12248,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.fullscreenButton.tabIndex = open ? 0 : -1;
   state.objectListButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
+  if (!open) setCompassSubmenuOpen(state, false);
   if (!open) setGeometrySubmenuOpen(state, false);
   if (!open) setRelationSubmenuOpen(state, false);
   if (!open) setShapeSubmenuOpen(state, false);
@@ -11828,6 +12256,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   if (!open) setRootSubmenuOpen(state, false);
   if (!open) setAxisScaleSubmenuOpen(state, false);
   if (!open) setFunctionDialogOpen(state, false);
+  if (!open) setCompassRadiusDialogOpen(state, false);
   if (!open) setTextDialogOpen(state, false);
   if (!open) setExportDialogOpen(state, false);
   if (changed) trackAxisWithMenu(state);
@@ -11862,6 +12291,10 @@ function positionDgsSubmenu(
 }
 
 function positionOpenDgsSubmenu(state: DgsState): void {
+  if (state.compassSubmenuOpen) {
+    positionDgsSubmenu(state, state.compassSubmenu, state.compassButton);
+    return;
+  }
   if (state.geometrySubmenuOpen) {
     positionDgsSubmenu(state, state.geometrySubmenu, state.segmentButton);
     return;
@@ -11887,7 +12320,24 @@ function positionOpenDgsSubmenu(state: DgsState): void {
   }
 }
 
+function setCompassSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setGeometrySubmenuOpen(state, false);
+  if (open) setRelationSubmenuOpen(state, false);
+  if (open) setShapeSubmenuOpen(state, false);
+  if (open) setAngleSubmenuOpen(state, false);
+  if (open) setRootSubmenuOpen(state, false);
+  if (open) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.compassSubmenu, state.compassButton);
+  state.compassSubmenuOpen = open;
+  state.compassSubmenu.dataset.open = open ? '1' : '0';
+  state.compassSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.compassButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  [state.compassToolButton, state.fixedRadiusCompassToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, open));
+}
+
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
@@ -11908,6 +12358,7 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open) setGeometrySubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
   if (open) setAngleSubmenuOpen(state, false);
@@ -11927,6 +12378,7 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) {
     state.geometrySubmenuOpen = false;
     state.geometrySubmenu.dataset.open = '0';
@@ -11952,6 +12404,7 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
@@ -11967,6 +12420,7 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setRootSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
   if (open && state.shapeSubmenuOpen) setShapeSubmenuOpen(state, false);
@@ -11988,6 +12442,7 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
   if (open) setGeometrySubmenuOpen(state, false);
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
@@ -12004,6 +12459,43 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
     state.logYScaleButton,
     state.logLogScaleButton
   ].forEach((button) => setDgsButtonTabIndex(button, open));
+}
+
+function setCompassRadiusDialogOpen(state: DgsState, open: boolean): void {
+  if (open) {
+    setExportDialogOpen(state, false);
+    setCompassSubmenuOpen(state, false);
+  }
+  state.compassRadiusDialogOpen = open;
+  state.compassRadiusDialog.dataset.open = open ? '1' : '0';
+  state.compassRadiusDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.compassRadiusDialogInput.tabIndex = open ? 0 : -1;
+  state.compassRadiusDialogConfirmButton.tabIndex = open ? 0 : -1;
+  state.compassRadiusDialogCancelButton.tabIndex = open ? 0 : -1;
+  renderToolState(state);
+  if (open) {
+    state.compassRadiusDialogInput.value = formatCoordinate(state.compassPresetRadius);
+    state.compassRadiusDialogInput.setAttribute('aria-invalid', 'false');
+    window.setTimeout(() => {
+      try {
+        state.compassRadiusDialogInput.focus();
+        state.compassRadiusDialogInput.select();
+      } catch (e) {}
+    }, 0);
+  }
+}
+
+function confirmDgsCompassRadius(state: DgsState): boolean {
+  const raw = String(state.compassRadiusDialogInput.value || '').trim().replace(',', '.');
+  const radius = Number(raw);
+  const valid = raw !== '' && Number.isFinite(radius) && radius > 1e-12;
+  state.compassRadiusDialogInput.setAttribute('aria-invalid', valid ? 'false' : 'true');
+  if (!valid) return false;
+  state.compassPresetRadius = radius;
+  state.compassMode = 'fixed';
+  setCompassRadiusDialogOpen(state, false);
+  setActiveTool(state, 'compass');
+  return true;
 }
 
 function setAngleDialogOpen(state: DgsState, open: boolean): void {
@@ -12190,7 +12682,9 @@ function setExportDialogOpen(state: DgsState, open: boolean): void {
   state.exportCloseButton.tabIndex = open ? 0 : -1;
   if (open) {
     state.exportSelectedToolIds = new Set<number>(
-      state.availableToolIds == null ? DGS_KNOWN_TOOL_IDS : state.availableToolIds
+      state.availableToolIds == null
+        ? DGS_EXPORT_SELECTABLE_TOOL_IDS
+        : dgsExportSelectableToolIds(state.availableToolIds)
     );
     state.exportSelectedRestrictionIds = new Set<number>(state.restrictionIds);
     setDgsExportDialogStep(state, 'tools');
@@ -12403,6 +12897,14 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.toolsDivider?.isConnected &&
     !!existing.selectButton?.isConnected &&
     !!existing.compassButton?.isConnected &&
+    !!existing.compassSubmenu?.isConnected &&
+    existing.compassSubmenu?.parentElement === existing.menuClip &&
+    !!existing.compassToolButton?.isConnected &&
+    !!existing.fixedRadiusCompassToolButton?.isConnected &&
+    !!existing.compassRadiusDialog?.isConnected &&
+    !!existing.compassRadiusDialogInput?.isConnected &&
+    !!existing.compassRadiusDialogConfirmButton?.isConnected &&
+    !!existing.compassRadiusDialogCancelButton?.isConnected &&
     !!existing.formatButton?.isConnected &&
     !!existing.pointButton?.isConnected &&
     !!existing.segmentButton?.isConnected &&
@@ -12473,7 +12975,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.exportToolsStep?.isConnected &&
     !!existing.exportMacroStep?.isConnected &&
     existing.exportToolButtons instanceof Map &&
-    existing.exportToolButtons.size === DGS_KNOWN_TOOL_IDS.length &&
+    existing.exportToolButtons.size === DGS_EXPORT_SELECTABLE_TOOL_IDS.length &&
     existing.exportRestrictionInputs instanceof Map &&
     existing.exportRestrictionInputs.size === DGS_KNOWN_RESTRICTION_IDS.length &&
     Array.from(existing.exportRestrictionInputs.values()).every((input) => input.isConnected) &&
@@ -12518,13 +13020,16 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     existing.restrictionSelectionKey = config.restrictionSelectionKey;
     if (toolSelectionChanged) {
       existing.exportSelectedToolIds = new Set<number>(
-        config.toolIds == null ? DGS_KNOWN_TOOL_IDS : config.toolIds
+        config.toolIds == null
+          ? DGS_EXPORT_SELECTABLE_TOOL_IDS
+          : dgsExportSelectableToolIds(config.toolIds)
       );
     }
     if (restrictionSelectionChanged) {
       existing.exportSelectedRestrictionIds = new Set<number>(config.restrictionIds);
     }
     if (toolSelectionChanged || restrictionSelectionChanged) {
+      setCompassSubmenuOpen(existing, false);
       setGeometrySubmenuOpen(existing, false);
       setRelationSubmenuOpen(existing, false);
       setShapeSubmenuOpen(existing, false);
@@ -12532,6 +13037,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       setRootSubmenuOpen(existing, false);
       setAxisScaleSubmenuOpen(existing, false);
       setAngleDialogOpen(existing, false);
+      setCompassRadiusDialogOpen(existing, false);
       setArcDialogOpen(existing, false);
       setFunctionDialogOpen(existing, false);
       setTextDialogOpen(existing, false);
@@ -12555,6 +13061,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (existing.xAxisSyncRAF) cancelAnimationFrame(existing.xAxisSyncRAF);
     if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
     if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
+    if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
     cancelScheduledDgsConstructionRestore(existing);
     restoreAxis(existing);
     restoreXAxis(existing);
@@ -12619,6 +13126,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     try { existing.objectListClip.remove(); } catch (e) {}
     try { existing.colorPopup.remove(); } catch (e) {}
     try { existing.angleDialog.remove(); } catch (e) {}
+    try { existing.compassRadiusDialog.remove(); } catch (e) {}
     try { existing.arcDialog.remove(); } catch (e) {}
     try { existing.functionDialog.remove(); } catch (e) {}
     try { existing.textDialog.remove(); } catch (e) {}
@@ -12644,13 +13152,39 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   selectButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(selectButton);
 
+  const refinedCompassBodyIcon =
+    '<path class=lia-dgs-compass-body ' +
+    'd=M11.25,1h1.5M11.25,1.7h1.5M11.25,2.4h1.5' +
+    'M12,1v2.1M9.85,3.1h4.3v3.7h-4.3z' +
+    'M10.7,7.1L6.15,20.8l-.45,1.55M13.3,7.1l4.55,13.7,.7,1.35' +
+    'M4.7,10.05h14.6M4.7,9.35v1.4M19.3,9.35v1.4></path>' +
+    '<circle class=lia-dgs-compass-joint ' +
+    'cx=10.45 cy=7.45 r=.72></circle>' +
+    '<circle class=lia-dgs-compass-joint ' +
+    'cx=13.55 cy=7.45 r=.72></circle>';
+  const compassIcon =
+    '<svg class=lia-dgs-compass-icon viewBox=0,0,24,24 aria-hidden=true>' +
+    '<g transform=rotate(-5,12,12)>' +
+    refinedCompassBodyIcon +
+    '<path class=lia-dgs-compass-accent ' +
+    'd=M5.7,22.35A7.2,3.4,0,0,1,18.55,22.15></path></g></svg>';
+  const fixedRadiusCompassIcon =
+    '<svg class=lia-dgs-compass-icon viewBox=0,0,24,24 aria-hidden=true>' +
+    '<g transform=rotate(-5,12,12)>' +
+    refinedCompassBodyIcon +
+    '<path class=lia-dgs-compass-accent d=M6.15,20.8H17.85></path>' +
+    '<text class=lia-dgs-compass-radius-label x=10.75 y=19.9>r</text></g></svg>';
   const compassButton = document.createElement('button');
   compassButton.type = 'button';
   compassButton.className = 'lia-dgs-geometry-button lia-dgs-compass-button';
-  compassButton.setAttribute('aria-label', text.compass);
+  compassButton.setAttribute('aria-label', text.compassTools);
   compassButton.setAttribute('aria-pressed', 'false');
+  compassButton.setAttribute('aria-haspopup', 'menu');
+  compassButton.setAttribute('aria-expanded', 'false');
   compassButton.title = text.compass;
   compassButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-reference" d="M12 3.5L5.5 20.5M8.5 13.2h7M4.5 20.5h2M10.5 5.2h3"></path><path d="M12 3.5l6.5 17M17.5 20.5h2M5.5 18.8A8 8 0 0 1 19.8 13.5"></path></svg>';
+  compassButton.title = text.compassTools;
+  compassButton.innerHTML = compassIcon;
   compassButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(compassButton);
 
@@ -12727,6 +13261,22 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     parent.appendChild(toolButton);
     return toolButton;
   };
+
+  const compassSubmenu = document.createElement('div');
+  compassSubmenu.id = `dgs-compass-submenu-${uid}`;
+  compassSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-compass-submenu';
+  compassSubmenu.setAttribute('role', 'menu');
+  compassSubmenu.setAttribute('aria-label', text.compassTools);
+  compassButton.setAttribute('aria-controls', compassSubmenu.id);
+  const compassToolButton = makeGeometryTool(compassSubmenu, text.freeCompass, compassIcon);
+  compassToolButton.setAttribute('aria-pressed', 'false');
+  const fixedRadiusCompassToolButton = makeGeometryTool(
+    compassSubmenu,
+    text.fixedRadiusCompass,
+    fixedRadiusCompassIcon
+  );
+  fixedRadiusCompassToolButton.setAttribute('aria-pressed', 'false');
+  menuBar.appendChild(compassSubmenu);
 
   const segmentToolButton = makeGeometryTool(geometrySubmenu, segmentLabel, segmentIcon);
   segmentToolButton.setAttribute('aria-pressed', 'false');
@@ -13002,6 +13552,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   // The toolbar scrolls horizontally and therefore clips its own descendants.
   // Keep flyout menus in the board-sized clip layer so they can extend below it.
   const flyoutSubmenus = [
+    compassSubmenu,
     geometrySubmenu,
     relationSubmenu,
     shapeSubmenu,
@@ -13514,6 +14065,44 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   angleDialog.appendChild(angleDialogField);
   angleDialog.appendChild(angleDialogActions);
 
+  const compassRadiusDialog = document.createElement('div');
+  compassRadiusDialog.className =
+    'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-compass-radius-dialog';
+  compassRadiusDialog.setAttribute('role', 'dialog');
+  compassRadiusDialog.setAttribute('aria-modal', 'true');
+  compassRadiusDialog.setAttribute('aria-hidden', 'true');
+  compassRadiusDialog.dataset.open = '0';
+  const compassRadiusDialogTitle = document.createElement('div');
+  compassRadiusDialogTitle.className = 'lia-dgs-angle-dialog-title';
+  compassRadiusDialogTitle.textContent = text.enterCompassRadius;
+  const compassRadiusDialogField = document.createElement('label');
+  compassRadiusDialogField.className = 'lia-dgs-angle-dialog-field';
+  const compassRadiusDialogInput = document.createElement('input');
+  compassRadiusDialogInput.type = 'text';
+  compassRadiusDialogInput.inputMode = 'decimal';
+  compassRadiusDialogInput.className = 'lia-dgs-angle-dialog-input';
+  compassRadiusDialogInput.setAttribute('aria-label', text.radius);
+  compassRadiusDialogInput.setAttribute('aria-invalid', 'false');
+  compassRadiusDialogInput.autocomplete = 'off';
+  compassRadiusDialogInput.spellcheck = false;
+  compassRadiusDialogField.appendChild(compassRadiusDialogInput);
+  const compassRadiusDialogActions = document.createElement('div');
+  compassRadiusDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const compassRadiusDialogCancelButton = document.createElement('button');
+  compassRadiusDialogCancelButton.type = 'button';
+  compassRadiusDialogCancelButton.className = 'lia-dgs-angle-dialog-button';
+  compassRadiusDialogCancelButton.textContent = text.cancel;
+  const compassRadiusDialogConfirmButton = document.createElement('button');
+  compassRadiusDialogConfirmButton.type = 'button';
+  compassRadiusDialogConfirmButton.className = 'lia-dgs-angle-dialog-button';
+  compassRadiusDialogConfirmButton.dataset.primary = '1';
+  compassRadiusDialogConfirmButton.textContent = text.create;
+  compassRadiusDialogActions.appendChild(compassRadiusDialogCancelButton);
+  compassRadiusDialogActions.appendChild(compassRadiusDialogConfirmButton);
+  compassRadiusDialog.appendChild(compassRadiusDialogTitle);
+  compassRadiusDialog.appendChild(compassRadiusDialogField);
+  compassRadiusDialog.appendChild(compassRadiusDialogActions);
+
   const arcDialog = document.createElement('div');
   arcDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-arc-dialog';
   arcDialog.setAttribute('role', 'dialog');
@@ -13708,7 +14297,6 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     .querySelector<HTMLButtonElement>('.lia-plot-regression-toggle')?.innerHTML ||
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h4M7 16v4M12.8 4.5l1.7 3.5 3.9.5-2.8 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8-2.8-2.7 3.9-.5z"></path></svg>';
   appendExportToolGroup(geometryLanguage === 'de' ? 'Format' : 'Formatting', [[
-    { id: DGS_TOOL_IDS.compass, label: text.compass, icon: compassButton.innerHTML, className: 'lia-dgs-compass-button' },
     { id: DGS_TOOL_IDS.formatCopy, label: text.copyFormat, icon: formatButton.innerHTML, className: 'lia-dgs-format-button' }
   ]]);
   appendExportToolGroup(geometryLanguage === 'de' ? 'Geometrie' : 'Geometry', [
@@ -13859,6 +14447,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   objectListPanel.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   colorPopup.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  compassRadiusDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   arcDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   functionDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   textDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
@@ -13877,6 +14466,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   boardContainer.appendChild(menuClip);
   boardContainer.appendChild(colorPopup);
   boardContainer.appendChild(angleDialog);
+  boardContainer.appendChild(compassRadiusDialog);
   boardContainer.appendChild(arcDialog);
   boardContainer.appendChild(functionDialog);
   boardContainer.appendChild(textDialog);
@@ -13928,7 +14518,9 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     exportMacroStep,
     exportToolButtons,
     exportSelectedToolIds: new Set<number>(
-      config.toolIds == null ? DGS_KNOWN_TOOL_IDS : config.toolIds
+      config.toolIds == null
+        ? DGS_EXPORT_SELECTABLE_TOOL_IDS
+        : dgsExportSelectableToolIds(config.toolIds)
     ),
     exportRestrictionInputs,
     exportSelectedRestrictionIds: new Set<number>(config.restrictionIds),
@@ -14006,6 +14598,13 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     colorValue: 1,
     selectButton,
     compassButton,
+    compassSubmenu,
+    compassToolButton,
+    fixedRadiusCompassToolButton,
+    compassRadiusDialog,
+    compassRadiusDialogInput,
+    compassRadiusDialogConfirmButton,
+    compassRadiusDialogCancelButton,
     formatButton,
     toolsDivider,
     pointButton,
@@ -14083,6 +14682,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     axisAdjusted: false,
     axisSyncing: false,
     open: false,
+    compassSubmenuOpen: false,
     geometrySubmenuOpen: false,
     relationSubmenuOpen: false,
     shapeSubmenuOpen: false,
@@ -14090,6 +14690,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     rootSubmenuOpen: false,
     axisScaleSubmenuOpen: false,
     angleDialogOpen: false,
+    compassRadiusDialogOpen: false,
     arcDialogOpen: false,
     functionDialogOpen: false,
     textDialogOpen: false,
@@ -14120,6 +14721,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     compassSweep: 0,
     compassRadius: 0,
     compassMoved: false,
+    compassMode: 'free',
+    compassPresetRadius: 1,
     pendingArcPoints: [],
     selectedRelationLine: null,
     selectedRelationPoint: null,
@@ -14136,7 +14739,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     restoring: false,
     rootConstructions: [],
     rootUpdating: false,
-    coordinateSyncing: false
+    coordinateSyncing: false,
+    fixedCompassSyncing: false,
+    fixedCompassPersistPending: false,
+    fixedCompassPersistHistory: false
   };
   states[uid] = state;
   exportToolButtons.forEach((toolButton, toolId) => {
@@ -14175,6 +14781,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   // only while dependencies are still unresolved.
   scheduleDgsConstructionRestore(state);
   setMenuOpen(state, false);
+  setCompassSubmenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
   setRelationSubmenuOpen(state, false);
   setShapeSubmenuOpen(state, false);
@@ -14182,6 +14789,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   setRootSubmenuOpen(state, false);
   setAxisScaleSubmenuOpen(state, false);
   setAngleDialogOpen(state, false);
+  setCompassRadiusDialogOpen(state, false);
   setArcDialogOpen(state, false);
   setFunctionDialogOpen(state, false);
   setTextDialogOpen(state, false);
@@ -14220,7 +14828,29 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setAngleDialogOpen(state, false);
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
-    setActiveTool(state, state.activeTool === 'compass' ? '' : 'compass');
+    setCompassRadiusDialogOpen(state, false);
+    setCompassSubmenuOpen(state, !state.compassSubmenuOpen);
+  });
+
+  compassToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const deactivate = state.activeTool === 'compass' && state.compassMode === 'free';
+    setActiveTool(state, '', false);
+    state.compassMode = 'free';
+    compassButton.innerHTML = compassIcon;
+    setCompassSubmenuOpen(state, false);
+    if (!deactivate) setActiveTool(state, 'compass');
+  });
+
+  fixedRadiusCompassToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setActiveTool(state, '', false);
+    state.compassMode = 'fixed';
+    compassButton.innerHTML = fixedRadiusCompassIcon;
+    setCompassSubmenuOpen(state, false);
+    setCompassRadiusDialogOpen(state, true);
   });
 
   formatButton.addEventListener('click', (evt) => {
@@ -14872,6 +15502,38 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
   });
 
+  compassRadiusDialogConfirmButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    confirmDgsCompassRadius(state);
+  });
+  compassRadiusDialogCancelButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setCompassRadiusDialogOpen(state, false);
+    setActiveTool(state, '', false);
+  });
+  compassRadiusDialogInput.addEventListener('input', () => {
+    compassRadiusDialogInput.setAttribute('aria-invalid', 'false');
+  });
+  compassRadiusDialogInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+        evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+      evt.stopPropagation();
+      return;
+    }
+    if (evt.key === 'Enter') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      confirmDgsCompassRadius(state);
+    } else if (evt.key === 'Escape') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setCompassRadiusDialogOpen(state, false);
+      setActiveTool(state, '', false);
+    }
+  });
+
   angleDialogConfirmButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -15418,7 +16080,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
         return;
       }
 
-      let point = findNearestBoardPoint(state, evt);
+      let point = state.compassMode === 'fixed' ? null : findNearestBoardPoint(state, evt);
       const center = state.selectedCompassCenter;
       const coordinates = eventToUserCoordinates(state, evt);
       if (!coordinates) return;
@@ -15428,14 +16090,29 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       if (!Number.isFinite(centerX) || !Number.isFinite(centerY) ||
           Math.hypot(coordinates.x - centerX, coordinates.y - centerY) <= 1e-12) return;
       if (point === center) return;
-      if (point && (getDgsObjectFixed(point) || point.__liaDgsCoordinateExpressions ||
-          String(point.elType || '').toLowerCase() === 'glider')) point = null;
-      if (!point) point = createDgsPoint(state, coordinates.x, coordinates.y);
+      if (state.compassMode === 'fixed') {
+        const directionX = coordinates.x - centerX;
+        const directionY = coordinates.y - centerY;
+        const directionLength = Math.hypot(directionX, directionY);
+        const presetRadius = Number(state.compassPresetRadius);
+        if (!Number.isFinite(presetRadius) || presetRadius <= 1e-12 || directionLength <= 1e-12) return;
+        point = createDgsPoint(
+          state,
+          centerX + presetRadius * directionX / directionLength,
+          centerY + presetRadius * directionY / directionLength
+        );
+      } else {
+        if (point && (getDgsObjectFixed(point) || point.__liaDgsCoordinateExpressions ||
+            String(point.elType || '').toLowerCase() === 'glider')) point = null;
+        if (!point) point = createDgsPoint(state, coordinates.x, coordinates.y);
+      }
       if (!point || point === center) return;
       let pointX = NaN;
       let pointY = NaN;
       try { pointX = Number(point.X()); pointY = Number(point.Y()); } catch (e) {}
-      const radius = Math.hypot(pointX - centerX, pointY - centerY);
+      const radius = state.compassMode === 'fixed'
+        ? Number(state.compassPresetRadius)
+        : Math.hypot(pointX - centerX, pointY - centerY);
       if (!Number.isFinite(radius) || radius <= 1e-12) return;
       evt.preventDefault();
       evt.stopImmediatePropagation();
@@ -15500,7 +16177,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
 
     if (state.activeTool === 'intersection') {
-      const source = findDgsTangentTarget(state, evt);
+      const source = findDgsIntersectionTarget(state, evt);
       if (!source) return;
       evt.preventDefault();
       evt.stopImmediatePropagation();
@@ -15768,6 +16445,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     refreshDgsSliderTypography(state);
   };
   state.onBoardRootUpdate = () => {
+    syncDgsFixedCompassConstructions(state);
     if (!state.axisSyncing) {
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
