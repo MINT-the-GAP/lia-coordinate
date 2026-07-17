@@ -3183,7 +3183,17 @@ function findNearestDgsLinearObject(
 }
 
 function isDgsFunctionTarget(object: any): boolean {
-  return !!object && (isDgsFunction(object) || String(object.elType || '').toLowerCase() === 'functiongraph');
+  return !!object && typeof object.Y === 'function' && (
+    isDgsFunction(object) ||
+    object.__liaDgsAnalysisFunction === true ||
+    String(object.elType || '').toLowerCase() === 'functiongraph'
+  );
+}
+
+function isDgsExternalFunctionAnalysisTarget(object: any): boolean {
+  return !!object && object.__liaDgsAnalysisFunction === true &&
+    !isDgsFunction(object) && typeof object.Y === 'function' &&
+    !!String(object.__liaDgsPersistentId || '');
 }
 
 function isDgsTangentTarget(object: any): boolean {
@@ -6567,6 +6577,10 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     else if (isDgsPoint(object)) type = 'point';
     else if (isDgsText(object)) type = 'text';
     else if (isDgsFunction(object)) type = 'function';
+    else if (isDgsExternalFunctionAnalysisTarget(object) && (
+      object.__liaDgsRootConstruction || object.__liaDgsExtremaConstruction ||
+      object.__liaDgsInflectionConstruction || object.__liaDgsYInterceptConstruction
+    )) type = 'external-function-analysis';
     else if (object.__liaDgsSegment) type = 'segment';
     else if (isDgsRay(object)) type = 'ray';
     else if (isDgsVector(object)) type = 'vector';
@@ -6878,6 +6892,32 @@ window.__persistDgsBoardState = function(boardId: string, recordHistory = true):
   persistDgsConstruction(state, recordHistory !== false);
 };
 
+window.__detachDgsAnalysisFunctionTarget = function(boardId: string, target: any): void {
+  const normalizedBoardId = String(boardId || '');
+  const state = getDgsStateForBoard(normalizedBoardId);
+  const currentBoard = window.__boards && window.__boards[normalizedBoardId];
+  if (!state || !target || !currentBoard || state.board !== currentBoard ||
+      target.board !== currentBoard || !state.boardContainer?.isConnected) return;
+
+  const constructions = new Set<any>();
+  [
+    target.__liaDgsRootConstruction,
+    target.__liaDgsExtremaConstruction,
+    target.__liaDgsInflectionConstruction,
+    target.__liaDgsYInterceptConstruction
+  ].forEach((construction) => { if (construction) constructions.add(construction); });
+  (Array.isArray(target.__liaDgsIntersectionConstructions)
+    ? target.__liaDgsIntersectionConstructions
+    : []
+  ).forEach((construction: any) => { if (construction) constructions.add(construction); });
+  constructions.forEach((construction) => removeDgsRootConstruction(state, construction, false));
+
+  (Array.isArray(target.__liaDgsTangents) ? target.__liaDgsTangents.slice() : [])
+    .forEach((tangent: any) => removeDgsTangent(state, tangent, false));
+  try { state.board.update?.(); } catch (e) {}
+  persistDgsConstruction(state, true);
+};
+
 function restoreDgsPointTraceState(state: DgsState, point: any, record: any): void {
   if (!point) return;
   const existingMarkers = Array.isArray(point.__liaDgsTraceMarkers)
@@ -7181,7 +7221,8 @@ function restoreDgsConstruction(state: DgsState): boolean {
     let pending = restoreDgsPendingRecords(
       state,
       saved.records.filter((record: any) =>
-        record.type !== 'point' && record.type !== 'intersection-construction'
+        record.type !== 'point' && record.type !== 'intersection-construction' &&
+        record.type !== 'external-function-analysis'
       ),
       existingById
     );
@@ -8232,6 +8273,7 @@ function buildDgsExportMacroBlock(
   const analysisSourceReference = (sourceValue: any): string => {
     const source = constructionSourceObject(sourceValue);
     if (!source) return '';
+    if (source.__liaDgsAnalysisFunction === true && !isDgsFunction(source)) return '';
     if (!source.__liaDgsPolygonBorder && !source.__liaDgsAngleBisector) {
       const exportedName = exportedObjectNames.get(source);
       if (exportedName) return exportedName;
@@ -8329,6 +8371,17 @@ function buildDgsExportMacroBlock(
     const name = cleanDgsExportToken(getDgsObjectName(object));
     const typeLabel = getDgsObjectTypeLabel(state, object);
 
+    if (object.__liaDgsAnalysisFunction === true && !isDgsFunction(object)) {
+      if (object.__liaDgsRootConstruction || object.__liaDgsExtremaConstruction ||
+          object.__liaDgsInflectionConstruction || object.__liaDgsYInterceptConstruction) {
+        const label = String(object.__liaRegressionEntry?.title ||
+          object.__liaRegressionAnalysisId || dgsText(state.language).analysis);
+        const message = label + ' - ' + dgsText(state.language).analysis;
+        if (!unsupported.includes(message)) unsupported.push(message);
+      }
+      return;
+    }
+
     const addFunctionAnalysisExport = (macroName: string, construction: any, prefix: string) => {
       addPointConstructionExport(
         macroName,
@@ -8368,6 +8421,10 @@ function buildDgsExportMacroBlock(
 
     if (object.__liaDgsTangent) {
       const source = object.__liaDgsTangentSource;
+      if (source && source.__liaDgsAnalysisFunction === true && !isDgsFunction(source)) {
+        unsupported.push((name ? name + ' - ' : '') + typeLabel);
+        return;
+      }
       let sourceReference = source ? (exportedObjectNames.get(source) || '') : '';
       if (!sourceReference && source) {
         if (!isDgsFunction(source) && !isDgsCircle(source) && source.point1 && source.point2) {
@@ -8604,9 +8661,18 @@ function buildDgsExportMacroBlock(
 
   getDgsIntersectionConstructionsForExport(state)
     .forEach((construction) => {
-      const firstReference = analysisSourceReference(construction.source || construction.__liaDgsSource);
-      const secondReference = analysisSourceReference(construction.source2 || construction.__liaDgsSource2);
-      if (!firstReference || !secondReference) return;
+      const firstSource = construction.source || construction.__liaDgsSource;
+      const secondSource = construction.source2 || construction.__liaDgsSource2;
+      const firstReference = analysisSourceReference(firstSource);
+      const secondReference = analysisSourceReference(secondSource);
+      if (!firstReference || !secondReference) {
+        if ((firstSource && firstSource.__liaDgsAnalysisFunction === true) ||
+            (secondSource && secondSource.__liaDgsAnalysisFunction === true)) {
+          const message = dgsText(state.language).intersection + ' - ' + dgsText(state.language).analysis;
+          if (!unsupported.includes(message)) unsupported.push(message);
+        }
+        return;
+      }
       addPointConstructionExport(
         macros.intersection,
         construction,

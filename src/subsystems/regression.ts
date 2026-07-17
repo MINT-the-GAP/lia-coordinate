@@ -142,6 +142,8 @@ type RegressionState = {
   overlayScaleCarry?: number;
   overlayScaleCarryUntil?: number;
   restoredSnapshotRevision?: number;
+  dgsSyncFrame?: number | null;
+  disposing?: boolean;
 };
 
 type RegressionAnalysisSnapshot = {
@@ -2540,6 +2542,38 @@ const GRAPH_MODELS: Record<string, GraphModelDescriptor> = {
   }
 };
 
+function regressionAnalysisGraphPersistentId(state: RegressionState, entry: AnyAnalysisEntry): string {
+  return 'regression:' + state.boardId + ':' + state.uid + ':' + entry.id;
+}
+
+function markRegressionAnalysisGraph(
+  state: RegressionState,
+  entry: AnyAnalysisEntry,
+  descriptor: GraphModelDescriptor,
+  graph: any = entry.graph
+): void {
+  if (!graph) return;
+  graph.__liaRegressionAnalysisGraph = true;
+  graph.__liaRegressionState = state;
+  graph.__liaRegressionEntry = entry;
+  graph.__liaRegressionDescriptor = descriptor;
+  graph.__liaRegressionBoardId = state.boardId;
+  graph.__liaRegressionUid = state.uid;
+  graph.__liaRegressionAnalysisId = entry.id;
+  graph.__liaRegressionClassKey = entry.classKey || '';
+  graph.__liaDgsAnalysisFunction = true;
+  graph.__liaDgsPersistentId = regressionAnalysisGraphPersistentId(state, entry);
+}
+
+function scheduleRegressionDgsSync(state: RegressionState): void {
+  if (!state || state.disposing || state.dgsSyncFrame != null) return;
+  state.dgsSyncFrame = window.requestAnimationFrame(() => {
+    state.dgsSyncFrame = null;
+    if (state.disposing || !state.boardContainer?.isConnected) return;
+    try { window.__persistDgsBoardState?.(state.boardId, false); } catch (e) {}
+  });
+}
+
 function removeEntryGraph(entry: AnyAnalysisEntry): void {
   const graph = entry.graph;
   if (!graph || !graph.board) {
@@ -2549,6 +2583,16 @@ function removeEntryGraph(entry: AnyAnalysisEntry): void {
 
   if (graph.__liaAnalysisDragDetach && typeof graph.__liaAnalysisDragDetach === 'function') {
     try { graph.__liaAnalysisDragDetach(); } catch (e) {}
+  }
+
+  const owner = graph.__liaRegressionState as RegressionState | undefined;
+  if (graph.__liaDgsAnalysisFunction && !owner?.disposing) {
+    try {
+      window.__detachDgsAnalysisFunctionTarget?.(
+        String(graph.__liaRegressionBoardId || owner?.boardId || ''),
+        graph
+      );
+    } catch (e) {}
   }
 
   try {
@@ -2575,6 +2619,7 @@ function renderEntryGraph(state: RegressionState, entry: AnyAnalysisEntry, descr
       withLabel: false
     });
     entry.graph = graph;
+    markRegressionAnalysisGraph(state, entry, descriptor, graph);
     try { board.update(); } catch (e) {}
     return true;
   } catch (e) {
@@ -2678,8 +2723,25 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
 }
 
 function updateEntryGraph(state: RegressionState, entry: AnyAnalysisEntry, descriptor: GraphModelDescriptor): void {
+  const graph = entry.graph;
+  if (graph && graph.board === state.board && graph.__liaRegressionDescriptor === descriptor) {
+    markRegressionAnalysisGraph(state, entry, descriptor, graph);
+    try {
+      graph.setAttribute?.({
+        strokeColor: entry.color,
+        highlightStrokeColor: entry.color
+      });
+    } catch (e) {}
+    try { graph.updateCurve?.(); } catch (e) {}
+    try { state.board.update(); } catch (e) {}
+    scheduleRegressionDgsSync(state);
+    return;
+  }
   const ok = renderEntryGraph(state, entry, descriptor);
-  if (ok) bindEntryDrag(state, entry, descriptor);
+  if (ok) {
+    bindEntryDrag(state, entry, descriptor);
+    scheduleRegressionDgsSync(state);
+  }
 }
 
 // Public per-model wrappers (existing call sites depend on these names).
@@ -3678,6 +3740,7 @@ function openRegressionAnalysisSnapshot(
   entry.title = String(snapshot.title || '');
   entry.color = String(snapshot.color || '#ff0000');
   entry.classKey = snapshot.classKey;
+  markRegressionAnalysisGraph(state, entry, GRAPH_MODELS[snapshot.classKey], entry.graph);
   if (entry.panel) entry.panel.style.setProperty('--lia-analysis-accent', entry.color);
   if (snapshot.minimized && entry.panel) {
     const close = entry.panel.querySelector<HTMLButtonElement>('.lia-plot-analysis-close');
@@ -8283,6 +8346,11 @@ window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boole
 
 function disposeRegressionState(state: RegressionState): void {
   try { persistRegressionSnapshot(state); } catch (e) {}
+  state.disposing = true;
+  if (state.dgsSyncFrame != null) {
+    try { window.cancelAnimationFrame(state.dgsSyncFrame); } catch (e) {}
+    state.dgsSyncFrame = null;
+  }
   removeAllAnalysisOverlays(state);
   removeAllQuadraticAnalysisOverlays(state);
   removeAllCubicAnalysisOverlays(state);
