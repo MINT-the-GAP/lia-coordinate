@@ -808,20 +808,38 @@ export function runExternalBootstraps(): void {
     try { fn(); } catch (e) {}
   }
 
+  // Preserve the old board while all macro registries still point at it. Their
+  // bootstraps dispose stale entries as soon as they see the replacement board.
+  call(window.__prepareDgsBoardReplacement);
+
+  // A LiaScript slide revisit creates a fresh JSXGraph board while the macro
+  // spec nodes may already be present in the DOM. Mutation observers therefore
+  // cannot be the only bootstrap trigger: they observe spec changes, not a
+  // replacement of window.__boards[id]. Keep this list dependency ordered so
+  // every macro-managed object is attached to the new board before DGS restores
+  // its interactive construction snapshot.
   call(window.__bootstrapAxisTitles);
-  call(window.__bootstrapScharen);
-  call(window.__bootstrapPlotFunctions);
-  call(window.__bootstrapPlotInputs);
+  call(window.__bootstrapSliders);
   call(window.__bootstrapCreatePoints);
   call(window.__bootstrapStaticPoints);
+  call(window.__bootstrapPlotFunctions);
+  call(window.__bootstrapPlotInputs);
+  call(window.__bootstrapScharen);
   call(window.__bootstrapPointOnGraphs);
   call(window.__bootstrapPointsOnGraph);
   call(window.__bootstrapDistances);
+  call(window.__bootstrapLinearObjects);
   call(window.__bootstrapArcs);
   call(window.__bootstrapAreas);
   call(window.__bootstrapAngles);
+  call(window.__bootstrapCoordTexts);
   call(window.__bootstrapCircles);
+  call(window.__bootstrapRelationObjects);
+  call(window.__bootstrapTangentSectorObjects);
+  call(window.__bootstrapFunctionAnalysisPoints);
+  call(window.__bootstrapObjectAnalysisPoints);
   call(window.__bootstrapRekonstruktion);
+  call(window.__bootstrapRegression);
   call(window.__bootstrapDGS);
 }
 

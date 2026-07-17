@@ -8,6 +8,7 @@ type DrawPoint = { x: number; y: number };
 type DrawStroke = { color: string; width: number; points: DrawPoint[] };
 type EraseEntry = { stroke: DrawStroke; index: number };
 type AutoPointData = { key: string; x: number; y: number };
+type RegressionLanguage = 'de' | 'en';
 type DrawAction =
   | { type: 'add'; stroke: DrawStroke }
   | { type: 'erase'; removed: EraseEntry[] }
@@ -19,6 +20,10 @@ type LinearParamKey = 'm' | 'n';
 type QuadraticParamKey = 'a' | 'c' | 'd';
 type CubicParamKey = 'a' | 'b' | 'c' | 'd';
 type QuarticParamKey = 'a' | 'b' | 'c' | 'd' | 'f';
+type LinearFit = { m: number; n: number; error: number };
+type QuadraticFit = { a: number; c: number; d: number; error: number };
+type CubicFit = { a: number; b: number; c: number; d: number; error: number };
+type QuarticFit = { a: number; b: number; c: number; d: number; f: number; error: number };
 type SinParamKey = 'A' | 'b' | 'c' | 'd';
 type ExpParamKey = 'A' | 'b' | 'c' | 'd';
 type LogParamKey = 'A' | 'b' | 'c' | 'd';
@@ -66,6 +71,10 @@ type AnalysisEntry<M> = {
   panel: HTMLElement | null;
   graph: any;
   model: M;
+  classKey?: AnalysisClassKey;
+  classProbabilities?: Record<AnalysisClassKey, number>;
+  linkedModels?: AnalysisLinkedModels;
+  cancelActiveDrag?: () => void;
   syncUi?: (lightweight?: boolean) => void;
   disposeUi?: () => void;
 };
@@ -84,6 +93,7 @@ type Hyperbola2AnalysisEntry = AnalysisEntry<{ A: number; b: number; c: number; 
 type RegressionState = {
   uid: string;
   boardId: string;
+  language: RegressionLanguage;
   board: any;
   anchor: HTMLElement | null;
   boardContainer: HTMLElement;
@@ -128,8 +138,42 @@ type RegressionState = {
   onDocPointerDown?: (evt: PointerEvent) => void;
   onWindowResize?: () => void;
   resizeObserver?: ResizeObserver;
+  resizeLayoutFrame?: number | null;
   overlayScaleCarry?: number;
   overlayScaleCarryUntil?: number;
+  restoredSnapshotRevision?: number;
+};
+
+type RegressionAnalysisSnapshot = {
+  id: string;
+  classKey: AnalysisClassKey;
+  title: string;
+  color: string;
+  model: Record<string, number>;
+  classProbabilities?: Record<AnalysisClassKey, number>;
+  linkedModels?: AnalysisLinkedModels;
+  overlayScale: number;
+  minimized: boolean;
+  order: number;
+};
+
+type RegressionSnapshot = {
+  revision: number;
+  boardId: string;
+  drawColor: string;
+  drawColorMenuOpen: boolean;
+  toolsMenuOpen: boolean;
+  activeTool: RegressionState['activeTool'];
+  regressionMode: RegressionState['regressionMode'];
+  drawingHistory: {
+    strokes: DrawStroke[];
+    undoActions: DrawAction[];
+    redoActions: DrawAction[];
+  };
+  regressionPoints: AutoPointData[];
+  autoCreatedPointsData: AutoPointData[];
+  analysisSeq: number;
+  analyses: RegressionAnalysisSnapshot[];
 };
 
 const DRAW_COLORS = [
@@ -137,20 +181,146 @@ const DRAW_COLORS = [
   '#00ffff', '#00ff00', '#007500', '#000000', '#ffffff'
 ];
 
-const ANALYSIS_CLASS_OPTIONS: AnalysisClassOption[] = [
-  { key: 'linear', label: 'Lineare Funktion' },
-  { key: 'quadratic', label: 'Quadratische Funktion' },
-  { key: 'cubic', label: 'Kubische Funktion' },
-  { key: 'quartic', label: 'Quartische Funktion' },
-  { key: 'sin', label: 'Sinusfunktion' },
-  { key: 'exp', label: 'Exponentialfunktion' },
-  { key: 'log', label: 'Logarithmusfunktion' },
-  { key: 'sqrt', label: 'Wurzelfunktion' },
-  { key: 'hyperbola', label: 'Hyperbelfunktion' },
-  { key: 'hyperbola2', label: 'Quadratische Hyperbelfunktion' }
+const ANALYSIS_CLASS_KEYS: AnalysisClassKey[] = [
+  'linear', 'quadratic', 'cubic', 'quartic', 'sin',
+  'exp', 'log', 'sqrt', 'hyperbola', 'hyperbola2'
 ];
 
+const REGRESSION_TEXT = {
+  de: {
+    classLabels: {
+      linear: 'Lineare Funktion',
+      quadratic: 'Quadratische Funktion',
+      cubic: 'Kubische Funktion',
+      quartic: 'Quartische Funktion',
+      sin: 'Sinusfunktion',
+      exp: 'Exponentialfunktion',
+      log: 'Logarithmusfunktion',
+      sqrt: 'Wurzelfunktion',
+      hyperbola: 'Hyperbelfunktion',
+      hyperbola2: 'Quadratische Hyperbelfunktion'
+    },
+    undo: 'R\u00fcckg\u00e4ngig',
+    redo: 'Wiederherstellen',
+    freehandDrawing: 'Freihandzeichnen',
+    eraseObjectOrStroke: 'Objekt oder Pinselstrich l\u00f6schen',
+    tools: 'Werkzeuge',
+    recognizeDrawing: 'Zeichnung erkennen',
+    selectPoints: 'Punkte ausw\u00e4hlen',
+    calculateRegression: 'Regression berechnen',
+    clearSelection: 'Auswahl aufheben',
+    drawingRecognized: 'Zeichnung erkannt',
+    regression: 'Regression',
+    minimizeAnalysis: 'Analyse minimieren',
+    resizeOverlay: 'Overlaygr\u00f6\u00dfe \u00e4ndern',
+    color: 'Farbe',
+    notImplemented: 'noch nicht implementiert',
+    numberLocale: 'de-DE'
+  },
+  en: {
+    classLabels: {
+      linear: 'Linear function',
+      quadratic: 'Quadratic function',
+      cubic: 'Cubic function',
+      quartic: 'Quartic function',
+      sin: 'Sine function',
+      exp: 'Exponential function',
+      log: 'Logarithmic function',
+      sqrt: 'Square-root function',
+      hyperbola: 'Hyperbola function',
+      hyperbola2: 'Quadratic hyperbola function'
+    },
+    undo: 'Undo',
+    redo: 'Redo',
+    freehandDrawing: 'Freehand drawing',
+    eraseObjectOrStroke: 'Delete object or brush stroke',
+    tools: 'Tools',
+    recognizeDrawing: 'Recognize drawing',
+    selectPoints: 'Select points',
+    calculateRegression: 'Calculate regression',
+    clearSelection: 'Clear selection',
+    drawingRecognized: 'Drawing recognized',
+    regression: 'Regression',
+    minimizeAnalysis: 'Minimize analysis',
+    resizeOverlay: 'Resize overlay',
+    color: 'Color',
+    notImplemented: 'not implemented',
+    numberLocale: 'en-US'
+  }
+} as const;
+
+function regressionText(language: RegressionLanguage) {
+  return REGRESSION_TEXT[language];
+}
+
+function getAnalysisClassOptions(language: RegressionLanguage): AnalysisClassOption[] {
+  const labels = regressionText(language).classLabels;
+  return ANALYSIS_CLASS_KEYS.map((key) => ({ key, label: labels[key] }));
+}
+
+function resolveRegressionLanguage(
+  anchor: HTMLElement | null,
+  explicitLanguage?: string,
+  boardContainer?: HTMLElement | null
+): RegressionLanguage {
+  const candidates: string[] = [String(explicitLanguage || '')];
+  try { candidates.push(anchor?.dataset.language || ''); } catch (e) {}
+  try { candidates.push(boardContainer?.dataset.liaDgsLanguage || ''); } catch (e) {}
+  try { candidates.push(anchor?.closest('[lang]')?.getAttribute('lang') || ''); } catch (e) {}
+  try { candidates.push(document.documentElement.lang || ''); } catch (e) {}
+  try { candidates.push(window.parent?.document?.documentElement?.lang || ''); } catch (e) {}
+
+  for (const candidate of candidates) {
+    if (/^de(?:-|$)/i.test(candidate)) return 'de';
+    if (/^en(?:-|$)/i.test(candidate)) return 'en';
+  }
+  return 'en';
+}
+
 const states: Record<string, RegressionState> = {};
+const regressionSnapshots: Record<string, RegressionSnapshot> = (() => {
+  const host = window as any;
+  if (!host.__liaRegressionSnapshots || typeof host.__liaRegressionSnapshots !== 'object') {
+    host.__liaRegressionSnapshots = Object.create(null);
+  }
+  return host.__liaRegressionSnapshots as Record<string, RegressionSnapshot>;
+})();
+
+function regressionSnapshotKey(boardId: string): string {
+  return 'board:' + String(boardId || '');
+}
+
+function cloneRegressionValue<T>(value: T): T {
+  try {
+    const clone = (window as any).structuredClone;
+    if (typeof clone === 'function') return clone(value);
+  } catch (e) {}
+
+  const seen = new WeakMap<object, any>();
+  const cloneFallback = (input: any): any => {
+    if (input === null || typeof input !== 'object') return input;
+    if (seen.has(input)) return seen.get(input);
+    if (input instanceof Date) return new Date(input.getTime());
+
+    if (Array.isArray(input)) {
+      const result: any[] = [];
+      seen.set(input, result);
+      for (let i = 0; i < input.length; i += 1) result.push(cloneFallback(input[i]));
+      return result;
+    }
+
+    const prototype = Object.getPrototypeOf(input);
+    if (prototype !== Object.prototype && prototype !== null) return input;
+    const result: Record<string, any> = prototype === null ? Object.create(null) : {};
+    seen.set(input, result);
+    Object.keys(input).forEach((key) => {
+      result[key] = cloneFallback(input[key]);
+    });
+    return result;
+  };
+
+  return cloneFallback(value) as T;
+}
 
 window.__recordDgsHistory = function(boardId: string, before: any, after: any): void {
   const board = window.__boards && window.__boards[boardId];
@@ -165,7 +335,7 @@ window.__recordDgsHistory = function(boardId: string, before: any, after: any): 
 const pendingRetries: Record<string, number> = {};
 const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
-const OVERLAY_MIN_SCALE = 0.42;
+const OVERLAY_DEFAULT_SCALE = 0.58;
 
 function clampOverlayScale(value: number): number {
   return Math.max(0.35, Math.min(1.45, value));
@@ -201,7 +371,7 @@ function consumeInitialOverlayScale(state: RegressionState, options?: AnalysisOv
     return clampOverlayScale(carryScale);
   }
 
-  return OVERLAY_MIN_SCALE;
+  return OVERLAY_DEFAULT_SCALE;
 }
 
 function ensureStyles(root: Document | ShadowRoot): void {
@@ -369,9 +539,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
       top: 8px;
       left: 10px;
       z-index: 70;
-      min-width: 260px;
-      width: auto;
-      max-width: calc(100% - 16px);
+      min-width: min(460px, max(1px, calc(100% - 20px)), max(1px, calc(100vw - 24px)));
+      width: max-content;
+      max-width: min(max(1px, calc(100% - 20px)), max(1px, calc(100vw - 24px)));
       min-height: 0 !important;
       height: auto !important;
       max-height: none !important;
@@ -431,21 +601,27 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-plot-analysis-select {
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      min-height: 42px;
       box-sizing: border-box;
       border-radius: 8px;
-      padding: 6px 8px;
+      padding: 8px 10px;
       border: 1px solid rgba(255,255,255,.35);
       background: rgba(0,0,0,.72);
       color: #fff;
       font-family: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1.2;
+      font-size: 20px !important;
+      font-weight: 600;
+      line-height: 1.3;
     }
 
     .lia-plot-analysis-select option {
       background: #1a1a1a;
       color: #ffffff;
+      font-family: inherit;
+      font-size: 20px !important;
+      font-weight: 500;
     }
 
     .lia-plot-analysis-row {
@@ -474,10 +650,10 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-plot-analysis-slider {
-      width: 220px;
+      width: min(220px, 100%);
       max-width: 220px;
-      min-width: 220px;
-      flex: 0 0 220px;
+      min-width: 0;
+      flex: 1 1 220px;
       margin: 0;
       margin-left: 12px;
       margin-right: 10px;
@@ -555,10 +731,12 @@ function ensureStyles(root: Document | ShadowRoot): void {
       font-size: 18px !important;
       font-weight: 600;
       line-height: 1.2;
-      word-break: break-word;
-      white-space: normal;
-      overflow-wrap: anywhere;
+      width: max-content;
       max-width: 100%;
+      box-sizing: border-box;
+      word-break: normal;
+      white-space: nowrap;
+      overflow-wrap: normal;
       display: block;
       overflow-x: auto;
       overflow-y: hidden;
@@ -569,12 +747,13 @@ function ensureStyles(root: Document | ShadowRoot): void {
       text-align: left !important;
       margin-left: 0 !important;
       margin-right: auto !important;
-      display: block !important;
-      word-wrap: break-word !important;
-      overflow-wrap: anywhere !important;
-      max-width: 100% !important;
-      overflow-x: auto !important;
-      overflow-y: hidden !important;
+      display: inline-block !important;
+      word-break: normal !important;
+      word-wrap: normal !important;
+      white-space: nowrap !important;
+      overflow-wrap: normal !important;
+      max-width: none !important;
+      overflow: visible !important;
     }
 
     .lia-plot-analysis-mini-wrap {
@@ -870,9 +1049,12 @@ function getQuadraticOverlayCandidate(a: number, c: number, d: number): { name: 
   };
 }
 
-function formatClassProbability(probability: number): string {
+function formatClassProbability(probability: number, language: RegressionLanguage): string {
   const safe = Number.isFinite(probability) ? Math.max(0, probability) : 0;
-  return safe.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return safe.toLocaleString(regressionText(language).numberLocale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function makeClassProbabilities(activeClass: AnalysisClassKey, activeProbability: number): Record<AnalysisClassKey, number> {
@@ -1017,15 +1199,21 @@ function createLinkedModels(
   };
 }
 
-function fillAnalysisClassSelect(select: HTMLSelectElement, probabilities: Record<AnalysisClassKey, number>, selected: AnalysisClassKey): void {
+function fillAnalysisClassSelect(
+  select: HTMLSelectElement,
+  probabilities: Record<AnalysisClassKey, number>,
+  selected: AnalysisClassKey,
+  language: RegressionLanguage
+): void {
   select.innerHTML = '';
+  const classOptions = getAnalysisClassOptions(language);
 
   const order = new Map<AnalysisClassKey, number>();
-  ANALYSIS_CLASS_OPTIONS.forEach((item, index) => {
+  classOptions.forEach((item, index) => {
     order.set(item.key, index);
   });
 
-  const sorted = ANALYSIS_CLASS_OPTIONS.slice().sort((a, b) => {
+  const sorted = classOptions.slice().sort((a, b) => {
     const pa = Number.isFinite(probabilities[a.key]) ? Number(probabilities[a.key]) : 0;
     const pb = Number.isFinite(probabilities[b.key]) ? Number(probabilities[b.key]) : 0;
     if (Math.abs(pb - pa) > 1e-12) return pb - pa;
@@ -1036,19 +1224,43 @@ function fillAnalysisClassSelect(select: HTMLSelectElement, probabilities: Recor
     const option = document.createElement('option');
     option.value = item.key;
     const p = probabilities[item.key];
-    option.textContent = item.label + ' (' + formatClassProbability(p) + '%)';
+    option.dataset.probability = String(Number.isFinite(p) ? p : 0);
+    option.textContent = item.label + ' (' + formatClassProbability(p, language) + '%)';
     option.selected = item.key === selected;
     select.appendChild(option);
   });
 }
 
-function getAnalysisClassLabel(key: AnalysisClassKey): string {
-  const match = ANALYSIS_CLASS_OPTIONS.find((item) => item.key === key);
-  return match ? match.label : String(key);
+function refreshAnalysisClassSelectLanguage(select: HTMLSelectElement, language: RegressionLanguage): void {
+  Array.from(select.options).forEach((option) => {
+    const key = String(option.value || '') as AnalysisClassKey;
+    if (!ANALYSIS_CLASS_KEYS.includes(key)) return;
+    const probability = Number(option.dataset.probability || '0');
+    option.textContent = getAnalysisClassLabel(key, language) + ' (' +
+      formatClassProbability(probability, language) + '%)';
+  });
 }
 
-function renderUnsupportedClassHint(host: HTMLElement, key: AnalysisClassKey): void {
-  host.textContent = getAnalysisClassLabel(key) + ' (noch nicht implementiert)';
+function getAnalysisClassLabel(key: AnalysisClassKey, language: RegressionLanguage): string {
+  return regressionText(language).classLabels[key] || String(key);
+}
+
+function renderUnsupportedClassHint(host: HTMLElement, key: AnalysisClassKey, language: RegressionLanguage): void {
+  host.textContent = getAnalysisClassLabel(key, language) + ' (' + regressionText(language).notImplemented + ')';
+}
+
+function localizeRegressionToolsMenu(menu: HTMLElement, language: RegressionLanguage): void {
+  const text = regressionText(language);
+  const labels: Record<string, string> = {
+    recognize: text.recognizeDrawing,
+    'select-points': text.selectPoints,
+    compute: text.calculateRegression,
+    clear: text.clearSelection
+  };
+  Object.keys(labels).forEach((action) => {
+    const button = menu.querySelector<HTMLElement>(`[data-action=${action}]`);
+    if (button) button.textContent = labels[action];
+  });
 }
 
 function getBoardContainer(boardId: string): HTMLElement | null {
@@ -1057,16 +1269,12 @@ function getBoardContainer(boardId: string): HTMLElement | null {
   return board.containerObj as HTMLElement;
 }
 
-function setAnalysisOverlayPanelWidth(panel: HTMLElement, boardContainer: HTMLElement): void {
-  const boardWidth = boardContainer.clientWidth;
-  const OVERLAY_MIN_WIDTH = 190;
-  // Nutze 80% der Boardbreite, mindestens aber OVERLAY_MIN_WIDTH
-  const desiredWidth = Math.max(OVERLAY_MIN_WIDTH, Math.floor(boardWidth * 0.8));
-  const viewportLimit = Math.max(OVERLAY_MIN_WIDTH, Math.floor(window.innerWidth * 0.94));
-  const finalWidth = Math.min(desiredWidth, viewportLimit);
-  panel.style.width = finalWidth + 'px';
-  panel.style.maxWidth = 'calc(100vw - 24px)';
-  panel.style.minWidth = OVERLAY_MIN_WIDTH + 'px';
+function setAnalysisOverlayPanelWidth(panel: HTMLElement, _boardContainer: HTMLElement): void {
+  // Keep width constraints in CSS so open panels react immediately to board,
+  // LiveEditor and fullscreen resizes without waiting for another layout pass.
+  panel.style.removeProperty('width');
+  panel.style.removeProperty('max-width');
+  panel.style.removeProperty('min-width');
   panel.style.boxSizing = 'border-box';
 }
 
@@ -1328,23 +1536,32 @@ function createAutoPoint(state: RegressionState, x: number, y: number, key?: str
   const pointKey = String(key || ('auto-x-' + Date.now() + '-' + Math.floor(Math.random() * 1000000)));
 
   try {
-    const pt = board.create('point', [x, y], {
-      name: pointKey,
-      fixed: false,
-      withLabel: false,
-      showInfobox: false,
-      strokeColor: '#ff00ff',
-      fillColor: '#ff00ff',
-      highlightStrokeColor: '#ff00ff',
-      highlightFillColor: '#ff00ff',
-      strokeWidth: 3,
-      highlightStrokeWidth: 3,
-      face: 'x',
-      size: 7
-    });
-
     ensurePointBuckets(state.boardId);
+    let pt = window.__points[state.boardId][pointKey];
+    if (!pt || pt.board !== board) {
+      if (pt) delete window.__points[state.boardId][pointKey];
+      pt = board.create('point', [x, y], {
+        name: pointKey,
+        fixed: false,
+        withLabel: false,
+        showInfobox: false,
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        highlightStrokeColor: '#ff00ff',
+        highlightFillColor: '#ff00ff',
+        strokeWidth: 3,
+        highlightStrokeWidth: 3,
+        face: 'x',
+        size: 7
+      });
+    } else if (typeof pt.setPositionDirectly === 'function' && typeof JXG !== 'undefined') {
+      pt.setPositionDirectly(JXG.COORDS_BY_USER, [x, y]);
+    }
+
+    pt.__liaRegressionAutoPoint = true;
+    pt.__liaRegressionAutoPointKey = pointKey;
     window.__points[state.boardId][pointKey] = pt;
+    try { board.update(); } catch (e) {}
     if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances();
     if (window.__scheduleBootstrapAreas) window.__scheduleBootstrapAreas();
   } catch (e) {
@@ -1420,8 +1637,9 @@ function getSelectableBoardPoints(state: RegressionState): AutoPointData[] {
   const out: AutoPointData[] = [];
   const seen = new Set<string>();
 
-  const pushPoint = (obj: any) => {
+  const pushPoint = (obj: any, keyHint?: string, requireStableName: boolean = false) => {
     if (!obj || typeof obj !== 'object') return;
+    if (obj.board && obj.board !== board) return;
     const type = String(obj.elType || '').toLowerCase();
     if (type !== 'point' && type !== 'glider') return;
 
@@ -1454,7 +1672,15 @@ function getSelectableBoardPoints(state: RegressionState): AutoPointData[] {
 
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
 
-    const key = String(obj.id || obj.name || ('xy:' + x.toFixed(6) + ',' + y.toFixed(6)));
+    const stableName = String(
+      obj.__liaDgsPersistentId ||
+      obj.__liaDgsMacroKey ||
+      keyHint ||
+      obj.name ||
+      ''
+    ).trim();
+    if (requireStableName && !stableName) return;
+    const key = String(stableName || obj.id || ('xy:' + x.toFixed(6) + ',' + y.toFixed(6)));
     if (seen.has(key)) return;
     seen.add(key);
     out.push({ key, x, y });
@@ -1463,19 +1689,17 @@ function getSelectableBoardPoints(state: RegressionState): AutoPointData[] {
   const namedPoints = (window.__points && boardId && window.__points[boardId]) || null;
   if (namedPoints && typeof namedPoints === 'object') {
     Object.keys(namedPoints).forEach((name) => {
-      pushPoint(namedPoints[name]);
+      pushPoint(namedPoints[name], name);
     });
   }
 
-  if (!out.length) {
-    if (Array.isArray(board.objectsList)) {
-      board.objectsList.forEach(pushPoint);
-    }
-    if (board.objects && typeof board.objects === 'object') {
-      Object.keys(board.objects).forEach((key) => {
-        pushPoint(board.objects[key]);
-      });
-    }
+  if (Array.isArray(board.objectsList)) {
+    board.objectsList.forEach((point: any) => pushPoint(point, undefined, true));
+  }
+  if (board.objects && typeof board.objects === 'object') {
+    Object.keys(board.objects).forEach((key) => {
+      pushPoint(board.objects[key], undefined, true);
+    });
   }
 
   return out;
@@ -1504,7 +1728,7 @@ function findNearestSelectableBoardPoint(state: RegressionState, localPoint: Dra
   return best;
 }
 
-function fitLinear(points: DrawPoint[]): { m: number; n: number; error: number } | null {
+function fitLinear(points: DrawPoint[]): LinearFit | null {
   const pts = Array.isArray(points)
     ? points.filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
     : [];
@@ -1542,7 +1766,7 @@ function fitLinear(points: DrawPoint[]): { m: number; n: number; error: number }
   };
 }
 
-function fitQuadratic(points: DrawPoint[]): { a: number; c: number; d: number; error: number } | null {
+function fitQuadratic(points: DrawPoint[]): QuadraticFit | null {
   const pts = Array.isArray(points)
     ? points.filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
     : [];
@@ -1775,7 +1999,7 @@ function computeRmse(points: DrawPoint[], predictFn: (x: number) => number): num
   return Math.sqrt(se / used);
 }
 
-function fitCubic(points: DrawPoint[]): { a: number; b: number; c: number; d: number; error: number } | null {
+function fitCubic(points: DrawPoint[]): CubicFit | null {
   const fitted = fitPolynomial(points, 3);
   if (!fitted) return null;
   return {
@@ -1787,7 +2011,7 @@ function fitCubic(points: DrawPoint[]): { a: number; b: number; c: number; d: nu
   };
 }
 
-function fitQuartic(points: DrawPoint[]): { a: number; b: number; c: number; d: number; f: number; error: number } | null {
+function fitQuartic(points: DrawPoint[]): QuarticFit | null {
   const fitted = fitPolynomial(points, 4);
   if (!fitted) return null;
   return {
@@ -1798,6 +2022,58 @@ function fitQuartic(points: DrawPoint[]): { a: number; b: number; c: number; d: 
     f: Number(fitted.coeff[0] || 0),
     error: fitted.error
   };
+}
+
+function liftLinearFitToCubic(linear: LinearFit): CubicFit {
+  return {
+    a: 0,
+    b: 0,
+    c: linear.m,
+    d: linear.n,
+    error: linear.error
+  };
+}
+
+function liftQuadraticFitToCubic(quadratic: QuadraticFit): CubicFit {
+  // The quadratic overlay uses a * (x + c)^2 + d. Expanding that form
+  // preserves the exact fitted curve while embedding it into the cubic model.
+  const x2 = quadratic.a;
+  const x1 = 2 * quadratic.a * quadratic.c;
+  const x0 = quadratic.a * quadratic.c * quadratic.c + quadratic.d;
+  return {
+    a: 0,
+    b: x2,
+    c: x1,
+    d: x0,
+    error: quadratic.error
+  };
+}
+
+function liftCubicFitToQuartic(cubic: CubicFit): QuarticFit {
+  return {
+    a: 0,
+    b: cubic.a,
+    c: cubic.b,
+    d: cubic.c,
+    f: cubic.d,
+    error: cubic.error
+  };
+}
+
+function completeHigherPolynomialFits(
+  linear: LinearFit | null,
+  quadratic: QuadraticFit | null,
+  fittedCubic: CubicFit | null,
+  fittedQuartic: QuarticFit | null
+): { cubic: CubicFit | null; quartic: QuarticFit | null } {
+  // Polynomial model spaces are nested. If there are too few points for a
+  // unique higher-degree fit, use the best available lower-degree polynomial
+  // with leading coefficients set to zero instead of an unrelated default.
+  const cubic = fittedCubic
+    || (quadratic ? liftQuadraticFitToCubic(quadratic) : null)
+    || (linear ? liftLinearFitToCubic(linear) : null);
+  const quartic = fittedQuartic || (cubic ? liftCubicFitToQuartic(cubic) : null);
+  return { cubic, quartic };
 }
 
 function fitSin(points: DrawPoint[]): { A: number; b: number; c: number; d: number; error: number } | null {
@@ -2318,6 +2594,9 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
   const onPointerDown = (evt: PointerEvent) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (entry.cancelActiveDrag) {
+      try { entry.cancelActiveDrag(); } catch (e) {}
+    }
 
     targets.forEach((target: any) => {
       try { target.style.cursor = 'grabbing'; } catch (e) {}
@@ -2349,6 +2628,17 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
       }
     };
 
+    const cleanupActiveDrag = () => {
+      if (moveRaf) {
+        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
+        moveRaf = 0;
+      }
+      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
+      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
+      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
+      if (entry.cancelActiveDrag === cleanupActiveDrag) entry.cancelActiveDrag = undefined;
+    };
+
     const onUp = (upEvt: PointerEvent) => {
       if (upEvt.pointerId !== pointerId) return;
       upEvt.preventDefault();
@@ -2358,20 +2648,14 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
         try { target.style.cursor = 'grab'; } catch (e) {}
       });
 
-      if (moveRaf) {
-        try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
-        moveRaf = 0;
-      }
+      cleanupActiveDrag();
 
       if (entry.syncUi) entry.syncUi(false);
       updateEntryGraph(state, entry, descriptor);
       redrawCanvas(state);
-
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
     };
 
+    entry.cancelActiveDrag = cleanupActiveDrag;
     window.addEventListener('pointermove', onMove, true);
     window.addEventListener('pointerup', onUp, true);
     window.addEventListener('pointercancel', onUp, true);
@@ -2432,7 +2716,7 @@ function recognizeQuadraticFromStroke(state: RegressionState, stroke: DrawStroke
     { a: 0.1, b: 0.1, c: 0, d: 0, f: fitted.d }
   );
   const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, null, 'quadratic');
-  return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+  return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
 }
 
 function computeQuadraticRegression(state: RegressionState): boolean {
@@ -2446,7 +2730,7 @@ function computeQuadraticRegression(state: RegressionState): boolean {
     { a: 0.1, b: 0.1, c: 0, d: 0, f: fitted.d }
   );
   const classProbabilities = computeStableClassProbabilities(null, fitted.error, null, null, null, null, null, null, null, 'quadratic');
-  return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, 'Regression', { classProbabilities, linkedModels });
+  return openQuadraticAnalysisOverlay(state, fitted.a, fitted.c, fitted.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
 }
 
 function analyzeStrokeStructure(
@@ -2539,20 +2823,66 @@ function analyzeStrokeStructure(
   };
 }
 
+function hasAtLeastDistinctRegressionX(points: DrawPoint[], required: number): boolean {
+  const xs = points
+    .filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
+    .map((point) => Number(point.x))
+    .sort((a, b) => a - b);
+  if (xs.length < required) return false;
+  const span = Math.max(1, Math.abs(xs[xs.length - 1] - xs[0]));
+  const epsilon = Math.max(1e-9, span * 1e-9);
+  let distinct = 0;
+  let previous = 0;
+  xs.forEach((x) => {
+    if (distinct === 0 || Math.abs(x - previous) > epsilon) {
+      distinct += 1;
+      previous = x;
+    }
+  });
+  return distinct >= required;
+}
+
+function applyHyperbolaFitEvidence(
+  candidates: Array<{ key: AnalysisClassKey; error: number; score: number }>,
+  ySpan: number
+): void {
+  const comparableKeys: AnalysisClassKey[] = ['linear', 'quadratic', 'exp', 'log', 'sqrt'];
+  const comparableErrors = candidates
+    .filter((candidate) => comparableKeys.includes(candidate.key) && Number.isFinite(candidate.error))
+    .map((candidate) => candidate.error);
+  const bestComparableError = comparableErrors.length ? Math.min(...comparableErrors) : Infinity;
+
+  candidates.forEach((candidate) => {
+    if (candidate.key !== 'hyperbola' && candidate.key !== 'hyperbola2') return;
+    const denominator = Math.max(bestComparableError, Math.max(0.001, ySpan) * 1e-6, 1e-9);
+    const gain = Number.isFinite(bestComparableError)
+      ? (bestComparableError - candidate.error) / denominator
+      : -Infinity;
+    let factor = 1.15;
+    if (gain >= 0.8) factor = 0.60;
+    else if (gain >= 0.5) factor = 0.78;
+    else if (gain >= 0.3) factor = 0.88;
+    else if (gain >= 0.2) factor = 0.95;
+    candidate.score *= factor;
+  });
+}
+
 function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): boolean {
   const points = simplifyStrokeFitPoints(collectSameColorStrokePoints(state, stroke));
   if (points.length < 2) return false;
 
   const linear = fitLinear(points);
   const quadratic = fitQuadratic(points);
-  const cubic = fitCubic(points);
-  const quartic = fitQuartic(points);
+  const fittedCubic = fitCubic(points);
+  const fittedQuartic = fitQuartic(points);
+  const { cubic, quartic } = completeHigherPolynomialFits(linear, quadratic, fittedCubic, fittedQuartic);
   const sin = fitSin(points);
   const exp = fitExp(points);
   const log = fitLog(points);
   const sqrt = fitSqrt(points);
-  const hyperbola = fitHyperbola(points);
-  const hyperbola2 = fitHyperbola2(points);
+  const allowHyperbolas = hasAtLeastDistinctRegressionX(points, 5);
+  const hyperbola = allowHyperbolas ? fitHyperbola(points) : null;
+  const hyperbola2 = allowHyperbolas ? fitHyperbola2(points) : null;
 
   let xMin = points[0].x;
   let xMax = points[0].x;
@@ -2566,8 +2896,6 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
   }
   const xSpan = Math.max(0.5, xMax - xMin);
   const ySpan = Math.max(0.5, yMax - yMin);
-  const baseTol = Math.max(0.35, ySpan * 0.22);
-
   const linearFinite = !!linear && Number.isFinite(linear.error);
   const quadraticFinite = !!quadratic && Number.isFinite(quadratic.error);
   const cubicFinite = !!cubic && Number.isFinite(cubic.error);
@@ -2579,29 +2907,18 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
   const hyperbolaFinite = !!hyperbola && Number.isFinite(hyperbola.error);
   const hyperbola2Finite = !!hyperbola2 && Number.isFinite(hyperbola2.error);
 
-  let linearOk = linearFinite && linear!.error <= baseTol * 1.45;
-  let quadraticOk = quadraticFinite && quadratic!.error <= baseTol * 1.65;
-  let cubicOk = cubicFinite && cubic!.error <= baseTol * 1.85;
-  let quarticOk = quarticFinite && quartic!.error <= baseTol * 2.0;
-  let sinOk = sinFinite && sin!.error <= baseTol * 1.95;
-  let expOk = expFinite && exp!.error <= baseTol * 1.95;
-  let logOk = logFinite && log!.error <= baseTol * 1.95;
-  let sqrtOk = sqrtFinite && sqrt!.error <= baseTol * 1.95;
-  let hyperbolaOk = hyperbolaFinite && hyperbola!.error <= baseTol * 1.95;
-  let hyperbola2Ok = hyperbola2Finite && hyperbola2!.error <= baseTol * 1.95;
-
-  if (!linearOk && !quadraticOk && !cubicOk && !quarticOk && !sinOk && !expOk && !logOk && !sqrtOk && !hyperbolaOk && !hyperbola2Ok) {
-    linearOk = linearFinite;
-    quadraticOk = quadraticFinite;
-    cubicOk = cubicFinite;
-    quarticOk = quarticFinite;
-    sinOk = sinFinite;
-    expOk = expFinite;
-    logOk = logFinite;
-    sqrtOk = sqrtFinite;
-    hyperbolaOk = hyperbolaFinite;
-    hyperbola2Ok = hyperbola2Finite;
-  }
+  // Stroke recognition and point regression must rank the same finite model
+  // candidates. Mode-specific pre-filtering changed both order and percentages.
+  const linearOk = linearFinite;
+  const quadraticOk = quadraticFinite;
+  const cubicOk = cubicFinite;
+  const quarticOk = quarticFinite;
+  const sinOk = sinFinite;
+  const expOk = expFinite;
+  const logOk = logFinite;
+  const sqrtOk = sqrtFinite;
+  const hyperbolaOk = hyperbolaFinite;
+  const hyperbola2Ok = hyperbola2Finite;
 
   if (!linearOk && !quadraticOk && !cubicOk && !quarticOk && !sinOk && !expOk && !logOk && !sqrtOk && !hyperbolaOk && !hyperbola2Ok) return false;
 
@@ -2676,8 +2993,6 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
         if (cand.key === 'exp') cand.score *= 0.78;
         if (cand.key === 'sqrt') cand.score *= 2.5;
         if (cand.key === 'log') cand.score *= 2.5;
-        if (cand.key === 'hyperbola2') cand.score *= 0.70;
-        if (cand.key === 'hyperbola') cand.score *= 0.60;
         if (cand.key === 'linear') cand.score *= 1.70;
       }
     }
@@ -2691,12 +3006,8 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
 
   // Gain-based pairwise comparisons
   const linearCand = candidates.find((c) => c.key === 'linear');
-  const quadCand = candidates.find((c) => c.key === 'quadratic');
-  const cubicCand = candidates.find((c) => c.key === 'cubic');
   const expCand = candidates.find((c) => c.key === 'exp');
   const logCand = candidates.find((c) => c.key === 'log');
-  const hyper2Cand = candidates.find((c) => c.key === 'hyperbola2');
-  const hyperCand = candidates.find((c) => c.key === 'hyperbola');
 
   if (linearCand && expCand && Number.isFinite(linearCand.error) && Number.isFinite(expCand.error)) {
     const expGain = (linearCand.error - expCand.error) / Math.max(linearCand.error, 1e-6);
@@ -2717,27 +3028,7 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
     }
   }
 
-  if (linearCand && hyper2Cand && Number.isFinite(linearCand.error) && Number.isFinite(hyper2Cand.error)) {
-    const hyper2Gain = (linearCand.error - hyper2Cand.error) / Math.max(linearCand.error, 1e-6);
-    if (hyper2Gain >= 0.12) {
-      linearCand.score *= 1.55;
-      hyper2Cand.score *= 0.68;
-    } else if (hyper2Gain >= 0.06) {
-      linearCand.score *= 1.25;
-      hyper2Cand.score *= 0.80;
-    }
-  }
-
-  if (linearCand && hyperCand && Number.isFinite(linearCand.error) && Number.isFinite(hyperCand.error)) {
-    const hyperGain = (linearCand.error - hyperCand.error) / Math.max(linearCand.error, 1e-6);
-    if (hyperGain >= 0.12) {
-      linearCand.score *= 1.55;
-      hyperCand.score *= 0.68;
-    } else if (hyperGain >= 0.06) {
-      linearCand.score *= 1.25;
-      hyperCand.score *= 0.80;
-    }
-  }
+  applyHyperbolaFitEvidence(candidates, ySpan);
 
   // Tie-break: linear when nearly equal
   if (linearCand && Number.isFinite(linearCand.error)) {
@@ -2788,34 +3079,34 @@ function recognizeLinearFromStroke(state: RegressionState, stroke: DrawStroke): 
   });
 
   if (selected === 'quadratic' && quadraticOk) {
-    return openQuadraticAnalysisOverlay(state, quadratic!.a, quadratic!.c, quadratic!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openQuadraticAnalysisOverlay(state, quadratic!.a, quadratic!.c, quadratic!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'cubic' && cubicOk) {
-    return openCubicAnalysisOverlay(state, cubic!.a, cubic!.b, cubic!.c, cubic!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openCubicAnalysisOverlay(state, cubic!.a, cubic!.b, cubic!.c, cubic!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'quartic' && quarticOk) {
-    return openQuarticAnalysisOverlay(state, quartic!.a, quartic!.b, quartic!.c, quartic!.d, quartic!.f, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openQuarticAnalysisOverlay(state, quartic!.a, quartic!.b, quartic!.c, quartic!.d, quartic!.f, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'sin' && sinOk) {
-    return openSinAnalysisOverlay(state, sin!.A, sin!.b, sin!.c, sin!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openSinAnalysisOverlay(state, sin!.A, sin!.b, sin!.c, sin!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'exp' && expOk) {
-    return openExpAnalysisOverlay(state, exp!.A, exp!.b, exp!.c, exp!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openExpAnalysisOverlay(state, exp!.A, exp!.b, exp!.c, exp!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'log' && logOk) {
-    return openLogAnalysisOverlay(state, log!.A, log!.b, log!.c, log!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openLogAnalysisOverlay(state, log!.A, log!.b, log!.c, log!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'sqrt' && sqrtOk) {
-    return openSqrtAnalysisOverlay(state, sqrt!.A, sqrt!.b, sqrt!.c, sqrt!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openSqrtAnalysisOverlay(state, sqrt!.A, sqrt!.b, sqrt!.c, sqrt!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'hyperbola' && hyperbolaOk) {
-    return openHyperbolaAnalysisOverlay(state, hyperbola!.A, hyperbola!.b, hyperbola!.c, hyperbola!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openHyperbolaAnalysisOverlay(state, hyperbola!.A, hyperbola!.b, hyperbola!.c, hyperbola!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'hyperbola2' && hyperbola2Ok) {
-    return openHyperbola2AnalysisOverlay(state, hyperbola2!.A, hyperbola2!.b, hyperbola2!.c, hyperbola2!.d, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openHyperbola2AnalysisOverlay(state, hyperbola2!.A, hyperbola2!.b, hyperbola2!.c, hyperbola2!.d, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
   if (selected === 'linear' && linearOk) {
-    return openLinearAnalysisOverlay(state, linear!.m, linear!.n, 'Zeichnung erkannt', { classProbabilities, linkedModels });
+    return openLinearAnalysisOverlay(state, linear!.m, linear!.n, regressionText(state.language).drawingRecognized, { classProbabilities, linkedModels });
   }
 
   return false;
@@ -2826,14 +3117,16 @@ function computeLinearRegression(state: RegressionState): boolean {
 
   const linear = fitLinear(state.regressionPoints);
   const quadratic = state.regressionPoints.length >= 3 ? fitQuadratic(state.regressionPoints) : null;
-  const cubic = state.regressionPoints.length >= 4 ? fitCubic(state.regressionPoints) : null;
-  const quartic = state.regressionPoints.length >= 5 ? fitQuartic(state.regressionPoints) : null;
+  const fittedCubic = state.regressionPoints.length >= 4 ? fitCubic(state.regressionPoints) : null;
+  const fittedQuartic = state.regressionPoints.length >= 5 ? fitQuartic(state.regressionPoints) : null;
+  const { cubic, quartic } = completeHigherPolynomialFits(linear, quadratic, fittedCubic, fittedQuartic);
   const sin = state.regressionPoints.length >= 4 ? fitSin(state.regressionPoints) : null;
   const exp = state.regressionPoints.length >= 3 ? fitExp(state.regressionPoints) : null;
   const log = state.regressionPoints.length >= 3 ? fitLog(state.regressionPoints) : null;
   const sqrt = state.regressionPoints.length >= 3 ? fitSqrt(state.regressionPoints) : null;
-  const hyperbola = state.regressionPoints.length >= 3 ? fitHyperbola(state.regressionPoints) : null;
-  const hyperbola2 = state.regressionPoints.length >= 3 ? fitHyperbola2(state.regressionPoints) : null;
+  const allowHyperbolas = hasAtLeastDistinctRegressionX(state.regressionPoints, 5);
+  const hyperbola = allowHyperbolas ? fitHyperbola(state.regressionPoints) : null;
+  const hyperbola2 = allowHyperbolas ? fitHyperbola2(state.regressionPoints) : null;
 
   const linearOk = !!linear && Number.isFinite(linear.error);
   const quadraticOk = !!quadratic && Number.isFinite(quadratic.error);
@@ -2933,8 +3226,6 @@ function computeLinearRegression(state: RegressionState): boolean {
         if (cand.key === 'exp') cand.score *= 0.78;
         if (cand.key === 'sqrt') cand.score *= 2.5;
         if (cand.key === 'log') cand.score *= 2.5;
-        if (cand.key === 'hyperbola2') cand.score *= 0.70;
-        if (cand.key === 'hyperbola') cand.score *= 0.60;
         if (cand.key === 'linear') cand.score *= 1.70;
       }
     }
@@ -2950,8 +3241,6 @@ function computeLinearRegression(state: RegressionState): boolean {
   const linearCand = candidates.find((c) => c.key === 'linear');
   const expCand = candidates.find((c) => c.key === 'exp');
   const logCand = candidates.find((c) => c.key === 'log');
-  const hyper2Cand = candidates.find((c) => c.key === 'hyperbola2');
-  const hyperCand = candidates.find((c) => c.key === 'hyperbola');
 
   if (linearCand && expCand && Number.isFinite(linearCand.error) && Number.isFinite(expCand.error)) {
     const expGain = (linearCand.error - expCand.error) / Math.max(linearCand.error, 1e-6);
@@ -2972,27 +3261,7 @@ function computeLinearRegression(state: RegressionState): boolean {
     }
   }
 
-  if (linearCand && hyper2Cand && Number.isFinite(linearCand.error) && Number.isFinite(hyper2Cand.error)) {
-    const hyper2Gain = (linearCand.error - hyper2Cand.error) / Math.max(linearCand.error, 1e-6);
-    if (hyper2Gain >= 0.12) {
-      linearCand.score *= 1.55;
-      hyper2Cand.score *= 0.68;
-    } else if (hyper2Gain >= 0.06) {
-      linearCand.score *= 1.25;
-      hyper2Cand.score *= 0.80;
-    }
-  }
-
-  if (linearCand && hyperCand && Number.isFinite(linearCand.error) && Number.isFinite(hyperCand.error)) {
-    const hyperGain = (linearCand.error - hyperCand.error) / Math.max(linearCand.error, 1e-6);
-    if (hyperGain >= 0.12) {
-      linearCand.score *= 1.55;
-      hyperCand.score *= 0.68;
-    } else if (hyperGain >= 0.06) {
-      linearCand.score *= 1.25;
-      hyperCand.score *= 0.80;
-    }
-  }
+  applyHyperbolaFitEvidence(candidates, ySpan);
 
   // Tie-break: linear when nearly equal
   if (linearCand && Number.isFinite(linearCand.error)) {
@@ -3043,34 +3312,34 @@ function computeLinearRegression(state: RegressionState): boolean {
   });
 
   if (selected === 'quartic' && quarticOk) {
-    return openQuarticAnalysisOverlay(state, quartic!.a, quartic!.b, quartic!.c, quartic!.d, quartic!.f, 'Regression', { classProbabilities, linkedModels });
+    return openQuarticAnalysisOverlay(state, quartic!.a, quartic!.b, quartic!.c, quartic!.d, quartic!.f, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'cubic' && cubicOk) {
-    return openCubicAnalysisOverlay(state, cubic!.a, cubic!.b, cubic!.c, cubic!.d, 'Regression', { classProbabilities, linkedModels });
+    return openCubicAnalysisOverlay(state, cubic!.a, cubic!.b, cubic!.c, cubic!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'sin' && sinOk) {
-    return openSinAnalysisOverlay(state, sin!.A, sin!.b, sin!.c, sin!.d, 'Regression', { classProbabilities, linkedModels });
+    return openSinAnalysisOverlay(state, sin!.A, sin!.b, sin!.c, sin!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'exp' && expOk) {
-    return openExpAnalysisOverlay(state, exp!.A, exp!.b, exp!.c, exp!.d, 'Regression', { classProbabilities, linkedModels });
+    return openExpAnalysisOverlay(state, exp!.A, exp!.b, exp!.c, exp!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'log' && logOk) {
-    return openLogAnalysisOverlay(state, log!.A, log!.b, log!.c, log!.d, 'Regression', { classProbabilities, linkedModels });
+    return openLogAnalysisOverlay(state, log!.A, log!.b, log!.c, log!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'sqrt' && sqrtOk) {
-    return openSqrtAnalysisOverlay(state, sqrt!.A, sqrt!.b, sqrt!.c, sqrt!.d, 'Regression', { classProbabilities, linkedModels });
+    return openSqrtAnalysisOverlay(state, sqrt!.A, sqrt!.b, sqrt!.c, sqrt!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'hyperbola' && hyperbolaOk) {
-    return openHyperbolaAnalysisOverlay(state, hyperbola!.A, hyperbola!.b, hyperbola!.c, hyperbola!.d, 'Regression', { classProbabilities, linkedModels });
+    return openHyperbolaAnalysisOverlay(state, hyperbola!.A, hyperbola!.b, hyperbola!.c, hyperbola!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'hyperbola2' && hyperbola2Ok) {
-    return openHyperbola2AnalysisOverlay(state, hyperbola2!.A, hyperbola2!.b, hyperbola2!.c, hyperbola2!.d, 'Regression', { classProbabilities, linkedModels });
+    return openHyperbola2AnalysisOverlay(state, hyperbola2!.A, hyperbola2!.b, hyperbola2!.c, hyperbola2!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'quadratic' && quadraticOk) {
-    return openQuadraticAnalysisOverlay(state, quadratic!.a, quadratic!.c, quadratic!.d, 'Regression', { classProbabilities, linkedModels });
+    return openQuadraticAnalysisOverlay(state, quadratic!.a, quadratic!.c, quadratic!.d, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
   if (selected === 'linear' && linearOk) {
-    return openLinearAnalysisOverlay(state, linear!.m, linear!.n, 'Regression', { classProbabilities, linkedModels });
+    return openLinearAnalysisOverlay(state, linear!.m, linear!.n, regressionText(state.language).regression, { classProbabilities, linkedModels });
   }
 
   return false;
@@ -3112,6 +3381,10 @@ type AnalysisListKey =
   | 'hyperbola2AnalysisEntries';
 
 function removeEntryFromList(state: RegressionState, entry: AnyAnalysisEntry, listKey: AnalysisListKey): void {
+  if (entry.cancelActiveDrag) {
+    try { entry.cancelActiveDrag(); } catch (e) {}
+    entry.cancelActiveDrag = undefined;
+  }
   removeEntryGraph(entry);
   if (entry.disposeUi) {
     try { entry.disposeUi(); } catch (e) {}
@@ -3197,11 +3470,12 @@ function relayoutAnalysisPanels(state: RegressionState): void {
     const panel = entry.panel;
     if (!panel || !panel.isConnected) continue;
 
+    const isMinimized = miniWrapIsVisible(panel);
+    if (!isMinimized) setAnalysisOverlayPanelWidth(panel, state.boardContainer);
     panel.style.left = '10px';
     panel.style.top = nextTop + 'px';
 
     const rect = panel.getBoundingClientRect();
-    const isMinimized = miniWrapIsVisible(panel);
     const gap = isMinimized ? 6 : 10;
     nextTop += Math.max(16, Math.round(rect.height || 0)) + gap;
   }
@@ -3211,6 +3485,253 @@ function miniWrapIsVisible(panel: HTMLElement): boolean {
   const miniWrap = panel.querySelector('.lia-plot-analysis-mini-wrap') as HTMLElement | null;
   if (!miniWrap) return false;
   return miniWrap.style.display === 'inline-flex';
+}
+
+function liveRegressionPointData(state: RegressionState, data: AutoPointData): AutoPointData {
+  const fallback: AutoPointData = {
+    key: String(data && data.key || ''),
+    x: Number(data && data.x),
+    y: Number(data && data.y)
+  };
+  if (!fallback.key) return fallback;
+
+  try {
+    let point = window.__points && window.__points[state.boardId]
+      ? window.__points[state.boardId][fallback.key]
+      : null;
+    if (!point || point.board !== state.board) {
+      const objects = state.board && state.board.objects ? state.board.objects : {};
+      point = Object.keys(objects).map((id) => objects[id]).find((candidate: any) =>
+        !!candidate &&
+        candidate.board === state.board &&
+        (
+          String(candidate.__liaRegressionAutoPointKey || '') === fallback.key ||
+          String(candidate.__liaDgsPersistentId || '') === fallback.key ||
+          String(candidate.__liaDgsMacroKey || '') === fallback.key ||
+          String(candidate.name || '') === fallback.key
+        )
+      ) || null;
+    }
+    if (!point || point.board !== state.board) return fallback;
+
+    const x = typeof point.X === 'function'
+      ? Number(point.X())
+      : Number(point.coords && point.coords.usrCoords && point.coords.usrCoords[1]);
+    const y = typeof point.Y === 'function'
+      ? Number(point.Y())
+      : Number(point.coords && point.coords.usrCoords && point.coords.usrCoords[2]);
+    if (Number.isFinite(x)) fallback.x = x;
+    if (Number.isFinite(y)) fallback.y = y;
+  } catch (e) {}
+
+  return fallback;
+}
+
+function collectRegressionAnalysisSnapshots(state: RegressionState): RegressionAnalysisSnapshot[] {
+  const result: RegressionAnalysisSnapshot[] = [];
+  const lists: Array<{ classKey: AnalysisClassKey; entries: AnyAnalysisEntry[] }> = [
+    { classKey: 'linear', entries: state.analysisEntries || [] },
+    { classKey: 'quadratic', entries: state.quadraticAnalysisEntries || [] },
+    { classKey: 'cubic', entries: state.cubicAnalysisEntries || [] },
+    { classKey: 'quartic', entries: state.quarticAnalysisEntries || [] },
+    { classKey: 'sin', entries: state.sinAnalysisEntries || [] },
+    { classKey: 'exp', entries: state.expAnalysisEntries || [] },
+    { classKey: 'log', entries: state.logAnalysisEntries || [] },
+    { classKey: 'sqrt', entries: state.sqrtAnalysisEntries || [] },
+    { classKey: 'hyperbola', entries: state.hyperbolaAnalysisEntries || [] },
+    { classKey: 'hyperbola2', entries: state.hyperbola2AnalysisEntries || [] }
+  ];
+
+  let fallbackOrder = 0;
+  lists.forEach((list) => {
+    list.entries.forEach((entry) => {
+      fallbackOrder += 1;
+      const parsedOrder = Number(String(entry.id || '').split('-').pop() || '');
+      const scale = readOverlayScaleFromPanel(entry.panel);
+      result.push({
+        id: String(entry.id || ''),
+        classKey: entry.classKey || list.classKey,
+        title: String(entry.title || ''),
+        color: String(entry.color || state.drawColor || '#ff0000'),
+        model: cloneRegressionValue(entry.model || {}),
+        classProbabilities: entry.classProbabilities
+          ? cloneRegressionValue(entry.classProbabilities)
+          : undefined,
+        linkedModels: entry.linkedModels
+          ? cloneRegressionValue(entry.linkedModels)
+          : undefined,
+        overlayScale: Number.isFinite(scale as number) ? Number(scale) : OVERLAY_DEFAULT_SCALE,
+        minimized: !!entry.panel && miniWrapIsVisible(entry.panel),
+        order: Number.isFinite(parsedOrder) ? parsedOrder : fallbackOrder
+      });
+    });
+  });
+
+  result.sort((a, b) => a.order - b.order);
+  return result;
+}
+
+function persistRegressionSnapshot(state: RegressionState): void {
+  if (!state || !state.boardId) return;
+
+  const key = regressionSnapshotKey(state.boardId);
+  const previous = regressionSnapshots[key];
+  const selectableByKey = new Map<string, AutoPointData>();
+  try {
+    getSelectableBoardPoints(state).forEach((point) => selectableByKey.set(point.key, point));
+  } catch (e) {}
+
+  const autoCreatedPointsData = (state.autoCreatedPointsData || []).map((point) =>
+    liveRegressionPointData(state, point)
+  );
+  const regressionPoints = (state.regressionPoints || []).map((point) => {
+    const live = selectableByKey.get(point.key);
+    return live
+      ? { key: point.key, x: Number(live.x), y: Number(live.y) }
+      : liveRegressionPointData(state, point);
+  });
+
+  regressionSnapshots[key] = {
+    revision: Math.max(0, Number(previous && previous.revision) || 0) + 1,
+    boardId: state.boardId,
+    drawColor: String(state.drawColor || '#ff0000'),
+    drawColorMenuOpen: !!state.drawColorMenuOpen,
+    toolsMenuOpen: !!state.toolsMenuOpen,
+    activeTool: state.activeTool,
+    regressionMode: state.regressionMode,
+    drawingHistory: cloneRegressionValue({
+      strokes: state.strokes || [],
+      undoActions: state.undoActions || [],
+      redoActions: state.redoActions || []
+    }),
+    regressionPoints: cloneRegressionValue(regressionPoints),
+    autoCreatedPointsData: cloneRegressionValue(autoCreatedPointsData),
+    analysisSeq: Math.max(0, Number(state.analysisSeq) || 0),
+    analyses: collectRegressionAnalysisSnapshots(state)
+  };
+}
+
+function lastRegressionAnalysisEntry(
+  state: RegressionState,
+  classKey: AnalysisClassKey
+): AnyAnalysisEntry | null {
+  const list = classKey === 'linear' ? state.analysisEntries
+    : classKey === 'quadratic' ? state.quadraticAnalysisEntries
+    : classKey === 'cubic' ? state.cubicAnalysisEntries
+    : classKey === 'quartic' ? state.quarticAnalysisEntries
+    : classKey === 'sin' ? state.sinAnalysisEntries
+    : classKey === 'exp' ? state.expAnalysisEntries
+    : classKey === 'log' ? state.logAnalysisEntries
+    : classKey === 'sqrt' ? state.sqrtAnalysisEntries
+    : classKey === 'hyperbola' ? state.hyperbolaAnalysisEntries
+    : state.hyperbola2AnalysisEntries;
+  return list && list.length ? list[list.length - 1] : null;
+}
+
+function openRegressionAnalysisSnapshot(
+  state: RegressionState,
+  snapshot: RegressionAnalysisSnapshot
+): AnyAnalysisEntry | null {
+  const model = snapshot.model || {};
+  const linkedModels = snapshot.linkedModels
+    ? cloneRegressionValue(snapshot.linkedModels)
+    : undefined;
+  if (linkedModels && linkedModels[snapshot.classKey]) {
+    Object.assign(linkedModels[snapshot.classKey], model);
+  }
+  const options: AnalysisOverlayOptions = {
+    overlayScale: snapshot.overlayScale,
+    classProbabilities: snapshot.classProbabilities
+      ? cloneRegressionValue(snapshot.classProbabilities)
+      : undefined,
+    linkedModels
+  };
+
+  state.drawColor = String(snapshot.color || '#ff0000');
+  let opened = false;
+  if (snapshot.classKey === 'linear') {
+    opened = openLinearAnalysisOverlay(state, Number(model.m), Number(model.n), snapshot.title, options);
+  } else if (snapshot.classKey === 'quadratic') {
+    opened = openQuadraticAnalysisOverlay(state, Number(model.a), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'cubic') {
+    opened = openCubicAnalysisOverlay(state, Number(model.a), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'quartic') {
+    opened = openQuarticAnalysisOverlay(state, Number(model.a), Number(model.b), Number(model.c), Number(model.d), Number(model.f), snapshot.title, options);
+  } else if (snapshot.classKey === 'sin') {
+    opened = openSinAnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'exp') {
+    opened = openExpAnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'log') {
+    opened = openLogAnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'sqrt') {
+    opened = openSqrtAnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'hyperbola') {
+    opened = openHyperbolaAnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  } else if (snapshot.classKey === 'hyperbola2') {
+    opened = openHyperbola2AnalysisOverlay(state, Number(model.A), Number(model.b), Number(model.c), Number(model.d), snapshot.title, options);
+  }
+  if (!opened) return null;
+
+  const entry = lastRegressionAnalysisEntry(state, snapshot.classKey);
+  if (!entry) return null;
+  if (snapshot.id) entry.id = String(snapshot.id);
+  entry.title = String(snapshot.title || '');
+  entry.color = String(snapshot.color || '#ff0000');
+  entry.classKey = snapshot.classKey;
+  if (entry.panel) entry.panel.style.setProperty('--lia-analysis-accent', entry.color);
+  if (snapshot.minimized && entry.panel) {
+    const close = entry.panel.querySelector<HTMLButtonElement>('.lia-plot-analysis-close');
+    if (close) close.click();
+  }
+  return entry;
+}
+
+function restoreRegressionSnapshot(state: RegressionState): boolean {
+  const snapshot = regressionSnapshots[regressionSnapshotKey(state.boardId)];
+  if (!snapshot || snapshot.boardId !== state.boardId) return false;
+  const revision = Math.max(0, Number(snapshot.revision) || 0);
+  if (state.restoredSnapshotRevision === revision) return false;
+  state.restoredSnapshotRevision = revision;
+
+  const history = cloneRegressionValue(snapshot.drawingHistory || {
+    strokes: [], undoActions: [], redoActions: []
+  });
+  state.strokes = Array.isArray(history.strokes) ? history.strokes : [];
+  state.undoActions = Array.isArray(history.undoActions) ? history.undoActions : [];
+  state.redoActions = Array.isArray(history.redoActions) ? history.redoActions : [];
+
+  state.autoCreatedPointsData = [];
+  (snapshot.autoCreatedPointsData || []).forEach((point) => {
+    if (!point || !point.key || !Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))) return;
+    createAutoPoint(state, Number(point.x), Number(point.y), String(point.key));
+  });
+  state.regressionPoints = cloneRegressionValue(snapshot.regressionPoints || []);
+
+  const analyses = cloneRegressionValue(snapshot.analyses || []).sort((a, b) => a.order - b.order);
+  analyses.forEach((analysis) => openRegressionAnalysisSnapshot(state, analysis));
+  state.analysisSeq = Math.max(
+    Math.max(0, Number(snapshot.analysisSeq) || 0),
+    Math.max(0, Number(state.analysisSeq) || 0)
+  );
+
+  state.drawColor = String(snapshot.drawColor || '#ff0000');
+  state.drawButton.style.setProperty('--draw-color', state.drawColor);
+  state.drawColorMenuOpen = !!snapshot.drawColorMenuOpen;
+  state.toolsMenuOpen = !!snapshot.toolsMenuOpen;
+  state.activeTool = snapshot.activeTool || '';
+  state.regressionMode = snapshot.regressionMode || '';
+  state.drawing = false;
+  state.pointerId = null;
+  state.currentStroke = null;
+  state.eraseRemoved = [];
+  rebuildColorMenu(state);
+  setMenuOpen(state.drawColorMenu, state.drawColorMenuOpen);
+  setMenuOpen(state.toolsMenu, state.toolsMenuOpen);
+  updateButtonStates(state);
+  redrawCanvas(state);
+  relayoutAnalysisPanels(state);
+  try { state.board.update(); } catch (e) {}
+  return true;
 }
 
 function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number, title: string, options?: AnalysisOverlayOptions): boolean {
@@ -3242,7 +3763,10 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { m: linkedModels.linear.m, n: linkedModels.linear.n }
+    model: { m: linkedModels.linear.m, n: linkedModels.linear.n },
+    classKey: 'linear',
+    classProbabilities,
+    linkedModels
   };
   state.analysisEntries.push(entry);
 
@@ -3266,7 +3790,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -3285,7 +3809,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'linear');
+  fillAnalysisClassSelect(select, classProbabilities, 'linear', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -3299,7 +3823,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: LinearParamKey; label: string }> = [
@@ -3563,7 +4087,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
       return;
     }
 
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -3588,7 +4112,7 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
       panel.style.alignItems = '';
       panel.style.justifyContent = '';
       panel.style.width = '';
-      panel.style.minWidth = '190px';
+      panel.style.minWidth = '';
       panel.style.height = '';
       panel.style.minHeight = '';
       miniStrip.style.width = '';
@@ -3763,7 +4287,10 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
       a: linkedModels.quadratic.a,
       c: linkedModels.quadratic.c,
       d: linkedModels.quadratic.d
-    }
+    },
+    classKey: 'quadratic',
+    classProbabilities,
+    linkedModels
   };
   state.quadraticAnalysisEntries.push(entry);
 
@@ -3787,7 +4314,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -3806,7 +4333,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'quadratic');
+  fillAnalysisClassSelect(select, classProbabilities, 'quadratic', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -3820,7 +4347,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygr\u00f6\u00dfe \u00e4ndern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: QuadraticParamKey; label: string }> = [
@@ -4086,7 +4613,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
       return;
     }
 
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -4111,7 +4638,7 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
       panel.style.alignItems = '';
       panel.style.justifyContent = '';
       panel.style.width = '';
-      panel.style.minWidth = '190px';
+      panel.style.minWidth = '';
       panel.style.height = '';
       panel.style.minHeight = '';
       miniStrip.style.width = '';
@@ -4282,7 +4809,10 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { a: linkedModels.cubic.a, b: linkedModels.cubic.b, c: linkedModels.cubic.c, d: linkedModels.cubic.d }
+    model: { a: linkedModels.cubic.a, b: linkedModels.cubic.b, c: linkedModels.cubic.c, d: linkedModels.cubic.d },
+    classKey: 'cubic',
+    classProbabilities,
+    linkedModels
   };
   state.cubicAnalysisEntries.push(entry);
 
@@ -4306,7 +4836,7 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -4325,7 +4855,7 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'cubic');
+  fillAnalysisClassSelect(select, classProbabilities, 'cubic', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -4339,7 +4869,7 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygr\u00f6\u00dfe \u00e4ndern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: CubicParamKey; label: string }> = [
@@ -4460,7 +4990,7 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
       openHyperbola2AnalysisOverlay(state, linkedModels.hyperbola2.A, linkedModels.hyperbola2.b, linkedModels.hyperbola2.c, linkedModels.hyperbola2.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -4622,7 +5152,10 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { a: linkedModels.quartic.a, b: linkedModels.quartic.b, c: linkedModels.quartic.c, d: linkedModels.quartic.d, f: linkedModels.quartic.f }
+    model: { a: linkedModels.quartic.a, b: linkedModels.quartic.b, c: linkedModels.quartic.c, d: linkedModels.quartic.d, f: linkedModels.quartic.f },
+    classKey: 'quartic',
+    classProbabilities,
+    linkedModels
   };
   state.quarticAnalysisEntries.push(entry);
 
@@ -4646,7 +5179,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -4665,7 +5198,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'quartic');
+  fillAnalysisClassSelect(select, classProbabilities, 'quartic', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -4679,7 +5212,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygr\u00f6\u00dfe \u00e4ndern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: QuarticParamKey; label: string }> = [
@@ -4790,7 +5323,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
       openHyperbola2AnalysisOverlay(state, linkedModels.hyperbola2.A, linkedModels.hyperbola2.b, linkedModels.hyperbola2.c, linkedModels.hyperbola2.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c: number, d: number, title: string, options?: AnalysisOverlayOptions): boolean {
@@ -4822,7 +5355,10 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
       color: state.drawColor || '#ff0000',
       panel: null,
       graph: null,
-      model: { A: linkedModels.sin.A, b: linkedModels.sin.b, c: linkedModels.sin.c, d: linkedModels.sin.d }
+      model: { A: linkedModels.sin.A, b: linkedModels.sin.b, c: linkedModels.sin.c, d: linkedModels.sin.d },
+      classKey: 'sin',
+      classProbabilities,
+      linkedModels
     };
     state.sinAnalysisEntries.push(entry);
 
@@ -4846,7 +5382,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
     close.type = 'button';
     close.className = 'lia-plot-analysis-close';
     close.textContent = '\u00d7';
-    close.setAttribute('aria-label', 'Analyse minimieren');
+    close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
     panel.appendChild(close);
 
     const miniWrap = document.createElement('div');
@@ -4865,7 +5401,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
     const select = document.createElement('select');
     select.className = 'lia-plot-analysis-select';
     select.setAttribute('aria-label', entry.title);
-    fillAnalysisClassSelect(select, classProbabilities, 'sin');
+    fillAnalysisClassSelect(select, classProbabilities, 'sin', state.language);
     stopPanelEventPropagation(select);
     selectWrap.appendChild(select);
     content.appendChild(selectWrap);
@@ -4879,7 +5415,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
 
     const resizeHandle = document.createElement('div');
     resizeHandle.className = 'lia-plot-analysis-resize';
-    resizeHandle.setAttribute('aria-label', 'Overlaygr\u00f6\u00dfe \u00e4ndern');
+    resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
     panel.appendChild(resizeHandle);
 
     const rows: Array<{ key: SinParamKey; label: string }> = [
@@ -4988,7 +5524,7 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
         openHyperbola2AnalysisOverlay(state, linkedModels.hyperbola2.A, linkedModels.hyperbola2.b, linkedModels.hyperbola2.c, linkedModels.hyperbola2.d, entry.title, { classProbabilities, linkedModels });
         return;
       }
-      renderUnsupportedClassHint(formula, selected);
+      renderUnsupportedClassHint(formula, selected, state.language);
     });
 
     const setMinimized = (value: boolean) => {
@@ -5282,7 +5818,10 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.sin.A, b: linkedModels.sin.b, c: linkedModels.sin.c, d: linkedModels.sin.d }
+    model: { A: linkedModels.sin.A, b: linkedModels.sin.b, c: linkedModels.sin.c, d: linkedModels.sin.d },
+    classKey: 'sin',
+    classProbabilities,
+    linkedModels
   };
   state.sinAnalysisEntries.push(entry);
 
@@ -5306,7 +5845,7 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -5325,7 +5864,7 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'sin');
+  fillAnalysisClassSelect(select, classProbabilities, 'sin', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -5339,7 +5878,7 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygr\u00f6\u00dfe \u00e4ndern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: SinParamKey; label: string }> = [
@@ -5444,7 +5983,7 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
       openHyperbolaAnalysisOverlay(state, linkedModels.hyperbola.A, linkedModels.hyperbola.b, linkedModels.hyperbola.c, linkedModels.hyperbola.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -5608,7 +6147,10 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.exp.A, b: linkedModels.exp.b, c: linkedModels.exp.c, d: linkedModels.exp.d }
+    model: { A: linkedModels.exp.A, b: linkedModels.exp.b, c: linkedModels.exp.c, d: linkedModels.exp.d },
+    classKey: 'exp',
+    classProbabilities,
+    linkedModels
   };
   state.expAnalysisEntries.push(entry);
 
@@ -5632,7 +6174,7 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -5651,7 +6193,7 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'exp');
+  fillAnalysisClassSelect(select, classProbabilities, 'exp', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -5665,7 +6207,7 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: ExpParamKey; label: string }> = [
@@ -5770,7 +6312,7 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
       openHyperbolaAnalysisOverlay(state, linkedModels.hyperbola.A, linkedModels.hyperbola.b, linkedModels.hyperbola.c, linkedModels.hyperbola.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -5936,7 +6478,10 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.log.A, b: linkedModels.log.b, c: linkedModels.log.c, d: linkedModels.log.d }
+    model: { A: linkedModels.log.A, b: linkedModels.log.b, c: linkedModels.log.c, d: linkedModels.log.d },
+    classKey: 'log',
+    classProbabilities,
+    linkedModels
   };
   state.logAnalysisEntries.push(entry);
 
@@ -5960,7 +6505,7 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -5979,7 +6524,7 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'log');
+  fillAnalysisClassSelect(select, classProbabilities, 'log', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -5993,7 +6538,7 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: LogParamKey; label: string }> = [
@@ -6098,7 +6643,7 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
       openHyperbolaAnalysisOverlay(state, linkedModels.hyperbola.A, linkedModels.hyperbola.b, linkedModels.hyperbola.c, linkedModels.hyperbola.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -6265,7 +6810,10 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.sqrt.A, b: linkedModels.sqrt.b, c: linkedModels.sqrt.c, d: linkedModels.sqrt.d }
+    model: { A: linkedModels.sqrt.A, b: linkedModels.sqrt.b, c: linkedModels.sqrt.c, d: linkedModels.sqrt.d },
+    classKey: 'sqrt',
+    classProbabilities,
+    linkedModels
   };
   state.sqrtAnalysisEntries.push(entry);
 
@@ -6289,7 +6837,7 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -6308,7 +6856,7 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'sqrt');
+  fillAnalysisClassSelect(select, classProbabilities, 'sqrt', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -6322,7 +6870,7 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: SqrtParamKey; label: string }> = [
@@ -6427,7 +6975,7 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
       openHyperbolaAnalysisOverlay(state, linkedModels.hyperbola.A, linkedModels.hyperbola.b, linkedModels.hyperbola.c, linkedModels.hyperbola.d, entry.title, { classProbabilities, linkedModels });
       return;
     }
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -6595,7 +7143,10 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.hyperbola.A, b: linkedModels.hyperbola.b, c: linkedModels.hyperbola.c, d: linkedModels.hyperbola.d }
+    model: { A: linkedModels.hyperbola.A, b: linkedModels.hyperbola.b, c: linkedModels.hyperbola.c, d: linkedModels.hyperbola.d },
+    classKey: 'hyperbola',
+    classProbabilities,
+    linkedModels
   };
   state.hyperbolaAnalysisEntries.push(entry);
 
@@ -6619,7 +7170,7 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -6638,7 +7189,7 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'hyperbola');
+  fillAnalysisClassSelect(select, classProbabilities, 'hyperbola', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -6652,7 +7203,7 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: HyperbolaParamKey; label: string }> = [
@@ -6734,7 +7285,7 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
     if (selected === 'log') return void openLogAnalysisOverlay(state, linkedModels.log.A, linkedModels.log.b, linkedModels.log.c, linkedModels.log.d, entry.title, { classProbabilities, linkedModels });
     if (selected === 'sqrt') return void openSqrtAnalysisOverlay(state, linkedModels.sqrt.A, linkedModels.sqrt.b, linkedModels.sqrt.c, linkedModels.sqrt.d, entry.title, { classProbabilities, linkedModels });
     if (selected === 'hyperbola2') return void openHyperbola2AnalysisOverlay(state, linkedModels.hyperbola2.A, linkedModels.hyperbola2.b, linkedModels.hyperbola2.c, linkedModels.hyperbola2.d, entry.title, { classProbabilities, linkedModels });
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -6903,7 +7454,10 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
     color: state.drawColor || '#ff0000',
     panel: null,
     graph: null,
-    model: { A: linkedModels.hyperbola2.A, b: linkedModels.hyperbola2.b, c: linkedModels.hyperbola2.c, d: linkedModels.hyperbola2.d }
+    model: { A: linkedModels.hyperbola2.A, b: linkedModels.hyperbola2.b, c: linkedModels.hyperbola2.c, d: linkedModels.hyperbola2.d },
+    classKey: 'hyperbola2',
+    classProbabilities,
+    linkedModels
   };
   state.hyperbola2AnalysisEntries.push(entry);
 
@@ -6927,7 +7481,7 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
   close.type = 'button';
   close.className = 'lia-plot-analysis-close';
   close.textContent = '\u00d7';
-  close.setAttribute('aria-label', 'Analyse minimieren');
+  close.setAttribute('aria-label', regressionText(state.language).minimizeAnalysis);
   panel.appendChild(close);
 
   const miniWrap = document.createElement('div');
@@ -6946,7 +7500,7 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
   const select = document.createElement('select');
   select.className = 'lia-plot-analysis-select';
   select.setAttribute('aria-label', entry.title);
-  fillAnalysisClassSelect(select, classProbabilities, 'hyperbola2');
+  fillAnalysisClassSelect(select, classProbabilities, 'hyperbola2', state.language);
   stopPanelEventPropagation(select);
   selectWrap.appendChild(select);
   content.appendChild(selectWrap);
@@ -6960,7 +7514,7 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
 
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'lia-plot-analysis-resize';
-  resizeHandle.setAttribute('aria-label', 'Overlaygroesse aendern');
+  resizeHandle.setAttribute('aria-label', regressionText(state.language).resizeOverlay);
   panel.appendChild(resizeHandle);
 
   const rows: Array<{ key: Hyperbola2ParamKey; label: string }> = [
@@ -7042,7 +7596,7 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
     if (selected === 'log') return void openLogAnalysisOverlay(state, linkedModels.log.A, linkedModels.log.b, linkedModels.log.c, linkedModels.log.d, entry.title, { classProbabilities, linkedModels });
     if (selected === 'sqrt') return void openSqrtAnalysisOverlay(state, linkedModels.sqrt.A, linkedModels.sqrt.b, linkedModels.sqrt.c, linkedModels.sqrt.d, entry.title, { classProbabilities, linkedModels });
     if (selected === 'hyperbola') return void openHyperbolaAnalysisOverlay(state, linkedModels.hyperbola.A, linkedModels.hyperbola.b, linkedModels.hyperbola.c, linkedModels.hyperbola.d, entry.title, { classProbabilities, linkedModels });
-    renderUnsupportedClassHint(formula, selected);
+    renderUnsupportedClassHint(formula, selected, state.language);
   });
 
   const setMinimized = (value: boolean) => {
@@ -7520,18 +8074,20 @@ function rebuildColorMenu(state: RegressionState): void {
   for (let i = 0; i < DRAW_COLORS.length; i += 1) {
     const color = DRAW_COLORS[i];
     const active = String(color).toLowerCase() === String(state.drawColor).toLowerCase() ? '1' : '0';
-    html += '<button class="lia-plot-color-item" type="button" data-color="' + color + '" data-active="' + active + '" style="background:' + color + ';" aria-label="Farbe ' + color + '"></button>';
+    html += '<button class="lia-plot-color-item" type="button" data-color="' + color + '" data-active="' + active + '" style="background:' + color + ';" aria-label="' + regressionText(state.language).color + ' ' + color + '"></button>';
   }
 
   html += '</div>';
   state.drawColorMenu.innerHTML = html;
 
   state.drawColorMenu.querySelectorAll<HTMLElement>('.lia-plot-color-item').forEach((item) => {
+    const itemColor = String(item.dataset.color || '').trim();
+    item.setAttribute('aria-label', regressionText(state.language).color + ' ' + itemColor);
     item.addEventListener('click', (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
 
-      const color = String(item.dataset.color || '').trim();
+      const color = itemColor;
       if (!color) return;
 
       state.drawColor = color;
@@ -7539,6 +8095,50 @@ function rebuildColorMenu(state: RegressionState): void {
       rebuildColorMenu(state);
       redrawCanvas(state);
     });
+  });
+}
+
+function applyRegressionLanguage(state: RegressionState, language: RegressionLanguage): void {
+  const text = regressionText(language);
+  state.language = language;
+
+  state.undoButton.setAttribute('aria-label', text.undo);
+  state.redoButton.setAttribute('aria-label', text.redo);
+  state.drawButton.setAttribute('aria-label', text.freehandDrawing);
+  state.eraseButton.setAttribute('aria-label', text.eraseObjectOrStroke);
+  state.toolsButton.setAttribute('aria-label', text.tools);
+  localizeRegressionToolsMenu(state.toolsMenu, language);
+  rebuildColorMenu(state);
+
+  const entries: AnyAnalysisEntry[] = ([] as AnyAnalysisEntry[])
+    .concat(state.analysisEntries || [])
+    .concat(state.quadraticAnalysisEntries || [])
+    .concat(state.cubicAnalysisEntries || [])
+    .concat(state.quarticAnalysisEntries || [])
+    .concat(state.sinAnalysisEntries || [])
+    .concat(state.expAnalysisEntries || [])
+    .concat(state.logAnalysisEntries || [])
+    .concat(state.sqrtAnalysisEntries || [])
+    .concat(state.hyperbolaAnalysisEntries || [])
+    .concat(state.hyperbola2AnalysisEntries || []);
+  const recognizedTitles = [REGRESSION_TEXT.de.drawingRecognized, REGRESSION_TEXT.en.drawingRecognized];
+  const regressionTitles = [REGRESSION_TEXT.de.regression, REGRESSION_TEXT.en.regression];
+
+  entries.forEach((entry) => {
+    if (recognizedTitles.includes(entry.title as any)) entry.title = text.drawingRecognized;
+    else if (regressionTitles.includes(entry.title as any)) entry.title = text.regression;
+
+    const panel = entry.panel;
+    if (!panel) return;
+    const close = panel.querySelector<HTMLElement>('.lia-plot-analysis-close');
+    const resize = panel.querySelector<HTMLElement>('.lia-plot-analysis-resize');
+    const select = panel.querySelector<HTMLSelectElement>('.lia-plot-analysis-select');
+    if (close) close.setAttribute('aria-label', text.minimizeAnalysis);
+    if (resize) resize.setAttribute('aria-label', text.resizeOverlay);
+    if (select) {
+      select.setAttribute('aria-label', entry.title);
+      refreshAnalysisClassSelectLanguage(select, language);
+    }
   });
 }
 
@@ -7682,6 +8282,7 @@ window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boole
 };
 
 function disposeRegressionState(state: RegressionState): void {
+  try { persistRegressionSnapshot(state); } catch (e) {}
   removeAllAnalysisOverlays(state);
   removeAllQuadraticAnalysisOverlays(state);
   removeAllCubicAnalysisOverlays(state);
@@ -7710,6 +8311,10 @@ function disposeRegressionState(state: RegressionState): void {
   if (state.resizeObserver) {
     state.resizeObserver.disconnect();
   }
+  if (state.resizeLayoutFrame !== null && state.resizeLayoutFrame !== undefined) {
+    try { window.cancelAnimationFrame(state.resizeLayoutFrame); } catch (e) {}
+    state.resizeLayoutFrame = null;
+  }
 
   try { state.drawLayer.remove(); } catch (e) {}
   try { state.undoButton.remove(); } catch (e) {}
@@ -7730,7 +8335,7 @@ function unregisterRegressionState(uid: string, state: RegressionState): void {
   }
 }
 
-function setupRegressionUI(uid: string, boardId: string): void {
+function setupRegressionUI(uid: string, boardId: string, languageCode?: string): void {
   if (!uid || !boardId) return;
 
   const boardContainer = getBoardContainer(boardId);
@@ -7741,7 +8346,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
 
     if (retries <= MAX_RETRIES) {
       window.setTimeout(() => {
-        setupRegressionUI(uid, boardId);
+        setupRegressionUI(uid, boardId, languageCode);
       }, RETRY_DELAY_MS);
     }
     return;
@@ -7754,6 +8359,8 @@ function setupRegressionUI(uid: string, boardId: string): void {
     anchor.style.display = 'none';
     anchor.setAttribute('aria-hidden', 'true');
   }
+  const language = resolveRegressionLanguage(anchor, languageCode, boardContainer);
+  const text = regressionText(language);
 
   // LiaScript's LiveEditor can replace the JSXGraph board while retaining the
   // same container and board id. Such states still have connected controls,
@@ -7780,6 +8387,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
       state.toolsButton?.isConnected
     );
   if (boardInstance && boardInstance !== states[uid]) {
+    applyRegressionLanguage(boardInstance, language);
     applyLayout(boardInstance);
     return;
   }
@@ -7816,6 +8424,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
     existing.drawColorMenu.isConnected &&
     existing.toolsMenu.isConnected
   ) {
+    applyRegressionLanguage(existing, language);
     applyLayout(existing);
     return;
   }
@@ -7827,31 +8436,31 @@ function setupRegressionUI(uid: string, boardId: string): void {
 
   const undoButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-undo-btn',
-    'Rueckgaengig',
+    text.undo,
     '<svg viewBox="-4 0 24 24" aria-hidden="true" style="transform:translateX(-4px);"><path d="M21 8H10.2V4L2 12l8.2 8v-4H21V8z" fill="currentColor"></path><rect x="10.2" y="10.6" width="10.8" height="2.8" rx="1.4" fill="currentColor"></rect></svg>'
   );
 
   const redoButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-redo-btn',
-    'Wiederherstellen',
+    text.redo,
     '<svg viewBox="-4 0 24 24" aria-hidden="true" style="transform:translateX(-4px);"><path d="M3 8h10.8V4l8.2 8-8.2 8v-4H3V8z" fill="currentColor"></path><rect x="3" y="10.6" width="10.8" height="2.8" rx="1.4" fill="currentColor"></rect></svg>'
   );
 
   const drawButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-draw-btn',
-    'Freihandzeichnen',
+    text.freehandDrawing,
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ico-stroke" d="M4 20l4.7-1.1L19 8.6 15.4 5 5.1 15.3z"></path><path class="ico-stroke" d="M13.9 6.5l3.6 3.6"></path><circle class="ico-color-dot" cx="16.5" cy="16.5" r="4.5"></circle></svg>'
   );
 
   const eraseButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-erase-toggle',
-    'Objekt oder Pinselstrich loeschen',
+    text.eraseObjectOrStroke,
     '<svg viewBox="0 0 24 24" aria-hidden="true" style="transform:translate(-1px, -2px);"><path class="ico-stroke" d="M6.2 15.7l8-8a2 2 0 0 1 2.8 0l3.1 3.1a2 2 0 0 1 0 2.8L13.4 20.3H9.3l-3.1-3.1a2 2 0 0 1 0-1.5z"></path><path class="ico-stroke" d="M9.2 20.3h8"></path><path class="ico-stroke" d="M10 13.9l5.7 5.7"></path></svg>'
   );
 
   const toolsButton = createToolbarButton(
     'lia-plot-draw-toggle lia-plot-regression-toggle',
-    'Tools',
+    text.tools,
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ico-stroke" d="M5 18h4"></path><path class="ico-stroke" d="M7 16v4"></path><path class="ico-stroke" d="M12.8 4.5l1.7 3.5 3.9.5-2.8 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8-2.8-2.7 3.9-.5z"></path></svg>'
   );
 
@@ -7865,10 +8474,12 @@ function setupRegressionUI(uid: string, boardId: string): void {
   const toolsMenu = document.createElement('div');
   toolsMenu.className = 'lia-plot-color-menu lia-plot-reg-menu';
   toolsMenu.innerHTML = '' +
-    '<button class="lia-plot-reg-item" type="button" data-action="recognize">Zeichnung erkennen</button>' +
-    '<button class="lia-plot-reg-item" type="button" data-action="select-points">Punkte ausw\u00e4hlen</button>' +
-    '<button class="lia-plot-reg-item is-disabled" type="button" data-action="compute" disabled="">Regression berechnen</button>' +
-    '<button class="lia-plot-reg-item is-disabled" type="button" data-action="clear" disabled="">Auswahl aufheben</button>';
+    '<button class="lia-plot-reg-item" type="button" data-action="recognize">' + text.recognizeDrawing + '</button>' +
+    '<button class="lia-plot-reg-item" type="button" data-action="select-points">' + text.selectPoints + '</button>' +
+    '<button class="lia-plot-reg-item is-disabled" type="button" data-action="compute" disabled="">' + text.calculateRegression + '</button>' +
+    '<button class="lia-plot-reg-item is-disabled" type="button" data-action="clear" disabled="">' + text.clearSelection + '</button>';
+
+  localizeRegressionToolsMenu(toolsMenu, language);
 
   boardContainer.appendChild(drawLayer);
   boardContainer.appendChild(undoButton);
@@ -7882,6 +8493,7 @@ function setupRegressionUI(uid: string, boardId: string): void {
   const state: RegressionState = {
     uid,
     boardId,
+    language,
     board,
     anchor,
     boardContainer,
@@ -8122,14 +8734,24 @@ function setupRegressionUI(uid: string, boardId: string): void {
 
   document.addEventListener('pointerdown', state.onDocPointerDown);
 
+  const scheduleResizeLayout = () => {
+    if (state.resizeLayoutFrame !== null && state.resizeLayoutFrame !== undefined) return;
+    state.resizeLayoutFrame = window.requestAnimationFrame(() => {
+      state.resizeLayoutFrame = null;
+      relayoutAnalysisPanels(state);
+    });
+  };
+
   state.onWindowResize = () => {
     redrawCanvas(state);
+    scheduleResizeLayout();
   };
   window.addEventListener('resize', state.onWindowResize);
 
   if (typeof ResizeObserver === 'function') {
     const ro = new ResizeObserver(() => {
       redrawCanvas(state);
+      scheduleResizeLayout();
     });
     ro.observe(boardContainer);
     state.resizeObserver = ro;
@@ -8138,12 +8760,15 @@ function setupRegressionUI(uid: string, boardId: string): void {
   states[uid] = state;
   window.__liaRegressionStates = window.__liaRegressionStates || {};
   window.__liaRegressionStates[uid] = state;
+  try { restoreRegressionSnapshot(state); } catch (e) {}
+  applyRegressionLanguage(state, language);
+  applyLayout(state);
 }
 
-window.__setupRegressionUI = function (uid: string, spec: string) {
+window.__setupRegressionUI = function (uid: string, spec: string, language?: string) {
   const boardId = unquote(String(spec || '').trim());
   scheduleBootstrap(() => {
-    setupRegressionUI(uid, boardId);
+    setupRegressionUI(uid, boardId, language);
   });
 };
 
@@ -8157,7 +8782,7 @@ export function bootstrapRegression(): void {
     const uid = match[1];
     const spec = (el as HTMLElement).dataset.spec || '';
     const boardId = unquote(String(spec).trim());
-    setupRegressionUI(uid, boardId);
+    setupRegressionUI(uid, boardId, (el as HTMLElement).dataset.language);
   });
 }
 

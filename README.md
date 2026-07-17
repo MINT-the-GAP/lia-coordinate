@@ -324,18 +324,18 @@ script:   ./dist/index.js
 </script>
 @end
 
-@Regression: @Regression_(@uid,`@0`)
-@Regession: @Regression_(@uid,`@0`)
-@PlotZeichnen: @Regression_(@uid,`@0`)
+@Regression: @Regression_(@uid,`@0`,@language)
+@Regession: @Regression_(@uid,`@0`,@language)
+@PlotZeichnen: @Regression_(@uid,`@0`,@language)
 
 @Regression_
-<span id="regression-ui-@0" data-spec="@1" style="display:none;"></span>
+<span id="regression-ui-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 
 <script modify="false">
 (function(){
   const spec = '@1';
   if (typeof window.__setupRegressionUI === 'function') {
-    window.__setupRegressionUI('@0', spec);
+    window.__setupRegressionUI('@0', spec, '@2');
   }
 })();
 </script>

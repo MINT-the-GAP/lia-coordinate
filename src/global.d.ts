@@ -276,7 +276,7 @@ interface Window {
   // Regression subsystem (@Regression)
   __regressionReady: boolean | undefined;
   __bootstrapRegression: (() => void) | undefined;
-  __setupRegressionUI: ((uid: string, spec: string) => void) | undefined;
+  __setupRegressionUI: ((uid: string, spec: string, language?: string) => void) | undefined;
   __relayoutRegressionForBoard: ((boardId: string, dgsOpen?: boolean) => void) | undefined;
   __setDgsExternalToolActive: ((boardId: string, active: boolean) => void) | undefined;
   __refreshDgsToolAvailabilityForBoard: ((boardId: string) => void) | undefined;
@@ -295,6 +295,8 @@ interface Window {
   // DGS subsystem (@DGS)
   __dgsReady: boolean | undefined;
   __bootstrapDGS: (() => void) | undefined;
+  __prepareDgsBoardReplacement: (() => void) | undefined;
+  __persistDgsBoardState: ((boardId: string, recordHistory?: boolean) => void) | undefined;
   __setupDGS: ((uid: string, spec: string, language?: string) => void) | undefined;
 
   // Table subsystem (@Table)

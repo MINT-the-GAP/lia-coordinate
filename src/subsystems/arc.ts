@@ -348,6 +348,27 @@ export function init(): void {
     }
   }
 
+  function currentArcAngle(
+    curve: any,
+    dgsProperty: '__liaDgsArcExitAngle' | '__liaDgsArcEntryAngle',
+    legacyProperty: '__liaArcExitAngle' | '__liaArcEntryAngle',
+    fallback: number
+  ): number {
+    const dgsAngle = Number(curve && curve[dgsProperty]);
+    if (Number.isFinite(dgsAngle)) return dgsAngle;
+    const legacyAngle = Number(curve && curve[legacyProperty]);
+    return Number.isFinite(legacyAngle) ? legacyAngle : fallback;
+  }
+
+  function currentArcStrokeWidth(curve: any, fallback: number): number {
+    const dgsStrokeWidth = Number(curve && curve.__liaDgsArcStrokeWidth);
+    if (Number.isFinite(dgsStrokeWidth) && dgsStrokeWidth > 0) return dgsStrokeWidth;
+    const legacyStrokeWidth = Number(curve && curve.__liaArcStrokeWidth);
+    return Number.isFinite(legacyStrokeWidth) && legacyStrokeWidth > 0
+      ? legacyStrokeWidth
+      : fallback;
+  }
+
   function arcGeometry(points: any[], exitAngle: number, entryAngle: number): ArcGeometry {
     const p0 = pointCoordinate(points[0]);
     const p3 = pointCoordinate(points[1]);
@@ -424,16 +445,20 @@ export function init(): void {
     board: any,
     endpoint: any,
     allEndpoints: any[],
-    angle: number,
+    angle: number | (() => number),
     color: string,
     strokeWidth: number,
     layer: number,
     visible: boolean
   ): ArcCap {
+    const currentAngle = function(): number {
+      const value = Number(typeof angle === 'function' ? angle() : angle);
+      return Number.isFinite(value) ? value : 0;
+    };
     const makePoint = function(side: number) {
       const point = board.create('point', [
-        function() { return Number(endpoint.X()) + capOffset(board, angle, side).x; },
-        function() { return Number(endpoint.Y()) + capOffset(board, angle, side).y; }
+        function() { return Number(endpoint.X()) + capOffset(board, currentAngle(), side).x; },
+        function() { return Number(endpoint.Y()) + capOffset(board, currentAngle(), side).y; }
       ], {
         name: '',
         withLabel: false,
@@ -464,8 +489,12 @@ export function init(): void {
     return { segment, points };
   }
 
-  function labelPosition(board: any, points: any[], cfg: ArcConfig): CoordinatePair {
-    const geometry = arcGeometry(points, cfg.exitAngle, cfg.entryAngle);
+  function labelPosition(board: any, points: any[], cfg: ArcConfig, curve: any): CoordinatePair {
+    const geometry = arcGeometry(
+      points,
+      currentArcAngle(curve, '__liaDgsArcExitAngle', '__liaArcExitAngle', cfg.exitAngle),
+      currentArcAngle(curve, '__liaDgsArcEntryAngle', '__liaArcEntryAngle', cfg.entryAngle)
+    );
     const midpoint = cubicPoint(geometry, 0.5);
     if (!Number.isFinite(midpoint.x) || !Number.isFinite(midpoint.y)) return midpoint;
     let derivative = cubicDerivative(geometry, 0.5);
@@ -493,7 +522,7 @@ export function init(): void {
       normalScreenX = -normalScreenX;
       normalScreenY = -normalScreenY;
     }
-    const offsetPx = Math.max(11, Math.min(20, 10 + cfg.strokeWidth));
+    const offsetPx = Math.max(11, Math.min(20, 10 + currentArcStrokeWidth(curve, cfg.strokeWidth)));
     return {
       x: midpoint.x + normalScreenX * offsetPx / unitX,
       y: midpoint.y - normalScreenY * offsetPx / unitY
@@ -501,12 +530,20 @@ export function init(): void {
   }
 
   function createCurve(board: any, points: any[], cfg: ArcConfig, layer: number): any {
-    const curve = board.create('curve', [
+    let curve: any = null;
+    const geometry = function(): ArcGeometry {
+      return arcGeometry(
+        points,
+        currentArcAngle(curve, '__liaDgsArcExitAngle', '__liaArcExitAngle', cfg.exitAngle),
+        currentArcAngle(curve, '__liaDgsArcEntryAngle', '__liaArcEntryAngle', cfg.entryAngle)
+      );
+    };
+    curve = board.create('curve', [
       function(t: number) {
-        return cubicPoint(arcGeometry(points, cfg.exitAngle, cfg.entryAngle), Number(t)).x;
+        return cubicPoint(geometry(), Number(t)).x;
       },
       function(t: number) {
-        return cubicPoint(arcGeometry(points, cfg.exitAngle, cfg.entryAngle), Number(t)).y;
+        return cubicPoint(geometry(), Number(t)).y;
       },
       0,
       1
@@ -533,11 +570,11 @@ export function init(): void {
     return curve;
   }
 
-  function createLabel(board: any, points: any[], cfg: ArcConfig): any {
+  function createLabel(board: any, points: any[], cfg: ArcConfig, curve: any): any {
     if (!cfg.caption) return null;
     const label = board.create('text', [
-      function() { return labelPosition(board, points, cfg).x; },
-      function() { return labelPosition(board, points, cfg).y; },
+      function() { return labelPosition(board, points, cfg, curve).x; },
+      function() { return labelPosition(board, points, cfg, curve).y; },
       cfg.renderedCaption
     ], {
       fixed: true,
@@ -589,13 +626,22 @@ export function init(): void {
     const language = String(entry.language || curve.__liaArcLanguage || 'de')
       .toLowerCase() === 'en' ? 'en' : 'de';
 
+    const currentExitAngle = Number(curve.__liaDgsArcExitAngle);
+    const currentEntryAngle = Number(curve.__liaDgsArcEntryAngle);
+    const macroBase = 'macro:arcEntries:' + entryKey(String(entry.uid || ''));
     curve.__liaDgsMacroManaged = true;
+    curve.__liaDgsMacroKey = macroBase + ':curve';
+    curve.__liaDgsPersistentId = macroBase + ':curve';
     curve.__liaDgsArc = true;
     curve.__liaDgsArcName = name;
     curve.__liaDgsArcStartPoint = startPoint;
     curve.__liaDgsArcEndPoint = endPoint;
-    curve.__liaDgsArcExitAngle = Number(entry.exitAngle ?? curve.__liaArcExitAngle);
-    curve.__liaDgsArcEntryAngle = Number(entry.entryAngle ?? curve.__liaArcEntryAngle);
+    curve.__liaDgsArcExitAngle = Number.isFinite(currentExitAngle)
+      ? currentExitAngle
+      : Number(entry.exitAngle ?? curve.__liaArcExitAngle);
+    curve.__liaDgsArcEntryAngle = Number.isFinite(currentEntryAngle)
+      ? currentEntryAngle
+      : Number(entry.entryAngle ?? curve.__liaArcEntryAngle);
     curve.__liaDgsArcCaption = caption;
     curve.__liaDgsArcDesign = design;
     curve.__liaDgsArcStrokeWidth = strokeWidth;
@@ -620,6 +666,13 @@ export function init(): void {
       : [];
     curve.__liaDgsArcLabel = entry.label || null;
     if (entry.label) curve.label = entry.label;
+    (Array.isArray(entry.ownedPoints) ? entry.ownedPoints : []).forEach(function(point: any, index: number) {
+      if (!point) return;
+      const key = macroBase + ':owned-point:' + index;
+      point.__liaDgsMacroManaged = true;
+      point.__liaDgsMacroKey = key;
+      point.__liaDgsPersistentId = key;
+    });
   }
 
   function applyArcVisibility(entry: any): void {
@@ -767,18 +820,40 @@ export function init(): void {
       const curveLayer = Number.isFinite(curveLayerValue) ? curveLayerValue : 5;
       const capLayer = Math.max(0, curveLayer - 1);
 
+      curve = createCurve(board, points, cfg, curveLayer);
       if (cfg.startCap) {
-        const cap = createCap(board, startPoint, points, cfg.exitAngle, cfg.color, cfg.strokeWidth, capLayer, cfg.visible);
+        const cap = createCap(
+          board,
+          startPoint,
+          points,
+          function() {
+            return currentArcAngle(curve, '__liaDgsArcExitAngle', '__liaArcExitAngle', cfg.exitAngle);
+          },
+          cfg.color,
+          cfg.strokeWidth,
+          capLayer,
+          cfg.visible
+        );
         capSegments.push(cap.segment);
         capPoints.push.apply(capPoints, cap.points);
       }
       if (cfg.endCap) {
-        const cap = createCap(board, endPoint, points, cfg.entryAngle, cfg.color, cfg.strokeWidth, capLayer, cfg.visible);
+        const cap = createCap(
+          board,
+          endPoint,
+          points,
+          function() {
+            return currentArcAngle(curve, '__liaDgsArcEntryAngle', '__liaArcEntryAngle', cfg.entryAngle);
+          },
+          cfg.color,
+          cfg.strokeWidth,
+          capLayer,
+          cfg.visible
+        );
         capSegments.push(cap.segment);
         capPoints.push.apply(capPoints, cap.points);
       }
-      curve = createCurve(board, points, cfg, curveLayer);
-      label = createLabel(board, points, cfg);
+      label = createLabel(board, points, cfg, curve);
 
       curve.__liaArc = true;
       curve.__liaArcStartPoint = startPoint;

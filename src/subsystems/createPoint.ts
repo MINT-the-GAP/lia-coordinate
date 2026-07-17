@@ -106,6 +106,41 @@ export function init(): void {
     };
   }
 
+  function findPointMacroObject(uid, spec) {
+    const target = getPointTargetFromSpec(spec);
+    const board = window.__boards && window.__boards[target.boardId];
+    let point = window.__points && window.__points[target.boardId] &&
+      window.__points[target.boardId][target.name];
+    if (!uid || !board) return null;
+    const key = 'macro:point:' + String(uid);
+    if (!point || point.board !== board) {
+      const objects = board.objects && typeof board.objects === 'object'
+        ? Object.keys(board.objects).map(function(objectKey) { return board.objects[objectKey]; })
+        : [];
+      point = objects.find(function(candidate) {
+        return candidate && candidate.board === board && candidate.__liaDgsMacroKey === key;
+      }) || null;
+    }
+    return point && point.board === board ? point : null;
+  }
+
+  function assignPointMacroIdentity(uid, spec) {
+    const target = getPointTargetFromSpec(spec);
+    const point = findPointMacroObject(uid, spec);
+    if (!point) return null;
+    ensureBuckets(target.boardId);
+    const key = 'macro:point:' + String(uid);
+    // Keep the source name as a resolver alias even when the visible DGS name
+    // is changed. Dependent macros still refer to the name from their source.
+    window.__points[target.boardId][target.name] = point;
+    point.__liaDgsMacroManaged = true;
+    point.__liaDgsMacroKey = key;
+    point.__liaDgsPersistentId = key;
+    point.__liaDgsMacroPointName = target.name;
+    point.__liaPointMacroSpec = String(spec || '');
+    return point;
+  }
+
   function stylePointLabel(pt) {
     if (!pt || typeof pt.setAttribute !== 'function') return;
 
@@ -301,15 +336,20 @@ export function init(): void {
     if (!pt || pt.__liaStateBound) return;
     pt.__liaStateBound = true;
 
-    const persist = function() {
+    const persist = function(recordHistory) {
       savePointState(boardId, name, pt);
+      try {
+        if (typeof window.__persistDgsBoardState === 'function') {
+          window.__persistDgsBoardState(boardId, recordHistory !== false);
+        }
+      } catch (e) {}
     };
 
-    try { pt.on('drag', persist); } catch (e) {}
-    try { pt.on('up', persist); } catch (e) {}
-    try { pt.on('move', persist); } catch (e) {}
+    try { pt.on('drag', function() { persist(false); }); } catch (e) {}
+    try { pt.on('up', function() { persist(true); }); } catch (e) {}
+    try { pt.on('move', function() { persist(false); }); } catch (e) {}
 
-    persist();
+    savePointState(boardId, name, pt);
   }
 
   function createPoint(board, boardId, name, x0, y0, isFixed = false, showName = true) {
@@ -549,8 +589,16 @@ export function init(): void {
       holder.dataset.spec = spec;
     }
 
+    const existing = findPointMacroObject(uid, spec);
+    if (existing && String(existing.__liaPointMacroSpec || '') === String(spec || '')) {
+      assignPointMacroIdentity(uid, spec);
+      return true;
+    }
+
     if (typeof window.placeStaticPointFromSpec === 'function') {
-      return !!window.placeStaticPointFromSpec(spec);
+      const placed = !!window.placeStaticPointFromSpec(spec);
+      if (placed) assignPointMacroIdentity(uid, spec);
+      return placed;
     }
     return false;
   };
@@ -744,7 +792,9 @@ export function init(): void {
         inner.style.transform = 'translateY(0px)';
       } catch (e) {}
 
-      if (typeof window.restorePointFromSpec === 'function') {
+      const existing = findPointMacroObject(uid, spec);
+      if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
+          typeof window.restorePointFromSpec === 'function') {
         window.restorePointFromSpec(spec);
       }
       return true;
@@ -790,7 +840,9 @@ export function init(): void {
     inner.style.transform = 'translateY(0px)';
     inner.style.whiteSpace = 'nowrap';
 
-    if (typeof window.restorePointFromSpec === 'function') {
+    const existing = findPointMacroObject(uid, spec);
+    if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
+        typeof window.restorePointFromSpec === 'function') {
       window.restorePointFromSpec(spec);
     }
 
@@ -825,10 +877,12 @@ export function init(): void {
         if (typeof window.ensurePointFromSpec === 'function') {
           window.ensurePointFromSpec(curSpec);
         }
+        assignPointMacroIdentity(uid, curSpec);
       });
     }
 
     applyCreatePointUi(uid);
+    assignPointMacroIdentity(uid, spec);
 
     if (!checkRoot.__liaPointUiObserved) {
       checkRoot.__liaPointUiObserved = true;
@@ -857,6 +911,7 @@ export function init(): void {
             if (typeof window.finalizePointFromSpec === 'function') {
               window.finalizePointFromSpec(curSpec);
             }
+            assignPointMacroIdentity(uid, curSpec);
           }, 0);
 
           setTimeout(function() {
@@ -864,6 +919,7 @@ export function init(): void {
             if (typeof window.finalizePointFromSpec === 'function') {
               window.finalizePointFromSpec(curSpec);
             }
+            assignPointMacroIdentity(uid, curSpec);
           }, 80);
         });
       } catch (e) {}
@@ -876,15 +932,23 @@ export function init(): void {
     }
 
     setTimeout(function() {
-      if (typeof window.restorePointFromSpec === 'function') {
+      if (!uiRoot.isConnected || String(uiRoot.dataset.spec || '') !== String(spec || '')) return;
+      const existing = findPointMacroObject(uid, spec);
+      if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
+          typeof window.restorePointFromSpec === 'function') {
         window.restorePointFromSpec(spec);
       }
+      assignPointMacroIdentity(uid, spec);
     }, 0);
 
     setTimeout(function() {
-      if (typeof window.restorePointFromSpec === 'function') {
+      if (!uiRoot.isConnected || String(uiRoot.dataset.spec || '') !== String(spec || '')) return;
+      const existing = findPointMacroObject(uid, spec);
+      if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
+          typeof window.restorePointFromSpec === 'function') {
         window.restorePointFromSpec(spec);
       }
+      assignPointMacroIdentity(uid, spec);
     }, 120);
 
     return true;

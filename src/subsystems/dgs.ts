@@ -197,6 +197,7 @@ type DgsState = {
   uid: string;
   boardId: string;
   language: 'de' | 'en';
+  macroSpecSignature: string;
   board: any;
   boardContainer: HTMLElement;
   button: HTMLButtonElement;
@@ -421,9 +422,11 @@ type DgsState = {
   circlePreview: any | null;
   circlePreviewPosition: { x: number; y: number } | null;
   restoring: boolean;
+  boardReplacementPrepared?: boolean;
   rootConstructions: any[];
   rootUpdateRAF?: number;
   rootUpdating?: boolean;
+  restoreTimer?: number;
   coordinateSyncRAF?: number;
   coordinateSyncing?: boolean;
   onBoardViewportChange?: () => void;
@@ -933,17 +936,136 @@ const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
 const DGS_STYLE_VERSION = '2026-07-16-2';
 
-function hasExternalDgsMacroSpecs(boardId: string): boolean {
-  const objectSpecId = /^(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-/;
+function assignDgsMacroPersistentIds(boardId: string, board: any): void {
+  if (!board) return;
+  const root = window as any;
+  const assign = (object: any, key: string, force = false) => {
+    if (!object || typeof object !== 'object' || object.board !== board) return;
+    if (!force && !object.__liaDgsMacroManaged) return;
+    const stableKey = 'macro:' + key;
+    object.__liaDgsMacroManaged = true;
+    object.__liaDgsMacroKey = stableKey;
+    object.__liaDgsPersistentId = stableKey;
+  };
+  const assignList = (values: any, key: string, force = false) => {
+    (Array.isArray(values) ? values : []).forEach((value: any, index: number) => {
+      assign(value, key + ':' + index, force);
+    });
+  };
+  const visit = (registryName: string, callback: (entry: any, key: string) => void) => {
+    const entries = root[registryName];
+    if (!entries || typeof entries !== 'object') return;
+    Object.keys(entries).sort().forEach((entryKey) => {
+      const entry = entries[entryKey];
+      if (!entry || String(entry.boardId || boardId) !== boardId) return;
+      const candidates = [
+        entry.board,
+        entry.graph?.board,
+        entry.slider?.board,
+        entry.object?.board,
+        entry.curve?.board,
+        entry.polygon?.board,
+        entry.angle?.board,
+        entry.text?.board,
+        entry.circle?.board,
+        entry.tangent?.board,
+        entry.sector?.board,
+        entry.contactPoint?.board,
+        entry.source?.board,
+        entry.source?.object?.board,
+        entry.points?.[0]?.board,
+        entry.ownedPoints?.[0]?.board,
+        entry.ownedObjects?.[0]?.board,
+        entry.segments?.[0]?.board
+      ].filter(Boolean);
+      if (!candidates.includes(board)) return;
+      callback(entry, registryName.replace(/^__/, '') + ':' + entryKey);
+    });
+  };
+
+  visit('__plotFunctionEntries', (entry, key) => assign(entry.graph, key + ':graph', true));
+  visit('__sliderEntries', (entry, key) => assign(entry.slider, key + ':slider', true));
+  visit('__distanceEntries', (entry, key) => {
+    assignList(entry.ownedPoints, key + ':owned-point', true);
+    assignList(entry.segments, key + ':segment', true);
+  });
+  visit('__linearObjectEntries', (entry, key) => {
+    assignList(entry.ownedPoints, key + ':owned-point', true);
+    assign(entry.object, key + ':object', true);
+  });
+  visit('__arcEntries', (entry, key) => {
+    assignList(entry.ownedPoints, key + ':owned-point', true);
+    assign(entry.curve, key + ':curve', true);
+  });
+  visit('__relationObjectEntries', (entry, key) => {
+    assignList(entry.ownedPoints, key + ':owned-point', true);
+    assign(entry.object, key + ':object', true);
+  });
+  visit('__areaEntries', (entry, key) => {
+    assignList(entry.ownedPoints, key + ':owned-point', true);
+    assign(entry.polygon, key + ':polygon', true);
+    assignList(entry.polygon && (entry.polygon.__liaDgsPolygonBorders || entry.polygon.borders), key + ':border', true);
+  });
+  visit('__angleEntries', (entry, key) => assign(entry.angle, key + ':angle', true));
+  visit('__coordTextEntries', (entry, key) => assign(entry.text, key + ':text', true));
+  visit('__circleEntries', (entry, key) => assign(entry.circle, key + ':circle', true));
+  visit('__tangentEntries', (entry, key) => {
+    assignList(entry.ownedObjects, key + ':owned-object', true);
+    assign(entry.contactPoint, key + ':contact', true);
+    assign(entry.tangent, key + ':tangent', true);
+  });
+  visit('__sectorEntries', (entry, key) => assign(entry.sector, key + ':sector', true));
+  visit('__functionAnalysisPointEntries', (entry, key) => assignList(entry.points, key + ':point', true));
+  visit('__objectAnalysisPointEntries', (entry, key) => assignList(entry.points, key + ':point', true));
+}
+
+function getExternalDgsMacroSpecSignature(boardId: string): string {
+  const objectSpecId = /^(?:(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-|point-ui-)/;
   try {
-    return Array.from(document.querySelectorAll<HTMLElement>('[id][data-spec]')).some((node) => {
-      if (!objectSpecId.test(String(node.id || ''))) return false;
+    const entries = Array.from(document.querySelectorAll<HTMLElement>('[id][data-spec]')).flatMap((node) => {
+      if (!objectSpecId.test(String(node.id || ''))) return [];
       const first = String(
         splitTopLevel(unquote(String(node.dataset.spec || '')), ';')[0] || ''
       ).trim();
       const idOption = first.match(/^id\s*=\s*(.+)$/i);
       const referencedBoardId = idOption ? unquote(String(idOption[1] || '')).trim() : first;
-      return referencedBoardId === boardId;
+      if (referencedBoardId !== boardId) return [];
+      return [{
+        id: String(node.id || ''),
+        spec: String(node.dataset.spec || ''),
+        kind: String(node.dataset.kind || ''),
+        language: String(node.dataset.language || '')
+      }];
+    }).filter(Boolean) as Array<{ id: string; spec: string; kind: string; language: string }>;
+    entries.sort((a, b) => {
+      const left = a.id + '\u0000' + a.kind + '\u0000' + a.spec + '\u0000' + a.language;
+      const right = b.id + '\u0000' + b.kind + '\u0000' + b.spec + '\u0000' + b.language;
+      return left.localeCompare(right);
+    });
+    return JSON.stringify(entries);
+  } catch (e) {
+    return '[]';
+  }
+}
+
+function hasChangedDgsMacroSpecAnchor(savedSignature: string, currentSignature: string): boolean {
+  try {
+    const saved = JSON.parse(savedSignature);
+    const current = JSON.parse(currentSignature);
+    if (!Array.isArray(saved) || !Array.isArray(current)) return false;
+    const savedById = new Map<string, any>();
+    saved.forEach((entry: any) => {
+      const id = String(entry && entry.id || '');
+      if (id) savedById.set(id, entry);
+    });
+    return current.some((entry: any) => {
+      const id = String(entry && entry.id || '');
+      const previous = id ? savedById.get(id) : null;
+      return !!previous && (
+        String(previous.spec || '') !== String(entry.spec || '') ||
+        String(previous.kind || '') !== String(entry.kind || '') ||
+        String(previous.language || '') !== String(entry.language || '')
+      );
     });
   } catch (e) {
     return false;
@@ -953,7 +1075,16 @@ function hasExternalDgsMacroSpecs(boardId: string): boolean {
 function discardStaleMacroBackedDgsSnapshot(boardId: string, board: any): void {
   if (!board || !dgsConstructionStates[boardId]) return;
   const snapshotBoard = dgsConstructionBoards[boardId];
-  if (snapshotBoard === board || !hasExternalDgsMacroSpecs(boardId)) return;
+  if (snapshotBoard === board) return;
+  const currentSignature = getExternalDgsMacroSpecSignature(boardId);
+  const savedSignature = String(dgsConstructionStates[boardId].macroSpecSignature || '[]');
+  if (savedSignature === currentSignature) return;
+  // LiaScript can mount the DGS anchor before all object-macro anchors. A
+  // temporarily empty or partial signature is therefore not proof of a source
+  // change. Only an anchor that exists on both sides and whose own source data
+  // changed invalidates the interactive snapshot. Added/removed anchors are
+  // reconciled by their stable macro keys during the deferred restore.
+  if (!hasChangedDgsMacroSpecAnchor(savedSignature, currentSignature)) return;
   delete dgsConstructionStates[boardId];
   delete dgsConstructionBoards[boardId];
   delete dgsPendingHistoryBefore[boardId];
@@ -3686,7 +3817,9 @@ function createDgsAnalysisConstruction(
       ? '__liaDgsInflectionConstruction'
       : (kind === 'ordinate-intercept' ? '__liaDgsYInterceptConstruction' : '__liaDgsRootConstruction'));
   const existing = source[property];
-  if (existing && state.rootConstructions.includes(existing)) {
+  if (existing && Array.isArray(existing.points) && existing.points.every((point: any) => !point || point.board === state.board)) {
+    if (existing.__liaDgsMacroManaged) return existing;
+    if (!state.rootConstructions.includes(existing)) state.rootConstructions.push(existing);
     updateDgsRootConstruction(state, existing);
     return existing;
   }
@@ -3704,12 +3837,23 @@ function createDgsRootConstruction(state: DgsState, source: any): any | null {
 
 function createDgsIntersectionConstruction(state: DgsState, first: any, second: any): any | null {
   if (!isDgsTangentTarget(first) || !isDgsTangentTarget(second) || first === second) return null;
-  const existing = state.rootConstructions.find((construction) =>
+  const candidates = state.rootConstructions.concat(
+    Array.isArray(first.__liaDgsIntersectionConstructions)
+      ? first.__liaDgsIntersectionConstructions
+      : []
+  );
+  const existing = candidates.find((construction) =>
     construction && construction.kind === 'intersections' &&
     ((construction.source === first && construction.source2 === second) ||
-     (construction.source === second && construction.source2 === first))
+     (construction.source === second && construction.source2 === first) ||
+     (construction.__liaDgsSource === first && construction.__liaDgsSource2 === second) ||
+     (construction.__liaDgsSource === second && construction.__liaDgsSource2 === first)) &&
+    Array.isArray(construction.points) &&
+    construction.points.every((point: any) => !point || point.board === state.board)
   );
   if (existing) {
+    if (existing.__liaDgsMacroManaged) return existing;
+    if (!state.rootConstructions.includes(existing)) state.rootConstructions.push(existing);
     updateDgsRootConstruction(state, existing);
     return existing;
   }
@@ -6344,21 +6488,39 @@ function getDgsAxisKey(state: DgsState, object: any): 'x' | 'y' | null {
 
 function dgsPointReference(point: any): any {
   return {
-    id: point && point.__liaDgsPointName ? ensureDgsPersistentId(point, 'point') : '',
+    id: point ? ensureDgsPersistentId(point, 'point') : '',
+    macroKey: String((point && point.__liaDgsMacroKey) || ''),
     name: String((point && (point.__liaDgsPointName || point.name)) || '')
   };
 }
 
 function dgsDerivedPointRecord(point: any): any {
+  const markers = getDgsPointTraceMarkers(point);
+  const liveTracePoints = markers.map((marker: any) => {
+    try { return { x: Number(marker.X()), y: Number(marker.Y()) }; } catch (e) { return null; }
+  }).filter((entry: any) => entry && Number.isFinite(entry.x) && Number.isFinite(entry.y));
+  const storedTracePoints = (Array.isArray(point?.__liaDgsTraceCoordinates)
+    ? point.__liaDgsTraceCoordinates
+    : []
+  ).map((entry: any) => ({ x: Number(entry?.x), y: Number(entry?.y) }))
+    .filter((entry: any) => Number.isFinite(entry.x) && Number.isFinite(entry.y));
   return {
     ...dgsPointReference(point),
+    fixed: getDgsObjectFixed(point),
     showName: point.__liaDgsShowName !== false,
     showObject: point.__liaDgsShowObject !== false,
     showValue: !!point.__liaDgsShowValue,
     opacity: getDgsObjectOpacity(point),
     textColor: getDgsObjectColor(point, 'text'),
     lineColor: getDgsObjectColor(point, 'line'),
-    layer: getDgsObjectLayer(point)
+    fillColor: getDgsObjectColor(point, 'fill'),
+    formatFontSize: getDgsFormatFontSize(point),
+    layer: getDgsObjectLayer(point),
+    traceEnabled: !!point.__liaDgsTraceEnabled,
+    traceColor: getDgsPointTraceColor(point),
+    tracePoints: markers.length === 0 && storedTracePoints.length > 0
+      ? storedTracePoints
+      : (liveTracePoints.length === markers.length ? liveTracePoints : storedTracePoints)
   };
 }
 
@@ -6378,6 +6540,8 @@ function dgsPolygonBorderRecord(border: any): any {
     fillColor: getDgsObjectColor(border, 'fill'),
     formatFontSize: getDgsFormatFontSize(border),
     showLength: !!border.__liaDgsShowLength,
+    design: isDgsSegmentStyleTarget(border) ? getDgsStrokeDesign(border) : '-',
+    strokeWidth: isDgsSegmentStyleTarget(border) ? getDgsStrokeWidth(border) : 3,
     showRoots: !!border.__liaDgsRootConstruction,
     showYIntercept: !!border.__liaDgsYInterceptConstruction,
     rootPoints: (border.__liaDgsRootConstruction?.points || []).map(dgsDerivedPointRecord),
@@ -6387,12 +6551,13 @@ function dgsPolygonBorderRecord(border: any): any {
 
 function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   if (!state || state.restoring || !state.board) return;
+  assignDgsMacroPersistentIds(state.boardId, state.board);
   const records: any[] = [];
   getDgsBoardObjects(state.board).forEach((object) => {
     if (object && (object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
         object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
         object.__liaDgsIntersectionPoint)) return;
-    if (object && (object.__liaDgsTangentPoint || object.__liaDgsTangentHelper)) return;
+    if (object && (object.__liaDgsTangentPoint === true || object.__liaDgsTangentHelper === true)) return;
     if (object && object.__liaDgsPolygonBorder) return;
     let type = '';
     if (object && object.__liaDgsTangent) type = 'tangent';
@@ -6417,6 +6582,8 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
 
     const record: any = {
       id: ensureDgsPersistentId(object, type),
+      origin: object.__liaDgsMacroKey ? 'macro' : 'dgs',
+      macroKey: String(object.__liaDgsMacroKey || ''),
       type,
       name: getDgsObjectName(object),
       language: object.__liaDgsLanguage || state.language,
@@ -6459,14 +6626,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.sourceId = ensureDgsPersistentId(source, sourceType);
       try { record.x = Number(point.X()); record.y = Number(point.Y()); } catch (e) {}
       record.contactPoint = {
-        ...dgsPointReference(point),
-        fixed: getDgsObjectFixed(point),
-        layer: getDgsObjectLayer(point),
-        showName: point.__liaDgsShowName !== false,
-        showObject: point.__liaDgsShowObject !== false,
-        opacity: getDgsObjectOpacity(point),
-        textColor: getDgsObjectColor(point, 'text'),
-        lineColor: getDgsObjectColor(point, 'line')
+        ...dgsDerivedPointRecord(point)
       };
     } else if (type === 'angle-bisector') {
       record.points = (object.__liaDgsAngleBisectorPoints || []).map(dgsPointReference);
@@ -6490,11 +6650,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.value = getDgsSliderValue(object);
     } else if (type === 'point') {
       try { record.x = Number(object.X()); record.y = Number(object.Y()); } catch (e) {}
-      record.traceEnabled = !!object.__liaDgsTraceEnabled;
-      record.traceColor = getDgsPointTraceColor(object);
-      record.tracePoints = getDgsPointTraceMarkers(object).map((marker: any) => {
-        try { return { x: Number(marker.X()), y: Number(marker.Y()) }; } catch (e) { return null; }
-      }).filter((entry: any) => entry && Number.isFinite(entry.x) && Number.isFinite(entry.y));
+      Object.assign(record, dgsDerivedPointRecord(object));
       if (object.__liaDgsCoordinateExpressions) {
         record.coordinateExpressions = {
           x: String(object.__liaDgsCoordinateExpressions.x || ''),
@@ -6532,7 +6688,9 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
         record.strokeWidth = getDgsStrokeWidth(object);
       }
     } else if (type === 'polygon') {
-      record.points = (object.vertices || []).map(dgsPointReference);
+    const vertices = Array.isArray(object.vertices) ? object.vertices.slice() : [];
+    if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+    record.points = vertices.map(dgsPointReference);
       record.borders = (object.__liaDgsPolygonBorders || object.borders || [])
         .filter((border: any) => !!border)
         .map(dgsPolygonBorderRecord);
@@ -6547,78 +6705,52 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     } else if (type === 'angle') {
       record.points = (object.__liaDgsAnglePoints || []).map(dgsPointReference);
     }
+    if (type === 'midpoint') Object.assign(record, dgsDerivedPointRecord(object));
     if (object.__liaDgsRootConstruction) {
-      record.rootPoints = (object.__liaDgsRootConstruction.points || []).map((point: any) => ({
-        ...dgsPointReference(point),
-        showName: point.__liaDgsShowName !== false,
-        showObject: point.__liaDgsShowObject !== false,
-        showValue: !!point.__liaDgsShowValue,
-        opacity: getDgsObjectOpacity(point),
-        textColor: getDgsObjectColor(point, 'text'),
-        lineColor: getDgsObjectColor(point, 'line'),
-        layer: getDgsObjectLayer(point)
-      }));
+      record.rootPoints = (object.__liaDgsRootConstruction.points || []).map(dgsDerivedPointRecord);
     }
     if (object.__liaDgsExtremaConstruction) {
-      record.extremaPoints = (object.__liaDgsExtremaConstruction.points || []).map((point: any) => ({
-        ...dgsPointReference(point),
-        showName: point.__liaDgsShowName !== false,
-        showObject: point.__liaDgsShowObject !== false,
-        showValue: !!point.__liaDgsShowValue,
-        opacity: getDgsObjectOpacity(point),
-        textColor: getDgsObjectColor(point, 'text'),
-        lineColor: getDgsObjectColor(point, 'line'),
-        layer: getDgsObjectLayer(point)
-      }));
+      record.extremaPoints = (object.__liaDgsExtremaConstruction.points || []).map(dgsDerivedPointRecord);
     }
     if (object.__liaDgsInflectionConstruction) {
-      record.inflectionPoints = (object.__liaDgsInflectionConstruction.points || []).map((point: any) => ({
-        ...dgsPointReference(point),
-        showName: point.__liaDgsShowName !== false,
-        showObject: point.__liaDgsShowObject !== false,
-        showValue: !!point.__liaDgsShowValue,
-        opacity: getDgsObjectOpacity(point),
-        textColor: getDgsObjectColor(point, 'text'),
-        lineColor: getDgsObjectColor(point, 'line'),
-        layer: getDgsObjectLayer(point)
-      }));
+      record.inflectionPoints = (object.__liaDgsInflectionConstruction.points || []).map(dgsDerivedPointRecord);
     }
     if (object.__liaDgsYInterceptConstruction) {
-      record.yInterceptPoints = (object.__liaDgsYInterceptConstruction.points || []).map((point: any) => ({
-        ...dgsPointReference(point),
-        showName: point.__liaDgsShowName !== false,
-        showObject: point.__liaDgsShowObject !== false,
-        showValue: !!point.__liaDgsShowValue,
-        opacity: getDgsObjectOpacity(point),
-        textColor: getDgsObjectColor(point, 'text'),
-        lineColor: getDgsObjectColor(point, 'line'),
-        layer: getDgsObjectLayer(point)
-      }));
+      record.yInterceptPoints = (object.__liaDgsYInterceptConstruction.points || []).map(dgsDerivedPointRecord);
     }
     records.push(record);
   });
-  state.rootConstructions
-    .filter((construction) => construction && construction.kind === 'intersections')
-    .forEach((construction) => {
+  const intersectionConstructions = new Set<any>();
+  state.rootConstructions.forEach((construction) => {
+    if (construction && construction.kind === 'intersections') intersectionConstructions.add(construction);
+  });
+  getDgsBoardObjects(state.board).forEach((object) => {
+    (Array.isArray(object?.__liaDgsIntersectionConstructions)
+      ? object.__liaDgsIntersectionConstructions
+      : []
+    ).forEach((construction: any) => {
+      if (construction && construction.kind === 'intersections') intersectionConstructions.add(construction);
+    });
+  });
+  intersectionConstructions.forEach((construction) => {
+      const source = construction.source || construction.__liaDgsSource;
+      const source2 = construction.source2 || construction.__liaDgsSource2;
+      if (!source || !source2 || source.board !== state.board || source2.board !== state.board) return;
       records.push({
         type: 'intersection-construction',
-        sourceId: ensureDgsPersistentId(construction.source, 'object'),
-        source2Id: ensureDgsPersistentId(construction.source2, 'object'),
-        intersectionPoints: (construction.points || []).map((point: any) => ({
-          ...dgsPointReference(point),
-          showName: point.__liaDgsShowName !== false,
-          showObject: point.__liaDgsShowObject !== false,
-          showValue: !!point.__liaDgsShowValue,
-          opacity: getDgsObjectOpacity(point),
-          textColor: getDgsObjectColor(point, 'text'),
-          lineColor: getDgsObjectColor(point, 'line'),
-          layer: getDgsObjectLayer(point)
-        }))
+        sourceId: ensureDgsPersistentId(source, 'object'),
+        source2Id: ensureDgsPersistentId(source2, 'object'),
+        intersectionPoints: (construction.points || []).map(dgsDerivedPointRecord)
       });
     });
   const next = {
     boardId: state.boardId,
     language: state.language,
+    macroSpecSignature: String(
+      state.macroSpecSignature ||
+      dgsConstructionStates[state.boardId]?.macroSpecSignature ||
+      getExternalDgsMacroSpecSignature(state.boardId)
+    ),
     axisLabels: getDgsAxisLabels(state),
     records
   };
@@ -6659,6 +6791,10 @@ function findDgsPointForRestore(state: DgsState, reference: any, byId: Map<strin
 
 function applyRestoredDgsProperties(state: DgsState, object: any, record: any): void {
   object.__liaDgsPersistentId = record.id;
+  if (record.macroKey) {
+    object.__liaDgsMacroManaged = true;
+    object.__liaDgsMacroKey = String(record.macroKey);
+  }
   object.__liaDgsLanguage = record.language || state.language;
   if (record.name) setDgsObjectName(state, object, record.name);
   setDgsObjectFixed(object, !!record.fixed);
@@ -6713,6 +6849,117 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   else refreshDgsObjectLabel(object);
 }
 
+window.__prepareDgsBoardReplacement = function(): void {
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    const currentBoard = window.__boards && window.__boards[state.boardId];
+    if (!state || !currentBoard || state.board === currentBoard || state.boardReplacementPrepared) return;
+    if (!state.boardContainer?.isConnected) {
+      // LiaScript removes the old slide DOM before constructing the next
+      // board. At that point macro MutationObservers may already have removed
+      // most old-board objects. Serializing that transient remnant would
+      // overwrite the last complete snapshot, so keep the snapshot captured
+      // by the actual DGS edits and mark this replacement as prepared.
+      state.boardReplacementPrepared = true;
+      return;
+    }
+    // Run before the external macro bootstraps remove their objects from the
+    // old board. Otherwise the final lifecycle snapshot would silently lose
+    // all macro-backed records and their DGS-side formatting changes.
+    persistDgsConstruction(state, true);
+    state.boardReplacementPrepared = true;
+  });
+};
+
+window.__persistDgsBoardState = function(boardId: string, recordHistory = true): void {
+  const state = getDgsStateForBoard(String(boardId || ''));
+  const currentBoard = window.__boards && window.__boards[String(boardId || '')];
+  if (!state || !currentBoard || state.board !== currentBoard || !state.boardContainer?.isConnected) return;
+  persistDgsConstruction(state, recordHistory !== false);
+};
+
+function restoreDgsPointTraceState(state: DgsState, point: any, record: any): void {
+  if (!point) return;
+  const existingMarkers = Array.isArray(point.__liaDgsTraceMarkers)
+    ? point.__liaDgsTraceMarkers.slice()
+    : [];
+  point.__liaDgsTraceRecording = true;
+  existingMarkers.forEach((marker: any) => {
+    try { if (marker && state.board) state.board.removeObject(marker); } catch (e) {}
+  });
+  point.__liaDgsTraceMarkers = [];
+  point.__liaDgsTraceCoordinates = [];
+  point.__liaDgsTraceEnabled = !!record.traceEnabled;
+  point.__liaDgsTraceColor = normalizeHexColor(record.traceColor) || '#ff00ff';
+  (Array.isArray(record.tracePoints) ? record.tracePoints : []).forEach((entry: any) => {
+    createDgsTraceMarker(state, point, Number(entry.x), Number(entry.y));
+  });
+  try {
+    point.__liaDgsTraceCursor = {
+      x: Number(point.X()),
+      y: Number(point.Y())
+    };
+  } catch (e) {
+    point.__liaDgsTraceCursor = null;
+  }
+  point.__liaDgsTraceRecording = false;
+}
+
+function applyRestoredDgsSpecificState(state: DgsState, object: any, record: any): void {
+  if (!object || !record) return;
+  if (record.type === 'point') {
+    setDgsPointPosition(object, Number(record.x), Number(record.y));
+    restoreDgsPointTraceState(state, object, record);
+  } else if (record.type === 'midpoint') {
+    restoreDgsPointTraceState(state, object, record);
+  } else if (record.type === 'slider') {
+    setDgsPointPosition(object.point1, Number(record.x1), Number(record.y1));
+    setDgsPointPosition(object.point2, Number(record.x2), Number(record.y2));
+    setDgsSliderSettings(
+      state,
+      object,
+      record.minimum,
+      record.maximum,
+      record.step,
+      record.value,
+      false
+    );
+  } else if (record.type === 'text') {
+    setDgsPointPosition(object, Number(record.x), Number(record.y));
+    setDgsTextContent(state, object, String(record.content || record.name || ''));
+    setDgsTextFontSize(state, object, Number(record.fontSize || record.formatFontSize));
+  } else if (record.type === 'function') {
+    const expression = String(record.expression || '').trim();
+    if (expression && expression !== String(object.__liaDgsFunctionExpression || '').trim()) {
+      applyDgsFunctionExpression(state, object, expression, false);
+    }
+  } else if (record.type === 'arc') {
+    setDgsArcAngles(state, object, record.exitAngle, record.entryAngle, false);
+  } else if (record.type === 'tangent') {
+    const point = object.__liaDgsTangentPoint;
+    const pointRecord = record.contactPoint || {};
+    if (point) {
+      setDgsPointPosition(point, Number(record.x), Number(record.y));
+      applyRestoredDgsProperties(state, point, {
+        id: pointRecord.id || ensureDgsPersistentId(point, 'point'),
+        name: pointRecord.name || getDgsObjectName(point),
+        language: record.language || state.language,
+        fixed: !!pointRecord.fixed,
+        layer: pointRecord.layer,
+        showName: pointRecord.showName,
+        showObject: pointRecord.showObject,
+        showValue: pointRecord.showValue,
+        opacity: pointRecord.opacity,
+        textColor: pointRecord.textColor,
+        lineColor: pointRecord.lineColor,
+        fillColor: pointRecord.fillColor || pointRecord.lineColor,
+        formatFontSize: pointRecord.formatFontSize
+      });
+      restoreDgsPointTraceState(state, point, pointRecord);
+    }
+  }
+}
+
 function restoreDgsPolygonBorders(
   state: DgsState,
   polygon: any,
@@ -6740,7 +6987,26 @@ function restoreDgsPendingRecords(
     const unresolved: any[] = [];
     let restoredThisPass = 0;
     pending.forEach((record: any) => {
-      if (existingById.has(record.id)) return;
+      const existingKey = String(record.id || record.macroKey || '');
+      const existing = existingKey ? existingById.get(existingKey) : null;
+      if (existing) {
+        applyRestoredDgsProperties(state, existing, record);
+        applyRestoredDgsSpecificState(state, existing, record);
+        if (record.type === 'polygon') {
+          restoreDgsPolygonBorders(state, existing, record.borders || [], existingById);
+        }
+        restoredThisPass += 1;
+        return;
+      }
+      if (record && (
+        record.origin === 'macro' || record.macroKey || String(record.id || '').startsWith('macro:')
+      )) {
+        // External macro bootstraps may still be waiting for a point/function
+        // dependency. Never manufacture a generic DGS replacement here: the
+        // real macro object would arrive a frame later with the same stable ID.
+        unresolved.push(record);
+        return;
+      }
       if (record.type === 'slider') {
         const slider = createDgsSlider(
           state,
@@ -6804,8 +7070,11 @@ function restoreDgsPendingRecords(
             opacity: pointRecord.opacity,
             textColor: pointRecord.textColor,
             lineColor: pointRecord.lineColor,
-            fillColor: pointRecord.lineColor
+            fillColor: pointRecord.fillColor || pointRecord.lineColor,
+            formatFontSize: pointRecord.formatFontSize,
+            showValue: pointRecord.showValue
           });
+          restoreDgsPointTraceState(state, point, pointRecord);
           if (pointRecord.id) existingById.set(String(pointRecord.id), point);
         }
         existingById.set(record.id, tangent);
@@ -6845,6 +7114,7 @@ function restoreDgsPendingRecords(
       else if (record.type === 'angle') object = createDgsAngle(state, points);
       if (!object) { unresolved.push(record); return; }
       applyRestoredDgsProperties(state, object, record);
+      applyRestoredDgsSpecificState(state, object, record);
       existingById.set(record.id, object);
       if (record.type === 'polygon') {
         restoreDgsPolygonBorders(state, object, record.borders || [], existingById);
@@ -6857,10 +7127,11 @@ function restoreDgsPendingRecords(
   return pending;
 }
 
-function restoreDgsConstruction(state: DgsState): void {
+function restoreDgsConstruction(state: DgsState): boolean {
   const saved = dgsConstructionStates[state.boardId];
-  if (!saved || saved.boardId !== state.boardId || !Array.isArray(saved.records)) return;
+  if (!saved || saved.boardId !== state.boardId || !Array.isArray(saved.records)) return false;
   dgsConstructionBoards[state.boardId] = state.board;
+  assignDgsMacroPersistentIds(state.boardId, state.board);
   const registered = window.__points && window.__points[state.boardId];
   if (registered && typeof registered === 'object') {
     Object.keys(registered).forEach((name) => {
@@ -6870,18 +7141,29 @@ function restoreDgsConstruction(state: DgsState): void {
   const existingById = new Map<string, any>();
   getDgsBoardObjects(state.board).forEach((object) => {
     if (object && object.__liaDgsPersistentId) existingById.set(String(object.__liaDgsPersistentId), object);
+    if (object && object.__liaDgsMacroKey) existingById.set(String(object.__liaDgsMacroKey), object);
   });
 
   state.restoring = true;
   try {
+    let needsDeferredRestore = false;
     if (saved.axisLabels && saved.axisLabels.x && saved.axisLabels.y) {
       applyDgsAxisLabels(state, saved.axisLabels);
     }
     saved.records.filter((record: any) => record.type === 'point').forEach((record: any) => {
-      let point = existingById.get(record.id);
+      const macroRecord = !!record && (
+        record.origin === 'macro' || record.macroKey || String(record.id || '').startsWith('macro:')
+      );
+      let point = existingById.get(String(record.id || record.macroKey || ''));
+      if (!point && !macroRecord) point = findDgsPointForRestore(state, record, existingById);
+      if (!point && macroRecord) {
+        needsDeferredRestore = true;
+        return;
+      }
       if (!point) point = createDgsPoint(state, Number(record.x), Number(record.y));
       if (!point) return;
       applyRestoredDgsProperties(state, point, record);
+      applyRestoredDgsSpecificState(state, point, record);
       if (record.coordinateExpressions) {
         point.__liaDgsCoordinateExpressions = {
           x: String(record.coordinateExpressions.x || ''),
@@ -6892,21 +7174,8 @@ function restoreDgsConstruction(state: DgsState): void {
           : Number(record.x);
         point.__liaDgsCoordinateCompiled = null;
       }
-      point.__liaDgsTraceEnabled = !!record.traceEnabled;
-      point.__liaDgsTraceColor = normalizeHexColor(record.traceColor) || '#ff00ff';
-      point.__liaDgsTraceMarkers = [];
-      (Array.isArray(record.tracePoints) ? record.tracePoints : []).forEach((entry: any) => {
-        createDgsTraceMarker(state, point, Number(entry.x), Number(entry.y));
-      });
-      try {
-        point.__liaDgsTraceCursor = {
-          x: Number(point.X()),
-          y: Number(point.Y())
-        };
-      } catch (e) {
-        point.__liaDgsTraceCursor = null;
-      }
       existingById.set(record.id, point);
+      if (record.macroKey) existingById.set(String(record.macroKey), point);
     });
 
     let pending = restoreDgsPendingRecords(
@@ -6916,30 +7185,68 @@ function restoreDgsConstruction(state: DgsState): void {
       ),
       existingById
     );
+    const applyAnalysisPointRecord = (point: any, reference: any) => {
+      if (!point || !reference) return;
+      const restoredRecord = {
+        ...reference,
+        id: reference.id || ensureDgsPersistentId(point, 'analysis-point'),
+        name: reference.name || getDgsObjectName(point),
+        language: reference.language || state.language,
+        fixed: !!reference.fixed,
+        layer: reference.layer,
+        showName: reference.showName,
+        showObject: reference.showObject,
+        showValue: reference.showValue,
+        opacity: reference.opacity,
+        textColor: reference.textColor || getNeutralColor(),
+        lineColor: reference.lineColor || '#ff00ff',
+        fillColor: reference.fillColor || reference.lineColor || '#ff00ff',
+        formatFontSize: reference.formatFontSize
+      };
+      applyRestoredDgsProperties(state, point, restoredRecord);
+      point.__liaDgsShowValue = !!reference.showValue;
+      setDgsAnalysisPointEntryOption(point, 'explicitValueVisibility', !!reference.showValue);
+      restoreDgsPointTraceState(state, point, reference);
+      if (restoredRecord.id) existingById.set(String(restoredRecord.id), point);
+      if (reference.macroKey) existingById.set(String(reference.macroKey), point);
+      refreshDgsObjectLabel(point);
+    };
+    needsDeferredRestore = needsDeferredRestore || pending.length > 0;
     const restoreAnalysisPoints = (
       record: any,
       kind: 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept',
       references: any[]
     ) => {
       const source = existingById.get(String(record.id || ''));
-      if (!source) return;
-      const construction = createDgsAnalysisConstruction(state, source, kind);
+      if (!source) {
+        needsDeferredRestore = true;
+        return;
+      }
+      const referencedPoints = references.map((reference: any) =>
+        existingById.get(String(reference.id || reference.macroKey || '')) || null
+      );
+      const expectsMacroPoints = references.some((reference: any) =>
+        !!reference.macroKey || String(reference.id || '').startsWith('macro:')
+      );
+      if (expectsMacroPoints && referencedPoints.some((point: any) => !point)) {
+        needsDeferredRestore = true;
+        return;
+      }
+      const property = kind === 'extrema'
+        ? '__liaDgsExtremaConstruction'
+        : (kind === 'inflections'
+          ? '__liaDgsInflectionConstruction'
+          : (kind === 'ordinate-intercept'
+            ? '__liaDgsYInterceptConstruction'
+            : '__liaDgsRootConstruction'));
+      const linkedConstruction = referencedPoints.find(Boolean)?.__liaDgsAnalysisConstruction;
+      const construction = linkedConstruction || source[property] ||
+        createDgsAnalysisConstruction(state, source, kind);
       if (!construction) return;
       references.forEach((reference: any, index: number) => {
-        const point = construction.points[index];
+        const point = referencedPoints[index] || construction.points?.[index];
         if (!point) return;
-        if (reference.name) setDgsObjectName(state, point, String(reference.name));
-        if (reference.id) point.__liaDgsPersistentId = String(reference.id);
-        if (reference.id) existingById.set(String(reference.id), point);
-        point.__liaDgsShowValue = !!reference.showValue;
-        setDgsAnalysisPointEntryOption(point, 'explicitValueVisibility', !!reference.showValue);
-        setDgsObjectLayer(point, Number.isFinite(reference.layer) ? reference.layer : getDgsObjectLayer(point));
-        setDgsObjectColor(point, 'text', reference.textColor || getNeutralColor());
-        setDgsObjectColor(point, 'line', reference.lineColor || '#ff00ff');
-        setDgsObjectOpacity(point, Number.isFinite(reference.opacity) ? reference.opacity : 1);
-        setDgsObjectVisible(point, reference.showObject !== false);
-        setDgsObjectNameVisible(point, reference.showName !== false);
-        refreshDgsObjectLabel(point);
+        applyAnalysisPointRecord(point, reference);
       });
     };
     saved.records.forEach((record: any) => {
@@ -6966,28 +7273,30 @@ function restoreDgsConstruction(state: DgsState): void {
       });
     });
     if (pending.length) pending = restoreDgsPendingRecords(state, pending, existingById);
+    if (pending.length) needsDeferredRestore = true;
     saved.records
       .filter((record: any) => record.type === 'intersection-construction')
       .forEach((record: any) => {
         const first = existingById.get(String(record.sourceId || ''));
         const second = existingById.get(String(record.source2Id || ''));
-        const construction = createDgsIntersectionConstruction(state, first, second);
+        const references = Array.isArray(record.intersectionPoints) ? record.intersectionPoints : [];
+        const referencedPoints = references.map((reference: any) =>
+          existingById.get(String(reference.id || reference.macroKey || '')) || null
+        );
+        const expectsMacroPoints = references.some((reference: any) =>
+          !!reference.macroKey || String(reference.id || '').startsWith('macro:')
+        );
+        if (!first || !second || (expectsMacroPoints && referencedPoints.some((point: any) => !point))) {
+          needsDeferredRestore = true;
+          return;
+        }
+        const linkedConstruction = referencedPoints.find(Boolean)?.__liaDgsAnalysisConstruction;
+        const construction = linkedConstruction || createDgsIntersectionConstruction(state, first, second);
         if (!construction) return;
-        (record.intersectionPoints || []).forEach((reference: any, index: number) => {
-          const point = construction.points[index];
+        references.forEach((reference: any, index: number) => {
+          const point = referencedPoints[index] || construction.points?.[index];
           if (!point) return;
-          if (reference.name) setDgsObjectName(state, point, String(reference.name));
-          if (reference.id) point.__liaDgsPersistentId = String(reference.id);
-          if (reference.id) existingById.set(String(reference.id), point);
-          point.__liaDgsShowValue = !!reference.showValue;
-          setDgsAnalysisPointEntryOption(point, 'explicitValueVisibility', !!reference.showValue);
-          setDgsObjectLayer(point, Number.isFinite(reference.layer) ? reference.layer : getDgsObjectLayer(point));
-          setDgsObjectColor(point, 'text', reference.textColor || getNeutralColor());
-          setDgsObjectColor(point, 'line', reference.lineColor || '#ff00ff');
-          setDgsObjectOpacity(point, Number.isFinite(reference.opacity) ? reference.opacity : 1);
-          setDgsObjectVisible(point, reference.showObject !== false);
-          setDgsObjectNameVisible(point, reference.showName !== false);
-          refreshDgsObjectLabel(point);
+          applyAnalysisPointRecord(point, reference);
         });
       });
     saved.records
@@ -6998,9 +7307,33 @@ function restoreDgsConstruction(state: DgsState): void {
         syncDgsCoordinatePoint(state, point);
       });
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
+    return needsDeferredRestore;
   } finally {
     state.restoring = false;
   }
+}
+
+function cancelScheduledDgsConstructionRestore(state: DgsState): void {
+  if (state.restoreTimer == null) return;
+  window.clearTimeout(state.restoreTimer);
+  state.restoreTimer = undefined;
+}
+
+function scheduleDgsConstructionRestore(state: DgsState): void {
+  cancelScheduledDgsConstructionRestore(state);
+  const delays = [160, 360, 700];
+  const attempt = (index: number) => {
+    state.restoreTimer = window.setTimeout(() => {
+      state.restoreTimer = undefined;
+      if (states[state.uid] !== state ||
+          state.board !== (window.__boards && window.__boards[state.boardId]) ||
+          !state.boardContainer?.isConnected) return;
+      assignDgsMacroPersistentIds(state.boardId, state.board);
+      const stillPending = restoreDgsConstruction(state);
+      if (stillPending && index + 1 < delays.length) attempt(index + 1);
+    }, delays[index]);
+  };
+  attempt(0);
 }
 
 function clearDgsConstructionFromBoard(state: DgsState): void {
@@ -7070,10 +7403,16 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
   objects.filter(isDgsPoint).forEach((point) => {
     const name = String(point.__liaDgsPointName || '');
     try {
-      if (window.__points && window.__points[state.boardId] && window.__points[state.boardId][name] === point) {
-        delete window.__points[state.boardId][name];
-      }
-      if (window.__pointStates && window.__pointStates[state.boardId]) delete window.__pointStates[state.boardId][name];
+      const pointRegistry = window.__points && window.__points[state.boardId];
+      const aliases = pointRegistry
+        ? Object.keys(pointRegistry).filter((key) => pointRegistry[key] === point)
+        : [name];
+      aliases.forEach((key) => {
+        if (pointRegistry && pointRegistry[key] === point) delete pointRegistry[key];
+        if (window.__pointStates && window.__pointStates[state.boardId]) {
+          delete window.__pointStates[state.boardId][key];
+        }
+      });
     } catch (e) {}
     try { state.board.removeObject(point); } catch (e) {}
   });
@@ -7093,7 +7432,7 @@ window.__applyDgsHistory = function(boardId: string, snapshot: any): void {
       language: state.language,
       records: []
     });
-    restoreDgsConstruction(state);
+    if (restoreDgsConstruction(state)) scheduleDgsConstructionRestore(state);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
   } finally {
     dgsHistoryApplying.delete(boardId);
@@ -8356,21 +8695,28 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
   } else if (isDgsPoint(object)) {
     const points = window.__points && window.__points[state.boardId];
     if (points && points[name] && points[name] !== object) return false;
+    const macroSourceName = object.__liaDgsMacroManaged
+      ? String(object.__liaDgsMacroPointName || '').trim()
+      : '';
 
     try {
       if (points) {
-        if (points[oldName] === object) delete points[oldName];
+        if (points[oldName] === object && oldName !== macroSourceName) delete points[oldName];
         points[name] = object;
+        if (macroSourceName) points[macroSourceName] = object;
       }
       const pointStates = window.__pointStates && window.__pointStates[state.boardId];
       if (pointStates) {
-        const savedState = pointStates[oldName];
-        if (savedState) delete pointStates[oldName];
-        pointStates[name] = savedState || {
+        const savedState = pointStates[oldName] ||
+          (macroSourceName ? pointStates[macroSourceName] : null);
+        if (savedState && oldName !== macroSourceName) delete pointStates[oldName];
+        const nextState = savedState || {
           x: Number(object.X()),
           y: Number(object.Y()),
           fixed: getDgsObjectFixed(object)
         };
+        pointStates[name] = nextState;
+        if (macroSourceName) pointStates[macroSourceName] = nextState;
       }
     } catch (e) {}
     object.__liaDgsPointName = name;
@@ -8381,7 +8727,9 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
       if (!isDgsPolygon(candidate) || seen.has(candidate) || !candidate.__liaDgsPolygonAutoName ||
           !Array.isArray(candidate.vertices) || !candidate.vertices.includes(object)) return;
       seen.add(candidate);
-      candidate.__liaDgsPolygonName = candidate.vertices
+      const vertices = candidate.vertices.slice();
+      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+      candidate.__liaDgsPolygonName = vertices
         .map((point: any) => String(point.__liaDgsPointName || ''))
         .join('');
       refreshDgsPolygonMeasurementLabel(candidate);
@@ -9158,8 +9506,13 @@ function createDgsTraceMarker(state: DgsState, point: any, x: number, y: number)
     marker.__liaDgsTraceOwner = point;
     const markers = getDgsPointTraceMarkers(point);
     markers.push(marker);
+    const coordinates = Array.isArray(point.__liaDgsTraceCoordinates)
+      ? point.__liaDgsTraceCoordinates
+      : (point.__liaDgsTraceCoordinates = []);
+    coordinates.push({ x, y });
     if (markers.length > DGS_TRACE_MAX_MARKERS) {
       const oldest = markers.shift();
+      coordinates.shift();
       try { if (oldest) state.board.removeObject(oldest); } catch (e) {}
     }
     updateDgsTraceControls(state, point);
@@ -9175,6 +9528,7 @@ function createDgsTraceMarker(state: DgsState, point: any, x: number, y: number)
 function clearDgsPointTrace(state: DgsState, point: any): void {
   const markers = getDgsPointTraceMarkers(point).slice();
   point.__liaDgsTraceMarkers = [];
+  point.__liaDgsTraceCoordinates = [];
   const wasRecording = !!point.__liaDgsTraceRecording;
   point.__liaDgsTraceRecording = true;
   try {
@@ -9652,13 +10006,16 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       clearDgsPointTrace(state, candidate);
       const candidateName = String(candidate.__liaDgsPointName || '');
       try {
-        if (window.__points && window.__points[state.boardId] &&
-            window.__points[state.boardId][candidateName] === candidate) {
-          delete window.__points[state.boardId][candidateName];
-        }
-        if (window.__pointStates && window.__pointStates[state.boardId]) {
-          delete window.__pointStates[state.boardId][candidateName];
-        }
+        const pointRegistry = window.__points && window.__points[state.boardId];
+        const aliases = pointRegistry
+          ? Object.keys(pointRegistry).filter((key) => pointRegistry[key] === candidate)
+          : [candidateName];
+        aliases.forEach((key) => {
+          if (pointRegistry && pointRegistry[key] === candidate) delete pointRegistry[key];
+          if (window.__pointStates && window.__pointStates[state.boardId]) {
+            delete window.__pointStates[state.boardId][key];
+          }
+        });
       } catch (e) {}
     }
     if (candidate && Array.isArray(candidate.__liaDgsIntersectionConstructions)) {
@@ -11415,10 +11772,10 @@ function getDgsGeometryLanguage(anchor: HTMLElement | null, explicitLanguage?: s
   return 'en';
 }
 
-function ensureDgsRegression(uid: string, boardId: string): void {
+function ensureDgsRegression(uid: string, boardId: string, language: 'de' | 'en'): void {
   try {
     if (typeof window.__setupRegressionUI === 'function') {
-      window.__setupRegressionUI('dgs-regression-' + uid, boardId);
+      window.__setupRegressionUI('dgs-regression-' + uid, boardId, language);
     }
   } catch (e) {}
 }
@@ -11440,14 +11797,21 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   }
 
   pendingRetries[uid] = 0;
-  boardContainer.dataset.liaDgsTools = config.toolSelectionKey;
-  boardContainer.dataset.liaDgsRestrictions = config.restrictionSelectionKey;
-  ensureDgsRegression(uid, boardId);
-  const currentBoard = window.__boards && window.__boards[boardId];
-  discardStaleMacroBackedDgsSnapshot(boardId, currentBoard);
-
   const anchor = document.getElementById(`dgs-ui-${uid}`);
   const geometryLanguage = getDgsGeometryLanguage(anchor, languageCode);
+  boardContainer.dataset.liaDgsTools = config.toolSelectionKey;
+  boardContainer.dataset.liaDgsRestrictions = config.restrictionSelectionKey;
+  boardContainer.dataset.liaDgsLanguage = geometryLanguage;
+  ensureDgsRegression(uid, boardId, geometryLanguage);
+  const currentBoard = window.__boards && window.__boards[boardId];
+  const currentMacroSpecSignature = getExternalDgsMacroSpecSignature(boardId);
+  const previousState = states[uid];
+  if (previousState && previousState.board && previousState.board !== currentBoard) {
+    if (!previousState.boardReplacementPrepared) persistDgsConstruction(previousState, true);
+  }
+  assignDgsMacroPersistentIds(boardId, currentBoard);
+  discardStaleMacroBackedDgsSnapshot(boardId, currentBoard);
+
   const text = dgsText(geometryLanguage);
   if (anchor) {
     anchor.style.display = 'none';
@@ -11613,6 +11977,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     const restrictionSelectionChanged =
       existing.restrictionSelectionKey !== config.restrictionSelectionKey;
     existing.availableToolIds = config.toolIds == null ? null : new Set<number>(config.toolIds);
+    existing.macroSpecSignature = currentMacroSpecSignature;
     existing.toolSelectionKey = config.toolSelectionKey;
     existing.restrictionIds = new Set<number>(config.restrictionIds);
     existing.restrictionSelectionKey = config.restrictionSelectionKey;
@@ -11640,6 +12005,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       existing.externalToolActive = false;
       notifyRegressionLayout(existing, false);
     }
+    const needsDeferredRestore = restoreDgsConstruction(existing);
+    if (needsDeferredRestore) scheduleDgsConstructionRestore(existing);
     applyDgsProfileRestrictions(existing);
     applyLayout(existing);
     return;
@@ -11653,6 +12020,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (existing.xAxisSyncRAF) cancelAnimationFrame(existing.xAxisSyncRAF);
     if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
     if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
+    cancelScheduledDgsConstructionRestore(existing);
     restoreAxis(existing);
     restoreXAxis(existing);
     if (existing.onBoardViewportChange && existing.board && typeof existing.board.off === 'function') {
@@ -12980,6 +13348,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     uid,
     boardId,
     language: geometryLanguage,
+    macroSpecSignature: currentMacroSpecSignature,
     board,
     boardContainer,
     button,
@@ -13236,6 +13605,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   setDgsZoomMode(state, storedZoomMode, false);
   setDgsAxisScaleMode(state, storedAxisScaleMode, false);
   restoreDgsConstruction(state);
+  // Several legacy macros finish their own restore in a zero/120 ms timeout.
+  // One settling pass therefore always runs after them; further passes happen
+  // only while dependencies are still unresolved.
+  scheduleDgsConstructionRestore(state);
   setMenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
   setRelationSubmenuOpen(state, false);
