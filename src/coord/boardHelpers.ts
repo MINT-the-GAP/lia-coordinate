@@ -552,25 +552,50 @@ function chooseMinorTicks(pxPerMajor: number): number {
   return 0;
 }
 
+export interface AdaptiveTickMetric {
+  pixelsPerUnit: number;
+  majorStep: number;
+  minorTicks: number;
+  pixelsPerMajor: number;
+}
+
+export function getAdaptiveTickMetric(
+  pixelsPerUnit: number,
+  targetPixels = 90
+): AdaptiveTickMetric {
+  const normalizedPixelsPerUnit = Math.max(
+    1e-9,
+    Math.abs(Number(pixelsPerUnit)) || 0
+  );
+  const normalizedTarget = Number.isFinite(targetPixels) && targetPixels > 0
+    ? targetPixels
+    : 90;
+  const majorStep = chooseDecadeStep(normalizedTarget / normalizedPixelsPerUnit);
+  const pixelsPerMajor = majorStep * normalizedPixelsPerUnit;
+  return {
+    pixelsPerUnit: normalizedPixelsPerUnit,
+    majorStep,
+    minorTicks: chooseMinorTicks(pixelsPerMajor),
+    pixelsPerMajor
+  };
+}
+
 // Per-board last-sig cache to avoid redundant setAttribute calls.
 const adaptiveSigCache = new WeakMap<object, string>();
 
 export function applyAdaptiveTicks(board: any): void {
   if (!board || !board.defaultAxes) return;
 
-  const ppuX = pxPerUnitX(board);
-  const ppuY = pxPerUnitY(board);
-  const targetPx = 90;
-
-  const majorStepX = chooseDecadeStep(targetPx / Math.max(1e-9, ppuX));
-  const majorStepY = chooseDecadeStep(targetPx / Math.max(1e-9, ppuY));
-
-  const minorX = chooseMinorTicks(majorStepX * ppuX);
-  const minorY = chooseMinorTicks(majorStepY * ppuY);
+  const xMetric = getAdaptiveTickMetric(pxPerUnitX(board));
+  const yMetric = getAdaptiveTickMetric(pxPerUnitY(board));
+  const majorStepX = xMetric.majorStep;
+  const majorStepY = yMetric.majorStep;
+  const minorX = xMetric.minorTicks;
+  const minorY = yMetric.minorTicks;
 
   let font = 18;
-  if (Math.min(majorStepX * ppuX, majorStepY * ppuY) < 90) font = 16;
-  if (Math.min(majorStepX * ppuX, majorStepY * ppuY) < 55) font = 14;
+  if (Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor) < 90) font = 16;
+  if (Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor) < 55) font = 14;
 
   const sig = [majorStepX, majorStepY, minorX, minorY, font].join('|');
   if (adaptiveSigCache.get(board) === sig) return;

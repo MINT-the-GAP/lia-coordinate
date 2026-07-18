@@ -2,6 +2,7 @@
 // Adds a menu button and a sliding top menu bar to a coordinate board.
 
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getAdaptiveTickMetric } from '../coord/boardHelpers';
 import { formatMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import {
@@ -15,6 +16,7 @@ type DgsAxisScaleMode = 'cartesian' | 'log-x' | 'log-y' | 'log-log';
 
 const DGS_TOOL_IDS = {
   formatCopy: 100,
+  setSquare: 140,
   compass: 150,
   point: 200,
   segment: 310,
@@ -54,6 +56,7 @@ type DgsToolId = typeof DGS_TOOL_IDS[keyof typeof DGS_TOOL_IDS];
 // reused. This keeps old restricted exports stable when the toolbar grows.
 const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
   DGS_TOOL_IDS.formatCopy,
+  DGS_TOOL_IDS.setSquare,
   DGS_TOOL_IDS.compass,
   DGS_TOOL_IDS.point,
   DGS_TOOL_IDS.segment,
@@ -91,6 +94,7 @@ const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
 // but do not expose them in the export profile: an old or restricted profile
 // must never be able to hide these controls.
 const DGS_ALWAYS_AVAILABLE_TOOL_IDS = new Set<number>([
+  DGS_TOOL_IDS.setSquare,
   DGS_TOOL_IDS.compass
 ]);
 const DGS_EXPORT_SELECTABLE_TOOL_IDS: DgsToolId[] = DGS_KNOWN_TOOL_IDS.filter(
@@ -314,6 +318,30 @@ type DgsState = {
   colorSaturation: number;
   colorValue: number;
   selectButton: HTMLButtonElement;
+  setSquareButton: HTMLButtonElement;
+  setSquareOverlay: HTMLDivElement;
+  setSquareVisible: boolean;
+  setSquareInitialized: boolean;
+  setSquarePivotX: number;
+  setSquarePivotY: number;
+  setSquarePivotXRatio: number;
+  setSquarePivotYRatio: number;
+  setSquareAngle: number;
+  setSquareScale: number;
+  setSquarePointerId: number | null;
+  setSquareInteraction: 'move' | 'rotate' | 'scale' | null;
+  setSquareStartClientX: number;
+  setSquareStartClientY: number;
+  setSquareStartPivotX: number;
+  setSquareStartPivotY: number;
+  setSquareStartAngle: number;
+  setSquareStartPointerAngle: number;
+  setSquareStartScale: number;
+  setSquareStartPointerDistance: number;
+  setSquareLastContainerWidth: number;
+  setSquareLastContainerHeight: number;
+  setSquareRulerSignature: string;
+  setSquareLayoutRAF?: number;
   compassButton: HTMLButtonElement;
   compassSubmenu: HTMLDivElement;
   compassToolButton: HTMLButtonElement;
@@ -517,6 +545,7 @@ const DGS_TEXT = {
     colorTraceProperties: 'Farb- und Spureinstellungen \u00f6ffnen',
     nextExport: 'Weiter', backExport: 'Zur\u00fcck',
     toolAvailable: 'verf\u00fcgbar', toolUnavailable: 'nicht verf\u00fcgbar',
+    setSquare: 'Geodreieck', showSetSquare: 'Geodreieck einblenden', hideSetSquare: 'Geodreieck ausblenden', moveSetSquare: 'Geodreieck verschieben', rotateSetSquare: 'Geodreieck um die Nullmarke drehen',
     compass: 'Zirkel', compassTools: 'Zirkelmodi', freeCompass: 'Radius durch zwei Punkte', fixedRadiusCompass: 'Radius eingeben', enterCompassRadius: 'Zirkelradius eingeben', radius: 'Radius', compassArc: 'Zirkelbogen', showCompassArc: 'Zirkelbogen anzeigen',
     arc: 'Bogen', showArc: 'Bogen anzeigen', createArc: 'Bogen erzeugen',
     exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
@@ -546,6 +575,7 @@ const DGS_TEXT = {
     colorTraceProperties: 'Open color and trace settings',
     nextExport: 'Continue', backExport: 'Back',
     toolAvailable: 'available', toolUnavailable: 'not available',
+    setSquare: 'Set square', showSetSquare: 'Show set square', hideSetSquare: 'Hide set square', moveSetSquare: 'Move set square', rotateSetSquare: 'Rotate set square around its zero mark',
     compass: 'Compass', compassTools: 'Compass modes', freeCompass: 'Radius through two points', fixedRadiusCompass: 'Enter radius', enterCompassRadius: 'Enter compass radius', radius: 'Radius', compassArc: 'Compass arc', showCompassArc: 'Show compass arc',
     arc: 'Arc', showArc: 'Show arc', createArc: 'Create arc',
     exitAngle: 'Exit angle', entryAngle: 'Entry angle',
@@ -566,6 +596,138 @@ const DGS_TEXT = {
 } as const;
 
 function dgsText(language: 'de' | 'en') { return DGS_TEXT[language]; }
+
+const DGS_SET_SQUARE_VIEW_WIDTH = 600;
+const DGS_SET_SQUARE_VIEW_HEIGHT = 350;
+const DGS_SET_SQUARE_PIVOT_X = 300;
+const DGS_SET_SQUARE_PIVOT_Y = 34;
+const DGS_SET_SQUARE_MIN_VISIBLE_FRACTION = 0.05;
+
+const DGS_SET_SQUARE_ICON =
+  '<svg class=lia-dgs-set-square-icon viewBox=0,0,24,24 aria-hidden=true>' +
+  '<path class=lia-dgs-set-square-icon-fill d=M2.5,4.5H21.5L12,20.7Z></path>' +
+  '<path class=lia-dgs-reference d=M2.5,4.5H21.5L12,20.7ZM6.6,4.5C7.3,11.3,16.7,11.3,17.4,4.5M5.2,4.5V6.6M8.2,4.5V5.9M15.8,4.5V5.9M18.8,4.5V6.6></path>' +
+  '<path class=lia-dgs-set-square-icon-accent d=M12,4.5V17.6M10.7,4.5H13.3></path>' +
+  '</svg>';
+
+function createDgsSetSquareGraphic(): string {
+  const number = (value: number): string => {
+    const rounded = Math.round(value * 100) / 100;
+    return String(rounded);
+  };
+  const point = (radius: number, degree: number): [number, number] => {
+    const radians = degree * Math.PI / 180;
+    return [
+      DGS_SET_SQUARE_PIVOT_X + Math.cos(radians) * radius,
+      DGS_SET_SQUARE_PIVOT_Y + Math.sin(radians) * radius
+    ];
+  };
+  const edgeRadius = (degree: number): number => {
+    const radians = degree * Math.PI / 180;
+    return 1 / (
+      Math.abs(Math.cos(radians)) / 290 +
+      Math.sin(radians) / 300
+    );
+  };
+
+  const rulerTicks = 'M300,34V52';
+  const rulerLabels =
+    '<text class=lia-dgs-set-square-ruler-number x=300 y=67 text-anchor=middle>0</text>';
+
+  const protractorRadius = 136;
+  let protractorArc = '';
+  for (let degree = 0; degree <= 180; degree += 2) {
+    const [x, y] = point(protractorRadius, degree);
+    protractorArc += (degree === 0 ? 'M' : 'L') + number(x) + ',' + number(y);
+  }
+  let protractorTicks = '';
+  let protractorRays = '';
+  let protractorLabels = '';
+  for (let degree = 0; degree <= 180; degree += 1) {
+    const tickLength = degree % 10 === 0 ? 20 : (degree % 5 === 0 ? 12 : 6);
+    const [outerX, outerY] = point(protractorRadius + tickLength / 2, degree);
+    const [innerX, innerY] = point(protractorRadius - tickLength / 2, degree);
+    protractorTicks += 'M' + number(innerX) + ',' + number(innerY) +
+      'L' + number(outerX) + ',' + number(outerY);
+    if (degree % 10 === 0 && degree > 0 && degree < 180) {
+      const [rayStartX, rayStartY] = point(protractorRadius + 14, degree);
+      const [rayEndX, rayEndY] = point(edgeRadius(degree), degree);
+      protractorRays += 'M' + number(rayStartX) + ',' + number(rayStartY) +
+        'L' + number(rayEndX) + ',' + number(rayEndY);
+      const [outerLabelX, outerLabelY] = point(160, degree);
+      const [innerLabelX, innerLabelY] = point(110, degree);
+      protractorLabels += '<text class=lia-dgs-set-square-degree-outer data-angle=' + degree +
+        ' data-ring=outer x=' +
+        number(outerLabelX) + ' y=' + number(outerLabelY) +
+        ' text-anchor=middle dominant-baseline=middle>' + degree + '</text>' +
+        '<text class=lia-dgs-set-square-degree-inner data-angle=' + degree +
+        ' data-ring=inner x=' + number(innerLabelX) +
+        ' y=' + number(innerLabelY) +
+        ' text-anchor=middle dominant-baseline=middle>' + (180 - degree) + '</text>';
+    }
+  }
+
+  let edgeAngleTicksMinor = '';
+  let edgeAngleTicksMedium = '';
+  let edgeAngleTicksMajor = '';
+  for (let degree = 1; degree < 180; degree += 1) {
+    const [edgeX, edgeY] = point(edgeRadius(degree), degree);
+    const radians = degree * Math.PI / 180;
+    const tickLength = degree % 10 === 0 ? 9 : (degree % 5 === 0 ? 6 : 3.5);
+    const inwardX = -Math.cos(radians);
+    const inwardY = -Math.sin(radians);
+    const tick = 'M' + number(edgeX) + ',' + number(edgeY) +
+      'L' + number(edgeX + inwardX * tickLength) + ',' +
+      number(edgeY + inwardY * tickLength);
+    if (degree % 10 === 0) edgeAngleTicksMajor += tick;
+    else if (degree % 5 === 0) edgeAngleTicksMedium += tick;
+    else edgeAngleTicksMinor += tick;
+  }
+
+  return [
+    '<svg viewBox=0,0,' + DGS_SET_SQUARE_VIEW_WIDTH + ',' +
+      DGS_SET_SQUARE_VIEW_HEIGHT + ' aria-hidden=true>',
+    '<title class=lia-dgs-set-square-svg-title></title>',
+    '<path class=lia-dgs-set-square-surface d=M10,34H590L300,334Z></path>',
+    '<path class=lia-dgs-set-square-outline d=M10,34H590L300,334Z></path>',
+    '<path class=lia-dgs-set-square-ruler-ticks d=' + rulerTicks + '></path>',
+    '<g class=lia-dgs-set-square-ruler-labels>' + rulerLabels + '</g>',
+    '<path class=lia-dgs-set-square-protractor-arc d=' + protractorArc + '></path>',
+    '<path class=lia-dgs-set-square-protractor-rays d=' + protractorRays + '></path>',
+    '<path class=lia-dgs-set-square-protractor-ticks d=' + protractorTicks + '></path>',
+    '<path class=lia-dgs-set-square-edge-angle-ticks-minor d=' + edgeAngleTicksMinor + '></path>',
+    '<path class=lia-dgs-set-square-edge-angle-ticks-medium d=' + edgeAngleTicksMedium + '></path>',
+    '<path class=lia-dgs-set-square-edge-angle-ticks-major d=' + edgeAngleTicksMajor + '></path>',
+    '<g class=lia-dgs-set-square-labels>' + protractorLabels + '</g>',
+    '<path class=lia-dgs-set-square-guides d=M300,34V329></path>',
+    '<line class=lia-dgs-set-square-accent-guide x1=300 y1=34 x2=152.54 y2=181.46></line>',
+    '<line class=lia-dgs-set-square-accent-guide x1=300 y1=34 x2=447.46 y2=181.46></line>',
+    '<path class=lia-dgs-set-square-zero d=M291,34H309M300,25V43></path>',
+    '<circle class=lia-dgs-set-square-zero-dot cx=300 cy=34 r=3.2></circle>',
+    '<g class=lia-dgs-set-square-scale-handle data-side=left>',
+    '<circle class=lia-dgs-set-square-scale-hit cx=85 cy=72 r=22></circle>',
+    '<circle class=lia-dgs-set-square-scale-ring cx=85 cy=72 r=11></circle>',
+    '<path class=lia-dgs-set-square-scale-arrow d=M82,75L88,69></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M77.4,79.6L84.62,77.62L79.38,72.38Z></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M92.6,64.4L90.62,71.62L85.38,66.38Z></path>',
+    '</g>',
+    '<g class=lia-dgs-set-square-scale-handle data-side=right>',
+    '<circle class=lia-dgs-set-square-scale-hit cx=515 cy=72 r=22></circle>',
+    '<circle class=lia-dgs-set-square-scale-ring cx=515 cy=72 r=11></circle>',
+    '<path class=lia-dgs-set-square-scale-arrow d=M512,69L518,75></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M507.4,64.4L509.38,71.62L514.62,66.38Z></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M522.6,79.6L515.38,77.62L520.62,72.38Z></path>',
+    '</g>',
+    '<g class=lia-dgs-set-square-rotate-handle>',
+    '<circle class=lia-dgs-set-square-rotate-hit cx=300 cy=270 r=22></circle>',
+    '<circle class=lia-dgs-set-square-rotate-ring cx=300 cy=270 r=11></circle>',
+    '<path class=lia-dgs-set-square-rotate-arrow d=M306.75,273.9A7.8,7.8,0,0,1,293.25,273.9></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M309.4,269.31L309.35,275.4L304.15,272.4Z></path>',
+    '<path class=lia-dgs-set-square-handle-arrowhead d=M290.6,269.31L295.85,272.4L290.65,275.4Z></path>',
+    '</g>',
+    '</svg>'
+  ].join('');
+}
 
 const DGS_ZOOM_ICONS: Record<'both' | 'vertical' | 'horizontal', string> = {
   both: '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M12,3V21M9.5,5.5L12,3l2.5,2.5M9.5,18.5L12,21l2.5,-2.5M3,12H21M5.5,9.5L3,12l2.5,2.5M18.5,9.5L21,12l-2.5,2.5></path></svg>',
@@ -630,6 +792,7 @@ function resizeDgsFullscreenBoard(state: DgsState): void {
   scheduleXAxisSync(state);
   scheduleDgsRootUpdate(state);
   refreshDgsSliderTypography(state);
+  scheduleDgsSetSquareLayout(state, true);
   try { window.__refreshAllAxisTitles?.(); } catch (e) {}
 }
 
@@ -687,6 +850,7 @@ function restoreDgsEmbeddedSize(state: DgsState): void {
   scheduleXAxisSync(state);
   scheduleDgsRootUpdate(state);
   refreshDgsSliderTypography(state);
+  scheduleDgsSetSquareLayout(state, true);
   try { window.__refreshAllAxisTitles?.(); } catch (e) {}
   if (boundingBox) {
     window.__coordBoardStates = window.__coordBoardStates || {};
@@ -955,6 +1119,562 @@ function setDgsAxisScaleMode(state: DgsState, modeValue: unknown, save = true): 
 
 const states: Record<string, DgsState> = {};
 
+type DgsInstrumentKind = 'compass' | 'set-square';
+
+type DgsInstrumentRequest = {
+  uid: string;
+  boardId: string;
+  kind: DgsInstrumentKind;
+  language?: string;
+  anchor: HTMLElement | null;
+  appliedState: DgsState | null;
+};
+
+const dgsInstrumentRequests: Record<string, DgsInstrumentRequest> = {};
+
+type DgsSetSquareStoredPose = {
+  visible: boolean;
+  initialized: boolean;
+  pivotXRatio: number;
+  pivotYRatio: number;
+  angle: number;
+  scale: number;
+};
+
+function normalizeDgsSetSquareAngle(value: unknown): number {
+  const angle = Number(value);
+  if (!Number.isFinite(angle)) return 0;
+  return ((angle + 180) % 360 + 360) % 360 - 180;
+}
+
+function normalizeDgsSetSquareScale(value: unknown): number {
+  const scale = Number(value);
+  if (!Number.isFinite(scale)) return 1;
+  return Math.max(0.35, Math.min(2, scale));
+}
+
+function readDgsSetSquarePose(boardId: string): DgsSetSquareStoredPose {
+  const raw = window.__coordBoardStates &&
+    window.__coordBoardStates[boardId] &&
+    (window.__coordBoardStates[boardId] as any).dgsSetSquare;
+  const hasX = Number.isFinite(Number(raw && raw.pivotXRatio));
+  const hasY = Number.isFinite(Number(raw && raw.pivotYRatio));
+  return {
+    visible: !!(raw && raw.visible),
+    initialized: !!(raw && raw.initialized && hasX && hasY),
+    pivotXRatio: hasX ? Number(raw.pivotXRatio) : 0.5,
+    pivotYRatio: hasY ? Number(raw.pivotYRatio) : 0.22,
+    angle: normalizeDgsSetSquareAngle(raw && raw.angle),
+    scale: normalizeDgsSetSquareScale(raw && raw.scale)
+  };
+}
+
+function persistDgsSetSquarePose(state: DgsState): void {
+  const width = state.boardContainer.clientWidth;
+  const height = state.boardContainer.clientHeight;
+  if (state.setSquareInitialized && width > 0 && height > 0) {
+    state.setSquarePivotXRatio = state.setSquarePivotX / width;
+    state.setSquarePivotYRatio = state.setSquarePivotY / height;
+  }
+  window.__coordBoardStates = window.__coordBoardStates || {};
+  const previous = window.__coordBoardStates[state.boardId] || {};
+  window.__coordBoardStates[state.boardId] = {
+    ...previous,
+    dgsSetSquare: {
+      visible: state.setSquareVisible,
+      initialized: state.setSquareInitialized,
+      pivotXRatio: state.setSquarePivotXRatio,
+      pivotYRatio: state.setSquarePivotYRatio,
+      angle: normalizeDgsSetSquareAngle(state.setSquareAngle),
+      scale: normalizeDgsSetSquareScale(state.setSquareScale)
+    }
+  };
+}
+
+function getDgsSetSquareScaleBounds(containerWidth: number): {
+  baseWidth: number;
+  minScale: number;
+  maxScale: number;
+} {
+  const availableWidth = Math.max(80, containerWidth - 16);
+  const baseWidth = Math.min(520, availableWidth);
+  const minWidth = Math.min(baseWidth, Math.max(140, baseWidth * 0.45));
+  const maxWidth = Math.max(baseWidth, Math.min(900, availableWidth));
+  return {
+    baseWidth,
+    minScale: minWidth / baseWidth,
+    maxScale: maxWidth / baseWidth
+  };
+}
+
+function getDgsSetSquareSizing(state: DgsState, containerWidth: number): {
+  width: number;
+  scale: number;
+} {
+  const bounds = getDgsSetSquareScaleBounds(containerWidth);
+  const scale = Math.max(
+    bounds.minScale,
+    Math.min(bounds.maxScale, normalizeDgsSetSquareScale(state.setSquareScale))
+  );
+  return { width: bounds.baseWidth * scale, scale };
+}
+
+type DgsSetSquareScreenPoint = [number, number];
+
+function dgsSetSquarePolygonArea(points: DgsSetSquareScreenPoint[]): number {
+  if (points.length < 3) return 0;
+  let twiceArea = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    twiceArea += current[0] * next[1] - next[0] * current[1];
+  }
+  return Math.abs(twiceArea) * 0.5;
+}
+
+function clipDgsSetSquarePolygonAtBoundary(
+  polygon: DgsSetSquareScreenPoint[],
+  isInside: (point: DgsSetSquareScreenPoint) => boolean,
+  intersect: (
+    from: DgsSetSquareScreenPoint,
+    to: DgsSetSquareScreenPoint
+  ) => DgsSetSquareScreenPoint
+): DgsSetSquareScreenPoint[] {
+  if (!polygon.length) return [];
+  const clipped: DgsSetSquareScreenPoint[] = [];
+  let previous = polygon[polygon.length - 1];
+  let previousInside = isInside(previous);
+  polygon.forEach((current) => {
+    const currentInside = isInside(current);
+    if (currentInside !== previousInside) clipped.push(intersect(previous, current));
+    if (currentInside) clipped.push(current);
+    previous = current;
+    previousInside = currentInside;
+  });
+  return clipped;
+}
+
+function getDgsSetSquareVisibleFraction(
+  pivotX: number,
+  pivotY: number,
+  scale: number,
+  angle: number,
+  containerWidth: number,
+  containerHeight: number
+): number {
+  const radians = angle * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  let polygon: DgsSetSquareScreenPoint[] = [
+    [-290 * scale, 0],
+    [290 * scale, 0],
+    [0, 300 * scale]
+  ].map(([x, y]) => [
+    pivotX + x * cos - y * sin,
+    pivotY + x * sin + y * cos
+  ] as DgsSetSquareScreenPoint);
+  const totalArea = dgsSetSquarePolygonArea(polygon);
+  if (!(totalArea > 1e-9)) return 0;
+
+  const clipAtX = (boundary: number) => (
+    from: DgsSetSquareScreenPoint,
+    to: DgsSetSquareScreenPoint
+  ): DgsSetSquareScreenPoint => {
+    const delta = to[0] - from[0];
+    const ratio = Math.abs(delta) > 1e-12 ? (boundary - from[0]) / delta : 0;
+    return [boundary, from[1] + (to[1] - from[1]) * ratio];
+  };
+  const clipAtY = (boundary: number) => (
+    from: DgsSetSquareScreenPoint,
+    to: DgsSetSquareScreenPoint
+  ): DgsSetSquareScreenPoint => {
+    const delta = to[1] - from[1];
+    const ratio = Math.abs(delta) > 1e-12 ? (boundary - from[1]) / delta : 0;
+    return [from[0] + (to[0] - from[0]) * ratio, boundary];
+  };
+
+  polygon = clipDgsSetSquarePolygonAtBoundary(polygon, (point) => point[0] >= 0, clipAtX(0));
+  polygon = clipDgsSetSquarePolygonAtBoundary(
+    polygon,
+    (point) => point[0] <= containerWidth,
+    clipAtX(containerWidth)
+  );
+  polygon = clipDgsSetSquarePolygonAtBoundary(polygon, (point) => point[1] >= 0, clipAtY(0));
+  polygon = clipDgsSetSquarePolygonAtBoundary(
+    polygon,
+    (point) => point[1] <= containerHeight,
+    clipAtY(containerHeight)
+  );
+  return Math.max(0, Math.min(1, dgsSetSquarePolygonArea(polygon) / totalArea));
+}
+
+function constrainDgsSetSquarePivot(
+  state: DgsState,
+  proposedX: number,
+  proposedY: number,
+  scale: number,
+  angle: number
+): { x: number; y: number; visibleFraction: number } {
+  const width = state.boardContainer.clientWidth;
+  const height = state.boardContainer.clientHeight;
+  const radians = angle * Math.PI / 180;
+  const centroidOffsetX = -100 * scale * Math.sin(radians);
+  const centroidOffsetY = 100 * scale * Math.cos(radians);
+  const centeredX = width * 0.5 - centroidOffsetX;
+  const centeredY = height * 0.5 - centroidOffsetY;
+  const targetX = Number.isFinite(proposedX) ? proposedX : centeredX;
+  const targetY = Number.isFinite(proposedY) ? proposedY : centeredY;
+  const visibleAt = (x: number, y: number): number => getDgsSetSquareVisibleFraction(
+    x,
+    y,
+    scale,
+    angle,
+    width,
+    height
+  );
+  const targetVisible = visibleAt(targetX, targetY);
+  if (targetVisible >= DGS_SET_SQUARE_MIN_VISIBLE_FRACTION) {
+    return { x: targetX, y: targetY, visibleFraction: targetVisible };
+  }
+
+  let anchorX = centeredX;
+  let anchorY = centeredY;
+  let anchorVisible = visibleAt(anchorX, anchorY);
+  if (state.setSquareInteraction === 'move') {
+    const startX = state.setSquareStartPivotX;
+    const startY = state.setSquareStartPivotY;
+    const startVisible = visibleAt(startX, startY);
+    if (startVisible >= DGS_SET_SQUARE_MIN_VISIBLE_FRACTION) {
+      anchorX = startX;
+      anchorY = startY;
+      anchorVisible = startVisible;
+    }
+  }
+  if (anchorVisible < DGS_SET_SQUARE_MIN_VISIBLE_FRACTION) {
+    return { x: anchorX, y: anchorY, visibleFraction: anchorVisible };
+  }
+
+  let validRatio = 0;
+  let invalidRatio = 1;
+  let visibleFraction = anchorVisible;
+  for (let index = 0; index < 28; index += 1) {
+    const ratio = (validRatio + invalidRatio) * 0.5;
+    const x = anchorX + (targetX - anchorX) * ratio;
+    const y = anchorY + (targetY - anchorY) * ratio;
+    const visible = visibleAt(x, y);
+    if (visible >= DGS_SET_SQUARE_MIN_VISIBLE_FRACTION) {
+      validRatio = ratio;
+      visibleFraction = visible;
+    } else {
+      invalidRatio = ratio;
+    }
+  }
+  return {
+    x: anchorX + (targetX - anchorX) * validRatio,
+    y: anchorY + (targetY - anchorY) * validRatio,
+    visibleFraction
+  };
+}
+
+function formatDgsSetSquareRulerValue(
+  value: number,
+  step: number,
+  language: 'de' | 'en'
+): string {
+  const normalized = Math.abs(value) < Math.abs(step) * 1e-8 ? 0 : Math.abs(value);
+  let label: string;
+  if ((normalized >= 1e6 || (normalized > 0 && normalized < 1e-4))) {
+    label = normalized.toExponential(2).replace(/(?:\.0+|(?:(\.\d*?)0+))e/, '$1e');
+  } else {
+    const decimals = Math.max(0, Math.min(6, -Math.floor(Math.log10(Math.abs(step)) + 1e-12)));
+    label = normalized.toFixed(decimals).replace(/\.0+$|(?:(\.\d*?)0+)$/, '$1');
+  }
+  return language === 'de' ? label.replace('.', ',') : label;
+}
+
+function renderDgsSetSquareRuler(
+  state: DgsState,
+  toolWidth: number,
+  angle: number
+): void {
+  const board = state.board;
+  let unitX = Math.abs(Number(board && board.unitX));
+  let unitY = Math.abs(Number(board && board.unitY));
+  if (!(unitX > 1e-9) || !Number.isFinite(unitX)) unitX = 50;
+  if (!(unitY > 1e-9) || !Number.isFinite(unitY)) unitY = unitX;
+
+  const radians = angle * Math.PI / 180;
+  const coordinateUnitsPerPixel = Math.hypot(
+    Math.cos(radians) / unitX,
+    Math.sin(radians) / unitY
+  );
+  if (!(coordinateUnitsPerPixel > 0) || !Number.isFinite(coordinateUnitsPerPixel)) return;
+
+  const effectivePixelsPerUnit = 1 / coordinateUnitsPerPixel;
+  const rulerMetric = getAdaptiveTickMetric(effectivePixelsPerUnit);
+  const majorStep = rulerMetric.majorStep;
+  const majorPixels = rulerMetric.pixelsPerMajor;
+  const scale = toolWidth / DGS_SET_SQUARE_VIEW_WIDTH;
+  const majorView = majorPixels / scale;
+  const axisSubdivisions = rulerMetric.minorTicks + 1;
+  const subdivisions = Math.max(10, axisSubdivisions * 2);
+  const minorView = majorView / subdivisions;
+  const signature = [
+    unitX.toPrecision(7),
+    unitY.toPrecision(7),
+    angle.toFixed(3),
+    toolWidth.toFixed(2),
+    majorStep.toPrecision(7),
+    axisSubdivisions,
+    subdivisions,
+    state.language
+  ].join('|');
+  if (state.setSquareRulerSignature === signature) return;
+
+  const ticks = state.setSquareOverlay.querySelector<SVGPathElement>(
+    '.lia-dgs-set-square-ruler-ticks'
+  );
+  const labels = state.setSquareOverlay.querySelector<SVGGElement>(
+    '.lia-dgs-set-square-ruler-labels'
+  );
+  if (!ticks || !labels) return;
+
+  const halfWidth = 278;
+  let path = '';
+  let markup = '';
+  const firstIndex = Math.ceil(-halfWidth / minorView);
+  const lastIndex = Math.floor(halfWidth / minorView);
+  for (let index = firstIndex; index <= lastIndex; index += 1) {
+    const x = DGS_SET_SQUARE_PIVOT_X + index * minorView;
+    const isMajor = index % subdivisions === 0;
+    const isHalf = !isMajor && subdivisions % 2 === 0 &&
+      Math.abs(index % subdivisions) === subdivisions / 2;
+    const quarterRemainder = Math.abs(index % subdivisions);
+    const isQuarter = !isMajor && !isHalf && subdivisions % 4 === 0 &&
+      (quarterRemainder === subdivisions / 4 || quarterRemainder === subdivisions * 3 / 4);
+    const tickLength = isMajor ? 18 : (isHalf ? 13 : (isQuarter ? 10 : 6));
+    path += 'M' + x.toFixed(2) + ',' + DGS_SET_SQUARE_PIVOT_Y +
+      'V' + (DGS_SET_SQUARE_PIVOT_Y + tickLength);
+    if (isMajor) {
+      const majorIndex = index / subdivisions;
+      const value = majorIndex * majorStep;
+      markup += '<text class=lia-dgs-set-square-ruler-number x=' + x.toFixed(2) +
+        ' y=68 text-anchor=middle data-value=' + String(value) + '>' +
+        formatDgsSetSquareRulerValue(value, majorStep, state.language) +
+        '</text>';
+    }
+  }
+
+  ticks.setAttribute('d', path);
+  labels.innerHTML = markup;
+  state.setSquareOverlay.dataset.rulerStep = String(majorStep);
+  state.setSquareOverlay.dataset.rulerMajorPixels = String(majorPixels);
+  state.setSquareOverlay.dataset.rulerUnitsPerPixel = String(coordinateUnitsPerPixel);
+  state.setSquareOverlay.dataset.rulerAxisMinorTicks = String(rulerMetric.minorTicks);
+  state.setSquareOverlay.dataset.rulerMinorTicks = String(subdivisions - 1);
+  state.setSquareOverlay.dataset.rulerSubdivisions = String(subdivisions);
+  state.setSquareRulerSignature = signature;
+}
+
+function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
+  const containerWidth = state.boardContainer.clientWidth;
+  const containerHeight = state.boardContainer.clientHeight;
+  if (!(containerWidth > 0) || !(containerHeight > 0)) return false;
+
+  const sizing = getDgsSetSquareSizing(state, containerWidth);
+  const toolWidth = sizing.width;
+  const scale = toolWidth / DGS_SET_SQUARE_VIEW_WIDTH;
+  const containerChanged =
+    state.setSquareLastContainerWidth !== containerWidth ||
+    state.setSquareLastContainerHeight !== containerHeight;
+  if (!state.setSquareInitialized) {
+    state.setSquarePivotX = containerWidth * 0.5;
+    state.setSquarePivotY = Math.max(
+      12 + DGS_SET_SQUARE_PIVOT_Y * scale,
+      Math.min(containerHeight * 0.24, MENU_HEIGHT_PX + 100)
+    );
+    state.setSquarePivotXRatio = state.setSquarePivotX / containerWidth;
+    state.setSquarePivotYRatio = state.setSquarePivotY / containerHeight;
+    state.setSquareInitialized = true;
+  } else if (
+    fromRatios ||
+    containerChanged
+  ) {
+    state.setSquarePivotX = state.setSquarePivotXRatio * containerWidth;
+    state.setSquarePivotY = state.setSquarePivotYRatio * containerHeight;
+  }
+
+  const angle = normalizeDgsSetSquareAngle(state.setSquareAngle);
+  state.setSquareAngle = angle;
+  renderDgsSetSquareRuler(state, toolWidth, angle);
+  const constrainedPivot = constrainDgsSetSquarePivot(
+    state,
+    state.setSquarePivotX,
+    state.setSquarePivotY,
+    scale,
+    angle
+  );
+  state.setSquarePivotX = constrainedPivot.x;
+  state.setSquarePivotY = constrainedPivot.y;
+  state.setSquarePivotXRatio = state.setSquarePivotX / containerWidth;
+  state.setSquarePivotYRatio = state.setSquarePivotY / containerHeight;
+  state.setSquareLastContainerWidth = containerWidth;
+  state.setSquareLastContainerHeight = containerHeight;
+
+  const pivotLeft = DGS_SET_SQUARE_PIVOT_X * scale;
+  const pivotTop = DGS_SET_SQUARE_PIVOT_Y * scale;
+  state.setSquareOverlay.style.width = toolWidth + 'px';
+  state.setSquareOverlay.style.left = (state.setSquarePivotX - pivotLeft) + 'px';
+  state.setSquareOverlay.style.top = (state.setSquarePivotY - pivotTop) + 'px';
+  state.setSquareOverlay.style.transformOrigin = pivotLeft + 'px ' + pivotTop + 'px';
+  state.setSquareOverlay.style.transform = 'rotate(' + angle + 'deg)';
+  state.setSquareOverlay.dataset.visible = state.setSquareVisible ? '1' : '0';
+  state.setSquareOverlay.classList.toggle('is-visible', state.setSquareVisible);
+  state.setSquareOverlay.dataset.angle = String(angle);
+  state.setSquareOverlay.dataset.scale = String(sizing.scale);
+  state.setSquareOverlay.dataset.toolWidth = String(toolWidth);
+  state.setSquareOverlay.dataset.pivotX = String(state.setSquarePivotX);
+  state.setSquareOverlay.dataset.pivotY = String(state.setSquarePivotY);
+  state.setSquareOverlay.dataset.visibleFraction = constrainedPivot.visibleFraction.toFixed(6);
+  state.setSquareOverlay.setAttribute('aria-hidden', state.setSquareVisible ? 'false' : 'true');
+  return true;
+}
+
+function scheduleDgsSetSquareLayout(state: DgsState, fromRatios = true): void {
+  if (state.setSquareLayoutRAF != null) cancelAnimationFrame(state.setSquareLayoutRAF);
+  state.setSquareLayoutRAF = requestAnimationFrame(() => {
+    state.setSquareLayoutRAF = undefined;
+    layoutDgsSetSquare(state, fromRatios);
+  });
+}
+
+function setDgsSetSquareVisible(state: DgsState, visible: boolean): void {
+  if (!visible) cancelDgsSetSquareInteraction(state);
+  state.setSquareVisible = visible;
+  layoutDgsSetSquare(state, false);
+  persistDgsSetSquarePose(state);
+  renderToolState(state);
+}
+
+function bindDgsSetSquareInteraction(state: DgsState): void {
+  const overlay = state.setSquareOverlay;
+  const pointerPosition = (evt: PointerEvent): { x: number; y: number } => {
+    const rect = state.boardContainer.getBoundingClientRect();
+    const layoutWidth = state.boardContainer.offsetWidth || state.boardContainer.clientWidth || 1;
+    const layoutHeight = state.boardContainer.offsetHeight || state.boardContainer.clientHeight || 1;
+    const scaleX = rect.width > 1e-9 ? rect.width / layoutWidth : 1;
+    const scaleY = rect.height > 1e-9 ? rect.height / layoutHeight : 1;
+    return {
+      x: (evt.clientX - rect.left) / scaleX - state.boardContainer.clientLeft,
+      y: (evt.clientY - rect.top) / scaleY - state.boardContainer.clientTop
+    };
+  };
+  const pointerAngle = (evt: PointerEvent): number => {
+    const pointer = pointerPosition(evt);
+    return Math.atan2(
+      pointer.y - state.setSquarePivotY,
+      pointer.x - state.setSquarePivotX
+    ) * 180 / Math.PI;
+  };
+  const pointerDistance = (evt: PointerEvent): number => {
+    const pointer = pointerPosition(evt);
+    return Math.hypot(
+      pointer.x - state.setSquarePivotX,
+      pointer.y - state.setSquarePivotY
+    );
+  };
+  const stop = (evt: PointerEvent): void => {
+    evt.preventDefault();
+    evt.stopImmediatePropagation();
+  };
+  const finish = (evt: PointerEvent): void => {
+    if (state.setSquarePointerId == null || evt.pointerId !== state.setSquarePointerId) return;
+    const pointerId = state.setSquarePointerId;
+    state.setSquarePointerId = null;
+    state.setSquareInteraction = null;
+    overlay.removeAttribute('data-interaction');
+    try {
+      if (overlay.hasPointerCapture(pointerId)) overlay.releasePointerCapture(pointerId);
+    } catch (e) {}
+    persistDgsSetSquarePose(state);
+    if (evt.type !== 'lostpointercapture') stop(evt);
+  };
+
+  overlay.addEventListener('pointerdown', (evt) => {
+    if (!state.setSquareVisible || state.setSquarePointerId != null) return;
+    if (evt.pointerType === 'mouse' && evt.button !== 0) return;
+    const target = evt.target as Element;
+    const rotate = !!target.closest('.lia-dgs-set-square-rotate-hit');
+    const scaleHandle = !!target.closest('.lia-dgs-set-square-scale-hit');
+    const surface = !!target.closest('.lia-dgs-set-square-surface');
+    if (!rotate && !scaleHandle && !surface) return;
+    stop(evt);
+    if (scaleHandle) {
+      const currentSizing = getDgsSetSquareSizing(
+        state,
+        state.boardContainer.clientWidth
+      );
+      state.setSquareScale = currentSizing.scale;
+    }
+    const pointer = pointerPosition(evt);
+    state.setSquarePointerId = evt.pointerId;
+    state.setSquareInteraction = rotate ? 'rotate' : (scaleHandle ? 'scale' : 'move');
+    state.setSquareStartClientX = pointer.x;
+    state.setSquareStartClientY = pointer.y;
+    state.setSquareStartPivotX = state.setSquarePivotX;
+    state.setSquareStartPivotY = state.setSquarePivotY;
+    state.setSquareStartAngle = state.setSquareAngle;
+    state.setSquareStartPointerAngle = pointerAngle(evt);
+    state.setSquareStartScale = state.setSquareScale;
+    state.setSquareStartPointerDistance = pointerDistance(evt);
+    overlay.dataset.interaction = state.setSquareInteraction;
+    try { overlay.setPointerCapture(evt.pointerId); } catch (e) {}
+  });
+
+  overlay.addEventListener('pointermove', (evt) => {
+    if (state.setSquarePointerId == null || evt.pointerId !== state.setSquarePointerId) return;
+    stop(evt);
+    if (state.setSquareInteraction === 'move') {
+      const pointer = pointerPosition(evt);
+      state.setSquarePivotX = state.setSquareStartPivotX +
+        (pointer.x - state.setSquareStartClientX);
+      state.setSquarePivotY = state.setSquareStartPivotY +
+        (pointer.y - state.setSquareStartClientY);
+    } else if (state.setSquareInteraction === 'rotate') {
+      let angle = state.setSquareStartAngle +
+        normalizeDgsSetSquareAngle(pointerAngle(evt) - state.setSquareStartPointerAngle);
+      if (evt.shiftKey) angle = Math.round(angle / 5) * 5;
+      state.setSquareAngle = normalizeDgsSetSquareAngle(angle);
+    } else if (state.setSquareInteraction === 'scale') {
+      const distance = pointerDistance(evt);
+      if (state.setSquareStartPointerDistance > 1 && Number.isFinite(distance)) {
+        const bounds = getDgsSetSquareScaleBounds(state.boardContainer.clientWidth);
+        const scale = state.setSquareStartScale *
+          distance / state.setSquareStartPointerDistance;
+        state.setSquareScale = Math.max(bounds.minScale, Math.min(bounds.maxScale, scale));
+      }
+    }
+    layoutDgsSetSquare(state, false);
+  });
+  overlay.addEventListener('pointerup', finish);
+  overlay.addEventListener('pointercancel', finish);
+  overlay.addEventListener('lostpointercapture', finish);
+}
+
+function cancelDgsSetSquareInteraction(state: DgsState): void {
+  if (state.setSquarePointerId != null) {
+    const pointerId = state.setSquarePointerId;
+    state.setSquarePointerId = null;
+    try {
+      if (state.setSquareOverlay.hasPointerCapture(pointerId)) {
+        state.setSquareOverlay.releasePointerCapture(pointerId);
+      }
+    } catch (e) {}
+  }
+  state.setSquareInteraction = null;
+  state.setSquareOverlay.removeAttribute('data-interaction');
+}
+
 function dgsMayDisplayObjectValues(object: any): boolean {
   return !(object && object.board && object.board.__liaDgsValueDisplayLocked);
 }
@@ -975,13 +1695,14 @@ function cloneDgsSnapshot(value: any): any {
   try { return JSON.parse(JSON.stringify(value)); } catch (e) { return { records: [] }; }
 }
 const pendingRetries: Record<string, number> = {};
+const pendingRetryTimers: Record<string, number | undefined> = {};
 const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
 const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-07-17-1';
+const DGS_STYLE_VERSION = '2026-07-18-10';
 
 function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   if (!board) return;
@@ -2358,6 +3079,22 @@ function ensureStyles(root: Document | ShadowRoot): void {
       stroke-width: 1.2;
     }
 
+    .lia-dgs-set-square-button .lia-dgs-set-square-icon-fill {
+      fill: var(--lia-dgs-neutral-color, currentColor) !important;
+      fill-opacity: 0.14;
+      stroke: none !important;
+    }
+
+    .lia-dgs-set-square-button .lia-dgs-reference {
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
+      stroke-width: 1.35;
+    }
+
+    .lia-dgs-set-square-button .lia-dgs-set-square-icon-accent {
+      stroke: var(--lia-dgs-theme-color, #00a8b5) !important;
+      stroke-width: 1.75;
+    }
+
     .lia-dgs-geometry-button .lia-dgs-cross {
       stroke: var(--lia-dgs-neutral-color, currentColor);
       stroke-width: 1.65;
@@ -2400,6 +3137,231 @@ function ensureStyles(root: Document | ShadowRoot): void {
       display: inline-block !important;
       margin: 0 !important;
       font-size: 1em !important;
+    }
+
+    .lia-dgs-set-square-overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      z-index: 46;
+      display: none;
+      width: 520px;
+      aspect-ratio: 600 / 350;
+      box-sizing: border-box;
+      color: var(--lia-dgs-neutral-color, currentColor);
+      pointer-events: none;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      transform-origin: 50% 9.7142857%;
+      will-change: left, top, transform;
+      filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
+    }
+
+    .lia-dgs-set-square-overlay.is-visible {
+      display: block;
+    }
+
+    .lia-dgs-set-square-overlay > svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .lia-dgs-set-square-surface {
+      fill: var(--lia-dgs-neutral-color, currentColor);
+      fill-opacity: 0.10;
+      stroke: none;
+      cursor: grab;
+      pointer-events: all;
+    }
+
+    .lia-dgs-set-square-overlay[data-interaction=move] .lia-dgs-set-square-surface,
+    .lia-dgs-set-square-overlay[data-interaction=rotate] .lia-dgs-set-square-rotate-hit {
+      cursor: grabbing;
+    }
+
+    .lia-dgs-set-square-outline,
+    .lia-dgs-set-square-ruler-ticks,
+    .lia-dgs-set-square-protractor-arc,
+    .lia-dgs-set-square-protractor-rays,
+    .lia-dgs-set-square-protractor-ticks,
+    .lia-dgs-set-square-edge-angle-ticks-minor,
+    .lia-dgs-set-square-edge-angle-ticks-medium,
+    .lia-dgs-set-square-edge-angle-ticks-major,
+    .lia-dgs-set-square-guides {
+      fill: none;
+      stroke: var(--lia-dgs-neutral-color, currentColor);
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lia-dgs-set-square-outline {
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+
+    .lia-dgs-set-square-ruler-ticks,
+    .lia-dgs-set-square-protractor-arc {
+      stroke-width: 1.15;
+    }
+
+    .lia-dgs-set-square-protractor-ticks {
+      stroke-width: 0.7;
+      stroke-opacity: 0.9;
+    }
+
+    .lia-dgs-set-square-edge-angle-ticks-minor,
+    .lia-dgs-set-square-edge-angle-ticks-medium,
+    .lia-dgs-set-square-edge-angle-ticks-major {
+      stroke-linecap: butt;
+    }
+
+    .lia-dgs-set-square-edge-angle-ticks-minor {
+      stroke-width: 0.95;
+      stroke-opacity: 0.78;
+    }
+
+    .lia-dgs-set-square-edge-angle-ticks-medium {
+      stroke-width: 1.3;
+      stroke-opacity: 0.9;
+    }
+
+    .lia-dgs-set-square-edge-angle-ticks-major {
+      stroke-width: 1.7;
+      stroke-opacity: 1;
+    }
+
+    .lia-dgs-set-square-protractor-rays {
+      stroke-width: 0.9;
+      stroke-opacity: 0.52;
+    }
+
+    .lia-dgs-set-square-guides {
+      stroke-width: 1;
+      stroke-opacity: 0.78;
+    }
+
+    .lia-dgs-set-square-accent-guide,
+    .lia-dgs-set-square-zero,
+    .lia-dgs-set-square-rotate-arrow,
+    .lia-dgs-set-square-scale-arrow {
+      fill: none;
+      stroke: var(--lia-dgs-theme-color, #00a8b5);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lia-dgs-set-square-handle-arrowhead {
+      fill: var(--lia-dgs-theme-color, #00a8b5);
+      stroke: none;
+      pointer-events: none;
+    }
+
+    .lia-dgs-set-square-accent-guide {
+      stroke-width: 2.8;
+      stroke-opacity: 1;
+      filter: drop-shadow(0 0 1.5px var(--lia-dgs-theme-color, #00a8b5));
+    }
+
+    .lia-dgs-set-square-zero {
+      stroke-width: 2;
+    }
+
+    .lia-dgs-set-square-zero-dot {
+      fill: var(--lia-dgs-theme-color, #00a8b5);
+      stroke: var(--lia-dgs-menu-bg, #fff);
+      stroke-width: 1.2;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lia-dgs-set-square-labels text,
+    .lia-dgs-set-square-ruler-labels text {
+      fill: var(--lia-dgs-neutral-color, currentColor);
+      stroke: var(--lia-dgs-menu-bg, #fff);
+      stroke-width: 1.8;
+      paint-order: stroke fill;
+      font-family: Arial, sans-serif;
+      font-size: 8px;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .lia-dgs-set-square-ruler-number {
+      font-size: 10.5px !important;
+      font-weight: 700 !important;
+    }
+
+    .lia-dgs-set-square-degree-outer,
+    .lia-dgs-set-square-degree-inner {
+      font-size: 12.5px !important;
+      font-weight: 700 !important;
+      font-variant-numeric: tabular-nums;
+      stroke-width: 2.4 !important;
+    }
+
+    .lia-dgs-set-square-degree-inner {
+      font-size: 12px !important;
+    }
+
+    .lia-dgs-set-square-rotate-hit {
+      fill: transparent;
+      stroke: none;
+      cursor: grab;
+      pointer-events: all;
+    }
+
+    .lia-dgs-set-square-rotate-ring {
+      fill: color-mix(in srgb, var(--lia-dgs-theme-color, #00a8b5) 24%, var(--lia-dgs-menu-bg, #fff));
+      stroke: var(--lia-dgs-theme-color, #00a8b5);
+      stroke-width: 2;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lia-dgs-set-square-rotate-arrow {
+      stroke-width: 2;
+    }
+
+    .lia-dgs-set-square-scale-hit {
+      fill: transparent;
+      stroke: none;
+      pointer-events: all;
+    }
+
+    .lia-dgs-set-square-scale-handle[data-side=left] .lia-dgs-set-square-scale-hit {
+      cursor: nwse-resize;
+    }
+
+    .lia-dgs-set-square-scale-handle[data-side=right] .lia-dgs-set-square-scale-hit {
+      cursor: nesw-resize;
+    }
+
+    .lia-dgs-set-square-scale-ring {
+      fill: color-mix(in srgb, var(--lia-dgs-theme-color, #00a8b5) 24%, var(--lia-dgs-menu-bg, #fff));
+      stroke: var(--lia-dgs-theme-color, #00a8b5);
+      stroke-width: 2;
+      pointer-events: none;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .lia-dgs-set-square-scale-arrow {
+      stroke-width: 2;
+    }
+
+    .lia-dgs-set-square-overlay[data-interaction=scale] .lia-dgs-set-square-scale-ring {
+      stroke-width: 2.8;
+      filter: drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5));
+    }
+
+    .lia-dgs-set-square-overlay[data-interaction=rotate] .lia-dgs-set-square-rotate-ring {
+      stroke-width: 2.8;
+      filter: drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5));
     }
 
     .lia-dgs-construction-mode,
@@ -2896,6 +3858,7 @@ function eventTargetsBoardUi(evt: Event): boolean {
     'textarea',
     'a',
     '[role="button"]',
+    '.lia-dgs-set-square-overlay',
     '.lia-dgs-menu-clip',
     '.lia-dgs-side-menu-clip',
     '.lia-dgs-color-popup',
@@ -7671,6 +8634,7 @@ window.__syncDgsFixedCompassPoint = function(boardId: string, point: any): boole
 window.__prepareDgsBoardReplacement = function(): void {
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
+    if (state) persistDgsSetSquarePose(state);
     const currentBoard = window.__boards && window.__boards[state.boardId];
     if (!state || !currentBoard || state.board === currentBoard || state.boardReplacementPrepared) return;
     if (!state.boardContainer?.isConnected) {
@@ -11026,6 +11990,165 @@ function getDgsStateForBoard(boardId: string): DgsState | null {
     .find((state) => !!state && state.boardId === boardId && state.board === board) || null;
 }
 
+function normalizeDgsInstrumentKind(value: unknown): DgsInstrumentKind | null {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'compass') return 'compass';
+  if (normalized === 'set-square' || normalized === 'setsquare') return 'set-square';
+  return null;
+}
+
+function getDgsInstrumentControllerUid(boardId: string): string {
+  const safeId = String(boardId || '')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 36) || 'board';
+  let hash = 2166136261;
+  for (let index = 0; index < boardId.length; index += 1) {
+    hash ^= boardId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return 'instrument-' + safeId + '-' + (hash >>> 0).toString(36);
+}
+
+function findDgsMacroAnchorForBoard(boardId: string): {
+  uid: string;
+  spec: string;
+  language?: string;
+} | null {
+  const anchors = document.querySelectorAll<HTMLElement>('[id^=dgs-ui-][data-spec]');
+  for (const anchor of Array.from(anchors)) {
+    const match = String(anchor.id || '').match(/^dgs-ui-(.+)$/);
+    if (!match) continue;
+    const spec = String(anchor.dataset.spec || '').trim();
+    if (parseDgsMacroSpec(spec).boardId !== boardId) continue;
+    return { uid: match[1], spec, language: anchor.dataset.language };
+  }
+  return null;
+}
+
+function pruneDgsInstrumentRequests(): void {
+  Object.keys(dgsInstrumentRequests).forEach((uid) => {
+    const request = dgsInstrumentRequests[uid];
+    if (request.anchor && !request.anchor.isConnected) delete dgsInstrumentRequests[uid];
+  });
+}
+
+function syncDgsInstrumentProfile(boardId: string): void {
+  const boardContainer = getBoardContainer(boardId);
+  if (!boardContainer) return;
+
+  pruneDgsInstrumentRequests();
+  const hasFullDgs = !!findDgsMacroAnchorForBoard(boardId);
+  const requestedToolIds = new Set<number>();
+  if (!hasFullDgs) {
+    Object.keys(dgsInstrumentRequests)
+      .map((uid) => dgsInstrumentRequests[uid])
+      .filter((request) => request.boardId === boardId)
+      .forEach((request) => {
+        requestedToolIds.add(
+          request.kind === 'set-square'
+            ? DGS_TOOL_IDS.setSquare
+            : DGS_TOOL_IDS.compass
+        );
+      });
+  }
+
+  if (hasFullDgs) {
+    delete boardContainer.dataset.liaDgsInstrumentTools;
+  } else if (!requestedToolIds.size) {
+    if ('liaDgsInstrumentTools' in boardContainer.dataset) {
+      boardContainer.dataset.liaDgsInstrumentTools = '0';
+    }
+  } else {
+    boardContainer.dataset.liaDgsInstrumentTools =
+      Array.from(requestedToolIds).sort((a, b) => a - b).join(',');
+  }
+
+  const state = getDgsStateForBoard(boardId);
+  if (!state) return;
+  applyDgsToolAvailability(state);
+  if (hasFullDgs) return;
+  if (!requestedToolIds.has(DGS_TOOL_IDS.setSquare) && state.setSquareVisible) {
+    setDgsSetSquareVisible(state, false);
+  }
+  if (!requestedToolIds.has(DGS_TOOL_IDS.compass) &&
+      (state.activeTool === 'compass' || state.compassRadiusDialogOpen)) {
+    setActiveTool(state, '', false);
+  }
+}
+
+function applyDgsInstrumentRequests(boardId: string): boolean {
+  const state = getDgsStateForBoard(boardId);
+  if (!state) return false;
+
+  pruneDgsInstrumentRequests();
+  const pending = Object.keys(dgsInstrumentRequests)
+    .map((uid) => dgsInstrumentRequests[uid])
+    .filter((request) =>
+      request.boardId === boardId &&
+      request.appliedState !== state
+    );
+  if (!pending.length) return true;
+
+  setMenuOpen(state, true);
+  if (pending.some((request) => request.kind === 'set-square')) {
+    setDgsSetSquareVisible(state, true);
+  }
+  if (pending.some((request) => request.kind === 'compass')) {
+    setActiveTool(state, '', false);
+    state.compassMode = 'free';
+    const compassToolIcon = state.compassToolButton.querySelector('svg');
+    if (compassToolIcon) {
+      state.compassButton.replaceChildren(compassToolIcon.cloneNode(true));
+    }
+    setCompassRadiusDialogOpen(state, false);
+    setCompassSubmenuOpen(state, false);
+    setActiveTool(state, 'compass');
+  }
+  pending.forEach((request) => { request.appliedState = state; });
+  return true;
+}
+
+function setupDGSInstrument(
+  uid: string,
+  spec: string,
+  kindValue: unknown,
+  languageCode?: string
+): void {
+  const kind = normalizeDgsInstrumentKind(kindValue);
+  const boardId = parseDgsMacroSpec(spec).boardId;
+  if (!uid || !boardId || !kind) return;
+
+  const anchor = document.getElementById('dgs-instrument-ui-' + uid) as HTMLElement | null;
+  const previous = dgsInstrumentRequests[uid];
+  const requestChanged =
+    !previous ||
+    previous.boardId !== boardId ||
+    previous.kind !== kind ||
+    previous.anchor !== anchor;
+  dgsInstrumentRequests[uid] = {
+    uid,
+    boardId,
+    kind,
+    language: languageCode,
+    anchor,
+    appliedState: requestChanged ? null : previous.appliedState
+  };
+  syncDgsInstrumentProfile(boardId);
+
+  const existing = getDgsStateForBoard(boardId);
+  if (existing) {
+    applyDgsInstrumentRequests(boardId);
+    return;
+  }
+
+  const dgsMacro = findDgsMacroAnchorForBoard(boardId);
+  const controllerUid = dgsMacro?.uid || getDgsInstrumentControllerUid(boardId);
+  const controllerSpec = dgsMacro?.spec || (boardId + ';tools=[0]');
+  setupDGS(controllerUid, controllerSpec, dgsMacro?.language || languageCode);
+  applyDgsInstrumentRequests(boardId);
+}
+
 window.__beginDgsErase = function(boardId: string): void {
   const state = getDgsStateForBoard(boardId);
   if (!state) return;
@@ -11326,6 +12449,11 @@ function renderToolState(state: DgsState): void {
   const textActive = state.activeTool === 'text';
   state.selectButton.classList.toggle('is-active', normalActive);
   state.selectButton.setAttribute('aria-pressed', normalActive ? 'true' : 'false');
+  state.setSquareButton.classList.toggle('is-active', state.setSquareVisible);
+  state.setSquareButton.setAttribute('aria-pressed', state.setSquareVisible ? 'true' : 'false');
+  const setSquareLabel = state.setSquareVisible ? text.hideSetSquare : text.showSetSquare;
+  state.setSquareButton.setAttribute('aria-label', setSquareLabel);
+  state.setSquareButton.title = setSquareLabel;
   state.compassButton.classList.toggle('is-active', compassActive);
   state.compassButton.setAttribute('aria-pressed', compassActive ? 'true' : 'false');
   const freeCompassActive = state.activeTool === 'compass' && state.compassMode === 'free';
@@ -11536,8 +12664,13 @@ function releaseRegressionControls(state: DgsState): void {
 }
 
 function isDgsToolAvailable(state: DgsState, toolId: number): boolean {
-  return DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId) ||
-    state.availableToolIds == null || state.availableToolIds.has(toolId);
+  if (DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId)) {
+    const instrumentProfile = String(
+      state.boardContainer.dataset.liaDgsInstrumentTools || ''
+    ).split(',').filter(Boolean).map(Number);
+    return !instrumentProfile.length || instrumentProfile.includes(toolId);
+  }
+  return state.availableToolIds == null || state.availableToolIds.has(toolId);
 }
 
 function setDgsButtonTabIndex(button: HTMLButtonElement, enabled: boolean): void {
@@ -11575,6 +12708,7 @@ function applyDgsToolAvailability(state: DgsState): void {
     return enabled;
   };
 
+  const setSquareVisible = setLeaf(state.setSquareButton, DGS_TOOL_IDS.setSquare);
   const compassVisible = setLeaf(state.compassButton, DGS_TOOL_IDS.compass);
   setLeaf(state.compassToolButton, DGS_TOOL_IDS.compass);
   setLeaf(state.fixedRadiusCompassToolButton, DGS_TOOL_IDS.compass);
@@ -11663,6 +12797,7 @@ function applyDgsToolAvailability(state: DgsState): void {
   };
 
   placeButton(state.selectButton, true);
+  placeButton(state.setSquareButton, setSquareVisible);
   placeButton(state.compassButton, compassVisible);
   placeButton(state.formatButton, formatVisible);
   placeDivider(state.toolsDivider, geometryVisible);
@@ -11690,6 +12825,7 @@ function applyDgsToolAvailability(state: DgsState): void {
 
   setDgsButtonTabIndex(state.selectButton, state.open);
   [
+    state.setSquareButton,
     state.compassButton,
     state.formatButton,
     state.pointButton,
@@ -11806,6 +12942,7 @@ function applyLayout(state: DgsState): void {
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-neutral-color', tone);
   state.boardContainer.style.setProperty('--lia-dgs-fullscreen-bg', tone === '#fff' ? '#151a1c' : '#fff');
+  layoutDgsSetSquare(state, false);
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
   if (state.xAxisAdjusted) scheduleXAxisSync(state);
@@ -12232,6 +13369,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.objectListPanel.dataset.topOpen = open ? '1' : '0';
   state.objectListPanel.classList.toggle('is-top-open', open);
   state.selectButton.tabIndex = open ? 0 : -1;
+  state.setSquareButton.tabIndex = open && !state.setSquareButton.disabled ? 0 : -1;
   state.compassButton.tabIndex = open && !state.compassButton.disabled ? 0 : -1;
   state.formatButton.tabIndex = open ? 0 : -1;
   state.pointButton.tabIndex = open ? 0 : -1;
@@ -12812,16 +13950,32 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
 
   const boardContainer = getBoardContainer(boardId);
   if (!boardContainer) {
+    if (pendingRetryTimers[uid] != null) return;
     const retries = (pendingRetries[uid] || 0) + 1;
     pendingRetries[uid] = retries;
 
     if (retries <= MAX_RETRIES) {
-      window.setTimeout(() => setupDGS(uid, spec, languageCode), RETRY_DELAY_MS);
+      pendingRetryTimers[uid] = window.setTimeout(() => {
+        pendingRetryTimers[uid] = undefined;
+        setupDGS(uid, spec, languageCode);
+      }, RETRY_DELAY_MS);
     }
     return;
   }
 
+  syncDgsInstrumentProfile(boardId);
+  if (pendingRetryTimers[uid] != null) window.clearTimeout(pendingRetryTimers[uid]);
+  pendingRetryTimers[uid] = undefined;
   pendingRetries[uid] = 0;
+  const boardState = getDgsStateForBoard(boardId) ||
+    Object.keys(states)
+      .map((stateUid) => states[stateUid])
+      .find((state) => !!state && state.boardId === boardId) ||
+    null;
+  if (!states[uid] && boardState) {
+    setupDGS(boardState.uid, spec, languageCode);
+    return;
+  }
   const anchor = document.getElementById(`dgs-ui-${uid}`);
   const geometryLanguage = getDgsGeometryLanguage(anchor, languageCode);
   boardContainer.dataset.liaDgsTools = config.toolSelectionKey;
@@ -12896,6 +14050,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.traceCheckbox?.isConnected &&
     !!existing.toolsDivider?.isConnected &&
     !!existing.selectButton?.isConnected &&
+    !!existing.setSquareButton?.isConnected &&
+    !!existing.setSquareOverlay?.isConnected &&
     !!existing.compassButton?.isConnected &&
     !!existing.compassSubmenu?.isConnected &&
     existing.compassSubmenu?.parentElement === existing.menuClip &&
@@ -13050,10 +14206,14 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (needsDeferredRestore) scheduleDgsConstructionRestore(existing);
     applyDgsProfileRestrictions(existing);
     applyLayout(existing);
+    layoutDgsSetSquare(existing, false);
+    applyDgsInstrumentRequests(boardId);
     return;
   }
 
   if (existing) {
+    persistDgsSetSquarePose(existing);
+    cancelDgsSetSquareInteraction(existing);
     setActiveTool(existing, '', false);
     if (existing.axisAnimationRAF) cancelAnimationFrame(existing.axisAnimationRAF);
     if (existing.axisSyncRAF) cancelAnimationFrame(existing.axisSyncRAF);
@@ -13062,6 +14222,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
     if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
     if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
+    if (existing.setSquareLayoutRAF != null) cancelAnimationFrame(existing.setSquareLayoutRAF);
     cancelScheduledDgsConstructionRestore(existing);
     restoreAxis(existing);
     restoreXAxis(existing);
@@ -13120,6 +14281,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       existing.rootConstructions.slice().forEach((construction) => removeDgsRootConstruction(existing, construction, false));
     }
     releaseRegressionControls(existing);
+    try { existing.setSquareOverlay.remove(); } catch (e) {}
     try { existing.button.remove(); } catch (e) {}
     try { existing.menuClip.remove(); } catch (e) {}
     try { existing.sideMenuClip.remove(); } catch (e) {}
@@ -13152,6 +14314,30 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   selectButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(selectButton);
 
+  const setSquareButton = document.createElement('button');
+  setSquareButton.type = 'button';
+  setSquareButton.className = 'lia-dgs-geometry-button lia-dgs-set-square-button';
+  setSquareButton.setAttribute('aria-label', text.showSetSquare);
+  setSquareButton.setAttribute('aria-pressed', 'false');
+  setSquareButton.title = text.showSetSquare;
+  setSquareButton.innerHTML = DGS_SET_SQUARE_ICON;
+  setSquareButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(setSquareButton);
+
+  const setSquareOverlay = document.createElement('div');
+  setSquareOverlay.className = 'lia-dgs-set-square-overlay';
+  setSquareOverlay.setAttribute('role', 'group');
+  setSquareOverlay.setAttribute('aria-label', text.setSquare);
+  setSquareOverlay.setAttribute('aria-hidden', 'true');
+  setSquareOverlay.dataset.visible = '0';
+  setSquareOverlay.innerHTML = createDgsSetSquareGraphic();
+  const setSquareTitle = setSquareOverlay.querySelector('.lia-dgs-set-square-svg-title');
+  if (setSquareTitle) setSquareTitle.textContent = text.rotateSetSquare;
+  setSquareOverlay.addEventListener('contextmenu', (evt) => {
+    evt.preventDefault();
+    evt.stopImmediatePropagation();
+  });
+
   const refinedCompassBodyIcon =
     '<path class=lia-dgs-compass-body ' +
     'd=M11.25,1h1.5M11.25,1.7h1.5M11.25,2.4h1.5' +
@@ -13167,7 +14353,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     '<g transform=rotate(-5,12,12)>' +
     refinedCompassBodyIcon +
     '<path class=lia-dgs-compass-accent ' +
-    'd=M5.7,22.35A7.2,3.4,0,0,1,18.55,22.15></path></g></svg>';
+    'd=M15.4,13.4C19.2,14.2,21.2,18.1,18.55,22.15></path></g></svg>';
   const fixedRadiusCompassIcon =
     '<svg class=lia-dgs-compass-icon viewBox=0,0,24,24 aria-hidden=true>' +
     '<g transform=rotate(-5,12,12)>' +
@@ -14461,6 +15647,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
   });
 
+  boardContainer.appendChild(setSquareOverlay);
   boardContainer.appendChild(objectListClip);
   boardContainer.appendChild(sideMenuClip);
   boardContainer.appendChild(menuClip);
@@ -14487,6 +15674,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     window.__coordBoardStates && window.__coordBoardStates[boardId] &&
       window.__coordBoardStates[boardId].axisScaleMode
   );
+  const storedSetSquarePose = readDgsSetSquarePose(boardId);
   const xAxis = board && board.defaultAxes && board.defaultAxes.x;
   const yAxis = board && board.defaultAxes && board.defaultAxes.y;
   const state: DgsState = {
@@ -14597,6 +15785,37 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     colorSaturation: 1,
     colorValue: 1,
     selectButton,
+    setSquareButton,
+    setSquareOverlay,
+    setSquareVisible: storedSetSquarePose.visible,
+    setSquareInitialized: storedSetSquarePose.initialized,
+    setSquarePivotX: storedSetSquarePose.initialized
+      ? storedSetSquarePose.pivotXRatio * boardContainer.clientWidth
+      : 0,
+    setSquarePivotY: storedSetSquarePose.initialized
+      ? storedSetSquarePose.pivotYRatio * boardContainer.clientHeight
+      : 0,
+    setSquarePivotXRatio: storedSetSquarePose.pivotXRatio,
+    setSquarePivotYRatio: storedSetSquarePose.pivotYRatio,
+    setSquareAngle: storedSetSquarePose.angle,
+    setSquareScale: storedSetSquarePose.scale,
+    setSquarePointerId: null,
+    setSquareInteraction: null,
+    setSquareStartClientX: 0,
+    setSquareStartClientY: 0,
+    setSquareStartPivotX: 0,
+    setSquareStartPivotY: 0,
+    setSquareStartAngle: 0,
+    setSquareStartPointerAngle: 0,
+    setSquareStartScale: storedSetSquarePose.scale,
+    setSquareStartPointerDistance: 1,
+    setSquareLastContainerWidth: storedSetSquarePose.initialized
+      ? boardContainer.clientWidth
+      : 0,
+    setSquareLastContainerHeight: storedSetSquarePose.initialized
+      ? boardContainer.clientHeight
+      : 0,
+    setSquareRulerSignature: '',
     compassButton,
     compassSubmenu,
     compassToolButton,
@@ -14745,6 +15964,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     fixedCompassPersistHistory: false
   };
   states[uid] = state;
+  bindDgsSetSquareInteraction(state);
+  layoutDgsSetSquare(state, false);
   exportToolButtons.forEach((toolButton, toolId) => {
     toolButton.addEventListener('click', (evt) => {
       evt.preventDefault();
@@ -14798,6 +16019,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   setSideMenuOpen(state, false);
   applyDgsProfileRestrictions(state);
   applyLayout(state);
+  renderToolState(state);
   renderDgsFullscreenButton(state);
 
   selectButton.addEventListener('click', (evt) => {
@@ -14814,6 +16036,12 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setTextDialogOpen(state, false);
     setActiveTool(state, '', false);
     notifyRegressionLayout(state, false);
+  });
+
+  setSquareButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setDgsSetSquareVisible(state, !state.setSquareVisible);
   });
 
   compassButton.addEventListener('click', (evt) => {
@@ -16443,6 +17671,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
     scheduleDgsRootUpdate(state);
     refreshDgsSliderTypography(state);
+    scheduleDgsSetSquareLayout(state, false);
   };
   state.onBoardRootUpdate = () => {
     syncDgsFixedCompassConstructions(state);
@@ -16464,6 +17693,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   if (typeof ResizeObserver === 'function') {
     state.resizeObserver = new ResizeObserver(() => {
       if (isDgsFullscreen(state)) scheduleDgsFullscreenResize(state);
+      const setSquareSizeChanged =
+        state.setSquareLastContainerWidth !== boardContainer.clientWidth ||
+        state.setSquareLastContainerHeight !== boardContainer.clientHeight;
+      scheduleDgsSetSquareLayout(state, setSquareSizeChanged);
       positionOpenDgsSubmenu(state);
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
@@ -16480,11 +17713,22 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     setMenuOpen(state, !state.open);
   });
+  applyDgsInstrumentRequests(boardId);
 }
 
 window.__setupDGS = function (uid: string, spec: string, language?: string): void {
   const rawSpec = String(spec || '').trim();
   scheduleBootstrap(() => setupDGS(uid, rawSpec, language));
+};
+
+window.__setupDGSInstrument = function (
+  uid: string,
+  spec: string,
+  kind: string,
+  language?: string
+): void {
+  const rawSpec = String(spec || '').trim();
+  scheduleBootstrap(() => setupDGSInstrument(uid, rawSpec, kind, language));
 };
 
 export function bootstrapDGS(): void {
@@ -16498,6 +17742,28 @@ export function bootstrapDGS(): void {
     const spec = String((el as HTMLElement).dataset.spec || '').trim();
     setupDGS(uid, spec, (el as HTMLElement).dataset.language);
   });
+
+  pruneDgsInstrumentRequests();
+  const instrumentAnchors =
+    document.querySelectorAll('[id^=dgs-instrument-ui-][data-spec][data-instrument]');
+  instrumentAnchors.forEach((el: Element) => {
+    const match = String(el.id || '').match(/^dgs-instrument-ui-(.+)$/);
+    if (!match) return;
+
+    const anchor = el as HTMLElement;
+    setupDGSInstrument(
+      match[1],
+      String(anchor.dataset.spec || '').trim(),
+      String(anchor.dataset.instrument || '').trim(),
+      anchor.dataset.language
+    );
+  });
+  Array.from(new Set(
+    Object.keys(states)
+      .map((uid) => states[uid])
+      .filter(Boolean)
+      .map((state) => state.boardId)
+  )).forEach((boardId) => syncDgsInstrumentProfile(boardId));
 }
 
 export function init(): void {

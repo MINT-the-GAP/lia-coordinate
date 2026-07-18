@@ -118,6 +118,8 @@ type RegressionState = {
   drawing: boolean;
   pointerId: number | null;
   currentStroke: DrawStroke | null;
+  setSquareGuideEdge: number | null;
+  setSquareStrokeInterrupted: boolean;
   eraseRemoved: EraseEntry[];
   autoCreatedPointsData: AutoPointData[];
   recognitionGraph: any;
@@ -1369,12 +1371,22 @@ function updateButtonStates(state: RegressionState): void {
   } catch (e) {}
 }
 
-function getDrawPos(layer: HTMLCanvasElement, evt: PointerEvent): DrawPoint {
+function clientToDrawLocal(
+  layer: HTMLCanvasElement,
+  clientX: number,
+  clientY: number
+): DrawPoint {
   const rect = layer.getBoundingClientRect();
+  const scaleX = rect.width > 1e-9 ? layer.clientWidth / rect.width : 1;
+  const scaleY = rect.height > 1e-9 ? layer.clientHeight / rect.height : 1;
   return {
-    x: evt.clientX - rect.left,
-    y: evt.clientY - rect.top
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
   };
+}
+
+function getDrawPos(layer: HTMLCanvasElement, evt: PointerEvent): DrawPoint {
+  return clientToDrawLocal(layer, evt.clientX, evt.clientY);
 }
 
 function eventToUser(board: any, evt: PointerEvent): { x: number; y: number } {
@@ -2024,6 +2036,152 @@ function fitQuartic(points: DrawPoint[]): QuarticFit | null {
     f: Number(fitted.coeff[0] || 0),
     error: fitted.error
   };
+}
+
+type SetSquareDrawConstraint = {
+  point: DrawPoint;
+  blocked: boolean;
+  snappedEdge: number | null;
+  vertices: DrawPoint[] | null;
+};
+
+function visibleSetSquareVertices(state: RegressionState): DrawPoint[] | null {
+  const overlay = state.boardContainer.querySelector<HTMLElement>(
+    '.lia-dgs-set-square-overlay.is-visible'
+  );
+  const svg = overlay && overlay.querySelector<SVGSVGElement>('svg');
+  if (!overlay || !svg || overlay.dataset.visible !== '1') return null;
+  const matrix = svg.getScreenCTM();
+  if (!matrix) return null;
+  const source: Array<[number, number]> = [[10, 34], [590, 34], [300, 334]];
+  try {
+    return source.map(([x, y]) => {
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = x;
+      svgPoint.y = y;
+      const screenPoint = svgPoint.matrixTransform(matrix);
+      return clientToDrawLocal(state.drawLayer, screenPoint.x, screenPoint.y);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+function closestPointOnDrawSegment(
+  point: DrawPoint,
+  a: DrawPoint,
+  b: DrawPoint
+): { point: DrawPoint; distance: number } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const denominator = dx * dx + dy * dy;
+  const t = denominator > 1e-9
+    ? Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator))
+    : 0;
+  const projected = { x: a.x + t * dx, y: a.y + t * dy };
+  return {
+    point: projected,
+    distance: Math.hypot(point.x - projected.x, point.y - projected.y)
+  };
+}
+
+function pointStrictlyInsideTriangle(point: DrawPoint, vertices: DrawPoint[]): boolean {
+  if (vertices.length !== 3) return false;
+  const cross = (a: DrawPoint, b: DrawPoint): number =>
+    (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
+  const values = [
+    cross(vertices[0], vertices[1]),
+    cross(vertices[1], vertices[2]),
+    cross(vertices[2], vertices[0])
+  ];
+  const hasPositive = values.some((value) => value > 0.5);
+  const hasNegative = values.some((value) => value < -0.5);
+  const onBoundary = values.some((value) => Math.abs(value) <= 0.5);
+  return !onBoundary && !(hasPositive && hasNegative);
+}
+
+function constrainDrawPointToSetSquare(
+  state: RegressionState,
+  point: DrawPoint,
+  preferredEdge: number | null
+): SetSquareDrawConstraint {
+  const vertices = visibleSetSquareVertices(state);
+  if (!vertices) return { point, blocked: false, snappedEdge: null, vertices: null };
+  const edges = [
+    [vertices[0], vertices[1]],
+    [vertices[1], vertices[2]],
+    [vertices[2], vertices[0]]
+  ] as Array<[DrawPoint, DrawPoint]>;
+  const candidates = edges.map(([a, b]) => closestPointOnDrawSegment(point, a, b));
+
+  if (preferredEdge != null && candidates[preferredEdge] &&
+      candidates[preferredEdge].distance <= 24) {
+    return {
+      point: candidates[preferredEdge].point,
+      blocked: false,
+      snappedEdge: preferredEdge,
+      vertices
+    };
+  }
+
+  let nearestEdge = 0;
+  for (let index = 1; index < candidates.length; index += 1) {
+    if (candidates[index].distance < candidates[nearestEdge].distance) nearestEdge = index;
+  }
+  if (candidates[nearestEdge].distance <= 14) {
+    return {
+      point: candidates[nearestEdge].point,
+      blocked: false,
+      snappedEdge: nearestEdge,
+      vertices
+    };
+  }
+  if (pointStrictlyInsideTriangle(point, vertices)) {
+    return {
+      point: candidates[nearestEdge].point,
+      blocked: true,
+      snappedEdge: null,
+      vertices
+    };
+  }
+  return { point, blocked: false, snappedEdge: null, vertices };
+}
+
+function firstSetSquareBoundaryIntersection(
+  a: DrawPoint,
+  b: DrawPoint,
+  vertices: DrawPoint[] | null
+): DrawPoint | null {
+  if (!vertices || vertices.length !== 3) return null;
+  const edges = [
+    [vertices[0], vertices[1]],
+    [vertices[1], vertices[2]],
+    [vertices[2], vertices[0]]
+  ] as Array<[DrawPoint, DrawPoint]>;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const denominator = dx * dx + dy * dy;
+  if (denominator <= 1e-9) return null;
+  const hits: Array<DrawPoint & { t: number }> = [];
+  edges.forEach(([edgeStart, edgeEnd]) => {
+    const hit = findSegmentIntersection(a, b, edgeStart, edgeEnd);
+    if (!hit.intersects || !Number.isFinite(hit.x) || !Number.isFinite(hit.y)) return;
+    const point = {
+      x: Number(hit.x),
+      y: Number(hit.y),
+      t: ((Number(hit.x) - a.x) * dx + (Number(hit.y) - a.y) * dy) / denominator
+    };
+    if (point.t < -1e-6 || point.t > 1 + 1e-6) return;
+    if (!hits.some((entry) => Math.hypot(entry.x - point.x, entry.y - point.y) < 0.75)) {
+      hits.push(point);
+    }
+  });
+  hits.sort((left, right) => left.t - right.t);
+  if (pointStrictlyInsideTriangle(b, vertices)) {
+    return hits.find((hit) => hit.t > 1e-5) || hits[0] || null;
+  }
+  if (hits.length >= 2) return hits.find((hit) => hit.t > 1e-5) || hits[0] || null;
+  return null;
 }
 
 function liftLinearFitToCubic(linear: LinearFit): CubicFit {
@@ -3786,6 +3944,8 @@ function restoreRegressionSnapshot(state: RegressionState): boolean {
   state.drawing = false;
   state.pointerId = null;
   state.currentStroke = null;
+  state.setSquareGuideEdge = null;
+  state.setSquareStrokeInterrupted = false;
   state.eraseRemoved = [];
   rebuildColorMenu(state);
   setMenuOpen(state.drawColorMenu, state.drawColorMenuOpen);
@@ -8040,10 +8200,15 @@ function bindDrawLayer(state: RegressionState): void {
       return;
     }
 
+    const constrained = constrainDrawPointToSetSquare(state, point, null);
+    state.setSquareGuideEdge = constrained.snappedEdge;
+    state.setSquareStrokeInterrupted = false;
+    if (constrained.blocked) return;
+
     const stroke: DrawStroke = {
       color: state.drawColor,
       width: 3,
-      points: [localToUser(state, point)]
+      points: [localToUser(state, constrained.point)]
     };
 
     state.currentStroke = stroke;
@@ -8073,8 +8238,46 @@ function bindDrawLayer(state: RegressionState): void {
       return;
     }
 
-    if (!state.currentStroke) return;
-    state.currentStroke.points.push(localToUser(state, point));
+    if (!state.currentStroke || state.setSquareStrokeInterrupted) return;
+    const constrained = constrainDrawPointToSetSquare(
+      state,
+      point,
+      state.setSquareGuideEdge
+    );
+    const last = state.currentStroke.points[state.currentStroke.points.length - 1];
+    const lastLocal = userToLocal(state, last);
+    if (constrained.blocked) {
+      const boundary = firstSetSquareBoundaryIntersection(
+        lastLocal,
+        point,
+        constrained.vertices
+      );
+      if (boundary && Math.hypot(boundary.x - lastLocal.x, boundary.y - lastLocal.y) > 0.25) {
+        state.currentStroke.points.push(localToUser(state, boundary));
+        redrawCanvas(state);
+      }
+      state.setSquareStrokeInterrupted = true;
+      state.setSquareGuideEdge = null;
+      return;
+    }
+    const staysOnGuide = state.setSquareGuideEdge != null &&
+      constrained.snappedEdge === state.setSquareGuideEdge;
+    const boundary = !staysOnGuide ? firstSetSquareBoundaryIntersection(
+      lastLocal,
+      constrained.point,
+      constrained.vertices
+    ) : null;
+    if (boundary) {
+      if (Math.hypot(boundary.x - lastLocal.x, boundary.y - lastLocal.y) > 0.25) {
+        state.currentStroke.points.push(localToUser(state, boundary));
+        redrawCanvas(state);
+      }
+      state.setSquareStrokeInterrupted = true;
+      state.setSquareGuideEdge = null;
+      return;
+    }
+    state.setSquareGuideEdge = constrained.snappedEdge;
+    state.currentStroke.points.push(localToUser(state, constrained.point));
     redrawCanvas(state);
   };
 
@@ -8086,6 +8289,8 @@ function bindDrawLayer(state: RegressionState): void {
 
     state.drawing = false;
     state.pointerId = null;
+    state.setSquareGuideEdge = null;
+    state.setSquareStrokeInterrupted = false;
 
     if (state.activeTool === 'regression') {
       updateButtonStates(state);
@@ -8347,6 +8552,8 @@ window.__relayoutRegressionForBoard = function (boardId: string, dgsOpen?: boole
 function disposeRegressionState(state: RegressionState): void {
   try { persistRegressionSnapshot(state); } catch (e) {}
   state.disposing = true;
+  state.setSquareGuideEdge = null;
+  state.setSquareStrokeInterrupted = false;
   if (state.dgsSyncFrame != null) {
     try { window.cancelAnimationFrame(state.dgsSyncFrame); } catch (e) {}
     state.dgsSyncFrame = null;
@@ -8586,6 +8793,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     drawing: false,
     pointerId: null,
     currentStroke: null,
+    setSquareGuideEdge: null,
+    setSquareStrokeInterrupted: false,
     eraseRemoved: [],
     autoCreatedPointsData: [],
     recognitionGraph: null,
@@ -8617,6 +8826,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.drawColorMenuOpen = open;
     state.toolsMenuOpen = false;
     state.activeTool = open ? 'draw' : '';
+    state.setSquareGuideEdge = null;
+    state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.drawColorMenu, open);
     setMenuOpen(state.toolsMenu, false);
@@ -8632,6 +8843,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.activeTool = isActive ? '' : 'erase';
     state.drawColorMenuOpen = false;
     state.toolsMenuOpen = false;
+    state.setSquareGuideEdge = null;
+    state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.drawColorMenu, false);
     setMenuOpen(state.toolsMenu, false);
@@ -8647,6 +8860,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.toolsMenuOpen = open;
     state.drawColorMenuOpen = false;
     state.activeTool = open ? 'tools' : '';
+    state.setSquareGuideEdge = null;
+    state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.toolsMenu, open);
     setMenuOpen(state.drawColorMenu, false);
@@ -8668,6 +8883,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
       state.activeTool = 'regression';
       state.drawing = false;
       state.pointerId = null;
+      state.setSquareGuideEdge = null;
+      state.setSquareStrokeInterrupted = false;
       state.toolsMenuOpen = true;
       setMenuOpen(state.toolsMenu, true);
       updateButtonStates(state);
@@ -8678,6 +8895,8 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     if (action === 'select-points') {
       state.regressionMode = 'select-points';
       state.activeTool = 'regression';
+      state.setSquareGuideEdge = null;
+      state.setSquareStrokeInterrupted = false;
       state.toolsMenuOpen = true;
       setMenuOpen(state.toolsMenu, true);
       updateButtonStates(state);

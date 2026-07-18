@@ -324,6 +324,23 @@ script:   ./dist/index.js
 </script>
 @end
 
+@Compass: @DGSInstrument_(@uid,`@0`,compass,@language)
+@Zirkel: @DGSInstrument_(@uid,`@0`,compass,@language)
+@SetSquare: @DGSInstrument_(@uid,`@0`,set-square,@language)
+@Geodreieck: @DGSInstrument_(@uid,`@0`,set-square,@language)
+
+@DGSInstrument_
+<span id='dgs-instrument-ui-@0' data-spec='@1' data-instrument='@2' data-language='@3' hidden aria-hidden=true></span>
+
+<script modify=false>
+(function(){
+  if (typeof window.__setupDGSInstrument === 'function') {
+    window.__setupDGSInstrument('@0', '@1', '@2', '@3');
+  }
+})();
+</script>
+@end
+
 @Regression: @Regression_(@uid,`@0`,@language)
 @Regession: @Regression_(@uid,`@0`,@language)
 @PlotZeichnen: @Regression_(@uid,`@0`,@language)
@@ -1055,7 +1072,26 @@ mode. It is highlighted whenever no DGS construction, function dialog, regressio
 eraser tool is active. Clicking it cancels the current tool and any unfinished multi-step
 selection. Its pointer icon follows the neutral light/dark-mode color, while the vertical
 divider before the construction tools uses the selected theme color.
-The formatting button directly beside the pointer is a two-step one-shot tool. Select the
+The set-square button between the normal pointer and the compass independently toggles a
+screen-space geometry instrument without changing the active drawing tool. Its triangular
+surface uses 10 percent opacity, while the ruler, angle scale, guides, and zero mark remain
+fully legible in the current light/dark and theme colors. The protractor uses one semicircular
+measurement ring with larger values once inside and once outside the ring; its ten-degree
+guides continue from the ring to the outer triangle edges. The long ruler keeps the same
+adaptive major metric as the coordinate axes, but always divides it into substantially finer
+ten or twenty-part intervals. Its metric updates while the board is zoomed or the instrument
+is rotated. Two bright theme-colored guides mark exactly 45 degrees on both sides without
+leaving the triangle. Drag
+inside the triangular surface to pan the complete instrument. Drag the circular handle near
+the lower tip to rotate it precisely around the zero mark at the center of the long ruler
+edge; holding Shift snaps the angle in five-degree steps. The handles on both acute corners
+scale the instrument around that fixed zero mark. Visibility, relative position, rotation,
+and scale survive responsive resizing, fullscreen, and LiaScript slide or board replacement.
+In freehand mode, new strokes cannot be drawn through the triangular surface. Pointer samples
+near an outer edge snap to one finite edge, allowing a straight ruler-guided stroke even after
+the set square has been rotated or scaled; a free stroke entering the triangle is clipped at
+its first boundary intersection.
+The formatting button directly beside the compass is a two-step one-shot tool. Select the
 source object first and then the target object; DGS copies text, line, fill, and applicable
 trace colors together with the object-label or text font size. The source is highlighted while
 the tool waits for its target, and the normal pointer mode is restored after the transfer.
@@ -1223,15 +1259,17 @@ Tool profiles use immutable numeric capability ids rather than toolbar positions
 the visual toolbar without changing the meaning of an older export. Missing `tools`, an empty
 list, or a list without numbers retains the complete legacy DGS; `tools=[0]` explicitly keeps
 only the permanent infrastructure. Hamburger, normal mouse mode, undo/redo, fullscreen, and the
-object list remain permanently available; the compass is also always present and is intentionally
-not part of the export-tool selection. Export remains available unless restriction `400` is set.
+object list remain permanently available; the set square and compass are also always present and
+are intentionally not part of the export-tool selection. Export remains available unless
+restriction `400` is set.
 The compass submenu offers the ordinary two-point radius and a fixed-radius mode. In fixed-radius
 mode, enter a positive radius, click the center, and use the second click to choose the drawing
 direction. The drawing point is created at exactly that radius and can immediately be dragged
 around the center to draw the arc. Once the fixed-radius arc is finished, moving either of its
 points translates the complete compass construction; the direction vector and radius remain
 unchanged. Connected fixed-radius compass constructions move as one unit.
-The currently assigned ids are: `100` formatting, reserved always-on id `150` for the compass,
+The currently assigned ids are: `100` formatting, reserved always-on id `140` for the set square,
+reserved always-on id `150` for the compass,
 `200` point, `310` segment, `320` ray,
 `330` line, `340` vector, `350` arc, `410` perpendicular, `420` parallel, `430` midpoint,
 `440` angle bisector, `510` polygon, `520` circle, `530` circular sector, `610` angle,
@@ -1297,6 +1335,59 @@ the Export button with:
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=;ymax=;width=;id=ex_dgs`)
 
 @DGS(`ex_dgs`)
+
+
+## `@Geodreieck` / `@SetSquare`
+
+          --{{0}}--
+Adds the set-square instrument to an existing coordinate system and displays it immediately.
+Its ruler subdivision follows the current axis metric, while both catheti carry exact
+radial 1-degree angle marks with stronger 5-degree and 10-degree divisions. Used on its own,
+the set square can be pushed roughly 95 percent beyond the board while at least 5 percent of its
+actual triangular surface remains visible and draggable. This limited off-board position persists
+across layout changes. The compact toolbar contains the set square
+but no compass. Repeated LiaScript
+bootstraps do not reopen a set square that the user has deliberately hidden. If `@DGS`,
+`@Zirkel`, or `@Compass` targets the same board, all macros share one DGS controller.
+
+Parameters: `<boardId>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=;id=ex_set_square_macro`)
+
+@Geodreieck(`ex_set_square_macro`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=;id=ex_set_square_macro`)
+
+@Geodreieck(`ex_set_square_macro`)
+
+
+## `@Zirkel` / `@Compass`
+
+          --{{0}}--
+Adds the compass instrument to an existing coordinate system, opens the shared instrument
+toolbar, and initially selects the ordinary two-point-radius mode. Used on its own, this
+toolbar contains the compass but no set square. The fixed-radius mode,
+movable compass constructions, persistence, and intersections are the same as in `@DGS`.
+Returning to a slide reapplies the initial macro state to the replacement board, while repeated
+bootstraps on the same board do not override a later user selection.
+
+Parameters: `<boardId>`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=;id=ex_compass_macro`)
+
+@Zirkel(`ex_compass_macro`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=;id=ex_compass_macro`)
+
+@Zirkel(`ex_compass_macro`)
 
 
 

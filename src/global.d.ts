@@ -300,6 +300,12 @@ interface Window {
   __persistDgsBoardState: ((boardId: string, recordHistory?: boolean) => void) | undefined;
   __detachDgsAnalysisFunctionTarget: ((boardId: string, target: any) => void) | undefined;
   __setupDGS: ((uid: string, spec: string, language?: string) => void) | undefined;
+  __setupDGSInstrument: ((
+    uid: string,
+    spec: string,
+    kind: string,
+    language?: string
+  ) => void) | undefined;
 
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;
