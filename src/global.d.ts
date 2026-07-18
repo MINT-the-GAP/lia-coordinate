@@ -273,6 +273,18 @@ interface Window {
   __checkRekonstruktionQuiz: ((uid: string, spec: string) => boolean) | undefined;
   __checkReconstructionQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
+  // Polygon metric quizzes (@PerimeterQuiz/@UmfangQuiz, @AreaQuiz/@FlaecheQuiz)
+  __polygonMetricQuizReady: boolean | undefined;
+  __bootstrapPolygonMetricQuizzes: (() => void) | undefined;
+  __setupPolygonMetricQuiz: ((
+    uid: string,
+    spec: string,
+    kind: string,
+    language?: string
+  ) => void) | undefined;
+  __checkPolygonMetricFromSpec: ((spec: string, kind: string) => boolean) | undefined;
+  __checkPolygonMetricQuiz: ((uid: string, spec: string, kind: string) => boolean) | undefined;
+
   // Regression subsystem (@Regression)
   __regressionReady: boolean | undefined;
   __bootstrapRegression: (() => void) | undefined;

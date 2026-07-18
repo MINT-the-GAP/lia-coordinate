@@ -219,6 +219,92 @@ script:   ./dist/index.js
 <span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
+@PerimeterQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,perimeter,@language)
+@UmfangQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,perimeter,@language)
+@AreaQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,area,@language)
+@FlaecheQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,area,@language)
+
+@PolygonMetricQuiz_
+<span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
+
+<div id='polygon-metric-quiz-check-@0'>
+@2
+[[!]]
+<script modify=false>
+  (() => {
+    const node = document.getElementById('polygon-metric-quiz-spec-@0');
+    const spec = String(node?.dataset.spec || String.raw`@1`);
+    const kind = String(node?.dataset.kind || '@3');
+
+    try {
+      if (typeof window.__checkPolygonMetricFromSpec === 'function' &&
+          window.__checkPolygonMetricFromSpec(spec, kind) === true) return true;
+      if (typeof window.__checkPolygonMetricQuiz === 'function' &&
+          window.__checkPolygonMetricQuiz('@0', spec, kind) === true) return true;
+    } catch (error) {}
+
+    // A freshly opened online course can briefly receive a cached bundle that
+    // predates this quiz helper. Inspect the live board instead of turning that
+    // loading state into an unconditional false.
+    const fields = spec.split(';').map(value => value.trim());
+    const boardId = fields[0] || '';
+    const corners = Number(fields[1]);
+    const target = Number(String(fields[2] || '').replace(',', '.'));
+    const tolerance = Number(String(fields[3] || '').replace(',', '.'));
+    const board = window.__boards && window.__boards[boardId];
+    if (!board || !Number.isInteger(corners) || corners < 3 ||
+        !Number.isFinite(target) || !Number.isFinite(tolerance) || tolerance < 0) return false;
+
+    const objects = [];
+    const seen = new Set();
+    const add = object => {
+      if (!object || seen.has(object)) return;
+      seen.add(object);
+      objects.push(object);
+    };
+    (Array.isArray(board.objectsList) ? board.objectsList : []).forEach(add);
+    Object.values(board.objects || {}).forEach(add);
+
+    return objects.some(object => {
+      if (object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey ||
+          !Array.isArray(object.vertices)) return false;
+      const type = String(object.elType || object.elementClass || '').toLowerCase();
+      if (object.__liaDgsPolygon !== true && type !== 'polygon') return false;
+      const vertices = object.vertices.slice();
+      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+      if (vertices.length !== corners) return false;
+      const points = vertices.map(point => [Number(point.X()), Number(point.Y())]);
+      if (points.some(point => !Number.isFinite(point[0]) || !Number.isFinite(point[1]))) return false;
+      let area2 = 0;
+      let perimeter = 0;
+      points.forEach((point, index) => {
+        const next = points[(index + 1) % points.length];
+        area2 += point[0] * next[1] - next[0] * point[1];
+        perimeter += Math.hypot(next[0] - point[0], next[1] - point[1]);
+      });
+      const value = kind === 'area' ? Math.abs(area2) / 2 : perimeter;
+      return Math.abs(value - target) <= tolerance + Number.EPSILON * 16 *
+        Math.max(1, Math.abs(value), Math.abs(target));
+    });
+  })()
+</script>
+</div>
+
+<script modify=false>
+(function(){
+  const node = document.getElementById('polygon-metric-quiz-spec-@0');
+  if (node && typeof window.__setupPolygonMetricQuiz === 'function') {
+    window.__setupPolygonMetricQuiz(
+      '@0',
+      String(node.dataset.spec || String.raw`@1`),
+      String(node.dataset.kind || '@3'),
+      String(node.dataset.language || '@4')
+    );
+  }
+})();
+</script>
+@end
+
 @Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
 @Reconstruction: @Rekonstruktion_(@uid,`@0`)
 
@@ -1337,6 +1423,54 @@ the Export button with:
 @DGS(`ex_dgs`)
 
 
+## `@UmfangQuiz` / `@PerimeterQuiz` and `@FlaecheQuiz` / `@AreaQuiz`
+
+          --{{0}}--
+Adds a normal LiaScript Check quiz to an existing DGS board. On every click of the
+Check button, the quiz reads the current live construction and searches for a
+learner-created polygon with exactly the requested number of vertices. Preset
+polygons created by `@Area` or `@Flaeche` do not count. Additional incorrect
+polygons do not prevent a matching polygon from solving the quiz.
+
+`@UmfangQuiz` / `@PerimeterQuiz` compares the closed Euclidean perimeter;
+`@FlaecheQuiz` / `@AreaQuiz` compares the absolute shoelace area. The tolerance is
+absolute and may be `0`; German decimal commas are accepted. Moving, deleting,
+undoing, restoring, or recreating a polygon is reflected the next time Check is
+pressed. Quiz settings are passed as a separate second macro argument. The HTML
+comment is emitted unchanged directly before `[[!]]`, just like for `@CreatePoint`;
+for example, `<!-- data-solution-button="5" -->` reveals the solution button after
+five unsuccessful checks.
+
+Parameters:
+
+1. Geometry specification: `<boardId>;<numberOfVertices>;<targetValue>;<absoluteTolerance>`
+2. LiaScript quiz comment: `<!-- data-solution-button="5" -->` (use `<!-- -->` if no option is needed)
+
+``` markdown
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=;id=ex_polygon_metric_quiz`)
+
+@DGS(`ex_polygon_metric_quiz;tools=[200;510;920]`)
+
+Construct a triangle with perimeter 12 and area 6.
+
+@UmfangQuiz(`ex_polygon_metric_quiz;3;12;0.05`,`<!-- data-solution-button="5" -->`)
+
+@FlaecheQuiz(`ex_polygon_metric_quiz;3;6;0.05`,`<!-- data-solution-button="5" -->`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=;id=ex_polygon_metric_quiz`)
+
+@DGS(`ex_polygon_metric_quiz;tools=[200;510;920]`)
+
+Construct a triangle with perimeter 12 and area 6.
+
+@UmfangQuiz(`ex_polygon_metric_quiz;3;12;0.05`,`<!-- data-solution-button="5" -->`)
+
+@FlaecheQuiz(`ex_polygon_metric_quiz;3;6;0.05`,`<!-- data-solution-button="5" -->`)
+
+
 ## `@Geodreieck` / `@SetSquare`
 
           --{{0}}--
@@ -1866,5 +2000,91 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @Table_
 <div id="lia-table-@0" data-spec="@1"></div>
+@end
+
+@PerimeterQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,perimeter,@language)
+@UmfangQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,perimeter,@language)
+@AreaQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,area,@language)
+@FlaecheQuiz: @PolygonMetricQuiz_(@uid,`@0`,`@1`,area,@language)
+
+@PolygonMetricQuiz_
+<span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
+
+<div id='polygon-metric-quiz-check-@0'>
+@2
+[[!]]
+<script modify=false>
+  (() => {
+    const node = document.getElementById('polygon-metric-quiz-spec-@0');
+    const spec = String(node?.dataset.spec || String.raw`@1`);
+    const kind = String(node?.dataset.kind || '@3');
+
+    try {
+      if (typeof window.__checkPolygonMetricFromSpec === 'function' &&
+          window.__checkPolygonMetricFromSpec(spec, kind) === true) return true;
+      if (typeof window.__checkPolygonMetricQuiz === 'function' &&
+          window.__checkPolygonMetricQuiz('@0', spec, kind) === true) return true;
+    } catch (error) {}
+
+    // A freshly opened online course can briefly receive a cached bundle that
+    // predates this quiz helper. Inspect the live board instead of turning that
+    // loading state into an unconditional false.
+    const fields = spec.split(';').map(value => value.trim());
+    const boardId = fields[0] || '';
+    const corners = Number(fields[1]);
+    const target = Number(String(fields[2] || '').replace(',', '.'));
+    const tolerance = Number(String(fields[3] || '').replace(',', '.'));
+    const board = window.__boards && window.__boards[boardId];
+    if (!board || !Number.isInteger(corners) || corners < 3 ||
+        !Number.isFinite(target) || !Number.isFinite(tolerance) || tolerance < 0) return false;
+
+    const objects = [];
+    const seen = new Set();
+    const add = object => {
+      if (!object || seen.has(object)) return;
+      seen.add(object);
+      objects.push(object);
+    };
+    (Array.isArray(board.objectsList) ? board.objectsList : []).forEach(add);
+    Object.values(board.objects || {}).forEach(add);
+
+    return objects.some(object => {
+      if (object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey ||
+          !Array.isArray(object.vertices)) return false;
+      const type = String(object.elType || object.elementClass || '').toLowerCase();
+      if (object.__liaDgsPolygon !== true && type !== 'polygon') return false;
+      const vertices = object.vertices.slice();
+      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+      if (vertices.length !== corners) return false;
+      const points = vertices.map(point => [Number(point.X()), Number(point.Y())]);
+      if (points.some(point => !Number.isFinite(point[0]) || !Number.isFinite(point[1]))) return false;
+      let area2 = 0;
+      let perimeter = 0;
+      points.forEach((point, index) => {
+        const next = points[(index + 1) % points.length];
+        area2 += point[0] * next[1] - next[0] * point[1];
+        perimeter += Math.hypot(next[0] - point[0], next[1] - point[1]);
+      });
+      const value = kind === 'area' ? Math.abs(area2) / 2 : perimeter;
+      return Math.abs(value - target) <= tolerance + Number.EPSILON * 16 *
+        Math.max(1, Math.abs(value), Math.abs(target));
+    });
+  })()
+</script>
+</div>
+
+<script modify=false>
+(function(){
+  const node = document.getElementById('polygon-metric-quiz-spec-@0');
+  if (node && typeof window.__setupPolygonMetricQuiz === 'function') {
+    window.__setupPolygonMetricQuiz(
+      '@0',
+      String(node.dataset.spec || String.raw`@1`),
+      String(node.dataset.kind || '@3'),
+      String(node.dataset.language || '@4')
+    );
+  }
+})();
+</script>
 @end
 ````
