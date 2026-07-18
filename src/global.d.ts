@@ -285,6 +285,17 @@ interface Window {
   __checkPolygonMetricFromSpec: ((spec: string, kind: string) => boolean) | undefined;
   __checkPolygonMetricQuiz: ((uid: string, spec: string, kind: string) => boolean) | undefined;
 
+  // Polygon construction quizzes (@KonstruktionQuiz/@ConstructionQuiz)
+  __constructionQuizReady: boolean | undefined;
+  __bootstrapConstructionQuizzes: (() => void) | undefined;
+  __setupConstructionQuiz: ((
+    uid: string,
+    spec: string,
+    language?: string
+  ) => void) | undefined;
+  __checkConstructionQuizFromSpec: ((spec: string) => boolean) | undefined;
+  __checkConstructionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+
   // Regression subsystem (@Regression)
   __regressionReady: boolean | undefined;
   __bootstrapRegression: (() => void) | undefined;

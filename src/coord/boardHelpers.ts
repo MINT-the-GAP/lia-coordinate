@@ -863,6 +863,7 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapTangentSectorObjects);
   call(window.__bootstrapFunctionAnalysisPoints);
   call(window.__bootstrapObjectAnalysisPoints);
+  call(window.__bootstrapConstructionQuizzes);
   call(window.__bootstrapRekonstruktion);
   call(window.__bootstrapRegression);
   call(window.__bootstrapDGS);

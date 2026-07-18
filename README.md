@@ -227,81 +227,25 @@ script:   ./dist/index.js
 @PolygonMetricQuiz_
 <span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
 
-<div id='polygon-metric-quiz-check-@0'>
 @2
 [[!]]
 <script modify=false>
-  (() => {
-    const node = document.getElementById('polygon-metric-quiz-spec-@0');
-    const spec = String(node?.dataset.spec || String.raw`@1`);
-    const kind = String(node?.dataset.kind || '@3');
-
-    try {
-      if (typeof window.__checkPolygonMetricFromSpec === 'function' &&
-          window.__checkPolygonMetricFromSpec(spec, kind) === true) return true;
-      if (typeof window.__checkPolygonMetricQuiz === 'function' &&
-          window.__checkPolygonMetricQuiz('@0', spec, kind) === true) return true;
-    } catch (error) {}
-
-    // A freshly opened online course can briefly receive a cached bundle that
-    // predates this quiz helper. Inspect the live board instead of turning that
-    // loading state into an unconditional false.
-    const fields = spec.split(';').map(value => value.trim());
-    const boardId = fields[0] || '';
-    const corners = Number(fields[1]);
-    const target = Number(String(fields[2] || '').replace(',', '.'));
-    const tolerance = Number(String(fields[3] || '').replace(',', '.'));
-    const board = window.__boards && window.__boards[boardId];
-    if (!board || !Number.isInteger(corners) || corners < 3 ||
-        !Number.isFinite(target) || !Number.isFinite(tolerance) || tolerance < 0) return false;
-
-    const objects = [];
-    const seen = new Set();
-    const add = object => {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    (Array.isArray(board.objectsList) ? board.objectsList : []).forEach(add);
-    Object.values(board.objects || {}).forEach(add);
-
-    return objects.some(object => {
-      if (object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey ||
-          !Array.isArray(object.vertices)) return false;
-      const type = String(object.elType || object.elementClass || '').toLowerCase();
-      if (object.__liaDgsPolygon !== true && type !== 'polygon') return false;
-      const vertices = object.vertices.slice();
-      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
-      if (vertices.length !== corners) return false;
-      const points = vertices.map(point => [Number(point.X()), Number(point.Y())]);
-      if (points.some(point => !Number.isFinite(point[0]) || !Number.isFinite(point[1]))) return false;
-      let area2 = 0;
-      let perimeter = 0;
-      points.forEach((point, index) => {
-        const next = points[(index + 1) % points.length];
-        area2 += point[0] * next[1] - next[0] * point[1];
-        perimeter += Math.hypot(next[0] - point[0], next[1] - point[1]);
-      });
-      const value = kind === 'area' ? Math.abs(area2) / 2 : perimeter;
-      return Math.abs(value - target) <= tolerance + Number.EPSILON * 16 *
-        Math.max(1, Math.abs(value), Math.abs(target));
-    });
-  })()
+  typeof window.__checkPolygonMetricQuiz === 'function' &&
+    window.__checkPolygonMetricQuiz('@0', '', '@3') === true
 </script>
-</div>
+@end
 
+@ConstructionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
+@KonstruktionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
+
+@ConstructionQuiz_
+<span id='construction-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+
+@2
+[[!]]
 <script modify=false>
-(function(){
-  const node = document.getElementById('polygon-metric-quiz-spec-@0');
-  if (node && typeof window.__setupPolygonMetricQuiz === 'function') {
-    window.__setupPolygonMetricQuiz(
-      '@0',
-      String(node.dataset.spec || String.raw`@1`),
-      String(node.dataset.kind || '@3'),
-      String(node.dataset.language || '@4')
-    );
-  }
-})();
+  typeof window.__checkConstructionQuiz === 'function' &&
+    window.__checkConstructionQuiz('@0', '') === true
 </script>
 @end
 
@@ -1471,6 +1415,75 @@ Construct a triangle with perimeter 12 and area 6.
 @FlaecheQuiz(`ex_polygon_metric_quiz;3;6;0.05`,`<!-- data-solution-button="5" -->`)
 
 
+## `@KonstruktionQuiz` / `@ConstructionQuiz`
+
+          --{{0}}--
+Adds a normal LiaScript construction quiz to an existing DGS board. The quiz
+accepts a learner-created, closed, non-self-intersecting polygon with exactly the
+requested number of genuine corners. A repeated JSXGraph closing vertex does not
+count; preset polygons created by `@Area` / `@Flaeche` are ignored.
+
+Each required property consists of a type followed by its target value:
+
+- `S4`, `Strecke:4`, `Side=4`, or `Length4` means a side of length 4.
+- `W90`, `Winkel:90°`, or `Angle=90deg` means an interior angle of 90 degrees.
+
+The compact comma-separated list uses a decimal point inside values. German and
+English long forms may be mixed.
+
+With `fest` / `fixed`, the polygon is read geometrically counterclockwise. Its
+starting corner is cyclically free, but the list is never read backwards. A
+property of the other type refers to the immediately following boundary feature;
+a repeated type refers to the next feature of that same type. Consequently,
+`S4,W90,S3` is the included-angle case SWS, while `S4,S3,W53.13` is the
+different SSW placement. This preserves the distinction between congruence
+patterns and mirror images.
+
+With `offen` / `open`, incidence and order are ignored. All requested side
+lengths and angles merely have to occur somewhere in the same polygon, including
+the requested multiplicity. In both modes, unlisted sides and angles remain
+unconstrained.
+
+Parameters:
+
+1. `<boardId>;<numberOfCorners>;<fest|offen>;<propertyList>`
+2. LiaScript quiz comment, for example `<!-- data-solution-button="5" -->`
+
+Optional fields after the property list:
+
+- `streckentoleranz=0.05` / `lengthTolerance=0.05`
+- `winkeltoleranz=1` / `angleTolerance=1`
+
+The defaults are 0.05 coordinate units and 1 degree.
+
+``` markdown
+@CoordinateSystem(`xmin=-1;xmax=7;ymin=-1;ymax=5;width=;id=ex_construction_quiz`)
+
+@DGS(`ex_construction_quiz;tools=[200;510]`)
+
+Construct counterclockwise a triangle with a side of length 4, its following
+interior angle of 90 degrees, and the following side of length 3.
+
+@KonstruktionQuiz(`ex_construction_quiz;3;fest;S4,W90,S3;streckentoleranz=0.05;winkeltoleranz=1`,`<!-- data-solution-button="5" -->`)
+
+@ConstructionQuiz(`ex_construction_quiz;3;open;W90,S3,S4`,`<!-- data-solution-button="5" -->`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=7;ymin=-1;ymax=5;width=;id=ex_construction_quiz`)
+
+@DGS(`ex_construction_quiz;tools=[200;510]`)
+
+Construct counterclockwise a triangle with a side of length 4, its following
+interior angle of 90 degrees, and the following side of length 3.
+
+@KonstruktionQuiz(`ex_construction_quiz;3;fest;S4,W90,S3;streckentoleranz=0.05;winkeltoleranz=1`,`<!-- data-solution-button="5" -->`)
+
+@ConstructionQuiz(`ex_construction_quiz;3;open;W90,S3,S4`,`<!-- data-solution-button="5" -->`)
+
+
+
 ## `@Geodreieck` / `@SetSquare`
 
           --{{0}}--
@@ -2010,81 +2023,24 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 @PolygonMetricQuiz_
 <span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
 
-<div id='polygon-metric-quiz-check-@0'>
 @2
 [[!]]
 <script modify=false>
-  (() => {
-    const node = document.getElementById('polygon-metric-quiz-spec-@0');
-    const spec = String(node?.dataset.spec || String.raw`@1`);
-    const kind = String(node?.dataset.kind || '@3');
-
-    try {
-      if (typeof window.__checkPolygonMetricFromSpec === 'function' &&
-          window.__checkPolygonMetricFromSpec(spec, kind) === true) return true;
-      if (typeof window.__checkPolygonMetricQuiz === 'function' &&
-          window.__checkPolygonMetricQuiz('@0', spec, kind) === true) return true;
-    } catch (error) {}
-
-    // A freshly opened online course can briefly receive a cached bundle that
-    // predates this quiz helper. Inspect the live board instead of turning that
-    // loading state into an unconditional false.
-    const fields = spec.split(';').map(value => value.trim());
-    const boardId = fields[0] || '';
-    const corners = Number(fields[1]);
-    const target = Number(String(fields[2] || '').replace(',', '.'));
-    const tolerance = Number(String(fields[3] || '').replace(',', '.'));
-    const board = window.__boards && window.__boards[boardId];
-    if (!board || !Number.isInteger(corners) || corners < 3 ||
-        !Number.isFinite(target) || !Number.isFinite(tolerance) || tolerance < 0) return false;
-
-    const objects = [];
-    const seen = new Set();
-    const add = object => {
-      if (!object || seen.has(object)) return;
-      seen.add(object);
-      objects.push(object);
-    };
-    (Array.isArray(board.objectsList) ? board.objectsList : []).forEach(add);
-    Object.values(board.objects || {}).forEach(add);
-
-    return objects.some(object => {
-      if (object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey ||
-          !Array.isArray(object.vertices)) return false;
-      const type = String(object.elType || object.elementClass || '').toLowerCase();
-      if (object.__liaDgsPolygon !== true && type !== 'polygon') return false;
-      const vertices = object.vertices.slice();
-      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
-      if (vertices.length !== corners) return false;
-      const points = vertices.map(point => [Number(point.X()), Number(point.Y())]);
-      if (points.some(point => !Number.isFinite(point[0]) || !Number.isFinite(point[1]))) return false;
-      let area2 = 0;
-      let perimeter = 0;
-      points.forEach((point, index) => {
-        const next = points[(index + 1) % points.length];
-        area2 += point[0] * next[1] - next[0] * point[1];
-        perimeter += Math.hypot(next[0] - point[0], next[1] - point[1]);
-      });
-      const value = kind === 'area' ? Math.abs(area2) / 2 : perimeter;
-      return Math.abs(value - target) <= tolerance + Number.EPSILON * 16 *
-        Math.max(1, Math.abs(value), Math.abs(target));
-    });
-  })()
+  typeof window.__checkPolygonMetricQuiz === 'function' &&
+    window.__checkPolygonMetricQuiz('@0', '', '@3') === true
 </script>
-</div>
+@end
+@ConstructionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
+@KonstruktionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
 
+@ConstructionQuiz_
+<span id='construction-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+
+@2
+[[!]]
 <script modify=false>
-(function(){
-  const node = document.getElementById('polygon-metric-quiz-spec-@0');
-  if (node && typeof window.__setupPolygonMetricQuiz === 'function') {
-    window.__setupPolygonMetricQuiz(
-      '@0',
-      String(node.dataset.spec || String.raw`@1`),
-      String(node.dataset.kind || '@3'),
-      String(node.dataset.language || '@4')
-    );
-  }
-})();
+  typeof window.__checkConstructionQuiz === 'function' &&
+    window.__checkConstructionQuiz('@0', '') === true
 </script>
 @end
 ````

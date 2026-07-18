@@ -22,6 +22,7 @@ import { init as initSchar } from './subsystems/schar';
 import { init as initTable } from './subsystems/table';
 import { init as initReconstruction } from './subsystems/reconstruction';
 import { init as initPolygonMetricQuiz } from './subsystems/polygonMetricQuiz';
+import { init as initConstructionQuiz } from './subsystems/constructionQuiz';
 import { init as initRegression } from './subsystems/regression';
 import { init as initDGS } from './subsystems/dgs';
 import {
@@ -123,5 +124,6 @@ initSchar();
 initTable();
 initReconstruction();
 initPolygonMetricQuiz();
+initConstructionQuiz();
 initRegression();
 initDGS();
