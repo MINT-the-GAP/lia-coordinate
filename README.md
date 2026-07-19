@@ -231,7 +231,7 @@ script:   ./dist/index.js
 [[!]]
 <script modify=false>
   typeof window.__checkPolygonMetricQuiz === 'function' &&
-    window.__checkPolygonMetricQuiz('@0', '', '@3') === true
+    window.__checkPolygonMetricQuiz('@0', "@'1", '@3') === true
 </script>
 @end
 
@@ -245,7 +245,7 @@ script:   ./dist/index.js
 [[!]]
 <script modify=false>
   typeof window.__checkConstructionQuiz === 'function' &&
-    window.__checkConstructionQuiz('@0', '') === true
+    window.__checkConstructionQuiz('@0', "@'1") === true
 </script>
 @end
 
@@ -1478,9 +1478,9 @@ interior angle of 90 degrees, and the following side of length 3.
 Construct counterclockwise a triangle with a side of length 4, its following
 interior angle of 90 degrees, and the following side of length 3.
 
-@KonstruktionQuiz(`ex_construction_quiz;3;fest;S4,W90,S3;streckentoleranz=0.05;winkeltoleranz=1`,`<!-- data-solution-button="5" -->`)
+@KonstruktionQuiz(`ex_construction_quiz;3;fest;S4,W90,S3;streckentoleranz=0.15;winkeltoleranz=0.75`,`<!-- data-solution-button="5" -->`)
 
-@ConstructionQuiz(`ex_construction_quiz;3;open;W90,S3,S4`,`<!-- data-solution-button="5" -->`)
+@ConstructionQuiz(`ex_construction_quiz;3;open;W90,S3,S4;streckentoleranz=0.15;winkeltoleranz=0.75`,`<!-- data-solution-button="5" -->`)
 
 
 
@@ -2027,7 +2027,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 [[!]]
 <script modify=false>
   typeof window.__checkPolygonMetricQuiz === 'function' &&
-    window.__checkPolygonMetricQuiz('@0', '', '@3') === true
+    window.__checkPolygonMetricQuiz('@0', "@'1", '@3') === true
 </script>
 @end
 @ConstructionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
@@ -2040,7 +2040,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 [[!]]
 <script modify=false>
   typeof window.__checkConstructionQuiz === 'function' &&
-    window.__checkConstructionQuiz('@0', '') === true
+    window.__checkConstructionQuiz('@0', "@'1") === true
 </script>
 @end
 ````
