@@ -25,6 +25,28 @@ interface XY {
   y: number;
 }
 
+/**
+ * JSXGraph's Angle#arc is an internal helper arc. It normally stays hidden
+ * because it runs through the first parent point and therefore does not share
+ * the radius of the visible angle sector.
+ */
+export function hideAngleHelperArc(angle: any): void {
+  const arc = angle && angle.arc;
+  if (!arc) return;
+  try {
+    if (typeof arc.setAttribute === 'function') {
+      arc.setAttribute({
+        visible: false,
+        fillColor: 'none',
+        highlightFillColor: 'none',
+        fillOpacity: 0,
+        highlightFillOpacity: 0
+      });
+    }
+  } catch (e) {}
+  try { if (typeof arc.hideElement === 'function') arc.hideElement(); } catch (e) {}
+}
+
 export function init(): void {
   if (window.__angleReady) {
     try {
@@ -241,11 +263,7 @@ export function init(): void {
     try {
       if (angle && typeof angle.setAttribute === 'function') angle.setAttribute(attributes);
     } catch (e) {}
-    try {
-      if (angle && angle.arc && typeof angle.arc.setAttribute === 'function') {
-        angle.arc.setAttribute(attributes);
-      }
-    } catch (e) {}
+    hideAngleHelperArc(angle);
   }
 
   function applyLabelStyle(label: any, color: string, opacity: number): void {
@@ -273,7 +291,7 @@ export function init(): void {
   function applyAngleVisibility(angle: any, label: any, cfg: AngleConfig): void {
     const visible = cfg.visible !== false;
     setElementVisibility(angle, visible);
-    setElementVisibility(angle && angle.arc, visible);
+    hideAngleHelperArc(angle);
     setElementVisibility(label, visible &&
       (cfg.showName || (mayDisplayDgsValues(cfg.boardId) && cfg.showValue)));
   }
@@ -418,7 +436,14 @@ export function init(): void {
         fillColor: cfg.color,
         highlightFillColor: cfg.color,
         fillOpacity: cfg.opacity * 0.2,
-        highlightFillOpacity: cfg.opacity * 0.2
+        highlightFillOpacity: cfg.opacity * 0.2,
+        arc: {
+          visible: false,
+          fillColor: 'none',
+          highlightFillColor: 'none',
+          fillOpacity: 0,
+          highlightFillOpacity: 0
+        }
       });
       applyAngleStyle(angle, cfg.color, cfg.opacity);
       label = createLabel(board, points, cfg);

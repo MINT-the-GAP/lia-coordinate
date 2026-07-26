@@ -23,8 +23,13 @@ import { init as initTable } from './subsystems/table';
 import { init as initReconstruction } from './subsystems/reconstruction';
 import { init as initPolygonMetricQuiz } from './subsystems/polygonMetricQuiz';
 import { init as initConstructionQuiz } from './subsystems/constructionQuiz';
+import { init as initCombinedQuiz } from './subsystems/combinedQuiz';
 import { init as initRegression } from './subsystems/regression';
 import { init as initDGS } from './subsystems/dgs';
+import {
+  initMacroCodeOrderLayers,
+  scheduleMacroCodeOrderLayers,
+} from './shared/macroLayer';
 import {
   parseCoordSpec,
   getSafeBBox,
@@ -54,6 +59,11 @@ import {
   wireBoard,
 } from './coord/boardHelpers';
 import { getNeutralColor, getAccentColor } from './shared/theme';
+
+// Install source-order layer reconciliation before pending board macros run.
+// The initial pass may precede subsystem registration; delayed passes below
+// reconcile the entries once all renderers have been initialized.
+initMacroCodeOrderLayers();
 
 // Expose board helpers on window.__coord for use by the inline macro code.
 window.__coord = {
@@ -125,5 +135,7 @@ initTable();
 initReconstruction();
 initPolygonMetricQuiz();
 initConstructionQuiz();
+initCombinedQuiz();
 initRegression();
 initDGS();
+scheduleMacroCodeOrderLayers();

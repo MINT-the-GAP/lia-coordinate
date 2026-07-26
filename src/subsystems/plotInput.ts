@@ -659,6 +659,11 @@ export function init(): void {
     state.text = labelPack.label;
 
     board.update();
+    try {
+      if (window.__scheduleMacroCodeOrderLayers) {
+        window.__scheduleMacroCodeOrderLayers();
+      }
+    } catch (e) {}
 
     return compiled;
   };

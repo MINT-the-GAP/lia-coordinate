@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "LiaScript plugin for interactive coordinate systems using JSXGraph",
   "scripts": {
-    "build": "parcel build src/index.ts --dist-dir dist --no-scope-hoist"
+    "build": "parcel build src/index.ts --dist-dir dist --no-scope-hoist",
+    "test": "node --test tests/macroLayer.test.mjs tests/combinedQuiz.test.mjs"
   },
   "devDependencies": {
     "parcel": "^2.13.3",

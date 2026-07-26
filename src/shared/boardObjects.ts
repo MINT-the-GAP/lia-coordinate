@@ -1,6 +1,6 @@
 // Shared JSXGraph board/point helpers used by all subsystems.
 
-import { CoordinatePair } from './parser';
+import type { CoordinatePair } from './parser';
 
 /**
  * Look up a live JSXGraph point by name, verifying it still belongs to the

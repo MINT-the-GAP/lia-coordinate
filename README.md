@@ -34,6 +34,7 @@ script:   ./dist/index.js
       axis: false, grid: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
+      resize: { enabled: false },
       zoom: { enabled: cfg.border, wheel: cfg.border, needShift: false, factorX: 1.15, factorY: 1.15 },
       pan:  { enabled: cfg.border, needShift: false, needTwoFingers: false }
     });
@@ -249,6 +250,22 @@ script:   ./dist/index.js
 </script>
 @end
 
+@KoordQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@GeometrieQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@CoordinateQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@GeometryQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+
+@CombinedQuiz_
+<span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+
+@2
+[[!]]
+<script modify=false>
+  typeof window.__checkCombinedQuiz === 'function' &&
+    window.__checkCombinedQuiz('@0', "@'1") === true
+</script>
+@end
+
 @Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
 @Reconstruction: @Rekonstruktion_(@uid,`@0`)
 
@@ -303,7 +320,7 @@ script:   ./dist/index.js
 @PunktGraph: @PointOnGraph_(@uid,`@0`)
 
 @PointOnGraph_
-<div id="graph-ui-@0">
+<div id="graph-ui-@0" data-spec="@1">
   <div id="graph-task-@0" class="lia-graph-task"></div>
   <div id="graph-check-@0">
     [[!]]
@@ -415,6 +432,16 @@ https://github.com/MINT-the-GAP/lia-coordinate
 2. Also requires JSXGraph (already included via the `import:` above):
 
    `import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md`
+
+## Drawing order
+
+Drawable macros that target the same coordinate system are stacked in their
+source-code order. The first macro uses layer `0`, the next one layer `1`, and
+so on, so an object written farther down in the course is rendered above an
+earlier object. All parts created by one macro, such as a segment together
+with its end caps and label, share the same layer. Layer values are capped at
+`20`; additional macros share that top layer. A layer that was changed and
+restored through DGS remains an explicit override.
 
 ## `@CoordinateSystem`
 
@@ -1385,6 +1412,11 @@ comment is emitted unchanged directly before `[[!]]`, just like for `@CreatePoin
 for example, `<!-- data-solution-button="5" -->` reveals the solution button after
 five unsuccessful checks.
 
+If area, perimeter, and construction properties belong to one task, use
+`@KoordQuiz` instead of placing several individual quiz macros below each
+other. It emits one quiz and requires one and the same learner polygon to
+satisfy every listed condition.
+
 Parameters:
 
 1. Geometry specification: `<boardId>;<numberOfVertices>;<targetValue>;<absoluteTolerance>`
@@ -1397,9 +1429,7 @@ Parameters:
 
 Construct a triangle with perimeter 12 and area 6.
 
-@UmfangQuiz(`ex_polygon_metric_quiz;3;12;0.05`,`<!-- data-solution-button="5" -->`)
-
-@FlaecheQuiz(`ex_polygon_metric_quiz;3;6;0.05`,`<!-- data-solution-button="5" -->`)
+@KoordQuiz(`ex_polygon_metric_quiz;3;Umfang(12;0.05);Flaeche(6;0.05)`,`<!-- data-solution-button="5" -->`)
 ```
 
 ---
@@ -1410,9 +1440,7 @@ Construct a triangle with perimeter 12 and area 6.
 
 Construct a triangle with perimeter 12 and area 6.
 
-@UmfangQuiz(`ex_polygon_metric_quiz;3;12;0.05`,`<!-- data-solution-button="5" -->`)
-
-@FlaecheQuiz(`ex_polygon_metric_quiz;3;6;0.05`,`<!-- data-solution-button="5" -->`)
+@KoordQuiz(`ex_polygon_metric_quiz;3;Umfang(12;0.05);Flaeche(6;0.05)`,`<!-- data-solution-button="5" -->`)
 
 
 ## `@KonstruktionQuiz` / `@ConstructionQuiz`
@@ -1481,6 +1509,55 @@ interior angle of 90 degrees, and the following side of length 3.
 @KonstruktionQuiz(`ex_construction_quiz;3;fest;S4,W90,S3;streckentoleranz=0.15;winkeltoleranz=0.75`,`<!-- data-solution-button="5" -->`)
 
 @ConstructionQuiz(`ex_construction_quiz;3;open;W90,S3,S4;streckentoleranz=0.15;winkeltoleranz=0.75`,`<!-- data-solution-button="5" -->`)
+
+
+
+## `@KoordQuiz` / `@GeometrieQuiz` and `@CoordinateQuiz` / `@GeometryQuiz`
+
+          --{{0}}--
+Combines construction, area, and perimeter requirements into one normal
+LiaScript quiz. Every condition is joined with AND and is tested on the same
+learner-created polygon. Thus, one polygon cannot satisfy the construction
+while a different polygon supplies the requested area. The existing individual
+quiz macros remain available for tasks with only one check.
+
+Parameters:
+
+1. `<boardId>;<numberOfCorners>;<condition>;<condition>;...`
+2. LiaScript quiz comment, for example `<!-- data-solution-button="5" -->`
+
+Supported conditions use the shorter form without repeating the board ID and
+corner count:
+
+- `Konstruktion(<fest|offen>;<propertyList>;optional tolerances)` or
+  `Construction(<fixed|open>;<propertyList>;optional tolerances)`
+- `Flaeche(<targetValue>;<absoluteTolerance>)` or
+  `Area(<targetValue>;<absoluteTolerance>)`
+- `Umfang(<targetValue>;<absoluteTolerance>)` or
+  `Perimeter(<targetValue>;<absoluteTolerance>)`
+
+The conditions may appear in any order. Their detailed property and tolerance
+syntax is identical to the corresponding individual quiz macros.
+
+``` markdown
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=;id=ex_combined_quiz`)
+
+@DGS(`ex_combined_quiz;tools=[200;510]`)
+
+Construct a rectangle with area 12 and perimeter 14.
+
+@KoordQuiz(`ex_combined_quiz;4;Konstruktion(offen;W90,W90,W90,W90);Flaeche(12;0.05);Umfang(14;0.05)`,`<!-- data-solution-button="5" -->`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=;id=ex_combined_quiz`)
+
+@DGS(`ex_combined_quiz;tools=[200;510]`)
+
+Construct a rectangle with area 12 and perimeter 14.
+
+@KoordQuiz(`ex_combined_quiz;4;Konstruktion(offen;W90,W90,W90,W90);Flaeche(12;0.05);Umfang(14;0.05)`,`<!-- data-solution-button="5" -->`)
 
 
 
@@ -1763,6 +1840,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
       axis: false, grid: false, showNavigation: false, showCopyright: false,
       boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
       keepaspectratio: true,
+      resize: { enabled: false },
       zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
       pan:  { enabled: true, needShift: false, needTwoFingers: false }
     });
@@ -1980,7 +2058,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 @PunktGraph: @PointOnGraph_(@uid,`@0`)
 
 @PointOnGraph_
-<div id="graph-ui-@0">
+<div id="graph-ui-@0" data-spec="@1">
   <div id="graph-task-@0" class="lia-graph-task"></div>
   <div id="graph-check-@0">
     [[!]]
@@ -2041,6 +2119,23 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <script modify=false>
   typeof window.__checkConstructionQuiz === 'function' &&
     window.__checkConstructionQuiz('@0', "@'1") === true
+</script>
+@end
+
+
+@KoordQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@GeometrieQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@CoordinateQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+@GeometryQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
+
+@CombinedQuiz_
+<span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+
+@2
+[[!]]
+<script modify=false>
+  typeof window.__checkCombinedQuiz === 'function' &&
+    window.__checkCombinedQuiz('@0', "@'1") === true
 </script>
 @end
 ````

@@ -6,6 +6,7 @@
 // Everything else (parse, theme, sizing, styling, ticks, resize handle) lives here.
 
 import { getNeutralColor, getAccentColor } from '../shared/theme';
+import { applyMacroCodeOrderLayers } from '../shared/macroLayer';
 
 const MAJOR_GRID_COLOR = '#808080';
 const MAJOR_GRID_OPACITY = 0.7;
@@ -141,6 +142,13 @@ export function getSafeBBox(board: any, fallback: number[]): number[] {
     if (isValidBBox(bb)) return bb.slice();
   } catch (e) {}
   return fallback.slice();
+}
+
+export function getResponsiveResizeAnchor(board: any, initialBBox: number[]): number[] {
+  const logicalBBox = board && board.__coordExportBBox;
+  return isValidBBox(logicalBBox)
+    ? logicalBBox.slice()
+    : getSafeBBox(board, initialBBox);
 }
 
 function asHTMLElement(value: any): HTMLElement | null {
@@ -351,11 +359,52 @@ export function prepareBoardContainer(
 
 export function computeResizeBBox(width: number, height: number, anchorBBox: number[], initialBBox: number[]): number[] {
   const bb = isValidBBox(anchorBBox) ? anchorBBox : initialBBox;
-  const xmin  = bb[0];
-  const ymax  = bb[1];
-  const xspan = bb[2] - bb[0];
-  const yspan = xspan * (height / width);
-  return [xmin, ymax, xmin + xspan, ymax - yspan];
+  const centerX = (bb[0] + bb[2]) / 2;
+  const centerY = (bb[1] + bb[3]) / 2;
+  let xspan = bb[2] - bb[0];
+  let yspan = bb[1] - bb[3];
+  const targetRatio = Math.max(1, Number(height) || 1) / Math.max(1, Number(width) || 1);
+
+  // Keep the complete logical viewport visible. A different container aspect
+  // ratio may reveal more coordinates, but it must never crop or shift the
+  // viewport that existed before a responsive layout change.
+  if (yspan / xspan < targetRatio) yspan = xspan * targetRatio;
+  else xspan = yspan / targetRatio;
+
+  return [
+    centerX - xspan / 2,
+    centerY + yspan / 2,
+    centerX + xspan / 2,
+    centerY - yspan / 2
+  ];
+}
+
+export function syncBoardRendererSize(
+  board: any,
+  fallbackWidth: number,
+  fallbackHeight: number,
+  useInitialBBox: boolean,
+  anchorBBox: number[],
+  initialBBox: number[]
+): { width: number; height: number; bbox: number[] } | null {
+  if (!board || !board.containerObj) return null;
+
+  const measuredWidth = readRenderedOuterSize(board.containerObj, 'width');
+  const measuredHeight = readRenderedOuterSize(board.containerObj, 'height');
+  const width = roundPx(measuredWidth > 0 ? measuredWidth : fallbackWidth);
+  const height = roundPx(measuredHeight > 0 ? measuredHeight : fallbackHeight);
+  const bbox = useInitialBBox
+    ? initialBBox.slice()
+    : computeResizeBBox(width, height, anchorBBox, initialBBox);
+
+  // CSS flex/max-size constraints can make the rendered dimensions smaller
+  // than the requested inline size. Resize the renderer to the real box, but
+  // do not let JSXGraph overwrite the requested CSS size: it is still needed
+  // so the board can grow again when its flex parent becomes larger.
+  try { board.resizeContainer(width, height, true, true); } catch (e) {}
+  try { board.setBoundingBox(bbox, true, 'keep'); } catch (e) {}
+
+  return { width, height, bbox };
 }
 
 export function applyBoardSize(
@@ -376,17 +425,19 @@ export function applyBoardSize(
   board.containerObj.style.width  = width + 'px';
   board.containerObj.style.height = height + 'px';
 
-  try { board.resizeContainer(width, height, false, true); } catch (e) {}
-
-  const bb = useInitialBBox
-    ? initialBBox.slice()
-    : computeResizeBBox(width, height, anchorBBox, initialBBox);
-
-  try { board.setBoundingBox(bb, true); } catch (e) {}
+  const renderedSize = syncBoardRendererSize(
+    board,
+    width,
+    height,
+    useInitialBBox,
+    anchorBBox,
+    initialBBox
+  );
+  if (!renderedSize) return null;
   try { board.update(); } catch (e) {}
 
   saveBoardState(board, boardId, initialBBox);
-  return { width, height };
+  return { width: renderedSize.width, height: renderedSize.height };
 }
 
 // ---------------------------------------------------------------------------
@@ -776,14 +827,22 @@ export function fitBoardSize(
       size.width,
       size.height,
       false,
-      getSafeBBox(board, initialBBox),
+      getResponsiveResizeAnchor(board, initialBBox),
       initialBBox,
       boardId,
       false
     );
   } else {
     const size = fitDimensionsWithinBounds(board, manualWidth, manualHeight);
-    applyBoardSize(board, size.width, size.height, false, getSafeBBox(board, initialBBox), initialBBox, boardId);
+    applyBoardSize(
+      board,
+      size.width,
+      size.height,
+      false,
+      getResponsiveResizeAnchor(board, initialBBox),
+      initialBBox,
+      boardId
+    );
   }
 }
 
@@ -864,8 +923,12 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapFunctionAnalysisPoints);
   call(window.__bootstrapObjectAnalysisPoints);
   call(window.__bootstrapConstructionQuizzes);
+  call(window.__bootstrapCombinedQuizzes);
   call(window.__bootstrapRekonstruktion);
   call(window.__bootstrapRegression);
+  // Bootstrap order is dependency based, while the author-facing stacking
+  // contract follows the order of macro markers in the course source.
+  try { applyMacroCodeOrderLayers(); } catch (e) {}
   call(window.__bootstrapDGS);
 }
 
@@ -1199,6 +1262,8 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   // resizes, this also covers layout changes such as sidebars or slide panels.
   let layoutResizeRAF = 0;
   let lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
+  let lastRenderedWidth = readRenderedOuterSize(board.containerObj, 'width');
+  let lastRenderedHeight = readRenderedOuterSize(board.containerObj, 'height');
 
   function scheduleLayoutRefit(): void {
     if (!isCurrentBoard()) {
@@ -1214,6 +1279,8 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       if (board.__liaDgsFullscreenActive) return;
       lastAvailableWidth = getConstrainedAncestorWidth(board.containerObj);
       fitBoardSize(board, initialBBox, cfg.width, initialRatio, cfg.id);
+      lastRenderedWidth = readRenderedOuterSize(board.containerObj, 'width');
+      lastRenderedHeight = readRenderedOuterSize(board.containerObj, 'height');
       applyAll();
     });
   }
@@ -1222,7 +1289,10 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 
   try {
     if (board.__coordContentResizeObserver) board.__coordContentResizeObserver.disconnect();
-    const observedContainers = getBoardContentContainers(board.containerObj);
+    const observedContainers = Array.from(new Set([
+      board.containerObj,
+      ...getBoardContentContainers(board.containerObj)
+    ]));
     if (observedContainers.length && typeof ResizeObserver === 'function') {
       board.__coordContentResizeObserver = new ResizeObserver(function() {
         if (!isCurrentBoard()) {
@@ -1230,8 +1300,16 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
           return;
         }
         const availableWidth = getConstrainedAncestorWidth(board.containerObj);
-        if (Math.abs(availableWidth - lastAvailableWidth) < 1) return;
+        const renderedWidth = readRenderedOuterSize(board.containerObj, 'width');
+        const renderedHeight = readRenderedOuterSize(board.containerObj, 'height');
+        const availableWidthUnchanged = Math.abs(availableWidth - lastAvailableWidth) < 1;
+        const renderedSizeUnchanged =
+          Math.abs(renderedWidth - lastRenderedWidth) < 1 &&
+          Math.abs(renderedHeight - lastRenderedHeight) < 1;
+        if (availableWidthUnchanged && renderedSizeUnchanged) return;
         lastAvailableWidth = availableWidth;
+        lastRenderedWidth = renderedWidth;
+        lastRenderedHeight = renderedHeight;
         scheduleLayoutRefit();
       });
       observedContainers.forEach(function(container) {

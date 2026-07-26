@@ -6,9 +6,9 @@ import { getBoardObjects } from '../shared/boardObjects';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { splitTopLevel, unquote } from '../shared/parser';
 
-type PolygonMetricKind = 'perimeter' | 'area';
+export type PolygonMetricKind = 'perimeter' | 'area';
 
-type PolygonMetricQuizSpec = {
+export type PolygonMetricQuizSpec = {
   boardId: string;
   corners: number;
   target: number;
@@ -107,6 +107,22 @@ function isLearnerDgsPolygon(object: any): boolean {
   return object.__liaDgsPolygon === true || elementType === 'polygon';
 }
 
+/** Check one concrete learner polygon against one metric condition. */
+export function polygonMatchesMetric(
+  polygon: any,
+  config: PolygonMetricQuizSpec,
+  kind: PolygonMetricKind
+): boolean {
+  if (!config.valid || !isLearnerDgsPolygon(polygon)) return false;
+  const coordinates = getPolygonCoordinates(polygon);
+  if (coordinates.length !== config.corners) return false;
+  const metric = kind === 'area' ? polygonArea(coordinates) : polygonPerimeter(coordinates);
+  const floatingPointSlack = Number.EPSILON * 16 *
+    Math.max(1, Math.abs(config.target), Math.abs(metric));
+  return Number.isFinite(metric) &&
+    Math.abs(metric - config.target) <= config.tolerance + floatingPointSlack;
+}
+
 export function checkPolygonMetricOnBoard(
   board: any,
   config: PolygonMetricQuizSpec,
@@ -115,14 +131,7 @@ export function checkPolygonMetricOnBoard(
   if (!board || !config.valid) return false;
 
   return getBoardObjects(board).some(function(object) {
-    if (!isLearnerDgsPolygon(object)) return false;
-    const coordinates = getPolygonCoordinates(object);
-    if (coordinates.length !== config.corners) return false;
-    const metric = kind === 'area' ? polygonArea(coordinates) : polygonPerimeter(coordinates);
-    const floatingPointSlack = Number.EPSILON * 16 *
-      Math.max(1, Math.abs(config.target), Math.abs(metric));
-    return Number.isFinite(metric) &&
-      Math.abs(metric - config.target) <= config.tolerance + floatingPointSlack;
+    return polygonMatchesMetric(object, config, kind);
   });
 }
 

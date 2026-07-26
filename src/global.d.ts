@@ -14,6 +14,13 @@ interface Window {
   __liaRunCoordHooks: Array<() => void> | { push(fn: () => void): void } | undefined;
   __coordBoardStates: Record<string, any>;
 
+  // Source-order layers for ordinary coordinate macros
+  __macroCodeLayersReady: boolean | undefined;
+  __applyMacroCodeOrderLayers: (() => void) | undefined;
+  __scheduleMacroCodeOrderLayers: (() => void) | undefined;
+  __initMacroCodeOrderLayers: (() => void) | undefined;
+  __macroCodeOrderLayerObserver: MutationObserver | undefined;
+
   // Board helpers namespace exposed for inline macro code
   __coord: {
     parseCoordSpec: (spec: string) => any;
@@ -142,6 +149,7 @@ interface Window {
   __pointGraphStates: Record<string, any>;
   __pointOnGraphInstances: Record<string, any>;
   __pointOnGraphLocks: Record<string, any>;
+  __pointOnGraphLayerEntries: Record<string, any>;
   __bootstrapPointOnGraphs: (() => void) | undefined;
   __bootstrapPointOnGraphsRAF: number | undefined;
   __scheduleBootstrapPointOnGraphs: (() => void) | undefined;
@@ -159,6 +167,7 @@ interface Window {
   __pointsOnGraphReady: boolean | undefined;
   __pointsOnGraphInstances: Record<string, any>;
   __pointsOnGraphLocks: Record<string, any>;
+  __pointsOnGraphLayerEntries: Record<string, any>;
   __bootstrapPointsOnGraph: (() => void) | undefined;
   __bootstrapPointsOnGraphRAF: number | undefined;
   __scheduleBootstrapPointsOnGraph: (() => void) | undefined;
@@ -295,6 +304,17 @@ interface Window {
   ) => void) | undefined;
   __checkConstructionQuizFromSpec: ((spec: string) => boolean) | undefined;
   __checkConstructionQuiz: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Combined polygon quizzes (@KoordQuiz/@GeometrieQuiz and English aliases)
+  __combinedQuizReady: boolean | undefined;
+  __bootstrapCombinedQuizzes: (() => void) | undefined;
+  __setupCombinedQuiz: ((
+    uid: string,
+    spec: string,
+    language?: string
+  ) => void) | undefined;
+  __checkCombinedQuizFromSpec: ((spec: string) => boolean) | undefined;
+  __checkCombinedQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
   // Regression subsystem (@Regression)
   __regressionReady: boolean | undefined;

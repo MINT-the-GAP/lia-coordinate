@@ -28,6 +28,7 @@ export function init(): void {
   window.__pointNeutralColor = getNeutralColor;
   window.__pointOnGraphInstances = window.__pointOnGraphInstances || {};
   window.__pointOnGraphLocks = window.__pointOnGraphLocks || {};
+  window.__pointOnGraphLayerEntries = window.__pointOnGraphLayerEntries || {};
 
   initThemeSync();
 
@@ -60,6 +61,8 @@ export function init(): void {
   }
 
   function getGraphUiSpecByUid(uid) {
+    const uiRoot = document.getElementById('graph-ui-' + uid);
+    if (uiRoot && uiRoot.dataset.spec) return String(uiRoot.dataset.spec);
     const holder = document.getElementById('graph-spec-' + uid);
     if (holder) return String(holder.textContent || '');
     return '';
@@ -106,6 +109,20 @@ export function init(): void {
       String(target.graphName || ''),
       String(target.expr || '')
     ].join('||');
+  }
+
+  function scheduleSourceLayers() {
+    try { window.__scheduleMacroCodeOrderLayers?.(); } catch (e) {}
+  }
+
+  function registerSourceLayerEntry(uid, spec) {
+    const target = getTargetFromSpec(spec);
+    window.__pointOnGraphLayerEntries[String(uid)] = {
+      boardId: target.boardId,
+      names: [target.name],
+      graphKey: getGraphKey(target)
+    };
+    scheduleSourceLayers();
   }
 
   function isLocked(uid) {
@@ -280,6 +297,7 @@ export function init(): void {
       stylePointLabel(pt);
       bindPointPersistence(boardId, name, pt);
       savePointState(boardId, name, pt);
+      scheduleSourceLayers();
 
       return pt;
     } catch (e) {
@@ -575,6 +593,7 @@ export function init(): void {
         name: graphName,
         color: graphColor
       };
+      scheduleSourceLayers();
 
       return window.__pointGraphs[boardId][graphKey];
     } catch (e) {
@@ -954,6 +973,8 @@ export function init(): void {
     const checkRoot = document.getElementById('graph-check-' + uid);
 
     if (!uiRoot || !taskRoot || !checkRoot) return false;
+    uiRoot.dataset.spec = spec;
+    registerSourceLayerEntry(uid, spec);
 
     let btn = document.getElementById('graph-btn-' + uid);
     if (!btn) {

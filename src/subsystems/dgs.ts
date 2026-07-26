@@ -7037,6 +7037,20 @@ function syncDgsRightAngleStyle(angle: any): void {
       });
     }
   } catch (e) {}
+  try {
+    if (angle.arc && typeof angle.arc.setAttribute === 'function') {
+      angle.arc.setAttribute({
+        visible: false,
+        fillColor: 'none',
+        highlightFillColor: 'none',
+        fillOpacity: 0,
+        highlightFillOpacity: 0
+      });
+    }
+  } catch (e) {}
+  try {
+    if (angle.arc && typeof angle.arc.hideElement === 'function') angle.arc.hideElement();
+  } catch (e) {}
 }
 
 function getDgsAngleRadius(points: any[]): number {
@@ -7097,6 +7111,13 @@ function createDgsAngle(state: DgsState, points: any[]): any | null {
       highlightFillColor: '#ff00ff',
       fillOpacity: 0.22,
       highlightFillOpacity: 0.22,
+      arc: {
+        visible: false,
+        fillColor: 'none',
+        highlightFillColor: 'none',
+        fillOpacity: 0,
+        highlightFillOpacity: 0
+      },
       label: {
         strokeColor: '#ff00ff',
         fillColor: '#ff00ff',
@@ -8215,6 +8236,58 @@ function dgsPointReference(point: any): any {
   };
 }
 
+const DGS_LAYER_OWNER_PROPERTIES = [
+  '__liaDgsOwner',
+  '__liaDgsSliderOwner',
+  '__liaDgsPolygonBorderOwner',
+  '__liaDgsDesignOwner'
+];
+
+function hasExplicitDgsLayer(object: any): boolean {
+  try {
+    return !!object && object.__liaDgsLayer != null &&
+      Number.isFinite(Number(object.__liaDgsLayer));
+  } catch (e) { return false; }
+}
+
+function hasExplicitDgsLayerOwner(object: any, seen = new Set<any>()): boolean {
+  if (!object || typeof object !== 'object' || seen.has(object)) return false;
+  seen.add(object);
+  if (hasExplicitDgsLayer(object)) return true;
+  return DGS_LAYER_OWNER_PROPERTIES.some((property) => {
+    try { return hasExplicitDgsLayerOwner(object[property], seen); } catch (e) { return false; }
+  });
+}
+
+function isMacroLayerManagedDgsObject(object: any, seen = new Set<any>()): boolean {
+  if (!object || typeof object !== 'object' || seen.has(object)) return false;
+  seen.add(object);
+  try {
+    if (object.__liaDgsMacroManaged === true ||
+        String(object.__liaDgsMacroKey || '').startsWith('macro:') ||
+        (object.__liaMacroSourceLayer != null &&
+          Number.isFinite(Number(object.__liaMacroSourceLayer)))) return true;
+  } catch (e) {}
+  return DGS_LAYER_OWNER_PROPERTIES.some((property) => {
+    try { return isMacroLayerManagedDgsObject(object[property], seen); } catch (e) { return false; }
+  });
+}
+
+function dgsSnapshotLayerProperties(object: any): any {
+  if (!isMacroLayerManagedDgsObject(object)) {
+    // DGS-owned objects retain the historic always-persisted layer behaviour.
+    return { layer: getDgsObjectLayer(object) };
+  }
+  if (!hasExplicitDgsLayerOwner(object)) {
+    // A macro source layer is derived from code order. Omitting its numeric
+    // value keeps automatic reordering out of DGS snapshots and undo history.
+    return { layerExplicit: false };
+  }
+  // Explicit macro layers keep the legacy numeric shape. This both preserves
+  // old snapshots and avoids a metadata-only undo entry during migration.
+  return { layer: getDgsObjectLayer(object) };
+}
+
 function dgsDerivedPointRecord(point: any): any {
   const markers = getDgsPointTraceMarkers(point);
   const liveTracePoints = markers.map((marker: any) => {
@@ -8236,7 +8309,7 @@ function dgsDerivedPointRecord(point: any): any {
     lineColor: getDgsObjectColor(point, 'line'),
     fillColor: getDgsObjectColor(point, 'fill'),
     formatFontSize: getDgsFormatFontSize(point),
-    layer: getDgsObjectLayer(point),
+    ...dgsSnapshotLayerProperties(point),
     traceEnabled: !!point.__liaDgsTraceEnabled,
     traceColor: getDgsPointTraceColor(point),
     tracePoints: markers.length === 0 && storedTracePoints.length > 0
@@ -8252,7 +8325,7 @@ function dgsPolygonBorderRecord(border: any): any {
     name: getDgsObjectName(border),
     language: border.__liaDgsLanguage,
     fixed: getDgsObjectFixed(border),
-    layer: getDgsObjectLayer(border),
+    ...dgsSnapshotLayerProperties(border),
     showName: border.__liaDgsShowName !== false,
     showObject: border.__liaDgsShowObject !== false,
     opacity: getDgsObjectOpacity(border),
@@ -8322,7 +8395,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       name: getDgsObjectName(object),
       language: object.__liaDgsLanguage || state.language,
       fixed: getDgsObjectFixed(object),
-      layer: getDgsObjectLayer(object),
+      ...dgsSnapshotLayerProperties(object),
       showName: object.__liaDgsShowName !== false,
       showObject: object.__liaDgsShowObject !== false,
       opacity: getDgsObjectOpacity(object),
@@ -8546,7 +8619,17 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   object.__liaDgsLanguage = record.language || state.language;
   if (record.name) setDgsObjectName(state, object, record.name);
   setDgsObjectFixed(object, !!record.fixed);
-  setDgsObjectLayer(object, Number.isFinite(record.layer) ? record.layer : getDgsObjectLayer(object));
+  const macroLayerRecord = isMacroLayerManagedDgsObject(object) ||
+    record.origin === 'macro' || !!record.macroKey ||
+    String(record.id || '').startsWith('macro:');
+  if (macroLayerRecord && record.layerExplicit === false) {
+    clearDgsObjectLayerOverride(object);
+  } else {
+    // Records without layerExplicit are legacy snapshots. Preserve their old
+    // interpretation as explicit layers so existing authored DGS formatting is
+    // not silently lost; all newly derived macro records carry false above.
+    setDgsObjectLayer(object, Number.isFinite(record.layer) ? record.layer : getDgsObjectLayer(object));
+  }
   object.__liaDgsShowName = record.showName !== false;
   object.__liaDgsShowObject = record.showObject !== false;
   object.__liaDgsShowLength = !!record.showLength;
@@ -8761,6 +8844,7 @@ function applyRestoredDgsSpecificState(state: DgsState, object: any, record: any
         language: record.language || state.language,
         fixed: !!pointRecord.fixed,
         layer: pointRecord.layer,
+        layerExplicit: pointRecord.layerExplicit,
         showName: pointRecord.showName,
         showObject: pointRecord.showObject,
         showValue: pointRecord.showValue,
@@ -8880,6 +8964,7 @@ function restoreDgsPendingRecords(
             language: record.language || state.language,
             fixed: !!pointRecord.fixed,
             layer: pointRecord.layer,
+            layerExplicit: pointRecord.layerExplicit,
             showName: pointRecord.showName,
             showObject: pointRecord.showObject,
             opacity: pointRecord.opacity,
@@ -10952,22 +11037,39 @@ function getDgsObjectLayer(object: any): number {
   return 5;
 }
 
+function applyDgsRenderedLayer(candidate: any, layer: number, fallbackBoard?: any): void {
+  try {
+    if (!candidate) return;
+    if (typeof candidate.setAttribute === 'function') candidate.setAttribute({ layer });
+    if (candidate.visProp) candidate.visProp.layer = layer;
+    if (candidate.visPropCalc) candidate.visPropCalc.layer = layer;
+    const board = candidate.board || fallbackBoard;
+    if (board && board.renderer && typeof board.renderer.setLayer === 'function') {
+      board.renderer.setLayer(candidate, layer);
+    }
+  } catch (e) {}
+}
+
+function clearDgsObjectLayerOverride(object: any): void {
+  if (!object) return;
+  try { delete object.__liaDgsLayer; } catch (e) { object.__liaDgsLayer = undefined; }
+  try {
+    const sourceLayer = object.__liaMacroSourceLayer;
+    if (sourceLayer != null && Number.isFinite(Number(sourceLayer))) {
+      const layer = Math.max(0, Math.min(20, Math.round(Number(sourceLayer))));
+      applyDgsRenderedLayer(object, layer, object.board);
+    }
+  } catch (e) {}
+  // Composite parts and late macro objects are reconciled by the shared,
+  // DGS-override-aware source-order pass.
+  try { window.__scheduleMacroCodeOrderLayers?.(); } catch (e) {}
+}
+
 function setDgsObjectLayer(object: any, value: number): number {
   const layer = Math.max(0, Math.min(20, Math.round(Number(value) || 0)));
   if (!object) return layer;
   object.__liaDgsLayer = layer;
-  const apply = (candidate: any) => {
-    try {
-      if (!candidate) return;
-      if (typeof candidate.setAttribute === 'function') candidate.setAttribute({ layer });
-      if (candidate.visProp) candidate.visProp.layer = layer;
-      if (candidate.visPropCalc) candidate.visPropCalc.layer = layer;
-      const board = candidate.board || object.board;
-      if (board && board.renderer && typeof board.renderer.setLayer === 'function') {
-        board.renderer.setLayer(candidate, layer);
-      }
-    } catch (e) {}
-  };
+  const apply = (candidate: any) => applyDgsRenderedLayer(candidate, layer, object.board);
   apply(object);
   apply(object.label);
   apply(object.arc);
@@ -11200,12 +11302,13 @@ function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill' | 'trace'
       try { object.setAttribute({ strokeColor: color, highlightStrokeColor: color }); } catch (e) {}
     }
   }
-  if (isDgsAngle(object) && object.arc && (kind === 'line' || kind === 'fill')) {
-    try {
-      object.arc.setAttribute(kind === 'line'
-        ? { strokeColor: color, highlightStrokeColor: color }
-        : { fillColor: color, highlightFillColor: color });
-    } catch (e) {}
+  if (isDgsAngle(object) && (kind === 'line' || kind === 'fill')) {
+    if (kind === 'line' && object.arc) {
+      try {
+        object.arc.setAttribute({ strokeColor: color, highlightStrokeColor: color });
+      } catch (e) {}
+    }
+    syncDgsRightAngleStyle(object);
   }
   if (isDgsAngle(object) && object.dot && (kind === 'line' || kind === 'fill')) {
     try {

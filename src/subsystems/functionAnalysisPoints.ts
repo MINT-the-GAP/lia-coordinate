@@ -614,6 +614,11 @@ export function init(): void {
         const point = createAnalysisPoint(entry, index);
         if (point) entry.points.push(point);
       }
+      try {
+        if (window.__scheduleMacroCodeOrderLayers) {
+          window.__scheduleMacroCodeOrderLayers();
+        }
+      } catch (e) {}
       return true;
     }
     positions.forEach(function(position, index) {

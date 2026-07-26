@@ -5,6 +5,35 @@ import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../s
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 
+/** Build the visual attributes that a static @Point needs on its first paint. */
+export function getStaticPointCreationAttributes(target: any, neutralColor = '#000'): any {
+  const color = String(target && target.color || '#ff00ff').trim() || '#ff00ff';
+  const rawOpacity = target && target.opacity;
+  const opacityValue = rawOpacity == null || rawOpacity === '' ? NaN : Number(rawOpacity);
+  const opacity = Number.isFinite(opacityValue)
+    ? Math.max(0, Math.min(1, opacityValue))
+    : 1;
+  const labelColor = target && target.hasExplicitColor ? color : neutralColor;
+  return {
+    strokeColor: color,
+    fillColor: color,
+    highlightStrokeColor: color,
+    highlightFillColor: color,
+    strokeOpacity: opacity,
+    fillOpacity: opacity,
+    highlightStrokeOpacity: opacity,
+    highlightFillOpacity: opacity,
+    label: {
+      strokeColor: labelColor,
+      fillColor: labelColor,
+      strokeOpacity: opacity,
+      fillOpacity: opacity,
+      highlightStrokeOpacity: opacity,
+      highlightFillOpacity: opacity
+    }
+  };
+}
+
 export function init(): void {
   if (window.__createPointReady) {
     try {
@@ -138,6 +167,11 @@ export function init(): void {
     point.__liaDgsPersistentId = key;
     point.__liaDgsMacroPointName = target.name;
     point.__liaPointMacroSpec = String(spec || '');
+    try {
+      if (window.__scheduleMacroCodeOrderLayers) {
+        window.__scheduleMacroCodeOrderLayers();
+      }
+    } catch (e) {}
     return point;
   }
 
@@ -357,24 +391,44 @@ export function init(): void {
     savePointState(boardId, name, pt);
   }
 
-  function createPoint(board, boardId, name, x0, y0, isFixed = false, showName = true) {
+  function createPoint(
+    board,
+    boardId,
+    name,
+    x0,
+    y0,
+    isFixed = false,
+    showName = true,
+    initialVisual = null
+  ) {
     try {
+      const initialAttributes = initialVisual
+        ? getStaticPointCreationAttributes(initialVisual, getNeutralColor())
+        : getStaticPointCreationAttributes(null, getNeutralColor());
       const pt = board.create('point', [x0, y0], {
         name: texName(name),
         fixed: !!isFixed,
         withLabel: true,
         showInfobox: false,
-        strokeColor: '#ff00ff',
-        fillColor: '#ff00ff',
-        highlightStrokeColor: '#ff00ff',
-        highlightFillColor: '#ff00ff',
+        strokeColor: initialAttributes.strokeColor,
+        fillColor: initialAttributes.fillColor,
+        highlightStrokeColor: initialAttributes.highlightStrokeColor,
+        highlightFillColor: initialAttributes.highlightFillColor,
+        strokeOpacity: initialAttributes.strokeOpacity,
+        fillOpacity: initialAttributes.fillOpacity,
+        highlightStrokeOpacity: initialAttributes.highlightStrokeOpacity,
+        highlightFillOpacity: initialAttributes.highlightFillOpacity,
         strokeWidth: 3,
         highlightStrokeWidth: 3,
         face: 'x',
         size: 7,
         label: {
-          strokeColor: getNeutralColor(),
-          fillColor: getNeutralColor(),
+          strokeColor: initialAttributes.label.strokeColor,
+          fillColor: initialAttributes.label.fillColor,
+          strokeOpacity: initialAttributes.label.strokeOpacity,
+          fillOpacity: initialAttributes.label.fillOpacity,
+          highlightStrokeOpacity: initialAttributes.label.highlightStrokeOpacity,
+          highlightFillOpacity: initialAttributes.label.highlightFillOpacity,
           visible: showName !== false,
           fontSize: 24,
           parse: false,
@@ -384,6 +438,13 @@ export function init(): void {
 
       pt.__liaDgsPointName = String(name || '');
       pt.__liaDgsShowName = showName !== false;
+      if (initialVisual) {
+        pt.__liaPointVisual = {
+          color: initialAttributes.strokeColor,
+          opacity: initialAttributes.strokeOpacity,
+          hasExplicitColor: !!initialVisual.hasExplicitColor
+        };
+      }
 
       ensureBuckets(boardId);
       window.__points[boardId][name] = pt;
@@ -556,15 +617,15 @@ export function init(): void {
 
     if (!pt) {
       if (isFixed) {
-        pt = createPoint(board, boardId, name, tx, ty, true, target.showName);
+        pt = createPoint(board, boardId, name, tx, ty, true, target.showName, target);
       } else if (
         state &&
         Number.isFinite(state.x) &&
         Number.isFinite(state.y)
       ) {
-        pt = createPoint(board, boardId, name, state.x, state.y, false, target.showName);
+        pt = createPoint(board, boardId, name, state.x, state.y, false, target.showName, target);
       } else {
-        pt = createPoint(board, boardId, name, tx, ty, false, target.showName);
+        pt = createPoint(board, boardId, name, tx, ty, false, target.showName, target);
       }
     }
 

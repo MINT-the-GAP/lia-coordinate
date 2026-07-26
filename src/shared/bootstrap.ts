@@ -6,17 +6,19 @@
  * This matches the pattern used in every subsystem to retry bootstrap after DOM settles.
  */
 export function scheduleBootstrap(fn: () => void): void {
-  try { fn(); } catch (e) {}
-
-  requestAnimationFrame(function() {
+  const run = function(): void {
     try { fn(); } catch (e) {}
-  });
+    try {
+      if (window.__scheduleMacroCodeOrderLayers) {
+        window.__scheduleMacroCodeOrderLayers();
+      }
+    } catch (e) {}
+  };
 
-  setTimeout(function() {
-    try { fn(); } catch (e) {}
-  }, 80);
+  run();
 
-  setTimeout(function() {
-    try { fn(); } catch (e) {}
-  }, 220);
+  requestAnimationFrame(run);
+
+  setTimeout(run, 80);
+  setTimeout(run, 220);
 }

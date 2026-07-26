@@ -28,6 +28,7 @@ export function init(): void {
   window.__pointNeutralColor = getNeutralColor;
   window.__pointsOnGraphInstances = window.__pointsOnGraphInstances || {};
   window.__pointsOnGraphLocks = window.__pointsOnGraphLocks || {};
+  window.__pointsOnGraphLayerEntries = window.__pointsOnGraphLayerEntries || {};
 
   initThemeSync();
 
@@ -132,6 +133,20 @@ export function init(): void {
       String(target.graphName || ''),
       String(target.expr || '')
     ].join('||');
+  }
+
+  function scheduleSourceLayers() {
+    try { window.__scheduleMacroCodeOrderLayers?.(); } catch (e) {}
+  }
+
+  function registerSourceLayerEntry(uid, spec) {
+    const target = getTargetFromSpec(spec);
+    window.__pointsOnGraphLayerEntries[String(uid)] = {
+      boardId: target.boardId,
+      names: target.names.slice(),
+      graphKey: getGraphKey(target)
+    };
+    scheduleSourceLayers();
   }
 
   function isLocked(uid) {
@@ -301,6 +316,7 @@ export function init(): void {
       stylePointLabel(pt);
       bindPointPersistence(boardId, name, pt);
       savePointState(boardId, name, pt);
+      scheduleSourceLayers();
 
       return pt;
     } catch (e) {
@@ -647,6 +663,7 @@ export function init(): void {
         name: graphName,
         color: graphColor
       };
+      scheduleSourceLayers();
 
       return window.__pointGraphs[boardId][graphKey];
     } catch (e) {
@@ -1050,6 +1067,7 @@ export function init(): void {
     if (!uiRoot || !taskRoot || !checkRoot) return false;
 
     uiRoot.dataset.spec = spec;
+    registerSourceLayerEntry(uid, spec);
 
     let btn = document.getElementById('multi-graph-btn-' + uid);
     if (!btn) {
