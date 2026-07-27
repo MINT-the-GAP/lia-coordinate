@@ -438,10 +438,15 @@ https://github.com/MINT-the-GAP/lia-coordinate
 Drawable macros that target the same coordinate system are stacked in their
 source-code order. The first macro uses layer `0`, the next one layer `1`, and
 so on, so an object written farther down in the course is rendered above an
-earlier object. All parts created by one macro, such as a segment together
-with its end caps and label, share the same layer. Layer values are capped at
-`20`; additional macros share that top layer. A layer that was changed and
-restored through DGS remains an explicit override.
+earlier object. Visible geometry and decorations created by one macro share
+that source rank. Each rank has small internal sublayers for geometry, hit
+targets, handles, and annotations, but the source rank remains primary: every
+SVG part of a later macro is above every SVG part of an earlier one.
+HTML/MathJax annotations remain in the board overlay and follow the same source
+order among themselves. Layer values are capped at `20`; additional macros
+share that top rank. A layer that was changed and restored through DGS remains
+an explicit override. Layering changes only drawing order; objects keep their
+user coordinates and therefore continue to follow board panning and zooming.
 
 ## `@CoordinateSystem`
 
@@ -2139,3 +2144,27 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 </script>
 @end
 ````
+
+
+### Testaufgabe:
+
+
+
+
+@Koordinatensystem(`xmin=-2;xmax=80;ymin=-8;ymax=4;width=900;id=G3602;achsen=0;grid=0;border=1`)
+
+@Vektor(`G3602;[[0;0];[76;0]];#000000;u=0`)
+
+@Strecke(`G3602;[[0;-0.8];[0;0.8]];#000000;;-;3px`)
+@Strecke(`G3602;[[24;-0.8];[24;0.8]];#000000;;-;3px`)
+@Strecke(`G3602;[[36;-0.8];[36;0.8]];#000000;;-;3px`)
+@Strecke(`G3602;[[48;-0.8];[48;0.8]];#000000;;-;3px`)
+@Strecke(`G3602;[[60;-0.8];[60;0.8]];#000000;;-;3px`)
+@Strecke(`G3602;[[72;-0.8];[72;0.8]];#000000;;-;3px`)
+@Bogen(`G3602;[12;-0.8];90;[12;0.8];270;;-;5px;#ff0000`)
+
+
+@KoordText(`G3602;[0;-5.1];$0$;#000000;1`)
+@KoordText(`G3602;[36;-5.1];$45$;#000000;1`)
+@KoordText(`G3602;[60;-5.1];$60$;#000000;1`)
+@KoordText(`G3602;[79.3;-0.15];$x$;#000000;1`)

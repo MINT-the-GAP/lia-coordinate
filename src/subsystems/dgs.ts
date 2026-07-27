@@ -6,6 +6,17 @@ import { getAdaptiveTickMetric } from '../coord/boardHelpers';
 import { formatMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import {
+  applySafeRenderedLayer,
+  getMacroLayerRenderRole,
+  getMacroRenderedLayer
+} from '../shared/macroLayer';
+import {
+  DGS_LAYER_OWNER_PROPERTIES,
+  getExplicitDgsLayerFromOwner,
+  getDgsRenderedLayer,
+  getRenderedDgsLayerFromOwner
+} from '../shared/dgsLayer';
+import {
   compileFunctionExpression,
   expandImplicitVariableProducts,
   prepareFunctionInput,
@@ -4181,7 +4192,7 @@ function findNearestDgsLinearObject(
     seen.add(line);
     try {
       if (typeof line.hasPoint === 'function' && line.hasPoint(localX, localY)) {
-        const layer = getDgsObjectLayer(line);
+        const layer = getDgsObjectRenderedLayer(line);
         if (layer >= nearestLayer) {
           nearest = line;
           nearestDistance = 0;
@@ -4207,7 +4218,7 @@ function findNearestDgsLinearObject(
         ? rawRatio
         : (isDgsRay(line) ? Math.max(0, rawRatio) : Math.max(0, Math.min(1, rawRatio)));
       const distance = Math.hypot(localX - (x1 + ratio * dx), localY - (y1 + ratio * dy));
-      const layer = getDgsObjectLayer(line);
+      const layer = getDgsObjectRenderedLayer(line);
       if (distance <= maxDistancePx &&
           (layer > nearestLayer || (layer === nearestLayer && distance <= nearestDistance))) {
         nearest = line;
@@ -4262,7 +4273,7 @@ function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
         ? dgsCircleContainsPointer(state, object, localX, localY)
         : (typeof object.hasPoint === 'function' && object.hasPoint(localX, localY));
     } catch (e) {}
-    const objectLayer = getDgsObjectLayer(object);
+    const objectLayer = getDgsObjectRenderedLayer(object);
     if (hit && objectLayer >= layer) {
       nearest = object;
       layer = objectLayer;
@@ -4288,7 +4299,7 @@ function findDgsIntersectionTarget(state: DgsState, evt: PointerEvent): any | nu
         ? dgsCircleContainsPointer(state, object, localX, localY)
         : (typeof object.hasPoint === 'function' && object.hasPoint(localX, localY));
     } catch (e) {}
-    const objectLayer = getDgsObjectLayer(object);
+    const objectLayer = getDgsObjectRenderedLayer(object);
     if (hit && objectLayer >= layer) {
       nearest = object;
       layer = objectLayer;
@@ -4316,7 +4327,7 @@ function findDgsRootTarget(state: DgsState, evt: PointerEvent, functionsOnly = f
     try {
       if (typeof object.evalVisProp === 'function' && object.evalVisProp('visible') === false) return;
       if (typeof object.hasPoint !== 'function' || !object.hasPoint(localX, localY)) return;
-      const objectLayer = getDgsObjectLayer(object);
+      const objectLayer = getDgsObjectRenderedLayer(object);
       if (objectLayer >= layer) {
         nearest = object;
         layer = objectLayer;
@@ -8236,13 +8247,6 @@ function dgsPointReference(point: any): any {
   };
 }
 
-const DGS_LAYER_OWNER_PROPERTIES = [
-  '__liaDgsOwner',
-  '__liaDgsSliderOwner',
-  '__liaDgsPolygonBorderOwner',
-  '__liaDgsDesignOwner'
-];
-
 function hasExplicitDgsLayer(object: any): boolean {
   try {
     return !!object && object.__liaDgsLayer != null &&
@@ -9510,7 +9514,7 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
       const screenX = Number(state.board.origin.scrCoords[1]) + Number(candidate.X()) * Number(state.board.unitX);
       const screenY = Number(state.board.origin.scrCoords[2]) - Number(candidate.Y()) * Number(state.board.unitY);
       const distance = Math.hypot(localX - screenX, localY - screenY);
-      const layer = getDgsObjectLayer(candidate);
+      const layer = getDgsObjectRenderedLayer(candidate);
       if (distance <= 18 && (layer > pointLayer || (layer === pointLayer && distance < pointDistance))) {
         point = candidate;
         pointLayer = layer;
@@ -9538,7 +9542,7 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   let nearestDistance = point ? 0 : 10;
   let nearestLayer = point ? pointLayer : -1;
   candidates.forEach((segment) => {
-    const layer = getDgsObjectLayer(segment);
+    const layer = getDgsObjectRenderedLayer(segment);
     if (isDgsCircle(segment) && dgsCircleContainsPointer(state, segment, localX, localY)) {
       if (layer > nearestLayer) {
         nearest = segment;
@@ -11028,8 +11032,10 @@ function setDgsObjectFixed(object: any, fixed: boolean): void {
 }
 
 function getDgsObjectLayer(object: any): number {
-  const stored = Number(object && object.__liaDgsLayer);
-  if (Number.isFinite(stored)) return Math.max(0, Math.min(20, Math.round(stored)));
+  const stored = getExplicitDgsLayerFromOwner(object);
+  if (stored != null) return stored;
+  const sourceLayer = Number(object && object.__liaMacroSourceLayer);
+  if (Number.isFinite(sourceLayer)) return Math.max(0, Math.min(20, Math.round(sourceLayer)));
   try {
     const value = Number(typeof object.getAttribute === 'function' ? object.getAttribute('layer') : object.visProp && object.visProp.layer);
     if (Number.isFinite(value)) return Math.max(0, Math.min(20, Math.round(value)));
@@ -11037,27 +11043,67 @@ function getDgsObjectLayer(object: any): number {
   return 5;
 }
 
+/** Rank overlapping hit targets by the layer users actually see on screen. */
+function getDgsObjectRenderedLayer(object: any): number {
+  const dgsLayer = getRenderedDgsLayerFromOwner(object);
+  if (dgsLayer != null) return dgsLayer;
+  try {
+    const macroLayer = Number(object && object.__liaMacroRenderedLayer);
+    if (Number.isFinite(macroLayer)) return Math.max(0, Math.round(macroLayer));
+  } catch (e) {}
+  try {
+    const value = Number(typeof object.getAttribute === 'function'
+      ? object.getAttribute('layer')
+      : object && object.visProp && object.visProp.layer);
+    if (Number.isFinite(value)) return Math.max(0, Math.round(value));
+  } catch (e) {}
+  return getDgsRenderedLayer(getDgsObjectLayer(object), getMacroLayerRenderRole(null, null, object));
+}
+
 function applyDgsRenderedLayer(candidate: any, layer: number, fallbackBoard?: any): void {
   try {
     if (!candidate) return;
-    if (typeof candidate.setAttribute === 'function') candidate.setAttribute({ layer });
-    if (candidate.visProp) candidate.visProp.layer = layer;
-    if (candidate.visPropCalc) candidate.visPropCalc.layer = layer;
-    const board = candidate.board || fallbackBoard;
-    if (board && board.renderer && typeof board.renderer.setLayer === 'function') {
-      board.renderer.setLayer(candidate, layer);
-    }
+    const role = getMacroLayerRenderRole(null, null, candidate);
+    // DGS keeps its public 0..20 scale, while the renderer uses the same
+    // source-major role slots as automatic macro layers.
+    const renderedLayer = getDgsRenderedLayer(layer, role);
+    candidate.__liaDgsRenderedLayer = renderedLayer;
+    applySafeRenderedLayer(candidate, renderedLayer, fallbackBoard, role);
   } catch (e) {}
 }
 
 function clearDgsObjectLayerOverride(object: any): void {
   if (!object) return;
   try { delete object.__liaDgsLayer; } catch (e) { object.__liaDgsLayer = undefined; }
+  const clearRenderedLayer = (candidate: any) => {
+    if (!candidate) return;
+    try { delete candidate.__liaDgsRenderedLayer; } catch (e) { candidate.__liaDgsRenderedLayer = undefined; }
+  };
+  clearRenderedLayer(object);
+  clearRenderedLayer(object.label);
+  clearRenderedLayer(object.arc);
+  clearRenderedLayer(object.dot);
+  clearRenderedLayer(object.__liaDgsMeasurementLabel);
+  clearRenderedLayer(object.__liaDgsAngleLabel);
+  clearRenderedLayer(object.__liaDgsCircleLabel);
+  if (isDgsSlider(object)) {
+    clearRenderedLayer(object.baseline);
+    clearRenderedLayer(object.highline);
+    clearRenderedLayer(object.point1);
+    clearRenderedLayer(object.point2);
+  }
+  if (isDgsPolygon(object) && Array.isArray(object.borders)) object.borders.forEach(clearRenderedLayer);
+  getDgsStrokeCapSegments(object).forEach(clearRenderedLayer);
+  getDgsStrokeCapPoints(object).forEach(clearRenderedLayer);
   try {
     const sourceLayer = object.__liaMacroSourceLayer;
     if (sourceLayer != null && Number.isFinite(Number(sourceLayer))) {
-      const layer = Math.max(0, Math.min(20, Math.round(Number(sourceLayer))));
-      applyDgsRenderedLayer(object, layer, object.board);
+      const role = object.__liaMacroLayerRole || getMacroLayerRenderRole(null, null, object);
+      const renderedLayer = Number(object.__liaMacroRenderedLayer);
+      const layer = Number.isFinite(renderedLayer)
+        ? Math.max(0, Math.round(renderedLayer))
+        : getMacroRenderedLayer(Number(sourceLayer), role);
+      applySafeRenderedLayer(object, layer, object.board, role);
     }
   } catch (e) {}
   // Composite parts and late macro objects are reconciled by the shared,
@@ -11464,7 +11510,7 @@ function createDgsTraceMarker(state: DgsState, point: any, x: number, y: number)
       fillColor: color,
       highlight: false,
       fixed: true,
-      frozen: true,
+      frozen: false,
       showInfobox: false,
       layer: Math.max(0, getDgsObjectLayer(point) - 1)
     });

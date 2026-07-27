@@ -14,14 +14,29 @@ registerHooks({
 
 const { hideAngleHelperArc } = await import('../src/subsystems/angle.ts');
 const { getStaticPointCreationAttributes } = await import('../src/subsystems/createPoint.ts');
+const { createHiddenPoint } = await import('../src/shared/boardObjects.ts');
+const {
+  getDgsRenderedLayer,
+  getExplicitDgsLayerFromOwner,
+  getRenderedDgsLayerFromOwner
+} = await import('../src/shared/dgsLayer.ts');
+const {
+  buildScharTermMarkup,
+  refreshScharCurveGeometry,
+  refreshScharTerm
+} = await import('../src/subsystems/schar.ts');
 const {
   computeResizeBBox,
   getResponsiveResizeAnchor,
   syncBoardRendererSize
 } = await import('../src/coord/boardHelpers.ts');
 const {
+  MACRO_RENDER_LAYER_COUNT,
   applyMacroCodeOrderLayers,
+  ensureBoardRendererLayerCapacity,
   ensureMacroLayerCapacity,
+  getMacroHtmlZIndex,
+  getMacroRenderedLayer,
   scheduleMacroCodeOrderLayers
 } = await import('../src/shared/macroLayer.ts');
 
@@ -133,6 +148,173 @@ test('the internal JSXGraph angle helper arc always stays hidden and unfilled', 
   assert.equal(arc.hideCalls, 1);
 });
 
+test('DGS composite children inherit an explicit layer from their owner', () => {
+  const owner = { __liaDgsLayer: 20, __liaDgsRenderedLayer: 65 };
+  const border = { __liaMacroSourceLayer: 1, __liaDgsPolygonBorderOwner: owner };
+  const label = { __liaDgsOwner: border };
+
+  assert.equal(getExplicitDgsLayerFromOwner(owner), 20);
+  assert.equal(getExplicitDgsLayerFromOwner(border), 20);
+  assert.equal(getExplicitDgsLayerFromOwner(label), 20);
+  assert.equal(getRenderedDgsLayerFromOwner(label), 65);
+  delete owner.__liaDgsLayer;
+  assert.equal(getExplicitDgsLayerFromOwner(border), null);
+  owner.__liaDgsRenderedLayer = null;
+  assert.equal(getRenderedDgsLayerFromOwner(label), null);
+});
+
+test('DGS ranks use the same source-major renderer slots as automatic macro ranks', () => {
+  assert.equal(getDgsRenderedLayer(0, 'body'), getMacroRenderedLayer(0, 'body'));
+  assert.equal(getDgsRenderedLayer(20, 'body'), getMacroRenderedLayer(20, 'body'));
+  assert.equal(getDgsRenderedLayer(20, 'handle'), getMacroRenderedLayer(20, 'handle'));
+  assert.equal(getDgsRenderedLayer(20, 'annotation'), getMacroRenderedLayer(20, 'annotation'));
+});
+
+test('source order outranks all renderer roles of an earlier macro', () => {
+  const roles = ['body', 'hit', 'handle', 'annotation'];
+  for (let sourceLayer = 0; sourceLayer < 20; sourceLayer += 1) {
+    const currentMaximum = Math.max(...roles.map((role) =>
+      getMacroRenderedLayer(sourceLayer, role)
+    ));
+    const nextMinimum = Math.min(...roles.map((role) =>
+      getMacroRenderedLayer(sourceLayer + 1, role)
+    ));
+    assert.ok(
+      currentMaximum < nextMinimum,
+      `source layer ${sourceLayer + 1} must be completely above ${sourceLayer}`
+    );
+  }
+});
+
+test('Schar drag frames recalculate both curves before repainting the board', () => {
+  const calls = [];
+  const graph = {
+    needsUpdate: false,
+    updateCurve() { calls.push('graph'); }
+  };
+  const dragGraph = {
+    needsUpdate: false,
+    updateCurve() { calls.push('dragGraph'); }
+  };
+  const graphLabel = { needsUpdate: false };
+  const board = { update() { calls.push('board'); } };
+
+  refreshScharCurveGeometry({ graph, dragGraph, graphLabel, board });
+
+  assert.deepEqual(calls, ['graph', 'dragGraph', 'board']);
+  assert.equal(graph.needsUpdate, true);
+  assert.equal(dragGraph.needsUpdate, true);
+  assert.equal(graphLabel.needsUpdate, true);
+});
+
+test('Schar drag values update the visible term before pointerup', async () => {
+  const entry = {
+    boardId: 'board-a',
+    board: {},
+    cfg: {
+      showTerm: true,
+      showName: true,
+      name: 'f',
+      variableName: 'x'
+    },
+    values: { m: 1, n: 0 },
+    linearMN: { m: 'm', n: 'n' },
+    polyCoeffDrag: null,
+    termVisible: true,
+    panelMinimized: false,
+    termEl: { innerHTML: '', textContent: '', style: {} },
+    termToggleWrapEl: { style: {} },
+    termToggleEl: { checked: false },
+    termMarkup: '',
+    pendingTermMarkup: null,
+    termTypesetRunning: false
+  };
+
+  assert.match(buildScharTermMarkup(entry), /1 \\cdot x/);
+  refreshScharTerm(entry);
+  assert.match(entry.termEl.innerHTML, /1 \\cdot x/);
+
+  entry.values.n = 2;
+  refreshScharTerm(entry);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.match(entry.termEl.innerHTML, /1 \\cdot x \+ 2/);
+  assert.equal(entry.termToggleEl.checked, true);
+});
+
+test('Schar term updates and hiding serialize MathJax DOM mutations', async () => {
+  const previousWindow = globalThis.window;
+  const typesets = [];
+  const clears = [];
+  let html = '';
+  const termEl = {
+    style: {},
+    get innerHTML() { return html; },
+    set innerHTML(value) { html = String(value); },
+    get textContent() { return html; },
+    set textContent(value) { html = String(value); }
+  };
+  globalThis.window = {
+    MathJax: {
+      typesetClear(nodes) { clears.push([...nodes]); },
+      typesetPromise(nodes) {
+        let resolve;
+        const promise = new Promise((done) => { resolve = done; });
+        typesets.push({ markup: nodes[0].innerHTML, resolve });
+        return promise;
+      }
+    }
+  };
+  const entry = {
+    boardId: 'board-a', board: {},
+    cfg: { showTerm: true, showName: true, name: 'f', variableName: 'x' },
+    values: { m: 1, n: 0 }, linearMN: { m: 'm', n: 'n' }, polyCoeffDrag: null,
+    termVisible: true, panelMinimized: false, termEl,
+    termToggleWrapEl: { style: {} }, termToggleEl: { checked: false },
+    termMarkup: '', pendingTermMarkup: null, termTypesetRunning: false
+  };
+  const drainMicrotasks = async () => {
+    for (let index = 0; index < 6; index += 1) await Promise.resolve();
+  };
+
+  try {
+    refreshScharTerm(entry);
+    entry.values.n = 1;
+    refreshScharTerm(entry);
+    entry.values.n = 2;
+    refreshScharTerm(entry);
+    assert.equal(typesets.length, 1);
+    assert.doesNotMatch(termEl.innerHTML, /\+ 2/);
+
+    typesets[0].resolve();
+    await drainMicrotasks();
+    assert.equal(typesets.length, 2);
+    assert.match(termEl.innerHTML, /\+ 2/);
+    assert.equal(clears.length, 2);
+
+    typesets[1].resolve();
+    await drainMicrotasks();
+    entry.values.n = 3;
+    refreshScharTerm(entry);
+    assert.equal(typesets.length, 3);
+    entry.termVisible = false;
+    refreshScharTerm(entry);
+    assert.equal(entry.termEl.style.display, 'none');
+    assert.match(termEl.innerHTML, /\+ 3/);
+
+    typesets[2].resolve();
+    await drainMicrotasks();
+    assert.equal(termEl.innerHTML, '');
+    assert.equal(entry.termMarkup, '');
+    assert.equal(entry.termTypesetRunning, false);
+    assert.equal(clears.length, 4);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
 test('a hidden static point has zero opacity in its first creation attributes', () => {
   const attributes = getStaticPointCreationAttributes({
     color: '#ff00ff',
@@ -176,6 +358,27 @@ test('ordinary interactive points keep their fully visible default creation styl
   assert.equal(attributes.label.fillOpacity, 1);
 });
 
+test('coordinate helper points are fixed for dragging but follow board pan and zoom', () => {
+  let creation = null;
+  const point = {};
+  const board = {
+    create(type, parents, attributes) {
+      creation = { type, parents, attributes };
+      return point;
+    }
+  };
+
+  const result = createHiddenPoint(board, { x: 2, y: -3 });
+
+  assert.equal(result, point);
+  assert.equal(creation.type, 'point');
+  assert.deepEqual(creation.parents, [2, -3]);
+  assert.equal(creation.attributes.fixed, true);
+  assert.equal(creation.attributes.frozen, false);
+  assert.equal(creation.attributes.visible, false);
+  assert.equal(point.__liaDgsHelperPoint, true);
+});
+
 function marker(id, spec, dataset = {}) {
   return {
     id,
@@ -197,8 +400,18 @@ function fakeRoot(nodes) {
 
 function fakeBoard() {
   const layerCalls = [];
+  const containerObj = {
+    namespaceURI: 'http://www.w3.org/1999/xhtml',
+    children: [],
+    appendChild(node) {
+      node.parentNode = this;
+      if (!this.children.includes(node)) this.children.push(node);
+      return node;
+    }
+  };
   return {
     layerCalls,
+    containerObj,
     fullUpdateCalls: 0,
     updateCalls: 0,
     renderer: {
@@ -231,6 +444,32 @@ function fakeObject(board, initial = {}) {
     }
   };
   return Object.assign(object, initial);
+}
+
+function fakeHtmlText(board) {
+  const rendNode = {
+    namespaceURI: 'http://www.w3.org/1999/xhtml',
+    parentNode: board.containerObj,
+    style: {}
+  };
+  return fakeObject(board, {
+    elType: 'text',
+    rendNode,
+    visProp: { display: 'html' },
+    visPropCalc: { display: 'html' }
+  });
+}
+
+function attachFakeSvgLayers(board, count = MACRO_RENDER_LAYER_COUNT) {
+  const layers = Array.from({ length: count }, () => ({ namespaceURI: 'http://www.w3.org/2000/svg' }));
+  board.renderer.layer = layers;
+  board.renderer.setLayer = function(object, layer) {
+    this.layer[layer].appendChild
+      ? this.layer[layer].appendChild(object.rendNode)
+      : (object.rendNode.parentNode = this.layer[layer]);
+    board.layerCalls.push({ object, layer });
+  };
+  return layers;
 }
 
 function distanceEntry(uid, boardId, board, overrides = {}) {
@@ -287,15 +526,35 @@ function scharEntry(uid, boardId, board, overrides = {}) {
   };
 }
 
-function expectLayer(object, expected) {
+function expectLayer(object, expected, role = 'body') {
+  const rendered = getMacroRenderedLayer(expected, role);
   assert.equal(object.__liaMacroSourceLayer, expected);
+  assert.equal(object.__liaMacroRenderedLayer, rendered);
+  assert.equal(object.__liaMacroLayerRole, role);
   assert.equal(object.__liaDgsLayer, undefined);
-  assert.equal(object.attributes.layer, expected);
-  assert.equal(object.visProp.layer, expected);
-  assert.equal(object.visPropCalc.layer, expected);
+  assert.equal(object.attributes.layer, undefined);
+  assert.equal(object.visProp.layer, rendered);
+  assert.equal(object.visPropCalc.layer, rendered);
   assert.ok(
-    object.board.layerCalls.some((call) => call.object === object && call.layer === expected),
+    object.board.layerCalls.some((call) => call.object === object && call.layer === rendered),
     'renderer.setLayer should receive the assigned layer'
+  );
+}
+
+function expectHtmlLayer(object, expected) {
+  const rendered = getMacroRenderedLayer(expected, 'annotation');
+  assert.equal(object.__liaMacroSourceLayer, expected);
+  assert.equal(object.__liaMacroRenderedLayer, rendered);
+  assert.equal(object.__liaMacroLayerRole, 'annotation');
+  assert.equal(object.attributes.layer, undefined);
+  assert.equal(object.visProp.layer, undefined);
+  assert.equal(object.visPropCalc.layer, undefined);
+  assert.equal(object.rendNode.style.zIndex, String(getMacroHtmlZIndex(expected)));
+  assert.equal(object.rendNode.parentNode, object.board.containerObj);
+  assert.equal(
+    object.board.layerCalls.some((call) => call.object === object),
+    false,
+    'HTML text must never be moved into an SVG renderer layer'
   );
 }
 
@@ -352,7 +611,9 @@ test('mixed macro types use DOM order, reversed UIDs, and board-local counters',
 
 test('a Schar macro resolves its fourth-field board id and reserves the first board-local layer', () => {
   const board = fakeBoard();
-  const schar = scharEntry('family', 'board-a', board);
+  const dragGraph = fakeObject(board);
+  const graphLabel = fakeHtmlText(board);
+  const schar = scharEntry('family', 'board-a', board, { dragGraph, graphLabel });
   const distance = distanceEntry('after-family', 'board-a', board);
   const registries = {
     __boards: { 'board-a': board },
@@ -366,20 +627,22 @@ test('a Schar macro resolves its fourth-field board id and reserves the first bo
   ]), registries);
 
   expectLayer(schar.graph, 0);
+  expectLayer(dragGraph, 0, 'hit');
+  expectHtmlLayer(graphLabel, 0);
   expectLayer(distance.segment, 1);
 });
 
 test('graph quiz macros reserve source layers and layer their late JSXGraph objects', () => {
   const board = fakeBoard();
-  const point = fakeObject(board);
-  point.label = fakeObject(board);
+  const point = fakeObject(board, { elType: 'point' });
+  point.label = fakeHtmlText(board);
   const graph = fakeObject(board);
-  const anchor = fakeObject(board);
-  const text = fakeObject(board);
-  const multiPoint = fakeObject(board);
+  const anchor = fakeObject(board, { elType: 'point' });
+  const text = fakeHtmlText(board);
+  const multiPoint = fakeObject(board, { elType: 'point' });
   const multiGraph = fakeObject(board);
-  const multiAnchor = fakeObject(board);
-  const multiText = fakeObject(board);
+  const multiAnchor = fakeObject(board, { elType: 'point' });
+  const multiText = fakeHtmlText(board);
   const distance = distanceEntry('after-quiz', 'board-a', board);
   const graphKey = 'A||f||x';
   const multiGraphKey = 'B||1||g||x+1';
@@ -407,9 +670,154 @@ test('graph quiz macros reserve source layers and layer their late JSXGraph obje
     marker('distance-spec-after-quiz', 'board-a;[[-2;0];[2;0]]')
   ]), registries);
 
-  [point, point.label, graph, anchor, text].forEach((object) => expectLayer(object, 0));
-  [multiPoint, multiGraph, multiAnchor, multiText].forEach((object) => expectLayer(object, 1));
+  expectLayer(point, 0, 'handle');
+  expectHtmlLayer(point.label, 0);
+  expectLayer(graph, 0);
+  assert.equal(anchor.__liaMacroSourceLayer, undefined);
+  expectHtmlLayer(text, 0);
+  expectLayer(multiPoint, 1, 'handle');
+  expectLayer(multiGraph, 1);
+  assert.equal(multiAnchor.__liaMacroSourceLayer, undefined);
+  expectHtmlLayer(multiText, 1);
   expectLayer(distance.segment, 2);
+});
+
+test('source-local handles and HTML measurements do not override later macro geometry', () => {
+  const board = fakeBoard();
+  const point = fakeObject(board, {
+    elType: 'point',
+    __liaDgsMacroKey: 'macro:point:vertex'
+  });
+  point.label = fakeHtmlText(board);
+  point.label.rendNode.parentNode = { namespaceURI: 'http://www.w3.org/2000/svg' };
+
+  const polygon = fakeObject(board, { elType: 'polygon' });
+  const areaLabel = fakeHtmlText(board);
+  polygon.label = areaLabel;
+  const angle = fakeObject(board, { elType: 'angle' });
+  const hiddenAngleHelper = fakeObject(board, { elType: 'arc' });
+  const angleDot = fakeObject(board, { elType: 'point' });
+  angle.arc = hiddenAngleHelper;
+  angle.dot = angleDot;
+  const angleLabel = fakeHtmlText(board);
+  angle.label = angleLabel;
+  const coordText = fakeHtmlText(board);
+
+  applyMacroCodeOrderLayers(fakeRoot([
+    marker('point-spec-vertex', 'board-a;A;[0;0]'),
+    marker('area-spec-triangle', 'board-a;[A;B;C]'),
+    marker('angle-spec-alpha', 'board-a;[A;B;C]'),
+    marker('coord-text-spec-caption', 'board-a;[0;0];Text')
+  ]), {
+    __boards: { 'board-a': board },
+    __points: { 'board-a': { A: point } },
+    __areaEntries: {
+      'area-triangle': { uid: 'triangle', boardId: 'board-a', board, polygon, ownedPoints: [], label: areaLabel }
+    },
+    __angleEntries: {
+      'angle-alpha': { uid: 'alpha', boardId: 'board-a', board, angle, label: angleLabel }
+    },
+    __coordTextEntries: {
+      'coord-text-caption': { uid: 'caption', boardId: 'board-a', board, text: coordText }
+    }
+  });
+
+  expectLayer(point, 0, 'handle');
+  expectHtmlLayer(point.label, 0);
+  expectLayer(polygon, 1);
+  expectHtmlLayer(areaLabel, 1);
+  expectLayer(angle, 2);
+  expectLayer(angleDot, 2, 'body');
+  assert.equal(hiddenAngleHelper.__liaMacroSourceLayer, undefined);
+  expectHtmlLayer(angleLabel, 2);
+  expectHtmlLayer(coordText, 3);
+  assert.ok(point.__liaMacroRenderedLayer < polygon.__liaMacroRenderedLayer);
+});
+
+test('HTML text layering is idempotent and never triggers a second board update', () => {
+  const board = fakeBoard();
+  const text = fakeHtmlText(board);
+  const root = fakeRoot([marker('coord-text-spec-stable', 'board-a;[0;0];Text')]);
+  const registries = {
+    __boards: { 'board-a': board },
+    __coordTextEntries: {
+      'coord-text-stable': { uid: 'stable', boardId: 'board-a', board, text }
+    }
+  };
+
+  const first = applyMacroCodeOrderLayers(root, registries);
+  const second = applyMacroCodeOrderLayers(root, registries);
+
+  assert.equal(first.appliedObjects, 1);
+  assert.equal(first.pendingObjects, 0);
+  assert.equal(second.appliedObjects, 0);
+  assert.equal(second.pendingObjects, 0);
+  assert.equal(board.fullUpdateCalls, 1);
+  expectHtmlLayer(text, 0);
+});
+
+test('internal SVG text uses the annotation renderer band', () => {
+  const board = fakeBoard();
+  const layers = attachFakeSvgLayers(board);
+  const text = fakeObject(board, {
+    elType: 'text',
+    rendNode: {
+      namespaceURI: 'http://www.w3.org/2000/svg',
+      parentNode: layers[9]
+    },
+    visProp: { display: 'internal', layer: 9 },
+    visPropCalc: { display: 'internal', layer: 9 }
+  });
+
+  const result = applyMacroCodeOrderLayers(
+    fakeRoot([marker('coord-text-spec-internal', 'board-a;[0;0];Text')]),
+    {
+      __boards: { 'board-a': board },
+      __coordTextEntries: {
+        'coord-text-internal': { uid: 'internal', boardId: 'board-a', board, text }
+      }
+    }
+  );
+
+  assert.equal(result.pendingObjects, 0);
+  expectLayer(text, 0, 'annotation');
+  assert.equal(text.rendNode.parentNode, layers[getMacroRenderedLayer(0, 'annotation')]);
+});
+
+test('a failed SVG layer move stays pending and succeeds on the next pass', () => {
+  const board = fakeBoard();
+  const layers = attachFakeSvgLayers(board);
+  const distance = distanceEntry('retry', 'board-a', board);
+  distance.segment.rendNode = {
+    namespaceURI: 'http://www.w3.org/2000/svg',
+    parentNode: layers[7]
+  };
+  let shouldFail = true;
+  let attempts = 0;
+  board.renderer.setLayer = function(object, layer) {
+    attempts += 1;
+    if (shouldFail) throw new Error('renderer not ready');
+    object.rendNode.parentNode = this.layer[layer];
+    board.layerCalls.push({ object, layer });
+  };
+  const root = fakeRoot([marker('distance-spec-retry', 'board-a;[[0;0];[1;1]]')]);
+  const registries = {
+    __boards: { 'board-a': board },
+    __distanceEntries: { [distance.key]: distance.entry }
+  };
+
+  const first = applyMacroCodeOrderLayers(root, registries);
+  assert.equal(first.pendingObjects, 1);
+  assert.equal(first.appliedObjects, 0);
+  assert.equal(distance.segment.visProp.layer, undefined);
+  assert.equal(distance.segment.__liaMacroLayerPending, true);
+
+  shouldFail = false;
+  const second = applyMacroCodeOrderLayers(root, registries);
+  assert.equal(second.pendingObjects, 0);
+  assert.equal(second.appliedObjects, 1);
+  assert.equal(attempts, 2);
+  expectLayer(distance.segment, 0);
 });
 
 test('a later macro keeps its DOM-derived layer when it is created before an earlier dependency', () => {
@@ -435,16 +843,16 @@ test('a later macro keeps its DOM-derived layer when it is created before an ear
   expectLayer(second.segment, 1);
 });
 
-test('all objects belonging to one composite distance macro share its owner layer', () => {
+test('a composite macro layers visible parts but leaves internal points untouched', () => {
   const board = fakeBoard();
   const first = distanceEntry('plain', 'board-a', board);
   const segmentA = fakeObject(board);
   const segmentB = fakeObject(board);
   const capSegment = fakeObject(board);
-  const capPointA = fakeObject(board);
-  const capPointB = fakeObject(board);
-  const ownedPoint = fakeObject(board);
-  const label = fakeObject(board);
+  const capPointA = fakeObject(board, { elType: 'point' });
+  const capPointB = fakeObject(board, { elType: 'point' });
+  const ownedPoint = fakeObject(board, { elType: 'point' });
+  const label = fakeHtmlText(board);
   segmentA.label = label;
   segmentA.__liaDgsStyleCapSegments = [capSegment];
   segmentA.__liaDgsStyleCapPoints = [capPointA, capPointB];
@@ -468,8 +876,12 @@ test('all objects belonging to one composite distance macro share its owner laye
     marker('distance-spec-composite', 'board-a;[[-2;1];[0;2];[2;1]]')
   ]), registries);
 
-  [segmentA, segmentB, capSegment, capPointA, capPointB, ownedPoint, label]
-    .forEach((object) => expectLayer(object, 1));
+  [segmentA, segmentB, capSegment].forEach((object) => expectLayer(object, 1));
+  [capPointA, capPointB, ownedPoint].forEach((object) => {
+    assert.equal(object.__liaMacroSourceLayer, undefined);
+    assert.equal(object.visProp.layer, undefined);
+  });
+  expectHtmlLayer(label, 1);
 });
 
 test('a finite DGS layer override is preserved', () => {
@@ -567,13 +979,60 @@ test('the scheduler performs a settle-frame pass after a macro replaces its regi
   expectLayer(newDistance.segment, 0);
 });
 
-test('JSXGraph is configured with enough renderer groups for layer 20', () => {
+test('JSXGraph is configured with enough renderer groups for all role bands', () => {
   const root = { JXG: { Options: { layer: { numlayers: 20 } } } };
-  assert.equal(ensureMacroLayerCapacity(root), 21);
-  assert.equal(root.JXG.Options.layer.numlayers, 21);
+  assert.equal(ensureMacroLayerCapacity(root), MACRO_RENDER_LAYER_COUNT);
+  assert.equal(root.JXG.Options.layer.numlayers, MACRO_RENDER_LAYER_COUNT);
 
-  root.JXG.Options.layer.numlayers = 30;
-  assert.equal(ensureMacroLayerCapacity(root), 30);
+  root.JXG.Options.layer.numlayers = MACRO_RENDER_LAYER_COUNT + 10;
+  assert.equal(ensureMacroLayerCapacity(root), MACRO_RENDER_LAYER_COUNT + 10);
+});
+
+test('existing SVG boards receive missing renderer groups in source order', () => {
+  const children = [];
+  const svgRoot = {
+    ownerDocument: null,
+    appendChild(node) {
+      node.parentNode = this;
+      children.push(node);
+      return node;
+    },
+    insertBefore(node, before) {
+      node.parentNode = this;
+      const index = children.indexOf(before);
+      children.splice(index < 0 ? children.length : index, 0, node);
+      return node;
+    }
+  };
+  const documentRoot = {
+    createElementNS(namespaceURI, tagName) {
+      return { namespaceURI, tagName, parentNode: null };
+    }
+  };
+  svgRoot.ownerDocument = documentRoot;
+  const layers = [];
+  for (let index = 0; index < 20; index += 1) {
+    const group = documentRoot.createElementNS('http://www.w3.org/2000/svg', 'g');
+    layers.push(group);
+    svgRoot.appendChild(group);
+  }
+  const foreignObjLayer = documentRoot.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+  svgRoot.appendChild(foreignObjLayer);
+  const board = {
+    renderer: {
+      type: 'svg',
+      layer: layers,
+      svgRoot,
+      foreignObjLayer,
+      svgNamespace: 'http://www.w3.org/2000/svg',
+      container: { ownerDocument: documentRoot }
+    }
+  };
+
+  assert.equal(ensureBoardRendererLayerCapacity(board), MACRO_RENDER_LAYER_COUNT);
+  assert.equal(layers.length, MACRO_RENDER_LAYER_COUNT);
+  assert.ok(layers.every((group) => group.parentNode === svgRoot));
+  assert.equal(children.at(-1), foreignObjLayer);
 });
 
 test('objects from a stale board instance are not relayered', () => {

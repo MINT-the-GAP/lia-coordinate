@@ -47,6 +47,9 @@ type ScharEntry = {
   dragShiftX: number;
   dragShiftY: number;
   polyBaseByDegree: Record<number, number> | null;
+  termMarkup: string;
+  pendingTermMarkup: string | null;
+  termTypesetRunning: boolean;
 };
 
 const RESERVED = new Set([
@@ -504,6 +507,12 @@ function typesetMathNode(node: HTMLElement): Promise<void> {
   } catch (e) {}
 
   return Promise.resolve();
+}
+
+function clearTypesetMathNode(node: HTMLElement): void {
+  const MJ = getMathJaxEngine();
+  if (!MJ || typeof MJ.typesetClear !== 'function') return;
+  try { MJ.typesetClear([node]); } catch (e) {}
 }
 
 function findMatchingParen(src: string, openIdx: number): number {
@@ -1189,14 +1198,95 @@ function syncSliderUiFromValues(entry: ScharEntry): void {
   });
 }
 
-function refreshEntry(entry: ScharEntry): void {
-  const scheduleRelayout = () => {
-    relayoutPanelsForBoard(entry.boardId, entry.board);
-    try {
-      window.requestAnimationFrame(() => relayoutPanelsForBoard(entry.boardId, entry.board));
-    } catch (e) {}
-  };
+function scheduleScharRelayout(entry: ScharEntry): void {
+  try { relayoutPanelsForBoard(entry.boardId, entry.board); } catch (e) {}
+  try {
+    window.requestAnimationFrame(() => relayoutPanelsForBoard(entry.boardId, entry.board));
+  } catch (e) {}
+}
 
+export function buildScharTermMarkup(entry: ScharEntry): string {
+  const texLhs = entry.cfg.showName
+    ? `${entry.cfg.name}(${entry.cfg.variableName}) = `
+    : '';
+  let texRhs: string;
+
+  if (entry.linearMN) {
+    const mVal = entry.values[entry.linearMN.m];
+    const nVal = entry.values[entry.linearMN.n];
+    const xVar = entry.cfg.variableName;
+    const mAbs = Math.abs(mVal);
+    const nAbs = Math.abs(nVal);
+    const mPart = (mVal < -1e-9 ? '-' : '') + fmtNum(mAbs) + ' \\cdot ' + xVar;
+    if (Math.abs(nVal) < 1e-9) texRhs = mPart;
+    else if (nVal > 0) texRhs = mPart + ' + ' + fmtNum(nAbs);
+    else texRhs = mPart + ' - ' + fmtNum(nAbs);
+  } else {
+    texRhs = getExpandedTexForEntry(entry);
+  }
+
+  if (entry.polyCoeffDrag) {
+    const shiftedTex = buildShiftedPolyTex(entry) || texRhs;
+    const expandedTex = buildExpandedShiftedPolyTex(entry) || texRhs;
+    return '<div class="lia-schar-term-line">\\(' + texLhs + shiftedTex + '\\)</div>' +
+      '<br>' +
+      '<div class="lia-schar-term-line">\\(' + texLhs + expandedTex + '\\)</div>';
+  }
+  return '<div class="lia-schar-term-line">\\(' + texLhs + texRhs + '\\)</div>';
+}
+
+function flushScharTermMarkup(entry: ScharEntry): void {
+  if (entry.termTypesetRunning || entry.pendingTermMarkup == null) return;
+  const markup = entry.pendingTermMarkup;
+  entry.pendingTermMarkup = null;
+  if (markup === entry.termMarkup) return;
+  // MathJax keeps a registry of MathItems. Clear the old item only after the
+  // preceding asynchronous typeset has finished, then replace its DOM.
+  clearTypesetMathNode(entry.termEl);
+  entry.termMarkup = markup;
+  if (markup) entry.termEl.innerHTML = markup;
+  else entry.termEl.textContent = '';
+  if (!markup) {
+    scheduleScharRelayout(entry);
+    flushScharTermMarkup(entry);
+    return;
+  }
+  entry.termTypesetRunning = true;
+  typesetMathNode(entry.termEl).then(() => {
+    entry.termTypesetRunning = false;
+    scheduleScharRelayout(entry);
+    flushScharTermMarkup(entry);
+  });
+}
+
+/** Update the visible formula while serializing potentially slow MathJax work. */
+export function refreshScharTerm(entry: ScharEntry): void {
+  const shouldRender = !!(entry.cfg.showTerm && entry.termVisible);
+  if (shouldRender) {
+    const markup = buildScharTermMarkup(entry);
+    entry.pendingTermMarkup = markup === entry.termMarkup ? null : markup;
+    flushScharTermMarkup(entry);
+  } else {
+    // Empty markup is a real queue value: it must wait for an in-flight
+    // MathJax typeset before clearing the same DOM node.
+    entry.pendingTermMarkup = entry.termMarkup ? '' : null;
+    flushScharTermMarkup(entry);
+  }
+
+  entry.termEl.style.fontSize = '20px';
+  entry.termEl.style.lineHeight = '1.2';
+  entry.termEl.style.textAlign = 'left';
+  entry.termEl.style.whiteSpace = 'nowrap';
+  entry.termEl.style.wordBreak = 'normal';
+  entry.termEl.style.overflowWrap = 'normal';
+  entry.termEl.style.overflowX = 'auto';
+  entry.termEl.style.overflowY = 'hidden';
+  entry.termEl.style.display = (shouldRender && !entry.panelMinimized) ? 'block' : 'none';
+  entry.termToggleWrapEl.style.display = (entry.cfg.showTerm && !entry.panelMinimized) ? 'inline-flex' : 'none';
+  entry.termToggleEl.checked = !!entry.termVisible;
+}
+
+function refreshEntry(entry: ScharEntry): void {
   if (typeof entry.stopDrag === 'function') {
     try { entry.stopDrag(); } catch (e) {}
     entry.stopDrag = null;
@@ -1302,62 +1392,21 @@ function refreshEntry(entry: ScharEntry): void {
   syncSliderUiFromValues(entry);
 
   entry.minBtnEl.style.color = entry.cfg.color;
-
-  if (entry.cfg.showTerm && entry.termVisible) {
-    const texLhs = entry.cfg.showName
-      ? `${entry.cfg.name}(${entry.cfg.variableName}) = `
-      : '';
-    let texRhs: string;
-
-    if (entry.linearMN) {
-      // Linear family: m·x + n with cdot; suppress n when 0
-      const mVal = entry.values[entry.linearMN.m];
-      const nVal = entry.values[entry.linearMN.n];
-      const xVar = entry.cfg.variableName;
-      const mAbs = Math.abs(mVal);
-      const nAbs = Math.abs(nVal);
-      const mIsNeg = mVal < -1e-9;
-      let mPart: string;
-      mPart = (mIsNeg ? '-' : '') + fmtNum(mAbs) + ' \\cdot ' + xVar;
-      if (Math.abs(nVal) < 1e-9) {
-        texRhs = mPart;
-      } else if (nVal > 0) {
-        texRhs = mPart + ' + ' + fmtNum(nAbs);
-      } else {
-        texRhs = mPart + ' - ' + fmtNum(nAbs);
-      }
-    } else {
-      texRhs = getExpandedTexForEntry(entry);
-    }
-
-    if (entry.polyCoeffDrag) {
-      const shiftedTex = buildShiftedPolyTex(entry) || texRhs;
-      const expandedTex = buildExpandedShiftedPolyTex(entry) || texRhs;
-      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + shiftedTex + '\\)</div>' +
-        '<br>' +
-        '<div class="lia-schar-term-line">\\(' + texLhs + expandedTex + '\\)</div>';
-    } else {
-      entry.termEl.innerHTML = '<div class="lia-schar-term-line">\\(' + texLhs + texRhs + '\\)</div>';
-    }
-    entry.termEl.style.fontSize = '20px';
-    entry.termEl.style.lineHeight = '1.2';
-    entry.termEl.style.textAlign = 'left';
-    entry.termEl.style.whiteSpace = 'nowrap';
-    entry.termEl.style.wordBreak = 'normal';
-    entry.termEl.style.overflowWrap = 'normal';
-    entry.termEl.style.overflowX = 'auto';
-    entry.termEl.style.overflowY = 'hidden';
-    typesetMathNode(entry.termEl).then(scheduleRelayout);
-  } else {
-    entry.termEl.textContent = '';
-  }
-
-  entry.termEl.style.display = (entry.cfg.showTerm && entry.termVisible && !entry.panelMinimized) ? 'block' : 'none';
-  entry.termToggleWrapEl.style.display = (entry.cfg.showTerm && !entry.panelMinimized) ? 'inline-flex' : 'none';
-  entry.termToggleEl.checked = !!entry.termVisible;
+  refreshScharTerm(entry);
 
   try { entry.board.update(); } catch (e) {}
-  scheduleRelayout();
+  scheduleScharRelayout(entry);
+}
+
+/** Recalculate both Schar curves before painting a drag frame. */
+export function refreshScharCurveGeometry(entry: any): void {
+  [entry && entry.graph, entry && entry.dragGraph].forEach((curve) => {
+    if (!curve) return;
+    try { curve.needsUpdate = true; } catch (e) {}
+    try { if (typeof curve.updateCurve === 'function') curve.updateCurve(); } catch (e) {}
+  });
+  try { if (entry && entry.graphLabel) entry.graphLabel.needsUpdate = true; } catch (e) {}
+  try { if (entry && entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
 }
 
 function bindGraphDrag(entry: ScharEntry): void {
@@ -1448,7 +1497,8 @@ function bindGraphDrag(entry: ScharEntry): void {
         moveRaf = window.requestAnimationFrame(() => {
           moveRaf = 0;
           syncSliderUiFromValues(entry);
-          try { entry.board.update(); } catch (e) {}
+          refreshScharCurveGeometry(entry);
+          refreshScharTerm(entry);
         });
       }
     };
@@ -2009,7 +2059,10 @@ export function init(): void {
       slidersByParam: {},
       dragShiftX: 0,
       dragShiftY: 0,
-      polyBaseByDegree: null
+      polyBaseByDegree: null,
+      termMarkup: '',
+      pendingTermMarkup: null,
+      termTypesetRunning: false
     };
 
     entry.linearMN = detectLinearMN(cfg, params);

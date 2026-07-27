@@ -23,14 +23,17 @@ export function getLivePoint(board: any, boardId: string, pointName: string): an
   return point;
 }
 
-/** Create an invisible, fixed helper point at the given coordinate. */
+/**
+ * Create an invisible helper point that cannot be dragged directly but stays
+ * attached to its user coordinate when the board is panned or zoomed.
+ */
 export function createHiddenPoint(board: any, coordinate: CoordinatePair): any {
   const point = board.create('point', [coordinate.x, coordinate.y], {
     name: '',
     withLabel: false,
     visible: false,
     fixed: true,
-    frozen: true,
+    frozen: false,
     highlight: false,
     showInfobox: false,
     size: 0

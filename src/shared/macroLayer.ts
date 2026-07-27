@@ -1,13 +1,65 @@
 // Source-order layering for drawable, non-DGS coordinate macros.
 //
 // A macro marker reserves one board-local layer in document order. All JSXGraph
-// objects owned by that marker share the layer, while referenced source objects
-// (for example the endpoints of a named segment) remain untouched.
+// objects owned by that marker retain the source rank, while renderer roles
+// order labels and interaction handles inside that same rank. Referenced source
+// objects (for example the endpoints of a named segment) stay untouched.
 
 import { splitTopLevel, unquote } from './parser';
 
 export const MACRO_SOURCE_LAYER_MIN = 0;
 export const MACRO_SOURCE_LAYER_MAX = 20;
+
+export type MacroLayerRenderRole = 'body' | 'hit' | 'handle' | 'annotation';
+
+// JSXGraph reserves its low layers for background, grid and axes. Each source
+// rank therefore owns four adjacent renderer slots. Source order stays the
+// primary z-order; roles only order parts of the same macro.
+export const MACRO_BODY_LAYER_BASE = 3;
+export const MACRO_HIT_LAYER_BASE = MACRO_BODY_LAYER_BASE + 1;
+export const MACRO_HANDLE_LAYER_BASE = MACRO_BODY_LAYER_BASE + 2;
+export const MACRO_ANNOTATION_LAYER_BASE = MACRO_BODY_LAYER_BASE + 3;
+export const MACRO_SOURCE_LAYER_STRIDE = 4;
+export const MACRO_RENDER_LAYER_COUNT = MACRO_BODY_LAYER_BASE +
+  (MACRO_SOURCE_LAYER_MAX + 1) * MACRO_SOURCE_LAYER_STRIDE;
+export const MACRO_HTML_Z_INDEX_BASE = 10;
+
+function clampMacroSourceLayer(layerValue: number): number {
+  return Math.max(
+    MACRO_SOURCE_LAYER_MIN,
+    Math.min(MACRO_SOURCE_LAYER_MAX, Math.round(Number(layerValue) || 0))
+  );
+}
+
+export function getMacroRenderedLayer(
+  layerValue: number,
+  role: MacroLayerRenderRole = 'body'
+): number {
+  const sourceLayer = clampMacroSourceLayer(layerValue);
+  const sourceOffset = sourceLayer * MACRO_SOURCE_LAYER_STRIDE;
+  if (role === 'annotation') return MACRO_ANNOTATION_LAYER_BASE + sourceOffset;
+  if (role === 'handle') return MACRO_HANDLE_LAYER_BASE + sourceOffset;
+  if (role === 'hit') return MACRO_HIT_LAYER_BASE + sourceOffset;
+  return MACRO_BODY_LAYER_BASE + sourceOffset;
+}
+
+export function getMacroHtmlZIndex(layerValue: number): number {
+  return MACRO_HTML_Z_INDEX_BASE + clampMacroSourceLayer(layerValue);
+}
+
+function getMacroSourceLayerFromRenderedLayer(
+  renderedLayer: number,
+  role: MacroLayerRenderRole
+): number {
+  const roleBase = role === 'annotation'
+    ? MACRO_ANNOTATION_LAYER_BASE
+    : (role === 'handle'
+      ? MACRO_HANDLE_LAYER_BASE
+      : (role === 'hit' ? MACRO_HIT_LAYER_BASE : MACRO_BODY_LAYER_BASE));
+  return clampMacroSourceLayer(
+    Math.floor((Math.round(Number(renderedLayer) || 0) - roleBase) / MACRO_SOURCE_LAYER_STRIDE)
+  );
+}
 
 export type MacroLayerMarkerKind =
   | 'point'
@@ -80,6 +132,7 @@ export interface MacroLayerApplyResult {
   appliedObjects: number;
   skippedDgsObjects: number;
   pendingMarkers: number;
+  pendingObjects: number;
 }
 
 /** Pure marker-id parser, intentionally independent of DOM globals. */
@@ -144,7 +197,7 @@ export function assignMacroLayersBySourceOrder<T = any>(markers: readonly T[]): 
       kind: info.kind,
       uid: info.uid,
       boardId,
-      layer: Math.max(MACRO_SOURCE_LAYER_MIN, Math.min(MACRO_SOURCE_LAYER_MAX, index))
+      layer: clampMacroSourceLayer(index)
     });
   });
 
@@ -289,7 +342,7 @@ const COMPOSITE_SINGLE_CHILDREN = [
 
 const COMPOSITE_ARRAY_CHILDREN = [
   'borders', '__liaDgsPolygonBorders',
-  '__liaDgsStyleCapSegments', '__liaDgsStyleCapPoints'
+  '__liaDgsStyleCapSegments'
 ];
 
 function addCompositeTree(
@@ -340,26 +393,18 @@ export function collectOwnedMacroLayerObjects(
   else if (kind === 'distance') {
     add(entry.segments);
     add(entry.capSegments);
-    add(entry.capPoints);
-    add(entry.ownedPoints);
     add(entry.label);
   } else if (kind === 'linear') {
     add(entry.object);
-    add(entry.ownedPoints);
     add(entry.label);
   } else if (kind === 'arc') {
     add(entry.curve);
-    add(entry.ownedPoints);
     add(entry.capSegments);
-    add(entry.capPoints);
     add(entry.label);
   } else if (kind === 'relation') {
     add(entry.object);
-    add(entry.ownedPoints);
-    add(entry.helperLine);
   } else if (kind === 'area') {
     add(entry.polygon);
-    add(entry.ownedPoints);
     add(entry.label);
   } else if (kind === 'angle') {
     add(entry.angle);
@@ -371,12 +416,9 @@ export function collectOwnedMacroLayerObjects(
   } else if (kind === 'tangent') {
     add(entry.tangent);
     add(entry.contactPoint);
-    add(entry.helperPoint);
-    add(entry.ownedObjects);
   } else if (kind === 'sector') add(entry.sector);
   else if (kind === 'plot') {
     add(entry.graph);
-    add(entry.anchor);
     add(entry.label);
   } else if (kind === 'function-analysis' || kind === 'object-analysis') add(entry.points);
   else if (kind === 'slider') {
@@ -393,18 +435,68 @@ export function collectOwnedMacroLayerObjects(
   } else if (kind === 'point-on-graph' || kind === 'points-on-graph') {
     add(entry.points);
     add(entry.graph);
-    add(entry.anchor);
     add(entry.text);
   } else if (kind === 'plot-input') {
     add(entry.graph);
-    add(entry.anchor);
     add(entry.text);
   }
 
   const output: any[] = [];
   const seen = new Set<any>();
   seeds.forEach(function(seed) { addCompositeTree(seed, output, seen, expectedBoard); });
-  return output;
+  // JSXGraph's angle.arc is an internal helper that must remain permanently
+  // hidden. Layer only the visible angle sector/dot and its annotation.
+  let hiddenAngleHelper: any = null;
+  try { if (kind === 'angle' && entry.angle) hiddenAngleHelper = entry.angle.arc; } catch (e) {}
+  return hiddenAngleHelper ? output.filter(function(object) { return object !== hiddenAngleHelper; }) : output;
+}
+
+function entryContainsValue(value: any, target: any): boolean {
+  if (Array.isArray(value)) return value.some(function(item) { return entryContainsValue(item, target); });
+  return !!value && value === target;
+}
+
+function objectElementType(object: any): string {
+  try { return String(object && (object.elType || object.typeName) || '').toLowerCase(); }
+  catch (e) { return ''; }
+}
+
+/** Determine the renderer role without changing the logical source rank. */
+export function getMacroLayerRenderRole(
+  kind: MacroLayerMarkerKind | null,
+  entry: any,
+  object: any
+): MacroLayerRenderRole {
+  const type = objectElementType(object);
+  const annotationValues = [
+    entry && entry.label,
+    entry && entry.text,
+    entry && entry.graphLabel,
+    entry && entry.nameLabel,
+    entry && entry.measurementLabel,
+    entry && entry.slider && entry.slider.label
+  ];
+  if (type === 'text' || annotationValues.some(function(value) { return entryContainsValue(value, object); })) {
+    return 'annotation';
+  }
+  if (entry && object === entry.dragGraph) return 'hit';
+  try {
+    if (kind === 'angle' && entry && entry.angle && object === entry.angle.dot) return 'body';
+  } catch (e) {}
+
+  const handleValues = [
+    kind === 'point' ? entry : null,
+    entry && entry.points,
+    entry && entry.contactPoint,
+    entry && entry.slider,
+    entry && entry.slider && entry.slider.point1,
+    entry && entry.slider && entry.slider.point2
+  ];
+  if (type === 'point' || type === 'glider' || type === 'slider' ||
+      handleValues.some(function(value) { return entryContainsValue(value, object); })) {
+    return 'handle';
+  }
+  return 'body';
 }
 
 function finiteDgsLayer(object: any): boolean {
@@ -427,27 +519,189 @@ function readObjectLayer(object: any): number | null {
   return null;
 }
 
-/** Apply one source layer without creating the DGS manual-layer sentinel. */
-export function applyMacroSourceLayer(object: any, layerValue: number): boolean {
-  if (!object || finiteDgsLayer(object)) return false;
-  const layer = Math.max(
-    MACRO_SOURCE_LAYER_MIN,
-    Math.min(MACRO_SOURCE_LAYER_MAX, Math.round(Number(layerValue) || 0))
-  );
-  const changed = readObjectLayer(object) !== layer;
-  object.__liaMacroSourceLayer = layer;
-  if (!changed) return false;
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 
-  try { if (typeof object.setAttribute === 'function') object.setAttribute({ layer }); } catch (e) {}
-  try { if (object.visProp) object.visProp.layer = layer; } catch (e) {}
-  try { if (object.visPropCalc) object.visPropCalc.layer = layer; } catch (e) {}
+function rendererNodes(object: any): any[] {
+  const nodes: any[] = [];
+  const seen = new Set<any>();
+  ['rendNode', 'rendNodeText'].forEach(function(property) {
+    try {
+      const node = object && object[property];
+      if (node && !seen.has(node)) {
+        seen.add(node);
+        nodes.push(node);
+      }
+    } catch (e) {}
+  });
+  return nodes;
+}
+
+function annotationUsesHtml(object: any, role: MacroLayerRenderRole): boolean {
+  if (role !== 'annotation') return false;
+  const nodes = rendererNodes(object);
+  const namespaces = nodes
+    .map(function(node) { return String(node.namespaceURI || ''); })
+    .filter(Boolean);
+  if (namespaces.some(function(namespace) { return namespace !== SVG_NAMESPACE; })) return true;
+  if (namespaces.some(function(namespace) { return namespace === SVG_NAMESPACE; })) return false;
+
+  const displayCandidates: any[] = [];
+  try { displayCandidates.push(object && object.visProp && object.visProp.display); } catch (e) {}
+  try { displayCandidates.push(object && object.visPropCalc && object.visPropCalc.display); } catch (e) {}
   try {
-    const board = object.board;
+    if (object && typeof object.getAttribute === 'function') displayCandidates.push(object.getAttribute('display'));
+  } catch (e) {}
+  const display = displayCandidates
+    .map(function(value) { return String(value == null ? '' : value).toLowerCase(); })
+    .find(Boolean) || '';
+  if (display === 'internal') return false;
+  if (display === 'html') return true;
+  return true;
+}
+
+function setLayerPending(object: any, pending: boolean): void {
+  try {
+    if (pending) object.__liaMacroLayerPending = true;
+    else delete object.__liaMacroLayerPending;
+  } catch (e) {
+    try { object.__liaMacroLayerPending = pending || undefined; } catch (e2) {}
+  }
+}
+
+/** Add missing SVG groups when a board was created before the global option changed. */
+export function ensureBoardRendererLayerCapacity(
+  board: any,
+  required: number = MACRO_RENDER_LAYER_COUNT
+): number | null {
+  try {
+    const renderer = board && board.renderer;
+    const layers = renderer && renderer.layer;
+    if (!Array.isArray(layers)) return null;
+    const target = Math.max(1, Math.round(Number(required) || MACRO_RENDER_LAYER_COUNT));
+    if (layers.length >= target && layers.slice(0, target).every(Boolean)) return layers.length;
+
+    const root = renderer.svgRoot;
+    const documentRoot = (renderer.container && renderer.container.ownerDocument) ||
+      (root && root.ownerDocument);
+    if (!root || !documentRoot || typeof documentRoot.createElementNS !== 'function') return layers.length;
+    const namespace = renderer.svgNamespace || SVG_NAMESPACE;
+    for (let index = 0; index < target; index += 1) {
+      if (layers[index]) continue;
+      const group = documentRoot.createElementNS(namespace, 'g');
+      let before = null;
+      for (let next = index + 1; next < layers.length; next += 1) {
+        if (layers[next] && layers[next].parentNode === root) {
+          before = layers[next];
+          break;
+        }
+      }
+      if (!before && renderer.foreignObjLayer && renderer.foreignObjLayer.parentNode === root) {
+        before = renderer.foreignObjLayer;
+      }
+      if (before && typeof root.insertBefore === 'function') root.insertBefore(group, before);
+      else if (typeof root.appendChild === 'function') root.appendChild(group);
+      else return layers.length;
+      layers[index] = group;
+    }
+    return layers.length;
+  } catch (e) { return null; }
+}
+
+function svgLayerMembership(object: any, board: any, layer: number): boolean | null {
+  try {
+    const renderer = board && board.renderer;
+    if (!renderer || !Array.isArray(renderer.layer)) return null;
+    const target = renderer.layer[layer];
+    const node = object && object.rendNode;
+    if (!target || !node) return false;
+    return node.parentNode === target;
+  } catch (e) { return false; }
+}
+
+/**
+ * Move SVG/VML objects safely and keep HTML/MathJax text in the board div.
+ * Calling JSXGraph's setAttribute({ layer }) for an HTML text would append its
+ * div to an SVG group and make it disappear.
+ */
+export function applySafeRenderedLayer(
+  object: any,
+  layerValue: number,
+  fallbackBoard?: any,
+  role: MacroLayerRenderRole = 'body'
+): boolean {
+  if (!object) return false;
+  const layer = Math.max(0, Math.round(Number(layerValue) || 0));
+  if (annotationUsesHtml(object, role)) {
+    let changed = false;
+    const board = object.board || fallbackBoard;
+    const cssLayer = getMacroHtmlZIndex(
+      getMacroSourceLayerFromRenderedLayer(layer, role)
+    );
+    const nodes = rendererNodes(object);
+    if (!nodes.length) {
+      setLayerPending(object, true);
+      return false;
+    }
+    nodes.forEach(function(node) {
+      try {
+        if (node.parentNode && String(node.parentNode.namespaceURI || '') === SVG_NAMESPACE &&
+            board && board.containerObj && typeof board.containerObj.appendChild === 'function') {
+          board.containerObj.appendChild(node);
+          changed = true;
+        }
+      } catch (e) {}
+      try {
+        if (node.style && String(node.style.zIndex || '') !== String(cssLayer)) {
+          node.style.zIndex = String(cssLayer);
+          changed = true;
+        }
+      } catch (e) {}
+    });
+    setLayerPending(object, false);
+    return changed;
+  }
+
+  const board = object.board || fallbackBoard;
+  ensureBoardRendererLayerCapacity(board);
+  const membership = svgLayerMembership(object, board, layer);
+  const changed = readObjectLayer(object) !== layer || membership === false;
+  if (!changed) {
+    setLayerPending(object, false);
+    return false;
+  }
+  try {
     if (board && board.renderer && typeof board.renderer.setLayer === 'function') {
       board.renderer.setLayer(object, layer);
     }
-  } catch (e) {}
+  } catch (e) {
+    setLayerPending(object, true);
+    return false;
+  }
+  if (svgLayerMembership(object, board, layer) === false) {
+    setLayerPending(object, true);
+    return false;
+  }
+  try { if (object.visProp) object.visProp.layer = layer; } catch (e) {}
+  try { if (object.visPropCalc) object.visPropCalc.layer = layer; } catch (e) {}
+  setLayerPending(object, false);
   return true;
+}
+
+/** Apply one logical source layer without creating the DGS manual-layer sentinel. */
+export function applyMacroSourceLayer(
+  object: any,
+  layerValue: number,
+  role: MacroLayerRenderRole = 'body'
+): boolean {
+  if (!object || finiteDgsLayer(object)) return false;
+  const sourceLayer = clampMacroSourceLayer(layerValue);
+  const renderedLayer = getMacroRenderedLayer(sourceLayer, role);
+  const metadataChanged = object.__liaMacroSourceLayer !== sourceLayer ||
+    object.__liaMacroRenderedLayer !== renderedLayer || object.__liaMacroLayerRole !== role;
+  object.__liaMacroSourceLayer = sourceLayer;
+  object.__liaMacroRenderedLayer = renderedLayer;
+  object.__liaMacroLayerRole = role;
+  return applySafeRenderedLayer(object, renderedLayer, object.board, role) || metadataChanged;
 }
 
 function protectedDgsCompositeObjects(objects: any[], expectedBoard?: any): Set<any> {
@@ -479,15 +733,14 @@ function defaultRegistryRoot(): any {
 }
 
 /**
- * JSXGraph's SVG renderer needs one group per usable layer. The imported
- * template defaults to 20 groups (0..19), while DGS already exposes layer 20.
+ * JSXGraph's SVG renderer needs one group per usable renderer layer.
  */
 export function ensureMacroLayerCapacity(registryRoot: any = defaultRegistryRoot()): number | null {
   try {
     const layerOptions = registryRoot && registryRoot.JXG &&
       registryRoot.JXG.Options && registryRoot.JXG.Options.layer;
     if (!layerOptions) return null;
-    const required = MACRO_SOURCE_LAYER_MAX + 1;
+    const required = MACRO_RENDER_LAYER_COUNT;
     const configured = Number(layerOptions.numlayers);
     if (!Number.isFinite(configured) || configured < required) {
       layerOptions.numlayers = required;
@@ -505,9 +758,12 @@ export function applyMacroCodeOrderLayers(
     assignments: 0,
     appliedObjects: 0,
     skippedDgsObjects: 0,
-    pendingMarkers: 0
+    pendingMarkers: 0,
+    pendingObjects: 0
   };
   if (!documentRoot || typeof (documentRoot as any).querySelectorAll !== 'function') return result;
+
+  ensureMacroLayerCapacity(registryRoot);
 
   let markers: any[] = [];
   try { markers = Array.from((documentRoot as any).querySelectorAll(MACRO_LAYER_MARKER_SELECTOR)); } catch (e) {}
@@ -522,6 +778,7 @@ export function applyMacroCodeOrderLayers(
       return;
     }
     const expectedBoard = registryRoot && registryRoot.__boards && registryRoot.__boards[assignment.boardId];
+    ensureBoardRendererLayerCapacity(expectedBoard || entry.board);
     const objects = collectOwnedMacroLayerObjects(assignment.kind, entry, expectedBoard);
     const protectedObjects = protectedDgsCompositeObjects(objects, expectedBoard);
     objects.forEach(function(object) {
@@ -529,7 +786,13 @@ export function applyMacroCodeOrderLayers(
         result.skippedDgsObjects += 1;
         return;
       }
-      if (!applyMacroSourceLayer(object, assignment.layer)) return;
+      const role = getMacroLayerRenderRole(assignment.kind, entry, object);
+      const changed = applyMacroSourceLayer(object, assignment.layer, role);
+      if (object.__liaMacroLayerPending) {
+        result.pendingObjects += 1;
+        return;
+      }
+      if (!changed) return;
       result.appliedObjects += 1;
       try { if (object.board) changedBoards.add(object.board); } catch (e) {}
     });
@@ -570,7 +833,7 @@ function queueMacroLayerFrame(): void {
     );
     const needsSettleFrame = settleFramePasses > 0;
     if (needsSettleFrame) settleFramePasses -= 1;
-    if (result.pendingMarkers > 0 && retryPass < MAX_RETRY_PASSES) {
+    if ((result.pendingMarkers > 0 || result.pendingObjects > 0) && retryPass < MAX_RETRY_PASSES) {
       retryPass += 1;
       if (retryTimer != null) clearTimeout(retryTimer);
       retryTimer = setTimeout(function() {
