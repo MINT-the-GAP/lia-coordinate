@@ -1,7 +1,8 @@
 // Area subsystem (@Area / @Fläche macros).
 // Fills a polygon spanned by named points and optionally displays area/perimeter.
 
-import { CoordinatePair, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import { parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import type { CoordinatePair } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
@@ -38,6 +39,15 @@ export function init(): void {
   initThemeSync();
 
   let hasPendingAreas = false;
+  let areaUpdateBatch: Map<any, {
+    wasSuspended: boolean;
+    suspendedHere: boolean;
+  }> | null = null;
+  const measurementLabelRefreshes = new Map<any, {
+    remaining: number;
+    scheduled: boolean;
+  }>();
+  const pendingDeferredBoardUpdates = new Set<any>();
 
   function parseAreaSpec(spec: string, language?: string): AreaConfig {
     const parts = splitTopLevel(unquote(String(spec || '')), ';')
@@ -86,9 +96,136 @@ export function init(): void {
     return 'area-' + String(uid || '');
   }
 
+  function beginAreaBoardMutation(board: any): void {
+    if (!board || !areaUpdateBatch || areaUpdateBatch.has(board)) return;
+
+    const wasSuspended = !!board.isSuspendedUpdate;
+    let suspendedHere = false;
+    if (
+      !wasSuspended &&
+      typeof board.suspendUpdate === 'function' &&
+      typeof board.unsuspendUpdate === 'function'
+    ) {
+      try {
+        board.suspendUpdate();
+        suspendedHere = board.isSuspendedUpdate === true;
+      } catch (e) {}
+    }
+
+    areaUpdateBatch.set(board, {
+      wasSuspended: wasSuspended,
+      suspendedHere: suspendedHere
+    });
+  }
+
+  function requestAreaBoardUpdate(board: any): void {
+    if (!board) return;
+    if (areaUpdateBatch) {
+      beginAreaBoardMutation(board);
+      return;
+    }
+    if (board.inUpdate === true) {
+      requestDeferredAreaBoardUpdate(board);
+      return;
+    }
+    try { board.update(); } catch (e) {}
+  }
+
+  function requestDeferredAreaBoardUpdate(board: any): void {
+    if (!board || pendingDeferredBoardUpdates.has(board)) return;
+    pendingDeferredBoardUpdates.add(board);
+
+    const update = function() {
+      pendingDeferredBoardUpdates.delete(board);
+      try { board.update(); } catch (e) {}
+    };
+    try {
+      requestAnimationFrame(update);
+    } catch (e) {
+      try { setTimeout(update, 0); } catch (timeoutError) {
+        pendingDeferredBoardUpdates.delete(board);
+      }
+    }
+  }
+
+  function runAreaUpdateBatch(callback: () => void): void {
+    if (areaUpdateBatch) {
+      callback();
+      return;
+    }
+
+    const batch = new Map<any, {
+      wasSuspended: boolean;
+      suspendedHere: boolean;
+    }>();
+    areaUpdateBatch = batch;
+    try {
+      callback();
+    } finally {
+      areaUpdateBatch = null;
+      batch.forEach(function(state, board) {
+        if (state.suspendedHere) {
+          try { board.unsuspendUpdate(); } catch (e) {}
+          return;
+        }
+        if (!state.wasSuspended) {
+          requestAreaBoardUpdate(board);
+        }
+      });
+    }
+  }
+
+  function scheduleMeasurementLabelRefresh(board: any): void {
+    if (!board) return;
+    let state = measurementLabelRefreshes.get(board);
+    if (!state) {
+      state = { remaining: 3, scheduled: false };
+      measurementLabelRefreshes.set(board, state);
+    } else {
+      state.remaining = 3;
+    }
+    if (state.scheduled) return;
+
+    const start = function() {
+      state!.scheduled = true;
+      let callbacksRemaining = 3;
+      const refresh = function() {
+        if (state!.remaining > 0) {
+          state!.remaining -= 1;
+          requestAreaBoardUpdate(board);
+        }
+        try {
+          if (window.__scheduleMacroCodeOrderLayers) {
+            window.__scheduleMacroCodeOrderLayers();
+          }
+        } catch (e) {}
+
+        callbacksRemaining -= 1;
+        if (callbacksRemaining > 0) return;
+        state!.scheduled = false;
+        if (state!.remaining > 0) start();
+        else if (measurementLabelRefreshes.get(board) === state) {
+          measurementLabelRefreshes.delete(board);
+        }
+      };
+
+      try {
+        if (window.__scheduleMacroCodeOrderLayers) {
+          window.__scheduleMacroCodeOrderLayers();
+        }
+      } catch (e) {}
+      setTimeout(refresh, 0);
+      setTimeout(refresh, 80);
+      setTimeout(refresh, 220);
+    };
+    start();
+  }
+
   function removeEntryByKey(key: string): void {
     const entry = window.__areaEntries[key];
     if (!entry) return;
+
+    beginAreaBoardMutation(entry.board);
 
     try {
       if (entry.board && entry.label) entry.board.removeObject(entry.label);
@@ -430,6 +567,31 @@ export function init(): void {
     });
   }
 
+  function updateAutomaticAreaColorMetadata(
+    polygon: any,
+    previousColor: string,
+    nextColor: string
+  ): void {
+    if (!polygon || previousColor === nextColor) return;
+    const fields = [
+      '__liaDgsColor',
+      '__liaDgsLineColor',
+      '__liaDgsFillColor'
+    ];
+    const borderFields = fields.concat('__liaDgsTextColor');
+    fields.forEach(function(field) {
+      if (polygon[field] === previousColor) polygon[field] = nextColor;
+    });
+
+    const borders = Array.isArray(polygon.borders) ? polygon.borders : [];
+    borders.forEach(function(border: any) {
+      if (!border) return;
+      borderFields.forEach(function(field) {
+        if (border[field] === previousColor) border[field] = nextColor;
+      });
+    });
+  }
+
   function createMeasurementLabel(board: any, points: any[], cfg: AreaConfig): any {
     const color = getNeutralColor();
     const label = board.create('text', [
@@ -450,9 +612,7 @@ export function init(): void {
       fontSize: 14
     });
 
-    scheduleBootstrap(function() {
-      try { board.update(); } catch (e) {}
-    });
+    scheduleMeasurementLabelRefresh(board);
     return label;
   }
 
@@ -511,6 +671,16 @@ export function init(): void {
       (!(cfg.showArea || cfg.showPerimeter) || old.label) &&
       old.polygon
     ) {
+      if (
+        old.color === cfg.color &&
+        old.opacity === cfg.opacity &&
+        old.hasExplicitColor === cfg.hasExplicitColor &&
+        old.visible === cfg.visible
+      ) {
+        return true;
+      }
+
+      beginAreaBoardMutation(board);
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
@@ -519,11 +689,12 @@ export function init(): void {
       applyLabelTheme(old.label);
       applyAreaVisibility(old.polygon, old.label, cfg);
       applyAreaDgsMetadata(old.polygon, old.points, old.label, cfg);
-      try { board.update(); } catch (e) {}
+      requestAreaBoardUpdate(board);
       return true;
     }
 
     removeEntry(uid);
+    beginAreaBoardMutation(board);
     let polygon = null;
     let label = null;
     const ownedPoints: any[] = [];
@@ -584,7 +755,7 @@ export function init(): void {
         label: label
       };
 
-      try { board.update(); } catch (e) {}
+      requestAreaBoardUpdate(board);
       return true;
     } catch (e) {
       try { if (label) board.removeObject(label); } catch (removeError) {}
@@ -597,26 +768,28 @@ export function init(): void {
   };
 
   window.__bootstrapAreas = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="area-spec-"][data-spec]');
-    const activeKeys = new Set<string>();
-    let pending = false;
+    runAreaUpdateBatch(function() {
+      const nodes = document.querySelectorAll<HTMLElement>('[id^="area-spec-"][data-spec]');
+      const activeKeys = new Set<string>();
+      let pending = false;
 
-    nodes.forEach(function(node) {
-      const uid = String(node.id || '').replace(/^area-spec-/, '');
-      const spec = String(node.dataset.spec || '');
-      const language = String(node.dataset.language || 'en');
-      if (!uid) return;
+      nodes.forEach(function(node) {
+        const uid = String(node.id || '').replace(/^area-spec-/, '');
+        const spec = String(node.dataset.spec || '');
+        const language = String(node.dataset.language || 'en');
+        if (!uid) return;
 
-      activeKeys.add(entryKey(uid));
-      if (!spec || !window.renderAreaFromSpec || !window.renderAreaFromSpec(uid, spec, language)) {
-        pending = true;
-      }
+        activeKeys.add(entryKey(uid));
+        if (!spec || !window.renderAreaFromSpec || !window.renderAreaFromSpec(uid, spec, language)) {
+          pending = true;
+        }
+      });
+
+      Object.keys(window.__areaEntries || {}).forEach(function(key) {
+        if (!activeKeys.has(key)) removeEntryByKey(key);
+      });
+      hasPendingAreas = pending;
     });
-
-    Object.keys(window.__areaEntries || {}).forEach(function(key) {
-      if (!activeKeys.has(key)) removeEntryByKey(key);
-    });
-    hasPendingAreas = pending;
   };
 
   window.__scheduleBootstrapAreas = function(): void {
@@ -668,16 +841,22 @@ export function init(): void {
   } catch (e) {}
 
   window.__registerLiaThemeListener(function() {
-    Object.keys(window.__areaEntries || {}).forEach(function(key) {
-      const entry = window.__areaEntries[key];
-      if (!entry) return;
-      if (!entry.hasExplicitColor) {
-        entry.color = getAccentColor();
-        applyPolygonStyle(entry.polygon, entry.color, entry.opacity);
-      }
-      applyLabelTheme(entry.label);
-      applyAreaVisibility(entry.polygon, entry.label, entry as AreaConfig);
-      try { if (entry.board) entry.board.update(); } catch (e) {}
+    runAreaUpdateBatch(function() {
+      Object.keys(window.__areaEntries || {}).forEach(function(key) {
+        const entry = window.__areaEntries[key];
+        if (!entry) return;
+
+        beginAreaBoardMutation(entry.board);
+        if (!entry.hasExplicitColor) {
+          const previousColor = entry.color;
+          entry.color = getAccentColor();
+          applyPolygonStyle(entry.polygon, entry.color, entry.opacity);
+          updateAutomaticAreaColorMetadata(entry.polygon, previousColor, entry.color);
+        }
+        applyLabelTheme(entry.label);
+        applyAreaVisibility(entry.polygon, entry.label, entry as AreaConfig);
+        requestAreaBoardUpdate(entry.board);
+      });
     });
   });
 
