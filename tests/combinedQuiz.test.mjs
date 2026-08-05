@@ -163,7 +163,7 @@ test('macro-managed polygons are ignored by the combined quiz', () => {
   assert.equal(checkCombinedQuizOnBoard(board, config), false);
 });
 
-test('each combined macro definition emits exactly one LiaScript quiz', () => {
+test('each combined macro definition emits one parser-stable hidden quiz', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const definitions = Array.from(
     readme.matchAll(/@CombinedQuiz_\r?\n([\s\S]*?)\r?\n@end/g)
@@ -171,6 +171,30 @@ test('each combined macro definition emits exactly one LiaScript quiz', () => {
 
   assert.equal(definitions.length, 2);
   definitions.forEach((definition) => {
-    assert.equal((definition[1].match(/\[\[!\]\]/g) || []).length, 1);
+    const source = definition[1];
+
+    assert.equal((source.match(/\[\[lia-coordinate-check\]\]/g) || []).length, 1);
+    assert.equal((source.match(/\[\[!\]\]/g) || []).length, 0);
+    assert.match(
+      source,
+      /@2\r?\n_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>\[\[lia-coordinate-check\]\]<\/span>_<script>\r?\n/
+    );
+    assert.equal((source.match(/<script\b/g) || []).length, 1);
+    assert.doesNotMatch(source, /<script\s+[^>]*>/);
+    assert.doesNotMatch(source, /modify\s*=/);
+    assert.match(source, /window\.__checkCombinedQuiz\('@0', ''\) === true/);
+    assert.doesNotMatch(source, /@'1/);
   });
+});
+
+test('combined quiz fixture covers a native hint and detailed solution in HTML', () => {
+  const fixture = readFileSync(
+    new URL('./fixtures/combinedQuizNestedSolution.md', import.meta.url),
+    'utf8'
+  );
+
+  assert.match(fixture, /<div class='flex-child'>/);
+  assert.match(fixture, /@GeometrieQuiz\(/);
+  assert.match(fixture, /\[\[\?\]\]/);
+  assert.equal((fixture.match(/^\*{16}$/gm) || []).length, 2);
 });

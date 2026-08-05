@@ -259,10 +259,9 @@ script:   ./dist/index.js
 <span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
 
 @2
-[[!]]
-<script modify=false>
+_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_<script>
   typeof window.__checkCombinedQuiz === 'function' &&
-    window.__checkCombinedQuiz('@0', "@'1") === true
+    window.__checkCombinedQuiz('@0', '') === true
 </script>
 @end
 
@@ -2137,10 +2136,9 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
 
 @2
-[[!]]
-<script modify=false>
+_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_<script>
   typeof window.__checkCombinedQuiz === 'function' &&
-    window.__checkCombinedQuiz('@0', "@'1") === true
+    window.__checkCombinedQuiz('@0', '') === true
 </script>
 @end
 ````
