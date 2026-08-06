@@ -1369,6 +1369,11 @@ inline color palette with hue and hexadecimal controls recolors DGS objects.
 undo and redo remain permanently stacked below the hamburger button, so no additional
 `@Regression` macro is required.
 Regression analysis panels are stacked below these permanent controls.
+Conversely, `@Regression` and `@Reconstruction` automatically add the same DGS shell with
+the compact tool profile `tools=[910;920;930]` (freehand pen, eraser, and regression tools).
+The set square, compass, and unrelated DGS tool groups stay hidden in this implicit profile.
+If an explicit `@DGS` targets the same board, its complete `tools` and `restrictions` profile
+takes precedence, regardless of whether it appears before or after the regression macro.
 
 Parameters: `<boardId>[;tools=[<stableToolId>;...]][;restrictions=[<stableRestrictionId>;...]]`
 
@@ -1622,8 +1627,10 @@ Parameters: `<boardId>`
 ## `@Regression`
 
           --{{0}}--
-Creates a regression analysis interface where students can reconstruct or draw a target function.
-Provides buttons for clearing, hints, and solution display.
+Creates the freehand drawing and regression-analysis interface for a coordinate board.
+It automatically uses the compact DGS menu containing the pen, eraser, and regression-tool
+button. Add an explicit `@DGS` for the same board when a different tool or restriction profile
+is required; that explicit profile takes precedence in either macro order.
 
 Parameters: `<boardId>`
 
@@ -1648,7 +1655,9 @@ Parameters: `<boardId>`
 ## `@Reconstruction`
 
           --{{0}}--
-Checks whether the currently adjusted graph matches a target function on a board.
+Checks whether the currently adjusted graph matches a target function on a board and activates
+the same compact DGS regression menu as `@Regression`. An explicit `@DGS` for the board controls
+the complete tool and restriction profile.
 
 Parameters: `<boardId>;<targetExpr>;<tolerance>`
 

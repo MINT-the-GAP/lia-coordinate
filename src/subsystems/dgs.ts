@@ -22,6 +22,7 @@ import {
   prepareFunctionInput,
   transformLatex
 } from '../shared/functionExpression';
+import { resolveRegressionDgsController } from '../shared/dgsRegressionProfile';
 
 type DgsAxisScaleMode = 'cartesian' | 'log-x' | 'log-y' | 'log-log';
 
@@ -1142,6 +1143,15 @@ type DgsInstrumentRequest = {
 };
 
 const dgsInstrumentRequests: Record<string, DgsInstrumentRequest> = {};
+
+type DgsRegressionRequest = {
+  uid: string;
+  boardId: string;
+  language?: string;
+  anchor: HTMLElement;
+};
+
+const dgsRegressionRequests: Record<string, DgsRegressionRequest> = {};
 
 type DgsSetSquareStoredPose = {
   visible: boolean;
@@ -12165,14 +12175,32 @@ function findDgsMacroAnchorForBoard(boardId: string): {
   language?: string;
 } | null {
   const anchors = document.querySelectorAll<HTMLElement>('[id^=dgs-ui-][data-spec]');
+  let owner: { uid: string; spec: string; language?: string } | null = null;
   for (const anchor of Array.from(anchors)) {
     const match = String(anchor.id || '').match(/^dgs-ui-(.+)$/);
     if (!match) continue;
     const spec = String(anchor.dataset.spec || '').trim();
     if (parseDgsMacroSpec(spec).boardId !== boardId) continue;
-    return { uid: match[1], spec, language: anchor.dataset.language };
+    // bootstrapDGS historically applies matching macros in DOM order, so the
+    // last authored @DGS is the canonical owner when a board is targeted more
+    // than once. Reconciliation must select the same owner.
+    owner = { uid: match[1], spec, language: anchor.dataset.language };
   }
-  return null;
+  return owner;
+}
+
+function pruneDgsRegressionRequests(): void {
+  Object.keys(dgsRegressionRequests).forEach((uid) => {
+    const request = dgsRegressionRequests[uid];
+    if (!request.anchor.isConnected) delete dgsRegressionRequests[uid];
+  });
+}
+
+function getDgsRegressionRequestsForBoard(boardId: string): DgsRegressionRequest[] {
+  pruneDgsRegressionRequests();
+  return Object.keys(dgsRegressionRequests)
+    .map((uid) => dgsRegressionRequests[uid])
+    .filter((request) => request.boardId === boardId);
 }
 
 function pruneDgsInstrumentRequests(): void {
@@ -12187,6 +12215,7 @@ function syncDgsInstrumentProfile(boardId: string): void {
   if (!boardContainer) return;
 
   pruneDgsInstrumentRequests();
+  const hasRegressionDgs = getDgsRegressionRequestsForBoard(boardId).length > 0;
   const hasFullDgs = !!findDgsMacroAnchorForBoard(boardId);
   const requestedToolIds = new Set<number>();
   if (!hasFullDgs) {
@@ -12205,7 +12234,7 @@ function syncDgsInstrumentProfile(boardId: string): void {
   if (hasFullDgs) {
     delete boardContainer.dataset.liaDgsInstrumentTools;
   } else if (!requestedToolIds.size) {
-    if ('liaDgsInstrumentTools' in boardContainer.dataset) {
+    if (hasRegressionDgs || 'liaDgsInstrumentTools' in boardContainer.dataset) {
       boardContainer.dataset.liaDgsInstrumentTools = '0';
     }
   } else {
@@ -12224,6 +12253,50 @@ function syncDgsInstrumentProfile(boardId: string): void {
       (state.activeTool === 'compass' || state.compassRadiusDialogOpen)) {
     setActiveTool(state, '', false);
   }
+}
+
+function getDgsRegressionControllerUid(boardId: string): string {
+  return getDgsInstrumentControllerUid(boardId).replace(/^instrument-/, 'regression-');
+}
+
+function syncDgsRegressionController(boardId: string, fallbackLanguage?: string): boolean {
+  const requests = getDgsRegressionRequestsForBoard(boardId);
+  if (!requests.length) return false;
+
+  const dgsMacro = findDgsMacroAnchorForBoard(boardId);
+  const requestLanguage = requests[requests.length - 1]?.language || fallbackLanguage;
+  const controller = resolveRegressionDgsController(
+    boardId,
+    getDgsRegressionControllerUid(boardId),
+    requestLanguage,
+    dgsMacro
+  );
+
+  // The instrument profile is separate because set square and compass are
+  // permanent in a normal DGS. In the implicit regression shell neither is
+  // shown unless its own @SetSquare/@Compass macro requests it.
+  syncDgsInstrumentProfile(boardId);
+  setupDGS(controller.uid, controller.spec, controller.language);
+  return true;
+}
+
+function setupDGSRegression(uid: string, spec: string, languageCode?: string): void {
+  const boardId = parseDgsMacroSpec(spec).boardId;
+  if (!uid || !boardId) return;
+
+  const anchor = document.getElementById('regression-ui-' + uid) as HTMLElement | null;
+  // DGS itself creates an anchorless regression instance. Accepting only real
+  // anchors prevents DGS -> Regression -> DGS recursion and establishes clear
+  // authored ownership.
+  if (!anchor) return;
+
+  dgsRegressionRequests[uid] = {
+    uid,
+    boardId,
+    language: languageCode || anchor.dataset.language,
+    anchor
+  };
+  syncDgsRegressionController(boardId, languageCode);
 }
 
 function applyDgsInstrumentRequests(boardId: string): boolean {
@@ -17870,6 +17943,15 @@ window.__setupDGS = function (uid: string, spec: string, language?: string): voi
   scheduleBootstrap(() => setupDGS(uid, rawSpec, language));
 };
 
+window.__setupDGSRegression = function (
+  uid: string,
+  spec: string,
+  language?: string
+): void {
+  const rawSpec = String(spec || '').trim();
+  scheduleBootstrap(() => setupDGSRegression(uid, rawSpec, language));
+};
+
 window.__setupDGSInstrument = function (
   uid: string,
   spec: string,
@@ -17892,6 +17974,21 @@ export function bootstrapDGS(): void {
     setupDGS(uid, spec, (el as HTMLElement).dataset.language);
   });
 
+  pruneDgsRegressionRequests();
+  const regressionAnchors = document.querySelectorAll(
+    '[id^="regression-ui-"][data-spec]'
+  );
+  regressionAnchors.forEach((el: Element) => {
+    const match = String(el.id || '').match(/^regression-ui-(.+)$/);
+    if (!match) return;
+    const anchor = el as HTMLElement;
+    setupDGSRegression(
+      match[1],
+      String(anchor.dataset.spec || '').trim(),
+      anchor.dataset.language
+    );
+  });
+
   pruneDgsInstrumentRequests();
   const instrumentAnchors =
     document.querySelectorAll('[id^=dgs-instrument-ui-][data-spec][data-instrument]');
@@ -17912,7 +18009,11 @@ export function bootstrapDGS(): void {
       .map((uid) => states[uid])
       .filter(Boolean)
       .map((state) => state.boardId)
-  )).forEach((boardId) => syncDgsInstrumentProfile(boardId));
+      .concat(Object.keys(dgsRegressionRequests).map((uid) => dgsRegressionRequests[uid].boardId))
+  )).forEach((boardId) => {
+    syncDgsInstrumentProfile(boardId);
+    syncDgsRegressionController(boardId);
+  });
 }
 
 export function init(): void {
