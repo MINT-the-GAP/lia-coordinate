@@ -119,9 +119,55 @@ test('renderer follows the real flex size and restores the logical viewport afte
   assert.deepEqual(grown, { width: 800, height: 600, bbox: initialBBox });
 });
 
-test('both coordinate-system initializers leave resizing to the template', () => {
+test('the bundled coordinate-system initializer leaves resizing to the template', () => {
+  const helpers = readFileSync(new URL('../src/coord/boardHelpers.ts', import.meta.url), 'utf8');
+  assert.equal((helpers.match(/resize:\s*\{\s*enabled:\s*false\s*\}/g) || []).length, 1);
+});
+
+test('coordinate-system initializers survive DynFlex quiz blockification', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  assert.equal((readme.match(/resize:\s*\{\s*enabled:\s*false\s*\}/g) || []).length, 2);
+  const pattern = /^@CoordinateSystem_\r?\n``` javascript @JSX\.Graph\r?\n([\s\S]*?)\r?\n```\r?\n@end$/gm;
+  const bodies = [...readme.matchAll(pattern)].map((match) => match[1]);
+
+  assert.equal(bodies.length, 2, 'header and implementation macro must both be covered');
+
+  bodies.forEach((body) => {
+    assert.doesNotMatch(body, /\r?\n[ \t]*\r?\n/);
+    const normalizedBody = body.replace(/\r\n/g, '\n');
+    const runMacro = new Function('window', 'jxgbox', normalizedBody);
+    const jxgbox = {};
+    const queuedCalls = [];
+    const queuedWindow = {};
+
+    runMacro(queuedWindow, jxgbox);
+    assert.equal(queuedWindow.__liaRunCoordHooks.length, 1);
+    queuedWindow.__coord = {
+      initializeCoordinateBoard(...args) { queuedCalls.push(args); }
+    };
+    queuedWindow.__liaRunCoordHooks[0]();
+    assert.deepEqual(queuedCalls, [[jxgbox, '@0']]);
+
+    const immediateCalls = [];
+    const readyWindow = {
+      __coord: {
+        initializeCoordinateBoard(...args) { immediateCalls.push(args); }
+      },
+      __liaRunCoordHooks: {
+        push(fn) { fn(); }
+      }
+    };
+    runMacro(readyWindow, jxgbox);
+    assert.deepEqual(immediateCalls, [[jxgbox, '@0']]);
+
+    const flexChild = `<jsx-graph>\n${normalizedBody}\n</jsx-graph>\n\n[[quiz]]`;
+    const parts = flexChild
+      .split(/\n[ \t]*\n+/)
+      .filter((part) => part.replace(/\s+/g, '').length > 0);
+    const graphParts = parts.filter((part) => part.includes('jsx-graph'));
+
+    assert.equal(graphParts.length, 1);
+    assert.match(graphParts[0], /^<jsx-graph>[\s\S]*<\/jsx-graph>$/);
+  });
 });
 
 test('the internal JSXGraph angle helper arc always stays hidden and unfilled', () => {

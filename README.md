@@ -15,44 +15,7 @@ script:   ./dist/index.js
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
-(function () {
-  function run() {
-    JXG.Options.text.useMathJax = true;
-
-    const C = window.__coord;
-    const cfg         = C.parseCoordSpec(String.raw`@0`);
-    const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
-    const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
-
-    // Pre-size against the actual LiaScript content column before JSXGraph starts.
-    // Only a size explicitly chosen with the resize handle is restored as manual.
-    const presetState = C.loadStoredBoardState(cfg.id);
-    C.prepareBoardContainer(jxgbox, cfg.width, INITIAL_RATIO, presetState);
-
-    // board.create() calls must be inline — jxgbox is only available in this fence.
-    const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, grid: false, showNavigation: false, showCopyright: false,
-      boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
-      keepaspectratio: true,
-      resize: { enabled: false },
-      zoom: { enabled: cfg.border, wheel: cfg.border, needShift: false, factorX: 1.15, factorY: 1.15 },
-      pan:  { enabled: cfg.border, needShift: false, needTwoFingers: false }
-    });
-
-    C.createBoardDecorations(board, cfg, C.getNeutralColor(), C.getAccentColor());
-
-    // Wire all hooks, event listeners, and sizing logic.
-    C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
-  }
-
-  // Defer until dist/index.js has set window.__coord.
-  if (window.__coord) {
-    run();
-  } else {
-    window.__liaRunCoordHooks = window.__liaRunCoordHooks || [];
-    window.__liaRunCoordHooks.push(run);
-  }
-})();
+/* Keep this initializer on one line for DynFlex quiz compatibility. */ (function (run) { window.__coord ? run() : (window.__liaRunCoordHooks = window.__liaRunCoordHooks || []).push(run); })(function () { window.__coord.initializeCoordinateBoard(jxgbox, String.raw`@0`); });
 ```
 @end
 
@@ -1837,38 +1800,7 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @CoordinateSystem_
 ``` javascript @JSX.Graph
-(function () {
-  function run() {
-    JXG.Options.text.useMathJax = true;
-
-    const C = window.__coord;
-    const cfg         = C.parseCoordSpec(String.raw`@0`);
-    const INITIAL_BBOX  = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
-    const INITIAL_RATIO = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
-
-    const presetState = C.loadStoredBoardState(cfg.id);
-    C.prepareBoardContainer(jxgbox, cfg.width, INITIAL_RATIO, presetState);
-
-    const board = JXG.JSXGraph.initBoard(jxgbox, {
-      axis: false, grid: false, showNavigation: false, showCopyright: false,
-      boundingbox: presetState ? presetState.bbox.slice() : INITIAL_BBOX.slice(),
-      keepaspectratio: true,
-      resize: { enabled: false },
-      zoom: { enabled: true, wheel: true, needShift: false, factorX: 1.15, factorY: 1.15 },
-      pan:  { enabled: true, needShift: false, needTwoFingers: false }
-    });
-
-    C.createBoardDecorations(board, cfg, C.getNeutralColor(), C.getAccentColor());
-    C.wireBoard(board, cfg, INITIAL_BBOX, INITIAL_RATIO);
-  }
-
-  if (window.__coord) {
-    run();
-  } else {
-    window.__liaRunCoordHooks = window.__liaRunCoordHooks || [];
-    window.__liaRunCoordHooks.push(run);
-  }
-})();
+/* Keep this initializer on one line for DynFlex quiz compatibility. */ (function (run) { window.__coord ? run() : (window.__liaRunCoordHooks = window.__liaRunCoordHooks || []).push(run); })(function () { window.__coord.initializeCoordinateBoard(jxgbox, String.raw`@0`); });
 ```
 @end
 

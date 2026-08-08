@@ -1,9 +1,6 @@
-// Board helpers for the @CoordinateSystem macro.
-// All logic that does NOT require a live JSXGraph board reference at definition time
-// lives here and is exposed on window.__coord so the inline macro code can call it.
-//
-// The macro still owns: initBoard(), buildStickyAxes(), board.create('grid'), event binding.
-// Everything else (parse, theme, sizing, styling, ticks, resize handle) lives here.
+// Board lifecycle and helpers for the @CoordinateSystem macro.
+// The functions are exposed on window.__coord so the inline macro only has to
+// enqueue one stable call, even when the bundle has not loaded yet.
 
 import { getNeutralColor, getAccentColor } from '../shared/theme';
 import { applyMacroCodeOrderLayers } from '../shared/macroLayer';
@@ -1424,4 +1421,44 @@ export function parseCoordSpec(spec: string): BoardConfig {
   cfg.width = (Number.isFinite(w) && w > 0) ? w : null;
 
   return cfg;
+}
+
+// Keep the complete board initializer in the bundle. Some layout templates
+// rewrite their child HTML at blank lines; an inline multi-paragraph initializer
+// can then be split and evaluated as invalid JavaScript.
+export function initializeCoordinateBoard(jxgbox: HTMLElement, spec: string): any {
+  JXG.Options.text.useMathJax = true;
+
+  const cfg = parseCoordSpec(spec);
+  const initialBBox = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
+  const initialRatio = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
+
+  const presetState = loadStoredBoardState(cfg.id);
+  prepareBoardContainer(jxgbox, cfg.width, initialRatio, presetState);
+
+  const board = JXG.JSXGraph.initBoard(jxgbox, {
+    axis: false,
+    grid: false,
+    showNavigation: false,
+    showCopyright: false,
+    boundingbox: presetState ? presetState.bbox.slice() : initialBBox.slice(),
+    keepaspectratio: true,
+    resize: { enabled: false },
+    zoom: {
+      enabled: cfg.border,
+      wheel: cfg.border,
+      needShift: false,
+      factorX: 1.15,
+      factorY: 1.15,
+    },
+    pan: {
+      enabled: cfg.border,
+      needShift: false,
+      needTwoFingers: false,
+    },
+  });
+
+  createBoardDecorations(board, cfg, getNeutralColor(), getAccentColor());
+  wireBoard(board, cfg, initialBBox, initialRatio);
+  return board;
 }

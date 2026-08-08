@@ -24,6 +24,7 @@ interface Window {
   // Board helpers namespace exposed for inline macro code
   __coord: {
     parseCoordSpec: (spec: string) => any;
+    initializeCoordinateBoard: (jxgbox: HTMLElement, spec: string) => any;
     getSafeBBox: (board: any, fallback: number[]) => number[];
     isValidBBox: (bb: any) => boolean;
     loadStoredBoardState: (id: string) => any;

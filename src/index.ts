@@ -32,6 +32,7 @@ import {
 } from './shared/macroLayer';
 import {
   parseCoordSpec,
+  initializeCoordinateBoard,
   getSafeBBox,
   isValidBBox,
   loadStoredBoardState,
@@ -68,6 +69,7 @@ initMacroCodeOrderLayers();
 // Expose board helpers on window.__coord for use by the inline macro code.
 window.__coord = {
   parseCoordSpec,
+  initializeCoordinateBoard,
   getSafeBBox,
   isValidBBox,
   loadStoredBoardState,
