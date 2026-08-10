@@ -3488,7 +3488,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-export-step[hidden],
     .lia-dgs-export-dialog [hidden],
-    .lia-dgs-top-menu [hidden] {
+    .lia-dgs-menu-clip [hidden] {
       display: none !important;
     }
 

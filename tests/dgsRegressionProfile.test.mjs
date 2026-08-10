@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import test from 'node:test';
 
@@ -59,4 +60,21 @@ test('an explicit DGS without a language inherits the requesting language', () =
     ).language,
     'de'
   );
+});
+
+test('unavailable flyout tools stay hidden after submenus move into the menu clip', () => {
+  const source = readFileSync(
+    new URL('../src/subsystems/dgs.ts', import.meta.url),
+    'utf8'
+  );
+
+  assert.match(
+    source,
+    /flyoutSubmenus\.forEach\(\(submenu\) => menuClip\.appendChild\(submenu\)\);/
+  );
+  assert.match(
+    source,
+    /\.lia-dgs-menu-clip \[hidden\]\s*\{\s*display:\s*none !important;/
+  );
+  assert.match(source, /button\.hidden = !enabled;\s*button\.disabled = !enabled;/);
 });
