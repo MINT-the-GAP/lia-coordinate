@@ -4,6 +4,7 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 
 /** Build the visual attributes that a static @Point needs on its first paint. */
 export function getStaticPointCreationAttributes(target: any, neutralColor = '#000'): any {
@@ -767,17 +768,15 @@ export function init(): void {
     return ok;
   };
 
+  window.__checkCreatePointQuiz = function(uid, spec) {
+    const uiRoot = document.getElementById('point-ui-' + uid);
+    const resolved = String(spec || uiRoot?.dataset.spec || '');
+    return !!(resolved && window.__checkPointFromSpec && window.__checkPointFromSpec(resolved));
+  };
+
   function findCheckButton(checkRoot) {
     return checkRoot.querySelector(
       'button.lia-btn, input.lia-btn, button, input[type="button"], input[type="submit"]'
-    );
-  }
-
-  function findAllQuizButtons(checkRoot) {
-    return Array.from(
-      checkRoot.querySelectorAll(
-        'button.lia-btn, input.lia-btn, button, input[type="button"], input[type="submit"]'
-      )
     );
   }
 
@@ -796,21 +795,10 @@ export function init(): void {
     return inner;
   }
 
-  function looksLikeResolveButton(checkRoot, targetBtn) {
-    const buttons = findAllQuizButtons(checkRoot);
-    const idx = buttons.indexOf(targetBtn);
-    const text = String(targetBtn.textContent || targetBtn.value || '').trim().toLowerCase();
-
-    if (idx >= 1) return true;
-    if (/solution|show|loesung|losung|anzeig|zeigen/.test(text)) return true;
-
-    return false;
-  }
-
   function applyCreatePointUi(uid) {
     const uiRoot = document.getElementById('point-ui-' + uid);
     const taskRoot = document.getElementById('point-task-' + uid);
-    const checkRoot = document.getElementById('point-check-' + uid);
+    const checkRoot = getCoordinateQuizRoot(document.getElementById('point-check-' + uid));
     const btn = document.getElementById('btn-' + uid);
 
     if (!uiRoot || !taskRoot || !checkRoot || !btn) return false;
@@ -828,9 +816,12 @@ export function init(): void {
     taskRoot.style.margin = '0';
     taskRoot.style.padding = '0';
 
-    checkRoot.style.display = 'inline-flex';
-    checkRoot.style.alignItems = 'flex-start';
-    checkRoot.style.alignSelf = 'flex-start';
+    const checkHost = checkRoot.parentElement as HTMLElement | null;
+    if (checkHost) {
+      checkHost.style.display = 'inline-flex';
+      checkHost.style.alignItems = 'flex-start';
+      checkHost.style.verticalAlign = 'top';
+    }
     checkRoot.style.margin = '0';
     checkRoot.style.padding = '0';
 
@@ -918,7 +909,7 @@ export function init(): void {
   window.renderCreatePointFromSpec = function(uid, spec) {
     const uiRoot = document.getElementById('point-ui-' + uid);
     const taskRoot = document.getElementById('point-task-' + uid);
-    const checkRoot = document.getElementById('point-check-' + uid);
+    const checkRoot = getCoordinateQuizRoot(document.getElementById('point-check-' + uid));
 
     if (!uiRoot || !taskRoot || !checkRoot) return false;
 
@@ -970,7 +961,7 @@ export function init(): void {
           const targetBtn = (e.target as HTMLElement)?.closest('button, input[type="button"], input[type="submit"]') ?? null;
 
           if (!targetBtn || !checkRoot.contains(targetBtn)) return;
-          if (!looksLikeResolveButton(checkRoot, targetBtn)) return;
+          if (!isQuizResolveButton(checkRoot, targetBtn)) return;
 
           setTimeout(function() {
             const curSpec = uiRoot.dataset.spec || '';

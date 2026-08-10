@@ -31,17 +31,12 @@ script:   ./dist/index.js
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
-  <div id="point-task-@0" class="lia-point-task"></div>
-
-  <div id="point-check-@0">
-    @2
-    [[!]]
-    <script modify="false">
-      window.__checkPointFromSpec && window.__checkPointFromSpec(document.getElementById('point-ui-@0')?.dataset.spec || '')
-    </script>
-  </div>
+<div id="point-task-@0" class="lia-point-task"></div>
 </div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
+@2
+<span id="point-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="create-point" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @Point: @Point_(@uid,`@0`)
@@ -190,13 +185,10 @@ script:   ./dist/index.js
 
 @PolygonMetricQuiz_
 <span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-[[!]]
-<script modify=false>
-  typeof window.__checkPolygonMetricQuiz === 'function' &&
-    window.__checkPolygonMetricQuiz('@0', "@'1", '@3') === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="polygon-metric" data-lia-coordinate-quiz-uid="@0" data-lia-coordinate-quiz-metric="@3" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @ConstructionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
@@ -204,13 +196,10 @@ script:   ./dist/index.js
 
 @ConstructionQuiz_
 <span id='construction-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-[[!]]
-<script modify=false>
-  typeof window.__checkConstructionQuiz === 'function' &&
-    window.__checkConstructionQuiz('@0', "@'1") === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @KoordQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
@@ -220,96 +209,61 @@ script:   ./dist/index.js
 
 @CombinedQuiz_
 <span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_<script>
-  typeof window.__checkCombinedQuiz === 'function' &&
-    window.__checkCombinedQuiz('@0', '') === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="combined" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
-@Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
-@Reconstruction: @Rekonstruktion_(@uid,`@0`)
+@Rekonstruktion: @Rekonstruktion_(@uid,`@0`,`<!-- -->`)
+@Reconstruction: @Rekonstruktion_(@uid,`@0`,`<!-- -->`)
+@RekonstruktionMitOptionen: @Rekonstruktion_(@uid,`@0`,`@1`)
+@ReconstructionWithOptions: @Rekonstruktion_(@uid,`@0`,`@1`)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
-
-<div id="rek-check-@0">
-[[!]]
 <script modify="false">
-  (() => {
-    const node = document.getElementById('rek-spec-@0');
-    const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
-
-    if (typeof window.__checkReconstructionQuiz === 'function') {
-      return window.__checkReconstructionQuiz('@0', spec);
-    }
-
-    if (typeof window.__checkRekonstruktionQuiz === 'function') {
-      return window.__checkRekonstruktionQuiz('@0', spec);
-    }
-
-    if (typeof window.__checkReconstructionFromSpec === 'function') {
-      return window.__checkReconstructionFromSpec(spec);
-    }
-
-    if (typeof window.__checkRekonstruktionFromSpec === 'function') {
-      return window.__checkRekonstruktionFromSpec(spec);
-    }
-
-    return false;
-  })()
-</script>
-</div>
-
-<script modify="false">
-(function(){
-  const node = document.getElementById('rek-spec-@0');
-  const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
   if (typeof window.__setupReconstructionQuiz === 'function') {
-    window.__setupReconstructionQuiz('@0', spec);
-    return;
+    window.__setupReconstructionQuiz('@0', '');
+  } else if (typeof window.__setupRekonstruktionQuiz === 'function') {
+    window.__setupRekonstruktionQuiz('@0', '');
   }
-
-  if (typeof window.__setupRekonstruktionQuiz === 'function') {
-    window.__setupRekonstruktionQuiz('@0', spec);
-  }
-})();
 </script>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span id="rek-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="reconstruction" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
-@PointOnGraph: @PointOnGraph_(@uid,`@0`)
-@PunktGraph: @PointOnGraph_(@uid,`@0`)
+@PointOnGraph: @PointOnGraph_(@uid,`@0`,`<!-- -->`)
+@PunktGraph: @PointOnGraph_(@uid,`@0`,`<!-- -->`)
+@PointOnGraphWithOptions: @PointOnGraph_(@uid,`@0`,`@1`)
+@PunktGraphMitOptionen: @PointOnGraph_(@uid,`@0`,`@1`)
 
 @PointOnGraph_
-<div id="graph-ui-@0" data-spec="@1">
-  <div id="graph-task-@0" class="lia-graph-task"></div>
-  <div id="graph-check-@0">
-    [[!]]
-    <script modify="false">
-      window.__checkPointGraphFromSpec && window.__checkPointGraphFromSpec('@0', document.getElementById('graph-spec-@0')?.textContent || '')
-    </script>
-  </div>
-</div>
 <span id="graph-spec-@0" style="display:none;">@1</span>
+<div id="graph-ui-@0" data-spec="@1">
+<div id="graph-task-@0" class="lia-graph-task"></div>
+</div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
+@2
+<span id="graph-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="point-on-graph" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
-@PointsOnGraph: @PointsOnGraph_(@uid,`@0`)
-@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`)
+@PointsOnGraph: @PointsOnGraph_(@uid,`@0`,`<!-- -->`)
+@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`,`<!-- -->`)
+@PointsOnGraphWithOptions: @PointsOnGraph_(@uid,`@0`,`@1`)
+@PunkteAufGraphMitOptionen: @PointsOnGraph_(@uid,`@0`,`@1`)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
-  <div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
-
-  <div id="multi-graph-check-@0">
-    [[!]]
-    <script modify="false">
-      window.__checkPointsOnGraphFromSpec && window.__checkPointsOnGraphFromSpec('@0', document.getElementById('multi-graph-ui-@0')?.dataset.spec || '')
-    </script>
-  </div>
+<div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
 </div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
+@2
+<span id="multi-graph-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="points-on-graph" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @Table: @Table_(@uid,`@0`)
@@ -469,7 +423,25 @@ A "Create point" button appears — clicking it places the draggable point. The 
 
 Parameters: `<boardId>;<pointName>;<targetX>;<targetY>`
 
-The second argument must always be provided. Pass an empty string (with a space) to use the default check button.
+The second argument must always be provided. Pass `<!-- -->` to use the default
+quiz controls. This non-empty no-op comment is also safe when the task is placed
+inside DynFlex.
+
+All quiz macros in this template support native LiaScript hints and detailed
+solutions directly after the macro call, with or without a separating blank
+line. The parser-stable pattern is:
+
+``` markdown
+@CreatePoint(`board;A;2;3`,`<!-- data-hint-button="2" data-solution-button="3" -->`)
+[[?]] This is a hint.
+*****************
+This is the detailed solution.
+*****************
+```
+
+The quiz comment can also contain `data-solution-timer*` attributes when the
+course imports `lia-timer`. `lia-coordinate` preserves the comment; `lia-timer`
+implements the countdown.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_point_ez`)
@@ -478,7 +450,7 @@ The second argument must always be provided. Pass an empty string (with a space)
 
 Drag point $A$ to the coordinates $(2 | 3)$.
 
-@CreatePoint(`ex_point_ez;A;2;3`,` `)
+@CreatePoint(`ex_point_ez;A;2;3`,`<!-- -->`)
 ```
 
 ---
@@ -489,7 +461,7 @@ Drag point $A$ to the coordinates $(2 | 3)$.
 
 Drag point $A$ to the coordinates $(2 | 3)$.
 
-@CreatePoint(`ex_point_ez;A;2;3`,` `)
+@CreatePoint(`ex_point_ez;A;2;3`,`<!-- -->`)
 
 ## `@Point`
 
@@ -1015,6 +987,11 @@ The check validates whether the point lies on the curve within the given toleran
 
 Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>`
 
+Use `@PointOnGraphWithOptions` / `@PunktGraphMitOptionen` with the same first
+argument and a LiaScript quiz comment as the second argument when custom hint,
+solution, or timer controls are needed. The original one-argument aliases remain
+fully compatible and use the default controls.
+
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_pg`)
 
@@ -1041,6 +1018,10 @@ Drag point $A$ onto the graph of $f(x) = 2x - 1$.
 Multi-point-on-graph exercise: places several draggable points that must all land on the graph.
 
 Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tolerance>`
+
+Use `@PointsOnGraphWithOptions` / `@PunkteAufGraphMitOptionen` for an additional
+LiaScript quiz-comment argument. The original one-argument aliases keep the
+default controls.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_points_on_graph`)
@@ -1380,9 +1361,10 @@ polygons do not prevent a matching polygon from solving the quiz.
 absolute and may be `0`; German decimal commas are accepted. Moving, deleting,
 undoing, restoring, or recreating a polygon is reflected the next time Check is
 pressed. Quiz settings are passed as a separate second macro argument. The HTML
-comment is emitted unchanged directly before `[[!]]`, just like for `@CreatePoint`;
-for example, `<!-- data-solution-button="5" -->` reveals the solution button after
-five unsuccessful checks.
+comment is emitted unchanged directly before the hidden LiaScript quiz input,
+just like for `@CreatePoint`; for example,
+`<!-- data-solution-button="5" -->` reveals the solution button after five
+unsuccessful checks.
 
 If area, perimeter, and construction properties belong to one task, use
 `@KoordQuiz` instead of placing several individual quiz macros below each
@@ -1624,6 +1606,11 @@ the complete tool and restriction profile.
 
 Parameters: `<boardId>;<targetExpr>;<tolerance>`
 
+Use `@ReconstructionWithOptions` / `@RekonstruktionMitOptionen` with the same
+first argument and a LiaScript quiz comment as the second argument for custom
+hint, solution, or timer controls. The original one-argument aliases keep the
+default controls.
+
 ``` markdown
 @Reconstruction(`ex_schar;2x-1;0.1`)
 ```
@@ -1816,16 +1803,12 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @CreatePoint_
 <div id="point-ui-@0" data-spec="@1">
-  <div id="point-task-@0" class="lia-point-task"></div>
-
-  <div id="point-check-@0">
-    @2
-    [[!]]
-    <script modify="false">
-      window.__checkPointFromSpec && window.__checkPointFromSpec(document.getElementById('point-ui-@0')?.dataset.spec || '')
-    </script>
-  </div>
+<div id="point-task-@0" class="lia-point-task"></div>
 </div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span id="point-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="create-point" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @Point: @Point_(@uid,`@0`)
@@ -1949,86 +1932,55 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <span id="schar-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
-@Rekonstruktion: @Rekonstruktion_(@uid,`@0`)
-@Reconstruction: @Rekonstruktion_(@uid,`@0`)
+@Rekonstruktion: @Rekonstruktion_(@uid,`@0`,`<!-- -->`)
+@Reconstruction: @Rekonstruktion_(@uid,`@0`,`<!-- -->`)
+@RekonstruktionMitOptionen: @Rekonstruktion_(@uid,`@0`,`@1`)
+@ReconstructionWithOptions: @Rekonstruktion_(@uid,`@0`,`@1`)
 
 @Rekonstruktion_
 <span id="rek-spec-@0" data-spec="@1" style="display:none;"></span>
-
-<div id="rek-check-@0">
-[[!]]
 <script modify="false">
-  (() => {
-    const node = document.getElementById('rek-spec-@0');
-    const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
-
-    if (typeof window.__checkReconstructionQuiz === 'function') {
-      return window.__checkReconstructionQuiz('@0', spec);
-    }
-
-    if (typeof window.__checkRekonstruktionQuiz === 'function') {
-      return window.__checkRekonstruktionQuiz('@0', spec);
-    }
-
-    if (typeof window.__checkReconstructionFromSpec === 'function') {
-      return window.__checkReconstructionFromSpec(spec);
-    }
-
-    if (typeof window.__checkRekonstruktionFromSpec === 'function') {
-      return window.__checkRekonstruktionFromSpec(spec);
-    }
-
-    return false;
-  })()
-</script>
-</div>
-
-<script modify="false">
-(function(){
-  const node = document.getElementById('rek-spec-@0');
-  const spec = node ? String(node.dataset.spec || '') : String.raw`@1`;
   if (typeof window.__setupReconstructionQuiz === 'function') {
-    window.__setupReconstructionQuiz('@0', spec);
-    return;
+    window.__setupReconstructionQuiz('@0', '');
+  } else if (typeof window.__setupRekonstruktionQuiz === 'function') {
+    window.__setupRekonstruktionQuiz('@0', '');
   }
-
-  if (typeof window.__setupRekonstruktionQuiz === 'function') {
-    window.__setupRekonstruktionQuiz('@0', spec);
-  }
-})();
 </script>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span id="rek-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="reconstruction" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
-@PointOnGraph: @PointOnGraph_(@uid,`@0`)
-@PunktGraph: @PointOnGraph_(@uid,`@0`)
+@PointOnGraph: @PointOnGraph_(@uid,`@0`,`<!-- -->`)
+@PunktGraph: @PointOnGraph_(@uid,`@0`,`<!-- -->`)
+@PointOnGraphWithOptions: @PointOnGraph_(@uid,`@0`,`@1`)
+@PunktGraphMitOptionen: @PointOnGraph_(@uid,`@0`,`@1`)
 
 @PointOnGraph_
-<div id="graph-ui-@0" data-spec="@1">
-  <div id="graph-task-@0" class="lia-graph-task"></div>
-  <div id="graph-check-@0">
-    [[!]]
-    <script modify="false">
-      window.__checkPointGraphFromSpec && window.__checkPointGraphFromSpec('@0', document.getElementById('graph-spec-@0')?.textContent || '')
-    </script>
-  </div>
-</div>
 <span id="graph-spec-@0" style="display:none;">@1</span>
+<div id="graph-ui-@0" data-spec="@1">
+<div id="graph-task-@0" class="lia-graph-task"></div>
+</div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span id="graph-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="point-on-graph" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
-@PointsOnGraph: @PointsOnGraph_(@uid,`@0`)
-@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`)
+@PointsOnGraph: @PointsOnGraph_(@uid,`@0`,`<!-- -->`)
+@PunkteAufGraph: @PointsOnGraph_(@uid,`@0`,`<!-- -->`)
+@PointsOnGraphWithOptions: @PointsOnGraph_(@uid,`@0`,`@1`)
+@PunkteAufGraphMitOptionen: @PointsOnGraph_(@uid,`@0`,`@1`)
 
 @PointsOnGraph_
 <div id="multi-graph-ui-@0" data-spec="@1">
-  <div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
-
-  <div id="multi-graph-check-@0">
-    [[!]]
-    <script modify="false">
-      window.__checkPointsOnGraphFromSpec && window.__checkPointsOnGraphFromSpec('@0', document.getElementById('multi-graph-ui-@0')?.dataset.spec || '')
-    </script>
-  </div>
+<div id="multi-graph-task-@0" class="lia-multi-graph-task"></div>
 </div>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span id="multi-graph-check-@0" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="points-on-graph" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 @Table: @Table_(@uid,`@0`)
@@ -2045,26 +1997,20 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @PolygonMetricQuiz_
 <span id='polygon-metric-quiz-spec-@0' data-spec='@1' data-kind='@3' data-language='@4' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-[[!]]
-<script modify=false>
-  typeof window.__checkPolygonMetricQuiz === 'function' &&
-    window.__checkPolygonMetricQuiz('@0', "@'1", '@3') === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="polygon-metric" data-lia-coordinate-quiz-uid="@0" data-lia-coordinate-quiz-metric="@3" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 @ConstructionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
 @KonstruktionQuiz: @ConstructionQuiz_(@uid,`@0`,`@1`,@language)
 
 @ConstructionQuiz_
 <span id='construction-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-[[!]]
-<script modify=false>
-  typeof window.__checkConstructionQuiz === 'function' &&
-    window.__checkConstructionQuiz('@0', "@'1") === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
 
@@ -2075,12 +2021,10 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @CombinedQuiz_
 <span id='combined-quiz-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
 
 @2
-_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_<script>
-  typeof window.__checkCombinedQuiz === 'function' &&
-    window.__checkCombinedQuiz('@0', '') === true
-</script>
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="combined" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 ````
 

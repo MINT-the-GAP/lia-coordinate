@@ -60,11 +60,13 @@ import {
   wireBoard,
 } from './coord/boardHelpers';
 import { getNeutralColor, getAccentColor } from './shared/theme';
+import { initQuizDom } from './shared/quizDom';
 
 // Install source-order layer reconciliation before pending board macros run.
 // The initial pass may precede subsystem registration; delayed passes below
 // reconcile the entries once all renderers have been initialized.
 initMacroCodeOrderLayers();
+initQuizDom();
 
 // Expose board helpers on window.__coord for use by the inline macro code.
 window.__coord = {

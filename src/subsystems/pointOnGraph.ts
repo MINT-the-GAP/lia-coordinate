@@ -4,6 +4,7 @@
 import { unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 
 export function init(): void {
   if (window.__pointOnGraphReady) {
@@ -791,13 +792,15 @@ export function init(): void {
   };
 
   window.__checkPointGraphFromSpec = function(uid, spec) {
+    const resolved = String(spec || getGraphUiSpecByUid(uid));
     const ok = !!(
+      resolved &&
       typeof window.checkPointGraphFromSpec === 'function' &&
-      window.checkPointGraphFromSpec(uid, spec)
+      window.checkPointGraphFromSpec(uid, resolved)
     );
 
     if (ok && typeof window.finalizePointGraphFromSpec === 'function') {
-      window.finalizePointGraphFromSpec(uid, spec);
+      window.finalizePointGraphFromSpec(uid, resolved);
     }
 
     return ok;
@@ -806,14 +809,6 @@ export function init(): void {
   function findCheckButton(checkRoot) {
     return checkRoot.querySelector(
       'button.lia-btn, input.lia-btn, button, input[type="button"], input[type="submit"]'
-    );
-  }
-
-  function findAllQuizButtons(checkRoot) {
-    return Array.from(
-      checkRoot.querySelectorAll(
-        'button.lia-btn, input.lia-btn, button, input[type="button"], input[type="submit"]'
-      )
     );
   }
 
@@ -832,17 +827,6 @@ export function init(): void {
     return inner;
   }
 
-  function looksLikeResolveButton(checkRoot, targetBtn) {
-    const buttons = findAllQuizButtons(checkRoot);
-    const idx = buttons.indexOf(targetBtn);
-    const text = String(targetBtn.textContent || targetBtn.value || '').trim().toLowerCase();
-
-    if (idx >= 1) return true;
-    if (/solution|show|loesung|losung|anzeig|zeigen/.test(text)) return true;
-
-    return false;
-  }
-
   function applyLockedStateToButton(uid, btn) {
     const locked = isLocked(uid);
 
@@ -855,7 +839,7 @@ export function init(): void {
   function applyPointOnGraphUi(uid) {
     const uiRoot = document.getElementById('graph-ui-' + uid);
     const taskRoot = document.getElementById('graph-task-' + uid);
-    const checkRoot = document.getElementById('graph-check-' + uid);
+    const checkRoot = getCoordinateQuizRoot(document.getElementById('graph-check-' + uid));
     const btn = document.getElementById('graph-btn-' + uid);
 
     if (!uiRoot || !taskRoot || !checkRoot || !btn) return false;
@@ -873,9 +857,12 @@ export function init(): void {
     taskRoot.style.margin = '0';
     taskRoot.style.padding = '0';
 
-    checkRoot.style.display = 'inline-flex';
-    checkRoot.style.alignItems = 'flex-start';
-    checkRoot.style.alignSelf = 'flex-start';
+    const checkHost = checkRoot.parentElement as HTMLElement | null;
+    if (checkHost) {
+      checkHost.style.display = 'inline-flex';
+      checkHost.style.alignItems = 'flex-start';
+      checkHost.style.verticalAlign = 'top';
+    }
     checkRoot.style.margin = '0';
     checkRoot.style.padding = '0';
 
@@ -970,7 +957,7 @@ export function init(): void {
   window.renderPointOnGraphFromSpec = function(uid, spec) {
     const uiRoot = document.getElementById('graph-ui-' + uid);
     const taskRoot = document.getElementById('graph-task-' + uid);
-    const checkRoot = document.getElementById('graph-check-' + uid);
+    const checkRoot = getCoordinateQuizRoot(document.getElementById('graph-check-' + uid));
 
     if (!uiRoot || !taskRoot || !checkRoot) return false;
     uiRoot.dataset.spec = spec;
@@ -1018,7 +1005,7 @@ export function init(): void {
           const targetBtn = (e.target as HTMLElement)?.closest('button, input[type="button"], input[type="submit"]') ?? null;
 
           if (!targetBtn || !checkRoot.contains(targetBtn)) return;
-          if (!looksLikeResolveButton(checkRoot, targetBtn)) return;
+          if (!isQuizResolveButton(checkRoot, targetBtn)) return;
 
           setTimeout(function() {
             const curSpec = getGraphUiSpecByUid(uid);

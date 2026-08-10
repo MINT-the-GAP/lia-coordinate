@@ -175,14 +175,15 @@ test('each combined macro definition emits one parser-stable hidden quiz', () =>
 
     assert.equal((source.match(/\[\[lia-coordinate-check\]\]/g) || []).length, 1);
     assert.equal((source.match(/\[\[!\]\]/g) || []).length, 0);
+    assert.equal((source.match(/data-lia-coordinate-dynflex-guard/g) || []).length, 1);
+    assert.equal((source.match(/data-lia-coordinate-quiz-anchor/g) || []).length, 1);
     assert.match(
       source,
-      /@2\r?\n_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>\[\[lia-coordinate-check\]\]<\/span>_<script>\r?\n/
+      /data-lia-coordinate-dynflex-guard[^\r\n]*\r?\n\r?\n@2\r?\n<span[^\r\n]*data-lia-coordinate-quiz-kind="combined"[^\r\n]*>[^\r\n]*_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>\[\[lia-coordinate-check\]\]<\/span>_/
     );
-    assert.equal((source.match(/<script\b/g) || []).length, 1);
-    assert.doesNotMatch(source, /<script\s+[^>]*>/);
-    assert.doesNotMatch(source, /modify\s*=/);
-    assert.match(source, /window\.__checkCombinedQuiz\('@0', ''\) === true/);
+    assert.equal((source.match(/data-lia-coordinate-output-marker/g) || []).length, 0);
+    assert.equal((source.match(/<script\b/g) || []).length, 0);
+    assert.doesNotMatch(source, /window\.__checkCombinedQuiz/);
     assert.doesNotMatch(source, /@'1/);
   });
 });

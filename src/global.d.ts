@@ -92,6 +92,7 @@ interface Window {
   finalizePointFromSpec: ((spec: string) => boolean) | undefined;
   renderCreatePointFromSpec: ((uid: string, spec: string) => boolean) | undefined;
   __checkPointFromSpec: ((spec: string) => boolean) | undefined;
+  __checkCreatePointQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
   // PlotFunction subsystem (@PlotFunction)
   __plotFunctionReady: boolean | undefined;
