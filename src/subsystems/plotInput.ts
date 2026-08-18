@@ -5,6 +5,12 @@ import { parseMacroName, splitTopLevel as sharedSplitTopLevel } from '../shared/
 import { getNeutralColor, themeDoc, themeWin, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { compileFunctionExpression } from '../shared/functionExpression';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  lineStyleAttributes,
+  parseLineStyleOptions
+} from '../shared/lineStyle';
 
 export function init(): void {
   if (window.__plotInputReady) {
@@ -35,7 +41,8 @@ export function init(): void {
   };
 
   H.parseInputSpec = function(spec){
-    const parts = sharedSplitTopLevel(String(spec || '').trim(), ';');
+    const rawParts = sharedSplitTopLevel(String(spec || '').trim(), ';');
+    const parts = rawParts.filter(function(part) { return !isLineStyleOption(part); });
     const name = parseMacroName(parts[1] || 'f', 'f');
 
     return {
@@ -47,7 +54,8 @@ export function init(): void {
       dx: H.numOr(parts, 4, 0.18),
       dy: H.numOr(parts, 5, 0.18),
       strokeWidth: H.numOr(parts, 6, 3),
-      labelFontSize: H.numOr(parts, 7, 28)
+      labelFontSize: H.numOr(parts, 7, 28),
+      lineStyle: parseLineStyleOptions(rawParts)
     };
   };
 
@@ -644,6 +652,7 @@ export function init(): void {
       strokeColor: state.color,
       highlightStrokeColor: state.color,
       strokeWidth: state.strokeWidth,
+      ...lineStyleAttributes(state.lineStyle || 'solid'),
       fixed: true,
       withLabel: false,
       resolution: 3,
@@ -652,6 +661,7 @@ export function init(): void {
     });
     state.graph.__liaPlotInputName = state.name;
     state.graph.__liaDgsShowName = state.showName !== false;
+    applyLineStyle(state.graph, state.lineStyle || 'solid');
     state.fn = fn;
 
     const labelPack = H.createFunctionLabel(board, fn, state);
@@ -694,6 +704,9 @@ export function init(): void {
       state.dx !== cfg.dx ||
       state.dy !== cfg.dy ||
       state.labelFontSize !== cfg.labelFontSize;
+    const graphStyleChanged = state.color !== cfg.color ||
+      state.strokeWidth !== cfg.strokeWidth ||
+      state.lineStyle !== cfg.lineStyle;
 
     state.uid = uid;
     state.boardId = cfg.boardId;
@@ -705,6 +718,18 @@ export function init(): void {
     state.dy = cfg.dy;
     state.strokeWidth = cfg.strokeWidth;
     state.labelFontSize = cfg.labelFontSize;
+    state.lineStyle = cfg.lineStyle;
+
+    if (state.graph && graphStyleChanged) {
+      try {
+        state.graph.setAttribute({
+          strokeColor: state.color,
+          highlightStrokeColor: state.color,
+          strokeWidth: state.strokeWidth
+        });
+      } catch (e) {}
+      applyLineStyle(state.graph, state.lineStyle || 'solid');
+    }
 
     if (state.graph && labelConfigChanged) {
       const board = window.__boards && window.__boards[state.boardId];

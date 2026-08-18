@@ -5,6 +5,13 @@ import { CoordinatePair, unquote } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { createHiddenPoint, getLivePoint } from '../shared/boardObjects';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 interface ArcEndpointSpec {
   name: string;
@@ -31,6 +38,7 @@ interface ArcConfig extends ArcDesign {
   strokeWidth: number;
   color: string;
   hasExplicitColor: boolean;
+  lineStyle: LineStyle;
   visible: boolean;
   language: 'de' | 'en';
 }
@@ -273,7 +281,7 @@ export function init(): void {
       .map(visibilityOptionValue)
       .filter(function(value): value is boolean { return value != null; });
     const styleParts = parts.slice(6).filter(function(part) {
-      return visibilityOptionValue(part) == null;
+      return visibilityOptionValue(part) == null && !isLineStyleOption(part);
     });
     let designToken = styleParts[0] || '';
     let strokeWidthToken = styleParts[1] || '';
@@ -303,6 +311,7 @@ export function init(): void {
       strokeWidth: parseStrokeWidth(strokeWidthToken),
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
+      lineStyle: parseLineStyleOptions(parts.slice(6)),
       visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
       ...design
@@ -560,6 +569,7 @@ export function init(): void {
       lineCap: 'round',
       firstArrow: arrowHead(cfg.firstArrow, cfg.strokeWidth),
       lastArrow: arrowHead(cfg.lastArrow, cfg.strokeWidth),
+      ...lineStyleAttributes(cfg.lineStyle),
       doAdvancedPlot: false,
       numberPointsLow: 64,
       numberPointsHigh: 128,
@@ -658,6 +668,7 @@ export function init(): void {
     curve.__liaDgsFillColor = color;
     curve.__liaDgsTextColor = color;
     curve.__liaDgsLanguage = language;
+    applyLineStyle(curve, entry.lineStyle || 'solid');
     curve.__liaDgsStyleCapSegments = Array.isArray(entry.capSegments)
       ? entry.capSegments
       : [];
@@ -713,6 +724,7 @@ export function init(): void {
         });
       }
     } catch (e) {}
+    applyLineStyle(entry.curve, entry.lineStyle || 'solid');
     (Array.isArray(entry.capSegments) ? entry.capSegments : []).forEach(function(segment: any) {
       try {
         if (segment && typeof segment.setAttribute === 'function') {
@@ -794,6 +806,7 @@ export function init(): void {
         old.language === cfg.language) {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
+      old.lineStyle = cfg.lineStyle;
       old.visible = cfg.visible;
       applyArcStyle(old, cfg.color);
       try { board.update(); } catch (e) {}
@@ -888,6 +901,7 @@ export function init(): void {
         strokeWidth: cfg.strokeWidth,
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
+        lineStyle: cfg.lineStyle,
         visible: cfg.visible,
         language: cfg.language,
         points,

@@ -15,6 +15,13 @@ import { getLivePoint, createHiddenPoint, getBoardObjects } from '../shared/boar
 import { normalizeName, namesEqual } from '../shared/format';
 import { normalizedTexName as texName } from '../shared/texName';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 type SourceKind = 'function' | 'linear' | 'circle';
 
@@ -38,6 +45,7 @@ interface TangentConfig {
   pointShowName: boolean;
   language: 'de' | 'en';
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 interface SectorConfig {
@@ -52,6 +60,7 @@ interface SectorConfig {
   showPerimeter: boolean;
   language: 'de' | 'en';
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 export function init(): void {
@@ -117,7 +126,7 @@ export function init(): void {
     let pointName = '';
     let hideAllNames = false;
     options.forEach(function(option) {
-      if (isVisibilityOption(option)) return;
+      if (isVisibilityOption(option) || isLineStyleOption(option)) return;
       if (isHiddenNameOption(option)) {
         hideAllNames = true;
         return;
@@ -153,7 +162,8 @@ export function init(): void {
       lineShowName: parsedLineName.showName && !hideAllNames,
       pointShowName: parsedPointName.showName && !hideAllNames,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-      visible: optionVisibility(options)
+      visible: optionVisibility(options),
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -179,7 +189,8 @@ export function init(): void {
         !/^name\s*=/i.test(option) &&
         !isTruthyOption(option, 'inhalt', 'area') &&
         !isTruthyOption(option, 'umfang', 'perimeter') &&
-        !isTruthyOption(option, 'umfang', 'circumference');
+        !isTruthyOption(option, 'umfang', 'circumference') &&
+        !isLineStyleOption(option);
     }) || '';
     const parsedObjectName = parseMacroName(objectNameToken);
 
@@ -196,7 +207,8 @@ export function init(): void {
         return isTruthyOption(option, 'umfang', 'perimeter') || isTruthyOption(option, 'umfang', 'circumference');
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-      visible: optionVisibility(options)
+      visible: optionVisibility(options),
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -387,7 +399,7 @@ export function init(): void {
     } catch (e) { return null; }
   }
 
-  function applyTangentStyle(tangent: any, contactPoint: any, color: string): void {
+  function applyTangentStyle(tangent: any, contactPoint: any, color: string, lineStyle: LineStyle): void {
     try {
       if (tangent && typeof tangent.setAttribute === 'function') tangent.setAttribute({
         strokeColor: color,
@@ -395,6 +407,7 @@ export function init(): void {
         label: { strokeColor: color, fillColor: color, highlightStrokeColor: color, highlightFillColor: color }
       });
     } catch (e) {}
+    applyLineStyle(tangent, lineStyle);
     try {
       if (contactPoint && typeof contactPoint.setAttribute === 'function') contactPoint.setAttribute({
         strokeColor: color,
@@ -491,7 +504,8 @@ export function init(): void {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
-      applyTangentStyle(old.tangent, old.contactPoint, cfg.color);
+      old.lineStyle = cfg.lineStyle;
+      applyTangentStyle(old.tangent, old.contactPoint, cfg.color, cfg.lineStyle);
       applyTangentVisibility(old.tangent, cfg);
       try { board.update(); } catch (e) {}
       return true;
@@ -560,6 +574,7 @@ export function init(): void {
         highlightStrokeColor: cfg.color,
         strokeWidth: 3,
         highlightStrokeWidth: 4,
+        ...lineStyleAttributes(cfg.lineStyle),
         label: {
           visible: cfg.visible && !!lineName && cfg.lineShowName,
           strokeColor: cfg.color,
@@ -598,6 +613,7 @@ export function init(): void {
       tangent.__liaDgsShowObject = cfg.visible;
       tangent.__liaDgsOpacity = 1;
       tangent.__liaDgsShowEquation = false;
+      applyTangentStyle(tangent, contactPoint, cfg.color, cfg.lineStyle);
       if (tangent.label) {
         tangent.label.__liaDgsMacroManaged = true;
         tangent.label.__liaDgsOwner = tangent;
@@ -627,6 +643,7 @@ export function init(): void {
         pointShowName: cfg.pointShowName,
         language: cfg.language,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board,
         source: resolved.source,
         contactPoint,
@@ -721,6 +738,7 @@ export function init(): void {
       setElementVisibility(sector && sector.label, labelVisible);
       if (sector) sector.__liaDgsShowObject = visible;
     } catch (e) {}
+    applyLineStyle(sector, cfg.lineStyle);
   }
 
   function removeSectorEntryByKey(key: string): void {
@@ -753,6 +771,7 @@ export function init(): void {
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.opacity = cfg.opacity;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applySectorStyle(old.sector, cfg);
       try { board.update(); } catch (e) {}
       return true;
@@ -770,6 +789,7 @@ export function init(): void {
         highlightStrokeColor: cfg.color,
         strokeWidth: 3,
         highlightStrokeWidth: 4,
+        ...lineStyleAttributes(cfg.lineStyle),
         fillColor: cfg.color,
         highlightFillColor: cfg.color,
         fillOpacity: cfg.opacity,
@@ -816,6 +836,7 @@ export function init(): void {
         showArea: cfg.showArea,
         showPerimeter: cfg.showPerimeter,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board,
         points,
         sector
@@ -921,7 +942,7 @@ export function init(): void {
       const entry = window.__tangentEntries[key];
       if (!entry) return;
       if (!entry.hasExplicitColor) entry.color = getAccentColor();
-      applyTangentStyle(entry.tangent, entry.contactPoint, entry.color);
+      applyTangentStyle(entry.tangent, entry.contactPoint, entry.color, entry.lineStyle || 'solid');
       applyTangentVisibility(entry.tangent, entry as TangentConfig);
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });

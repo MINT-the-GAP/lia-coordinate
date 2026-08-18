@@ -6,6 +6,12 @@ import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint } from '../shared/boardObjects';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import {
+  applyLineStyle,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 interface AngleConfig {
   boardId: string;
@@ -18,6 +24,7 @@ interface AngleConfig {
   showValue: boolean;
   language: 'de' | 'en';
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 interface XY {
@@ -97,7 +104,8 @@ export function init(): void {
         return /^(?:wert|value)\s*=\s*1$/i.test(option);
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-      visible: visible
+      visible: visible,
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -318,6 +326,7 @@ export function init(): void {
     angle.__liaDgsOpacity = cfg.opacity;
     angle.__liaDgsShowAngle = cfg.showValue;
     angle.__liaDgsAngleLabel = label || null;
+    applyLineStyle(angle, cfg.lineStyle);
     if (label) {
       label.__liaDgsMacroManaged = true;
       label.__liaDgsOwner = angle;
@@ -402,6 +411,7 @@ export function init(): void {
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applyAngleStyle(old.angle, cfg.color, cfg.opacity);
       applyLabelStyle(old.label, cfg.color, cfg.opacity);
       applyAngleVisibility(old.angle, old.label, cfg);
@@ -433,6 +443,7 @@ export function init(): void {
         highlightStrokeColor: cfg.color,
         strokeWidth: 2.5,
         highlightStrokeWidth: 2.5,
+        ...lineStyleAttributes(cfg.lineStyle),
         fillColor: cfg.color,
         highlightFillColor: cfg.color,
         fillOpacity: cfg.opacity * 0.2,
@@ -465,6 +476,7 @@ export function init(): void {
         showValue: cfg.showValue,
         language: cfg.language,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board: board,
         angle: angle,
         label: label

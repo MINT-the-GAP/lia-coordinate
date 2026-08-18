@@ -5,6 +5,15 @@
 import { getBoardObjects } from '../shared/boardObjects';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { splitTopLevel, unquote } from '../shared/parser';
+import {
+  DEFAULT_ANGLE_TOLERANCE,
+  DEFAULT_LENGTH_TOLERANCE,
+  analyzePolygonGeometry,
+  isLearnerDgsPolygon,
+  normalizePolygonCounterClockwise,
+  readPolygonCoordinates,
+  type PolygonCoordinate,
+} from '../shared/polygonGeometry';
 
 export type ConstructionConstraintKind = 'side' | 'angle';
 export type ConstructionQuizMode = 'fixed' | 'open';
@@ -24,18 +33,11 @@ export type ConstructionQuizConfig = {
   valid: boolean;
 };
 
-type ConstructionCoordinate = {
-  x: number;
-  y: number;
-};
+type ConstructionCoordinate = PolygonCoordinate;
 
 type ConstructionFeature = ConstructionConstraint & {
   boundaryIndex: number;
 };
-
-const DEFAULT_LENGTH_TOLERANCE = 0.05;
-const DEFAULT_ANGLE_TOLERANCE = 1;
-const GEOMETRY_EPSILON = 1e-10;
 
 function normalizeWord(value: unknown): string {
   return String(value == null ? '' : value)
@@ -193,193 +195,14 @@ export function parseConstructionQuizSpec(spec: string): ConstructionQuizConfig 
   };
 }
 
-function readPolygonCoordinates(polygon: any): ConstructionCoordinate[] {
-  if (!polygon || !Array.isArray(polygon.vertices)) return [];
-  const coordinates: ConstructionCoordinate[] = [];
-  for (const vertex of polygon.vertices) {
-    try {
-      const x = Number(vertex && vertex.X());
-      const y = Number(vertex && vertex.Y());
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
-      coordinates.push({ x, y });
-    } catch (e) {
-      return [];
-    }
-  }
-
-  if (coordinates.length > 1) {
-    const first = coordinates[0];
-    const last = coordinates[coordinates.length - 1];
-    if (
-      polygon.vertices[0] === polygon.vertices[polygon.vertices.length - 1] ||
-      (Math.abs(first.x - last.x) <= GEOMETRY_EPSILON &&
-       Math.abs(first.y - last.y) <= GEOMETRY_EPSILON)
-    ) {
-      coordinates.pop();
-    }
-  }
-  return coordinates;
-}
-
-function signedDoubleArea(coordinates: ConstructionCoordinate[]): number {
-  if (coordinates.length < 3) return 0;
-  const origin = coordinates[0];
-  let sum = 0;
-  for (let index = 1; index < coordinates.length - 1; index += 1) {
-    const currentX = coordinates[index].x - origin.x;
-    const currentY = coordinates[index].y - origin.y;
-    const nextX = coordinates[index + 1].x - origin.x;
-    const nextY = coordinates[index + 1].y - origin.y;
-    sum += currentX * nextY - nextX * currentY;
-  }
-  return sum;
-}
-
-function coordinateScale(coordinates: ConstructionCoordinate[]): number {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  coordinates.forEach(function(point) {
-    minX = Math.min(minX, point.x);
-    maxX = Math.max(maxX, point.x);
-    minY = Math.min(minY, point.y);
-    maxY = Math.max(maxY, point.y);
-  });
-  return Math.max(1, maxX - minX, maxY - minY);
-}
-
-function cross(
-  a: ConstructionCoordinate,
-  b: ConstructionCoordinate,
-  c: ConstructionCoordinate
-): number {
-  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-}
-
-function pointOnSegment(
-  a: ConstructionCoordinate,
-  b: ConstructionCoordinate,
-  point: ConstructionCoordinate,
-  epsilon: number
-): boolean {
-  return Math.abs(cross(a, b, point)) <= epsilon &&
-    point.x >= Math.min(a.x, b.x) - epsilon &&
-    point.x <= Math.max(a.x, b.x) + epsilon &&
-    point.y >= Math.min(a.y, b.y) - epsilon &&
-    point.y <= Math.max(a.y, b.y) + epsilon;
-}
-
-function segmentsIntersect(
-  a: ConstructionCoordinate,
-  b: ConstructionCoordinate,
-  c: ConstructionCoordinate,
-  d: ConstructionCoordinate,
-  epsilon: number
-): boolean {
-  const abC = cross(a, b, c);
-  const abD = cross(a, b, d);
-  const cdA = cross(c, d, a);
-  const cdB = cross(c, d, b);
-  if (
-    ((abC > epsilon && abD < -epsilon) || (abC < -epsilon && abD > epsilon)) &&
-    ((cdA > epsilon && cdB < -epsilon) || (cdA < -epsilon && cdB > epsilon))
-  ) {
-    return true;
-  }
-  return pointOnSegment(a, b, c, epsilon) ||
-    pointOnSegment(a, b, d, epsilon) ||
-    pointOnSegment(c, d, a, epsilon) ||
-    pointOnSegment(c, d, b, epsilon);
-}
-
-function isSimpleNonDegeneratePolygon(coordinates: ConstructionCoordinate[]): boolean {
-  const count = coordinates.length;
-  if (count < 3) return false;
-  const scale = coordinateScale(coordinates);
-  const epsilon = GEOMETRY_EPSILON * scale;
-  const areaEpsilon = GEOMETRY_EPSILON * scale * scale;
-  if (Math.abs(signedDoubleArea(coordinates)) <= areaEpsilon) return false;
-
-  for (let first = 0; first < count; first += 1) {
-    const firstNext = (first + 1) % count;
-    const dx = coordinates[firstNext].x - coordinates[first].x;
-    const dy = coordinates[firstNext].y - coordinates[first].y;
-    if (Math.hypot(dx, dy) <= epsilon) return false;
-    if (
-      Math.abs(cross(
-        coordinates[(first - 1 + count) % count],
-        coordinates[first],
-        coordinates[firstNext]
-      )) <= areaEpsilon
-    ) {
-      // A point on a straight side is not an additional geometric corner.
-      return false;
-    }
-    for (let second = first + 1; second < count; second += 1) {
-      if (
-        second === first ||
-        second === firstNext ||
-        (second + 1) % count === first
-      ) {
-        continue;
-      }
-      if (
-        segmentsIntersect(
-          coordinates[first],
-          coordinates[firstNext],
-          coordinates[second],
-          coordinates[(second + 1) % count],
-          epsilon
-        )
-      ) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function normalizeCounterClockwise(
-  coordinates: ConstructionCoordinate[]
-): ConstructionCoordinate[] {
-  return signedDoubleArea(coordinates) < 0
-    ? coordinates.slice().reverse()
-    : coordinates.slice();
-}
-
-function interiorAngle(
-  previous: ConstructionCoordinate,
-  current: ConstructionCoordinate,
-  next: ConstructionCoordinate
-): number {
-  const incomingX = current.x - previous.x;
-  const incomingY = current.y - previous.y;
-  const outgoingX = next.x - current.x;
-  const outgoingY = next.y - current.y;
-  const turn = Math.atan2(
-    incomingX * outgoingY - incomingY * outgoingX,
-    incomingX * outgoingX + incomingY * outgoingY
-  ) * 180 / Math.PI;
-  let result = 180 - turn;
-  if (result <= 0) result += 360;
-  if (result >= 360) result -= 360;
-  return result;
-}
-
 export function buildConstructionFeatures(
   inputCoordinates: ConstructionCoordinate[]
 ): ConstructionFeature[] {
-  if (!isSimpleNonDegeneratePolygon(inputCoordinates)) return [];
-  const coordinates = normalizeCounterClockwise(inputCoordinates);
+  const analysis = analyzePolygonGeometry(inputCoordinates);
+  if (!analysis.valid) return [];
+  const coordinates = normalizePolygonCounterClockwise(inputCoordinates);
   const count = coordinates.length;
-  const angles = coordinates.map(function(current, index) {
-    return interiorAngle(
-      coordinates[(index - 1 + count) % count],
-      current,
-      coordinates[(index + 1) % count]
-    );
-  });
+  const angles = analysis.interiorAngles;
   const features: ConstructionFeature[] = [];
   for (let index = 0; index < count; index += 1) {
     const nextIndex = (index + 1) % count;
@@ -480,16 +303,11 @@ function matchesOpenConstruction(
   return true;
 }
 
-function isLearnerPolygon(object: any): boolean {
-  if (!object || object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey) return false;
-  return object.__liaDgsPolygon === true && Array.isArray(object.vertices);
-}
-
 export function polygonMatchesConstruction(
   polygon: any,
   config: ConstructionQuizConfig
 ): boolean {
-  if (!config.valid || !isLearnerPolygon(polygon)) return false;
+  if (!config.valid || !isLearnerDgsPolygon(polygon, false)) return false;
   const coordinates = readPolygonCoordinates(polygon);
   if (coordinates.length !== config.corners) return false;
   const features = buildConstructionFeatures(coordinates);

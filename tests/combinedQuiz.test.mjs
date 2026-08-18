@@ -14,6 +14,7 @@ registerHooks({
 
 const {
   checkCombinedQuizOnBoard,
+  evaluateCombinedQuizOnBoard,
   parseCombinedQuizSpec
 } = await import('../src/subsystems/combinedQuiz.ts');
 
@@ -65,6 +66,7 @@ test('combined quiz parser accepts German condition names', () => {
 
   assert.equal(config.valid, true);
   assert.equal(config.boardId, 'board-de');
+  assert.equal('error' in config, false, 'valid legacy parser shape stays additive');
   assert.equal(config.corners, 4);
   assert.deepEqual(conditionSummary(config), [
     'construction',
@@ -93,15 +95,181 @@ test('combined quiz parser accepts English condition names', () => {
   ]);
 });
 
+test('combined quiz parser accepts Form with localized types and exclusions', () => {
+  const german = parseCombinedQuizSpec(
+    'board-de;4;Form(Parallelogramm;exklusiv=Raute|Rechteck);Flaeche(18;0.05)'
+  );
+  assert.equal(german.valid, true);
+  assert.deepEqual(conditionSummary(german), ['form', 'metric:area']);
+  assert.equal(german.conditions[0].config.form, 'parallelogram');
+  assert.deepEqual(german.conditions[0].config.exclusions, ['rhombus', 'rectangle']);
+
+  const english = parseCombinedQuizSpec('board-en;4;fOrM(Rectangle;EXKLUSIV=Square)');
+  assert.equal(english.valid, true);
+  assert.equal(english.conditions[0].config.form, 'rectangle');
+  assert.deepEqual(english.conditions[0].config.exclusions, ['square']);
+});
+
 test('combined quiz parser rejects missing and invalid conditions', () => {
   [
     'board;4',
     'board;4;Flaeche()',
     'board;4;Konstruktion(offen;)',
-    'board;4;Unbekannt(12;0.05)'
+    'board;4;Unbekannt(12;0.05)',
+    'board;4;Form(Unbekannt)',
+    'board;4;Form(Raute;exklusiv=Unbekannt)',
+    'board;4;Form(Raute;exklusiv=Raute)',
+    'board;4;Form(Raute;modus=exakt)',
+    'board;4;Form()',
+    'board;2;Form(Raute)',
+    'board;3;Form(Raute)'
   ].forEach((spec) => {
     assert.equal(parseCombinedQuizSpec(spec).valid, false, spec);
   });
+  assert.equal(
+    parseCombinedQuizSpec('board;4;Form()').error?.formConfig.error,
+    'missing-form'
+  );
+  assert.equal(
+    parseCombinedQuizSpec('board;2;Form(Raute)').error?.formConfig.error,
+    'requires-four-corners'
+  );
+});
+
+test('Form and area must be satisfied by the same learner polygon', () => {
+  const config = parseCombinedQuizSpec(
+    'board;4;Form(Raute);Flaeche(20;0.001)'
+  );
+  const board = boardWithPolygons([
+    // A genuine rhombus with area 15.
+    (owner) => polygon(owner, [[0, 0], [5, 0], [9, 3], [4, 3]]),
+    // Area 20, but side lengths 5 and 4.
+    (owner) => polygon(owner, [[0, 0], [5, 0], [5, 4], [0, 4]])
+  ]);
+
+  assert.equal(config.valid, true);
+  assert.equal(checkCombinedQuizOnBoard(board, config), false);
+  const diagnostic = evaluateCombinedQuizOnBoard(board, config, 'en');
+  assert.equal(diagnostic.code, 'area-mismatch');
+  assert.equal(diagnostic.polygon, board.objectsList[0]);
+
+  const matching = polygon(board, [[0, 0], [5, 0], [8, 4], [3, 4]]);
+  board.objectsList.push(matching);
+  board.objects.matching = matching;
+  assert.equal(checkCombinedQuizOnBoard(board, config), true);
+});
+
+test('one free rhombus satisfies Form, area, and perimeter together', () => {
+  const config = parseCombinedQuizSpec(
+    'board;4;Form(Rhombus);Area(20;0.001);Perimeter(20;0.001)'
+  );
+  const board = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [5, 0], [8, 4], [3, 4]])
+  ]);
+
+  assert.equal(config.valid, true);
+  assert.equal(checkCombinedQuizOnBoard(board, config), true);
+});
+
+test('combined exclusions retain inclusive geometric semantics', () => {
+  const rectangle = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [4, 0], [4, 2], [0, 2]])
+  ]);
+  const square = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [2, 0], [2, 2], [0, 2]])
+  ]);
+  const general = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [6, 0], [7.5, 3], [1.5, 3]])
+  ]);
+  const trapezoid = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [5, 0], [4, 2], [1, 2]])
+  ]);
+
+  assert.equal(
+    checkCombinedQuizOnBoard(rectangle, parseCombinedQuizSpec(
+      'board;4;Form(Parallelogramm;exklusiv=Raute)'
+    )),
+    true
+  );
+  assert.equal(
+    checkCombinedQuizOnBoard(square, parseCombinedQuizSpec(
+      'board;4;Form(Parallelogramm;exklusiv=Raute)'
+    )),
+    false
+  );
+  assert.equal(
+    checkCombinedQuizOnBoard(general, parseCombinedQuizSpec(
+      'board;4;Form(Parallelogramm;exklusiv=Raute|Rechteck);Flaeche(18;0.001)'
+    )),
+    true
+  );
+  assert.equal(
+    checkCombinedQuizOnBoard(trapezoid, parseCombinedQuizSpec(
+      'board;4;Form(Trapez;exklusiv=Parallelogramm)'
+    )),
+    true
+  );
+  assert.equal(
+    checkCombinedQuizOnBoard(general, parseCombinedQuizSpec(
+      'board;4;Form(Trapez;exklusiv=Parallelogramm)'
+    )),
+    false
+  );
+});
+
+test('combined evaluation localizes invalid, base, excluded, and metric failures', () => {
+  const bowTie = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [2, 2], [0, 2], [2, 0]])
+  ]);
+  const invalid = evaluateCombinedQuizOnBoard(
+    bowTie,
+    parseCombinedQuizSpec('board;4;Form(Trapez)'),
+    'de'
+  );
+  assert.equal(invalid.code, 'invalid-quadrilateral');
+  assert.match(invalid.message, /selbstüberschneidend/);
+
+  const rectangle = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [4, 0], [4, 2], [0, 2]])
+  ]);
+  const base = evaluateCombinedQuizOnBoard(
+    rectangle,
+    parseCombinedQuizSpec('board;4;Form(Raute)'),
+    'de'
+  );
+  assert.equal(base.code, 'form-mismatch');
+  assert.match(base.message, /keine Raute/);
+
+  const square = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [2, 0], [2, 2], [0, 2]])
+  ]);
+  const excluded = evaluateCombinedQuizOnBoard(
+    square,
+    parseCombinedQuizSpec('board;4;Form(Rectangle;exklusiv=Square)'),
+    'en'
+  );
+  assert.equal(excluded.code, 'excluded-form');
+  assert.match(excluded.message, /excluded shape square/);
+
+  const metric = evaluateCombinedQuizOnBoard(
+    rectangle,
+    parseCombinedQuizSpec('board;4;Form(Rectangle);Area(9;0.001)'),
+    'en'
+  );
+  assert.equal(metric.code, 'area-mismatch');
+  assert.match(metric.message, /area condition/);
+
+  const mixed = boardWithPolygons([
+    (owner) => polygon(owner, [[0, 0], [2, 2], [0, 2], [2, 0]]),
+    (owner) => polygon(owner, [[0, 0], [4, 0], [4, 2], [0, 2]])
+  ]);
+  const preferredValidCandidate = evaluateCombinedQuizOnBoard(
+    mixed,
+    parseCombinedQuizSpec('board;4;Form(Raute)'),
+    'en'
+  );
+  assert.equal(preferredValidCandidate.code, 'form-mismatch');
+  assert.equal(preferredValidCandidate.polygon, mixed.objectsList[1]);
 });
 
 test('different polygons cannot satisfy construction and area separately', () => {
@@ -198,4 +366,27 @@ test('combined quiz fixture covers a native hint and detailed solution in HTML',
   assert.match(fixture, /@GeometrieQuiz\(/);
   assert.match(fixture, /\[\[\?\]\]/);
   assert.equal((fixture.match(/^\*{16}$/gm) || []).length, 2);
+});
+
+test('README documents the complete Form API and executable rhombus example', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  [
+    'Parallelogramm', 'Parallelogram',
+    'Rechteck', 'Rectangle',
+    'Raute', 'Rhombus',
+    'Quadrat', 'Square',
+    'Trapez', 'Trapezoid',
+    'Drachenviereck', 'Kite'
+  ].forEach((name) => assert.match(readme, new RegExp('`' + name + '`')));
+
+  assert.match(readme, /Form\(<quadrilateralType>;exklusiv=<type>\[\|<type>\.\.\.\]\)/);
+  assert.match(readme, /The only public `Form` attribute is `exklusiv`/);
+  assert.match(readme, /one and the same polygon/);
+  assert.match(readme, /\\min\(0\.05,\\;0\.01L_\{max\}\)/);
+  assert.equal((readme.match(/id=rhombus_area/g) || []).length, 4);
+  assert.equal(
+    (readme.match(/Form\(Raute\);Flaeche\(20;0\.05\)/g) || []).length,
+    3,
+    'one compact example plus fenced and live executable examples'
+  );
 });

@@ -16,6 +16,13 @@ import { getLivePoint, createHiddenPoint, getBoardObjects, sameCoordinates } fro
 import { normalizeName, namesEqual } from '../shared/format';
 import { normalizedTexName as texName } from '../shared/texName';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 type RelationKind = 'orthogonal' | 'parallel' | 'midpoint';
 
@@ -37,6 +44,7 @@ interface RelationConfig {
   language: 'de' | 'en';
   showValue: boolean;
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 interface ResolvedRelationInput {
@@ -100,7 +108,7 @@ export function init(): void {
     }).find(Boolean) || '';
     const positionalName = trailingOptions.find(function(part) {
       return !/^name\s*=/i.test(part) && !isValueOption(part) &&
-        !isHiddenNameOption(part) && !isVisibilityOption(part);
+        !isHiddenNameOption(part) && !isVisibilityOption(part) && !isLineStyleOption(part);
     }) || '';
     const parsed = parseMacroName(namedOption || positionalName, fallback);
     return {
@@ -156,7 +164,8 @@ export function init(): void {
         showName: objectName.showName,
         language: languageValue,
         showValue: trailingOptions.some(isValueOption),
-        visible: optionVisibility(trailingOptions)
+        visible: optionVisibility(trailingOptions),
+        lineStyle: parseLineStyleOptions(trailingOptions)
       };
     }
 
@@ -200,7 +209,8 @@ export function init(): void {
       showName: objectName.showName,
       language: languageValue,
       showValue: false,
-      visible: optionVisibility(trailingOptions)
+      visible: optionVisibility(trailingOptions),
+      lineStyle: parseLineStyleOptions(trailingOptions)
     };
   }
 
@@ -348,6 +358,7 @@ export function init(): void {
         }
       });
     } catch (e) {}
+    applyLineStyle(object, cfg.lineStyle);
     try {
       if (cfg.visible && typeof object.showElement === 'function') object.showElement();
       if (!cfg.visible && typeof object.hideElement === 'function') object.hideElement();
@@ -393,6 +404,7 @@ export function init(): void {
     object.__liaDgsShowObject = cfg.visible;
     object.__liaDgsOpacity = 1;
     object.__liaDgsShowEquation = false;
+    applyLineStyle(object, cfg.lineStyle);
     [baseLine && baseLine.point1, baseLine && baseLine.point2, throughPoint].forEach(function(point) {
       if (!point || point.__liaDgsPointName) return;
       point.__liaDgsMacroManaged = true;
@@ -550,6 +562,7 @@ export function init(): void {
       highlightStrokeColor: cfg.color,
       strokeWidth: 3,
       highlightStrokeWidth: 4,
+      ...lineStyleAttributes(cfg.lineStyle),
       label: {
         visible: cfg.visible && cfg.showName && !!cfg.objectName,
         strokeColor: cfg.color,
@@ -599,6 +612,7 @@ export function init(): void {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applyRelationVisual(old.object, cfg);
       applyRelationDgsMetadata(old.object, cfg, old.baseLine, old.throughPoint);
       try { board.update(); } catch (e) {}
@@ -631,6 +645,7 @@ export function init(): void {
         showName: cfg.showName,
         language: cfg.language,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board: board,
         object: object,
         baseLine: input.baseLine,
@@ -854,7 +869,8 @@ export function init(): void {
         showName: entry.showName !== false,
         language: String(entry.language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
         showValue: !!entry.showValue,
-        visible: entry.visible !== false
+        visible: entry.visible !== false,
+        lineStyle: entry.lineStyle || 'solid'
       };
       if (entry.kind === 'midpoint') applyMidpointVisual(entry.object, cfg);
       else applyRelationVisual(entry.object, cfg);

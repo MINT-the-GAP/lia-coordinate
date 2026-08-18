@@ -145,6 +145,12 @@ test('native quiz capture writes the hidden LiaScript input before checking', ()
   assert.match(source, /\[data-lia-coordinate-quiz-input\] input\.lia-quiz__input/);
   assert.match(source, /input\.value = solved \? QUIZ_TOKEN : ''/);
   assert.match(source, /new Event\('input', \{ bubbles: true \}\)/);
+  assert.match(source, /updateCoordinateQuizFeedback\(anchor, quiz, solved\)/);
+  assert.match(source, /combined-quiz-spec-/);
+  assert.match(source, /data-lia-coordinate-quiz-feedback/);
+  assert.match(source, /feedback\.setAttribute\('role', 'status'\)/);
+  assert.match(source, /feedback\.setAttribute\('aria-live', 'polite'\)/);
+  assert.match(source, /liaCoordinateCheckBound[\s\S]*updateCoordinateQuizFeedback\(anchor, quiz, false\)/);
   assert.match(source, /MutationObserver/);
   assert.doesNotMatch(source, /output-marker|validator-output|querySelector[^\n]*output/);
 

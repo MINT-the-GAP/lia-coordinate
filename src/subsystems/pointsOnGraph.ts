@@ -5,6 +5,7 @@ import { unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
+import { applyLineStyle, lineStyleAttributes, parseLineStyleOptions } from '../shared/lineStyle';
 
 export function init(): void {
   if (window.__pointsOnGraphReady) {
@@ -123,7 +124,8 @@ export function init(): void {
       expr: expr,
       graphColor: graphColor || '#b41f65',
       eps: eps,
-      names: names
+      names: names,
+      lineStyle: parseLineStyleOptions(parts)
     };
   }
 
@@ -641,12 +643,14 @@ export function init(): void {
         strokeColor: graphColor,
         highlightStrokeColor: graphColor,
         strokeWidth: 3,
+        ...lineStyleAttributes(target.lineStyle),
         fixed: true,
         withLabel: false,
         resolution: 3,
         vectorContent: 2,
         plotpoints: false
       });
+      applyLineStyle(graph, target.lineStyle);
 
       const labelPack = createFunctionLabel(board, f, graphName, graphColor);
 
@@ -657,12 +661,14 @@ export function init(): void {
         text: labelPack.text,
         name: graphName,
         color: graphColor,
+        lineStyle: target.lineStyle,
         expr: expr
       };
       window.__pointGraphStates[boardId][graphKey] = {
         visible: true,
         name: graphName,
-        color: graphColor
+        color: graphColor,
+        lineStyle: target.lineStyle
       };
       scheduleSourceLayers();
 
@@ -700,6 +706,8 @@ export function init(): void {
           });
         }
       } catch (e) {}
+      applyLineStyle(entry.graph, target.lineStyle);
+      entry.lineStyle = target.lineStyle;
 
       try {
         if (entry.text) {
@@ -714,7 +722,8 @@ export function init(): void {
       window.__pointGraphStates[boardId][graphKey] = {
         visible: true,
         name: target.graphName,
-        color: graphColor
+        color: graphColor,
+        lineStyle: target.lineStyle
       };
     }
 

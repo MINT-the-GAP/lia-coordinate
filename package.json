@@ -4,7 +4,7 @@
   "description": "LiaScript plugin for interactive coordinate systems using JSXGraph",
   "scripts": {
     "build": "parcel build src/index.ts --dist-dir dist --no-scope-hoist",
-    "test": "node --test tests/macroLayer.test.mjs tests/combinedQuiz.test.mjs tests/constructionQuiz.test.mjs tests/quizMacros.test.mjs tests/area.test.mjs tests/dgsRegressionProfile.test.mjs"
+    "test": "node --test tests/macroLayer.test.mjs tests/combinedQuiz.test.mjs tests/quadrilateralForm.test.mjs tests/constructionQuiz.test.mjs tests/quizMacros.test.mjs tests/area.test.mjs tests/dgsRegressionProfile.test.mjs tests/lineStyle.test.mjs"
   },
   "devDependencies": {
     "parcel": "^2.13.3",

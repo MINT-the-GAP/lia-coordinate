@@ -565,3 +565,32 @@ test('direct rendering updates once and then becomes idempotent', (t) => {
   assertNoActivity(board);
   assert.equal(harness.scheduled.length, 0);
 });
+
+test('line-style options update a polygon outline in place, including every border', (t) => {
+  const board = fakeBoard('board-a');
+  const harness = areaHarness(t, { 'board-a': board });
+  const dotted = areaSpec('board-a', { options: ['linestyle=dotted'] });
+
+  assert.equal(harness.window.renderAreaFromSpec('line-style', dotted, 'en'), true);
+  const entry = harness.window.__areaEntries['area-line-style'];
+  const polygon = entry.polygon;
+  assert.equal(entry.lineStyle, 'dotted');
+  assert.ok(polygon.attributes.some(attributes => attributes.dash === 7));
+  assert.ok(polygon.borders.every(border =>
+    border.attributes.some(attributes => attributes.dash === 7)
+  ));
+
+  board.resetCalls();
+  const dashDotted = areaSpec('board-a', { options: ['Linienstil = DASH-DOTTED'] });
+  assert.equal(harness.window.renderAreaFromSpec('line-style', dashDotted, 'en'), true);
+  const updated = harness.window.__areaEntries['area-line-style'];
+  assert.strictEqual(updated, entry);
+  assert.strictEqual(updated.polygon, polygon);
+  assert.equal(updated.lineStyle, 'dashdotted');
+  assert.equal(board.calls.creates.length, 0);
+  assert.equal(board.calls.removals.length, 0);
+  assert.ok(polygon.attributes.some(attributes => attributes.dash === 6));
+  assert.ok(polygon.borders.every(border =>
+    border.attributes.some(attributes => attributes.dash === 6)
+  ));
+});

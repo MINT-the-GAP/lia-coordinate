@@ -13,6 +13,12 @@ import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 interface DistanceDesign {
   normalizedDesign: string;
@@ -34,6 +40,7 @@ interface DistanceConfig extends DistanceDesign {
   segmentName: string;
   showName: boolean;
   strokeWidth: number;
+  lineStyle: LineStyle;
   visible: boolean;
 }
 
@@ -185,6 +192,7 @@ export function init(): void {
       return index !== designIndex &&
         index !== strokeWidthIndex &&
         !/^length\s*=/i.test(part) &&
+        !isLineStyleOption(part) &&
         visibilityOptionValue(part) == null &&
         !isHiddenNameOption(part);
     }) || '';
@@ -204,6 +212,7 @@ export function init(): void {
       segmentName: parsedName.name,
       showName: parsedName.showName && !standaloneHiddenName,
       strokeWidth: parseStrokeWidth(strokeWidthToken),
+      lineStyle: parseLineStyleOptions(trailingOptions),
       visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       ...design
     };
@@ -340,7 +349,8 @@ export function init(): void {
     strokeWidth: number,
     firstArrow: boolean,
     lastArrow: boolean,
-    normalizedDesign: string
+    normalizedDesign: string,
+    lineStyle: LineStyle
   ): void {
     if (!segment || typeof segment.setAttribute !== 'function') return;
 
@@ -354,6 +364,7 @@ export function init(): void {
         lastArrow: arrowHead(lastArrow, strokeWidth)
       });
     } catch (e) {}
+    applyLineStyle(segment, lineStyle);
     try {
       segment.__liaDistanceColor = color;
       segment.__liaDistanceStrokeWidth = strokeWidth;
@@ -367,7 +378,8 @@ export function init(): void {
     strokeWidth: number,
     firstArrow: boolean,
     lastArrow: boolean,
-    normalizedDesign: string
+    normalizedDesign: string,
+    lineStyle: LineStyle
   ): void {
     segments.forEach(function(segment, index) {
       applySegmentStyle(
@@ -376,7 +388,8 @@ export function init(): void {
         strokeWidth,
         firstArrow && index === 0,
         lastArrow && index === segments.length - 1,
-        normalizedDesign
+        normalizedDesign,
+        lineStyle
       );
     });
   }
@@ -471,6 +484,7 @@ export function init(): void {
       segment.__liaDgsLanguage = cfg.language;
       segment.__liaDgsSegmentDesign = design;
       segment.__liaDgsSegmentStrokeWidth = cfg.strokeWidth;
+      applyLineStyle(segment, cfg.lineStyle);
 
       if (index === 0 && entry.label) segment.label = entry.label;
       if (isTwoPointSegment) {
@@ -746,6 +760,7 @@ export function init(): void {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.strokeWidth = cfg.strokeWidth;
+      old.lineStyle = cfg.lineStyle;
       old.firstArrow = cfg.firstArrow;
       old.lastArrow = cfg.lastArrow;
       old.startCap = cfg.startCap;
@@ -757,7 +772,8 @@ export function init(): void {
         cfg.strokeWidth,
         cfg.firstArrow,
         cfg.lastArrow,
-        cfg.normalizedDesign
+        cfg.normalizedDesign,
+        cfg.lineStyle
       );
       applyCapStyles(old.capSegments, cfg.color, cfg.strokeWidth);
       applyLabelColor(old.label, cfg.color);
@@ -809,6 +825,7 @@ export function init(): void {
         segment.__liaDistanceColor = cfg.color;
         segment.__liaDistanceStrokeWidth = cfg.strokeWidth;
         segment.__liaDistanceDesign = cfg.normalizedDesign;
+        applyLineStyle(segment, cfg.lineStyle);
         segments.push(segment);
       }
 
@@ -843,6 +860,7 @@ export function init(): void {
         showName: cfg.showName,
         visible: cfg.visible,
         strokeWidth: cfg.strokeWidth,
+        lineStyle: cfg.lineStyle,
         normalizedDesign: cfg.normalizedDesign,
         firstArrow: cfg.firstArrow,
         lastArrow: cfg.lastArrow,
@@ -973,7 +991,8 @@ export function init(): void {
           Number(entry.strokeWidth) || 3,
           !!entry.firstArrow,
           !!entry.lastArrow,
-          String(entry.normalizedDesign || '')
+          String(entry.normalizedDesign || ''),
+          entry.lineStyle || 'solid'
         );
         applyCapStyles(
           Array.isArray(entry.capSegments) ? entry.capSegments : [],

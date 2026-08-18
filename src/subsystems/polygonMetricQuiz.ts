@@ -5,6 +5,14 @@
 import { getBoardObjects } from '../shared/boardObjects';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { splitTopLevel, unquote } from '../shared/parser';
+import {
+  isLearnerDgsPolygon,
+  polygonArea,
+  polygonPerimeter,
+  readPolygonCoordinates,
+} from '../shared/polygonGeometry';
+
+export { polygonArea, polygonPerimeter } from '../shared/polygonGeometry';
 
 export type PolygonMetricKind = 'perimeter' | 'area';
 
@@ -14,11 +22,6 @@ export type PolygonMetricQuizSpec = {
   target: number;
   tolerance: number;
   valid: boolean;
-};
-
-type PolygonCoordinate = {
-  x: number;
-  y: number;
 };
 
 function normalizeKind(value: unknown): PolygonMetricKind | null {
@@ -52,61 +55,6 @@ export function parsePolygonMetricQuizSpec(spec: string): PolygonMetricQuizSpec 
   return { boardId, corners, target, tolerance, valid };
 }
 
-function getPolygonCoordinates(polygon: any): PolygonCoordinate[] {
-  if (!polygon || !Array.isArray(polygon.vertices)) return [];
-  const vertices = polygon.vertices.slice();
-  // JSXGraph closes polygons by appending the first vertex once more. The DGS
-  // persistence layer removes that same sentinel before serializing a polygon;
-  // it is a closing aid, not an additional corner of the N-gon.
-  if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) {
-    vertices.pop();
-  }
-  const coordinates: PolygonCoordinate[] = [];
-  for (const vertex of vertices) {
-    try {
-      const x = Number(vertex && vertex.X());
-      const y = Number(vertex && vertex.Y());
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
-      coordinates.push({ x, y });
-    } catch (e) {
-      return [];
-    }
-  }
-  return coordinates;
-}
-
-export function polygonArea(coordinates: PolygonCoordinate[]): number {
-  let sum = 0;
-  for (let index = 0; index < coordinates.length; index += 1) {
-    const current = coordinates[index];
-    const next = coordinates[(index + 1) % coordinates.length];
-    sum += current.x * next.y - next.x * current.y;
-  }
-  return Math.abs(sum) / 2;
-}
-
-export function polygonPerimeter(coordinates: PolygonCoordinate[]): number {
-  let sum = 0;
-  for (let index = 0; index < coordinates.length; index += 1) {
-    const current = coordinates[index];
-    const next = coordinates[(index + 1) % coordinates.length];
-    sum += Math.hypot(next.x - current.x, next.y - current.y);
-  }
-  return sum;
-}
-
-function isLearnerDgsPolygon(object: any): boolean {
-  if (!object || object.__liaDgsMacroManaged === true || object.__liaDgsMacroKey) return false;
-  if (!Array.isArray(object.vertices)) return false;
-
-  // Interactive DGS polygons carry __liaDgsPolygon. Keep the JSXGraph type as
-  // a fallback because LiaScript can remount/restore a board before all DGS
-  // metadata has been attached again. In that short-lived state the object is
-  // still an ordinary JSXGraph polygon and must remain checkable.
-  const elementType = String(object.elType || object.elementClass || '').toLowerCase();
-  return object.__liaDgsPolygon === true || elementType === 'polygon';
-}
-
 /** Check one concrete learner polygon against one metric condition. */
 export function polygonMatchesMetric(
   polygon: any,
@@ -114,7 +62,7 @@ export function polygonMatchesMetric(
   kind: PolygonMetricKind
 ): boolean {
   if (!config.valid || !isLearnerDgsPolygon(polygon)) return false;
-  const coordinates = getPolygonCoordinates(polygon);
+  const coordinates = readPolygonCoordinates(polygon);
   if (coordinates.length !== config.corners) return false;
   const metric = kind === 'area' ? polygonArea(coordinates) : polygonPerimeter(coordinates);
   const floatingPointSlack = Number.EPSILON * 16 *

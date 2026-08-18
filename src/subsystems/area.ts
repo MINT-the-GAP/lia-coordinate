@@ -7,6 +7,7 @@ import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme'
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import { applyLineStyle, parseLineStyleOptions, type LineStyle } from '../shared/lineStyle';
 
 interface AreaConfig {
   boardId: string;
@@ -19,6 +20,7 @@ interface AreaConfig {
   showPerimeter: boolean;
   language: 'de' | 'en';
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 interface XY {
@@ -88,7 +90,8 @@ export function init(): void {
         return /^(?:umfang|perimeter)\s*=\s*1$/i.test(option);
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-      visible: visible
+      visible: visible,
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -531,6 +534,7 @@ export function init(): void {
     polygon.__liaDgsShowArea = cfg.showArea;
     polygon.__liaDgsShowPerimeter = cfg.showPerimeter;
     polygon.__liaDgsMeasurementLabel = label || null;
+    applyLineStyle(polygon, cfg.lineStyle);
     points.forEach(function(point) {
       if (!point || point.__liaDgsPointName) return;
       point.__liaDgsMacroManaged = true;
@@ -544,6 +548,7 @@ export function init(): void {
 
     borders.forEach(function(border: any, index: number) {
       if (!border) return;
+      applyLineStyle(border, cfg.lineStyle);
       border.__liaDgsMacroManaged = true;
       border.__liaDgsSegment = true;
       border.__liaDgsPolygonBorder = true;
@@ -675,7 +680,8 @@ export function init(): void {
         old.color === cfg.color &&
         old.opacity === cfg.opacity &&
         old.hasExplicitColor === cfg.hasExplicitColor &&
-        old.visible === cfg.visible
+        old.visible === cfg.visible &&
+        old.lineStyle === cfg.lineStyle
       ) {
         return true;
       }
@@ -685,6 +691,7 @@ export function init(): void {
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applyPolygonStyle(old.polygon, cfg.color, cfg.opacity);
       applyLabelTheme(old.label);
       applyAreaVisibility(old.polygon, old.label, cfg);
@@ -750,6 +757,7 @@ export function init(): void {
         showArea: cfg.showArea,
         showPerimeter: cfg.showPerimeter,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board: board,
         polygon: polygon,
         label: label

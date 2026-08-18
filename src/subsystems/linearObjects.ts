@@ -13,6 +13,13 @@ import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
 import { subscriptTexName as texName } from '../shared/texName';
+import {
+  applyLineStyle,
+  isLineStyleOption,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 type LinearKind = 'line' | 'ray' | 'vector';
 
@@ -27,6 +34,7 @@ interface LinearObjectConfig {
   objectName: string;
   showName: boolean;
   visible: boolean;
+  lineStyle: LineStyle;
   language: 'de' | 'en';
 }
 
@@ -89,7 +97,8 @@ export function init(): void {
       .map(visibilityOptionValue)
       .filter(function(value): value is boolean { return value != null; });
     const nameOptions = trailingOptions.filter(function(part) {
-      return !isHiddenNameOption(part) && visibilityOptionValue(part) == null;
+      return !isHiddenNameOption(part) && !isLineStyleOption(part) &&
+        visibilityOptionValue(part) == null;
     });
     const namedOption = nameOptions.map(function(part) {
       const match = part.match(/^name\s*=\s*(.+)$/i);
@@ -111,6 +120,7 @@ export function init(): void {
       objectName: parsedName.name,
       showName: parsedName.showName && !standaloneHiddenName,
       visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
+      lineStyle: parseLineStyleOptions(trailingOptions),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
     };
   }
@@ -255,7 +265,8 @@ export function init(): void {
       highlightStrokeWidth: 4,
       firstArrow: false,
       lastArrow: cfg.kind === 'vector',
-      visible: cfg.visible
+      visible: cfg.visible,
+      ...lineStyleAttributes(cfg.lineStyle)
     };
     if (cfg.kind === 'vector') {
       return board.create('segment', [points[0], points[1]], base);
@@ -296,6 +307,7 @@ export function init(): void {
     object.__liaDgsFillColor = cfg.color;
     object.__liaDgsTextColor = cfg.color;
     object.__liaDgsLanguage = cfg.language;
+    applyLineStyle(object, cfg.lineStyle);
 
     if (!object.point1) object.point1 = points[0];
     if (!object.point2) object.point2 = points[1];
@@ -333,7 +345,9 @@ export function init(): void {
       old.color = cfg.color;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applyObjectColor(old.object, old.label, cfg.color);
+      applyLineStyle(old.object, cfg.lineStyle);
       applyLinearObjectVisibility(old, cfg);
       applyDgsLinearObjectMetadata(old, cfg);
       try { board.update(); } catch (e) {}
@@ -371,6 +385,7 @@ export function init(): void {
         objectName: cfg.objectName,
         showName: cfg.showName,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         language: cfg.language,
         board: board,
         points: points,

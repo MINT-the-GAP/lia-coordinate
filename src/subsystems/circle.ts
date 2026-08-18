@@ -7,6 +7,12 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint } from '../shared/boardObjects';
 import { subscriptTexName as texName } from '../shared/texName';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
+import {
+  applyLineStyle,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 interface CircleConfig {
   boardId: string;
@@ -22,6 +28,7 @@ interface CircleConfig {
   showCircumference: boolean;
   language: 'de' | 'en';
   visible: boolean;
+  lineStyle: LineStyle;
 }
 
 export function init(): void {
@@ -88,7 +95,8 @@ export function init(): void {
         return /^(?:umfang|circumference|perimeter)\s*=\s*1$/i.test(option);
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
-      visible: visible
+      visible: visible,
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -266,6 +274,7 @@ export function init(): void {
     circle.__liaDgsCircleMeasurementLabel = measurementLabel || null;
     circle.__liaDgsCircleLabel = nameLabel || measurementLabel || null;
     circle.__liaDgsMeasurementLabel = measurementLabel || null;
+    applyLineStyle(circle, cfg.lineStyle);
     if (nameLabel || measurementLabel) circle.label = nameLabel || measurementLabel;
     [nameLabel, measurementLabel].forEach(function(label) {
       if (!label) return;
@@ -339,6 +348,7 @@ export function init(): void {
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
       applyCircleStyle(old.circle, cfg.color, cfg.opacity);
       applyNameStyle(old.nameLabel, cfg.color);
       applyMeasurementTheme(old.measurementLabel);
@@ -371,6 +381,7 @@ export function init(): void {
         highlightStrokeColor: cfg.color,
         strokeWidth: 2.5,
         highlightStrokeWidth: 2.5,
+        ...lineStyleAttributes(cfg.lineStyle),
         fillColor: cfg.color,
         highlightFillColor: cfg.color,
         fillOpacity: cfg.opacity,
@@ -400,6 +411,7 @@ export function init(): void {
         showArea: cfg.showArea,
         showCircumference: cfg.showCircumference,
         visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
         board: board,
         circle: circle,
         nameLabel: nameLabel,

@@ -3,6 +3,7 @@
 
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { compileFunctionExpression } from '../shared/functionExpression';
+import { applyLineStyle, lineStyleAttributes, parseLineStyleOptions } from '../shared/lineStyle';
 
 export function init(): void {
   if (window.__plotFunctionReady) {
@@ -43,7 +44,8 @@ export function init(): void {
       showName: parsedName.showName && !options.some(isHiddenNameOption),
       visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       expr:    parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
-      color:   parts[3] ? unquote(parts[3]) : 'red'
+      color:   parts[3] ? unquote(parts[3]) : 'red',
+      lineStyle: parseLineStyleOptions(options)
     };
   }
 
@@ -403,6 +405,7 @@ export function init(): void {
       (/^de(?:-|$)/i.test(String(document.documentElement.lang || '')) ? 'de' : 'en');
     graph.label = cfg.label || null;
     graph.__liaDgsFunctionLabel = cfg.label || null;
+    applyLineStyle(graph, cfg.lineStyle || 'solid');
   }
 
   window.renderPlotFunctionFromSpec = function(uid, spec) {
@@ -414,6 +417,7 @@ export function init(): void {
     const color = String(cfg.color || 'red').trim() || 'red';
     const showName = cfg.showName !== false;
     const visible = cfg.visible !== false;
+    const lineStyle = cfg.lineStyle || 'solid';
 
     if (!boardId || !expr) return false;
 
@@ -443,6 +447,7 @@ export function init(): void {
       old.fn = fn;
       old.normalized = compiled.normalized;
       old.visible = visible;
+      old.lineStyle = lineStyle;
       applyFunctionVisibility(old.graph, old.label, showName, visible);
       applyDgsFunctionMetadata(old.graph, {
         fn: old.evaluator,
@@ -452,6 +457,7 @@ export function init(): void {
         showName,
         visible,
         color,
+        lineStyle,
         label: old.label
       });
       old.graph.needsUpdate = true;
@@ -471,6 +477,7 @@ export function init(): void {
         strokeColor: color,
         highlightStrokeColor: color,
         strokeWidth: 3,
+        ...lineStyleAttributes(lineStyle),
         resolution: 3,
         vectorContent: 2,
         plotpoints: false,
@@ -490,6 +497,7 @@ export function init(): void {
         showName,
         visible,
         color,
+        lineStyle,
         label: labelPack.label
       });
 
@@ -505,6 +513,7 @@ export function init(): void {
         evaluatorState: evaluatorState,
         evaluator: evaluator,
         color: color,
+        lineStyle: lineStyle,
         graph: graph,
         anchor: labelPack.anchor,
         label: labelPack.label

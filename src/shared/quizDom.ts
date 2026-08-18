@@ -105,6 +105,32 @@ function setNativeQuizInput(anchor: HTMLElement, solved: boolean): boolean {
   return true;
 }
 
+function updateCoordinateQuizFeedback(
+  anchor: HTMLElement,
+  quiz: HTMLElement,
+  solved: boolean
+): void {
+  if (String(anchor.dataset.liaCoordinateQuizKind || '') !== 'combined') return;
+  const uid = anchorUid(anchor);
+  const source = document.getElementById('combined-quiz-spec-' + uid) as HTMLElement | null;
+  const message = solved ? '' : String(source?.dataset.feedback || '');
+  let feedback = quiz.querySelector<HTMLElement>('[data-lia-coordinate-quiz-feedback]');
+
+  if (!message) {
+    if (feedback) feedback.remove();
+    return;
+  }
+  if (!feedback) {
+    feedback = document.createElement('div');
+    feedback.dataset.liaCoordinateQuizFeedback = uid;
+    feedback.className = 'lia-coordinate-quiz-feedback';
+    feedback.setAttribute('role', 'status');
+    feedback.setAttribute('aria-live', 'polite');
+    quiz.appendChild(feedback);
+  }
+  if (feedback.textContent !== message) feedback.textContent = message;
+}
+
 function bindAnchor(anchor: HTMLElement): boolean {
   const quiz = getCoordinateQuizRoot(anchor);
   if (!quiz) return false;
@@ -119,14 +145,22 @@ function bindAnchor(anchor: HTMLElement): boolean {
     paragraph.setAttribute('aria-hidden', 'true');
   }
 
-  if (quiz.dataset.liaCoordinateCheckBound === '1') return true;
+  if (quiz.dataset.liaCoordinateCheckBound === '1') {
+    // Rehydrate detailed feedback if LiaScript replaced quiz descendants while
+    // preserving the quiz root during a reactive remount.
+    updateCoordinateQuizFeedback(anchor, quiz, false);
+    return true;
+  }
   quiz.dataset.liaCoordinateCheckBound = '1';
   quiz.addEventListener('click', (event) => {
     const target = event.target as Element | null;
     const checkButton = target?.closest('.lia-quiz__check');
     if (!checkButton || !quiz.contains(checkButton)) return;
-    setNativeQuizInput(anchor, checkAnchor(anchor));
+    const solved = checkAnchor(anchor);
+    setNativeQuizInput(anchor, solved);
+    updateCoordinateQuizFeedback(anchor, quiz, solved);
   }, true);
+  updateCoordinateQuizFeedback(anchor, quiz, false);
   return true;
 }
 

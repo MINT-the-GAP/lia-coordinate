@@ -4,6 +4,12 @@
 import { parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import {
+  applyLineStyle,
+  lineStyleAttributes,
+  parseLineStyleOptions,
+  type LineStyle
+} from '../shared/lineStyle';
 
 type ScharCfg = {
   name: string;
@@ -13,6 +19,7 @@ type ScharCfg = {
   boardId: string;
   showTerm: boolean;
   color: string;
+  lineStyle: LineStyle;
 };
 
 type ScharEntry = {
@@ -359,7 +366,8 @@ function parseScharSpec(spec: string): ScharCfg {
     expr: parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
     boardId: parts[3] ? unquote(parts[3]) : '',
     showTerm: true,
-    color: '#0b5fff'
+    color: '#0b5fff',
+    lineStyle: parseLineStyleOptions(parts.slice(4))
   };
 
   if (parts[4] && looksLikeColor(unquote(parts[4]))) {
@@ -1306,6 +1314,7 @@ function refreshEntry(entry: ScharEntry): void {
       strokeColor: entry.cfg.color,
       highlightStrokeColor: entry.cfg.color,
       strokeWidth: 3,
+      ...lineStyleAttributes(entry.cfg.lineStyle),
       fixed: true,
       withLabel: false,
       resolution: 3,
@@ -1325,6 +1334,7 @@ function refreshEntry(entry: ScharEntry): void {
       }
     } catch (e) {}
   }
+  applyLineStyle(entry.graph, entry.cfg.lineStyle);
 
   if (entry.linearMN || entry.shiftBC || entry.shiftCD || entry.polyCoeffDrag) {
     if (!entry.dragGraph) {

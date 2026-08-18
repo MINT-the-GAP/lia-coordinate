@@ -523,6 +523,32 @@ Parameters: `<boardId>;[<x>;<y>];<content>;<color>;<opacity>`
 @CoordText(`ex_coord_text;[-2;2];Hinweis;#00ff00;0.8`)
 @KoordText(`ex_coord_text;[2;1];$f(x)=x^2$;#e63946;1`)
 
+## Line styles
+
+          --{{0}}--
+The line-like macros listed below accept the additive named
+option `linestyle=solid|dashed|dotted|dashdotted`. The German alias
+`linienstil=...` is equivalent; names are case-insensitive. Put the option at
+the end of the existing specification. If it is omitted, the line remains
+`solid`, preserving the appearance of existing courses. If an option occurs
+more than once, the last valid value wins.
+
+The renderer mapping is `solid` to JSXGraph `dash: 0`, `dashed` to `dash: 2`,
+and `dotted` to the round-dot preset `dash: 7`. JSXGraph has no native
+dash-dot preset; `dashdotted` therefore uses its renderer-native alternating
+long/short pattern `dash: 6` as the closest portable approximation. The
+corresponding German descriptions are durchgezogen, gestrichelt, gepunktet,
+and strichpunktiert.
+
+Specifically, the option is supported by `@Strecke` / `@distance`; `@Line` /
+`@Gerade`, `@Ray` / `@Strahl`, and `@Vector` / `@Vektor`; `@Arc` /
+`@Bogen`; perpendiculars and parallels; `@Area` / `@Flaeche` polygon
+outlines; angles, circles, tangents, and circular sectors; `@PlotFunction` and
+`@PlotInput`; `@PointOnGraph` and `@PointsOnGraph`; and `@Schar`. Midpoints
+are points rather than strokes, and freehand `@Regression` traces keep their
+separate drawing-tool styles. The option changes only the stroke pattern.
+Arrow/end-cap `design`, line width, color, fill, and opacity remain independent.
+
 ## `@Strecke` / `@distance`
 
           --{{0}}--
@@ -548,7 +574,7 @@ of the complete polygonal path. An optional line width such as `2px`
 defaults to `3px`; use `-;2px` when only the width should change.
 The unambiguous aliases `design=...` and `width=...` are accepted as well.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>[=0][;length=1][;<design>][;<lineWidth>]`
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<segmentName>[=0][;length=1][;<design>][;<lineWidth>][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_distance`)
@@ -556,7 +582,7 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 @Point(`ex_distance;A;-2;-1`)
 @Point(`ex_distance;B;3;2`)
 
-@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px`)
+@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px;linestyle=dashed`)
 
 @Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#457b9d;s=0;length=1;|<->|;4px`)
 ```
@@ -568,7 +594,7 @@ Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];...];<color>;<se
 @Point(`ex_distance;A;-2;-1`)
 @Point(`ex_distance;B;3;2`)
 
-@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px`)
+@Strecke(`ex_distance;[A;B];#e63946;a;length=1;->|;2px;linestyle=dashed`)
 
 @Strecke(`ex_distance;[[2;3];[4;4];[6;2]];#00ffff;s=0;length=1;|<->|;4px`)
 
@@ -582,7 +608,7 @@ without arrowheads. Vectors use the JSXGraph arrow and are labelled as
 `\overrightarrow{...}`; if no explicit vector name is given, named endpoints are
 used automatically, for example `\overrightarrow{AB}`.
 
-Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0]`
+Parameters: `<boardId>;[<pointName1>;<pointName2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0][;linestyle=<style>]`
 
 For a vector using its automatic endpoint name, append the standalone option
 `name=0` to hide that automatic label.
@@ -595,7 +621,7 @@ For a vector using its automatic endpoint name, append the standalone option
 @Point(`ex_linear;C;-1;3`)
 @Point(`ex_linear;D;3;1`)
 
-@Gerade(`ex_linear;[A;B];#e63946;g`)
+@Gerade(`ex_linear;[A;B];#e63946;g;linienstil=dotted`)
 @Strahl(`ex_linear;[C;D];#457b9d;r`)
 @Vektor(`ex_linear;[A;D];#ff00ff`)
 @Vector(`ex_linear;[[0;0];[2;1]];#00ffff;w`)
@@ -610,7 +636,7 @@ For a vector using its automatic endpoint name, append the standalone option
 @Point(`ex_linear;C;-1;3`)
 @Point(`ex_linear;D;3;1`)
 
-@Gerade(`ex_linear;[A;B];#e63946;g`)
+@Gerade(`ex_linear;[A;B];#e63946;g;linienstil=dotted`)
 @Strahl(`ex_linear;[C;D];#457b9d;r`)
 @Vektor(`ex_linear;[A;D];#ff00ff`)
 @Vector(`ex_linear;[[0;0];[2;1]];#00ffff;w`)
@@ -642,7 +668,7 @@ Without that argument, the curve follows the current theme accent color. For
 compatibility with the color position of the other geometry macros,
 `<caption>;<color>;<design>;<lineWidth>` is accepted as an alias as well.
 
-Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<entryAngle>;<caption>;<design>;<lineWidth>[;<color>]`
+Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<entryAngle>;<caption>;<design>;<lineWidth>[;<color>][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_arc`)
@@ -650,7 +676,7 @@ Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<
 @Point(`ex_arc;A;-3;0`)
 @Point(`ex_arc;B;3;0`)
 
-@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946`)
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946;linestyle=dashdotted`)
 @Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px;#457b9d`)
 ```
 
@@ -661,7 +687,7 @@ Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<
 @Point(`ex_arc;A;-3;0`)
 @Point(`ex_arc;B;3;0`)
 
-@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946`)
+@Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946;linestyle=dashdotted`)
 @Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px;#457b9d`)
 
 ## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`
@@ -673,7 +699,7 @@ object (`@Strecke`, `@Gerade`, `@Strahl`, `@Vektor`) or use a point pair as an
 implicit base line. The midpoint is registered as a point, so later macros can
 refer to it by name. Add `wert=1` / `value=1` to show its coordinates.
 
-Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>[=0]`
+Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>[=0][;linestyle=<style>]`
 
 Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0];wert=1`
 
@@ -716,7 +742,7 @@ to show live measurements at the polygon center. German output uses `FE` and
 `LE`; English output uses `AU` and `LU`. The English option aliases `area=1`
 and `perimeter=1` are also accepted.
 
-Parameters: `<boardId>;[<point1>;<point2>;...]|[[<x1>;<y1>];...];<color>;<opacity>;inhalt=1;umfang=1`
+Parameters: `<boardId>;[<point1>;<point2>;...]|[[<x1>;<y1>];...];<color>;<opacity>;inhalt=1;umfang=1[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area`)
@@ -756,7 +782,7 @@ places. `@Winkel` uses a decimal comma; `@angle` uses a decimal point. Common
 Greek names such as `alpha` may be written with or without the leading TeX
 backslash.
 
-Parameters: `<boardId>;<name>[=0];[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1`
+Parameters: `<boardId>;<name>[=0];[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
@@ -797,7 +823,7 @@ center, rounded to three decimal places. German output uses `FE` and `LE`;
 English output uses `AU` and `LU`. The aliases `area=1`, `circumference=1`, and
 `perimeter=1` are also accepted.
 
-Parameters: `<boardId>;<name>[=0];<centerPoint>;<color>;<opacity>;radius=<number|point>;inhalt=1;umfang=1`
+Parameters: `<boardId>;<name>[=0];<centerPoint>;<color>;<opacity>;radius=<number|point>;inhalt=1;umfang=1[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_circle`)
@@ -831,9 +857,9 @@ as a named line, so intersection and ordinate-intercept macros can use it afterw
 The circular-sector macro uses three existing points in center--radius point--second
 arm point order. `@Kreissegment` is accepted as an alias for exported DGS sectors.
 
-Parameters for tangents: `<boardId>;<sourceName>|[<point1>;<point2>];[<x>;<y>];<color>;<lineName>[=0];<contactPointName>[=0]`
+Parameters for tangents: `<boardId>;<sourceName>|[<point1>;<point2>];[<x>;<y>];<color>;<lineName>[=0];<contactPointName>[=0][;linestyle=<style>]`
 
-Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>];<color>;<opacity>;<name>[=0];inhalt=1;umfang=1`
+Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>];<color>;<opacity>;<name>[=0];inhalt=1;umfang=1[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-4;xmax=4;ymin=-4;ymax=4;width=800;id=ex_tangent_sector`)
@@ -868,7 +894,7 @@ Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>
           --{{0}}--
 Plots a function curve on the board using a formula. The formula uses standard math syntax.
 
-Parameters: `<boardId>;<funcName>[=0];<formula>;<color>`
+Parameters: `<boardId>;<funcName>[=0];<formula>;<color>[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
@@ -961,7 +987,7 @@ Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`,
           --{{0}}--
 Renders a LaTeX input field where students can type a function and see it plotted live.
 
-Parameters: `<boardId>;<funcName>;<color>`
+Parameters: `<boardId>;<funcName>;<color>[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_input`)
@@ -985,7 +1011,7 @@ Parameters: `<boardId>;<funcName>;<color>`
 Point-on-graph exercise: the student drags a point onto the graph of a given function.
 The check validates whether the point lies on the curve within the given tolerance.
 
-Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>`
+Parameters: `<boardId>;<pointName>;<funcName>;<formula>;<tolerance>[;linestyle=<style>]`
 
 Use `@PointOnGraphWithOptions` / `@PunktGraphMitOptionen` with the same first
 argument and a LiaScript quiz comment as the second argument when custom hint,
@@ -1017,7 +1043,7 @@ Drag point $A$ onto the graph of $f(x) = 2x - 1$.
           --{{0}}--
 Multi-point-on-graph exercise: places several draggable points that must all land on the graph.
 
-Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tolerance>`
+Parameters: `<boardId>;n=<count>;d=<step>;<pointName>;<funcName>;<formula>;<tolerance>[;linestyle=<style>]`
 
 Use `@PointsOnGraphWithOptions` / `@PunkteAufGraphMitOptionen` for an additional
 LiaScript quiz-comment argument. The original one-argument aliases keep the
@@ -1138,12 +1164,28 @@ centered dialog using the same unit-circle convention as `@Arc` / `@Bogen`. The 
 cubic Bézier curve stays attached to both movable endpoints and receives the next free lowercase
 object name. Both tangent angles can later be changed on blur or Enter in the right-click object
 menu; invalid values remain marked for correction.
-The right-click menus of standalone segments and arcs also contain an Appearance section.
-Its Design selector offers the plain line plus all directional arrow and orthogonal end-cap
-combinations supported by the macros, including `|<->|`. Line width accepts values from
-`0.25` to `20` with or without the `px` suffix and is applied on blur or Enter. Arrowheads
-and end caps stay attached while endpoints move or the board is zoomed. Both settings participate
-in DGS persistence and undo/redo and are included in the object-list macro export.
+The object menu opened by right-clicking the board or an object-list entry contains an
+Appearance section with a Line style / Linienart selector. It offers Solid, Dashed,
+Dotted, and Dash-dotted for segments (including polygon sides), rays, vectors, straight
+lines, tangents, perpendiculars, parallels, angle bisectors, custom and compass arcs,
+polygon outlines, angle contours, circles, circular sectors, and DGS-created or
+`@PlotFunction` function graphs. For
+multi-part objects such as polygons and sectors, selecting the owner changes the complete
+visible outline together. A registered polygon side remains separately selectable and can
+therefore receive its own override. Such a per-side override participates in DGS
+persistence and undo/redo, but it cannot be represented by the single outline style of
+`@Area` / `@Flaeche` and is consequently not part of macro export.
+
+Standalone segments and custom arcs additionally retain their Design selector for
+directional arrows and orthogonal end caps, including `|<->|`, and their Line width field.
+Line width accepts values from `0.25` to `20` with or without the `px` suffix and is
+applied on blur or Enter. Arrowheads and end caps stay attached while endpoints move or
+the board is zoomed. Line style, design, and width are independent. All supported
+appearance settings participate in DGS persistence and undo/redo. For exportable object
+types they are also included in the object-list macro export. A non-solid style is exported
+canonically as
+`linestyle=dashed`, `linestyle=dotted`, or `linestyle=dashdotted`; the default
+`solid` is omitted to keep exported legacy-compatible specifications compact.
 The line-relations submenu sits between the line and shape tools and provides perpendicular,
 parallel, midpoint, and angle-bisector constructions. For a perpendicular or parallel, select a
 segment, ray, vector, or straight line and a point in either order; it creates the dynamically
@@ -1305,7 +1347,7 @@ removed from their object menus.
 Each zero point also offers Show value; enabling it adds the current x-value to its dynamic
 label. Extremum and inflection points offer the same option and display their current coordinate
 pair; an ordinate-axis intercept displays its current ordinate value.
-Right-clicking a DGS point, segment, ray, vector, arc, line, function, or polygon opens an object menu from the right. It can lock the
+Right-clicking a DGS point or a supported geometry object opens an object menu from the right. It can lock the
 object and independently show or hide its name and visual representation; an open top menu
 pushes this object menu downward. Point coordinates are applied on blur or Enter, and an
 inline color palette with hue and hexadecimal controls recolors DGS objects.
@@ -1469,8 +1511,8 @@ interior angle of 90 degrees, and the following side of length 3.
 ## `@KoordQuiz` / `@GeometrieQuiz` and `@CoordinateQuiz` / `@GeometryQuiz`
 
           --{{0}}--
-Combines construction, area, and perimeter requirements into one normal
-LiaScript quiz. Every condition is joined with AND and is tested on the same
+Combines construction, quadrilateral-form, area, and perimeter requirements
+into one normal LiaScript quiz. Every condition is joined with AND and is tested on the same
 learner-created polygon. Thus, one polygon cannot satisfy the construction
 while a different polygon supplies the requested area. The existing individual
 quiz macros remain available for tasks with only one check.
@@ -1485,13 +1527,89 @@ corner count:
 
 - `Konstruktion(<fest|offen>;<propertyList>;optional tolerances)` or
   `Construction(<fixed|open>;<propertyList>;optional tolerances)`
+- `Form(<quadrilateralType>)` or
+  `Form(<quadrilateralType>;exklusiv=<type>[|<type>...])`
 - `Flaeche(<targetValue>;<absoluteTolerance>)` or
   `Area(<targetValue>;<absoluteTolerance>)`
 - `Umfang(<targetValue>;<absoluteTolerance>)` or
   `Perimeter(<targetValue>;<absoluteTolerance>)`
 
-The conditions may appear in any order. Their detailed property and tolerance
-syntax is identical to the corresponding individual quiz macros.
+The conditions may appear in any order. Construction and metric conditions keep
+the detailed property and tolerance syntax of the corresponding individual quiz
+macros.
+
+`Form(...)` is available only for specifications with exactly four corners. It
+accepts the following case-insensitive German and English names. Every
+definition is inclusive:
+
+| German name | English name | Property checked |
+|---|---|---|
+| `Parallelogramm` | `Parallelogram` | Both pairs of opposite sides are parallel. |
+| `Rechteck` | `Rectangle` | All four interior angles are right angles. Squares therefore count as rectangles. |
+| `Raute` | `Rhombus` | All four sides have equal length. Squares therefore count as rhombi. |
+| `Quadrat` | `Square` | All four sides have equal length and all four interior angles are right angles. |
+| `Trapez` | `Trapezoid` | At least one pair of opposite sides is parallel. Parallelograms, rectangles, rhombi, and squares therefore count as trapezoids. |
+| `Drachenviereck` | `Kite` | Two distinct pairs of adjacent sides have equal length: $a=b$ and $c=d$, or $b=c$ and $d=a$. Rhombi and squares therefore count as kites. |
+
+Consequently, rectangles and rhombi (including squares) also count as
+parallelograms. This inclusive hierarchy remains closed even when individual
+numeric predicates lie on different sides of their tolerance boundaries.
+
+The only public `Form` attribute is `exklusiv`. It rejects a construction when
+the construction has any listed excluded property, even if the required base
+property is satisfied. A single exclusion uses
+`Form(Rechteck;exklusiv=Quadrat)`; multiple exclusions are separated with `|`,
+for example `Form(Parallelogramm;exklusiv=Raute|Rechteck)`. Because exclusions
+are property-based, a square is also rejected by `exklusiv=Raute` and by
+`exklusiv=Rechteck`. Repeated exclusions are deduplicated. Unknown base or
+excluded names, attributes other than `exklusiv`, and a self-contradiction such
+as `Form(Raute;exklusiv=Raute)` make the complete quiz specification invalid.
+There are no `modus`, `inklusiv`, `exakt`, or separate form-variant options.
+
+Before classifying a form, the checker rejects repeated or practically
+identical vertices, near-zero sides or area, three practically collinear
+consecutive vertices, and self-intersections. Concave, non-self-intersecting
+quadrilaterals remain valid, including concave kites. Position, rotation,
+reflection, traversal direction, and the cyclic starting corner do not affect
+classification.
+
+`Form` deliberately exposes no tolerance attribute. Internally it uses the
+construction defaults `streckentoleranz=0.05` and `winkeltoleranz=1`. For an
+equality comparison, let $L_{max}$ be the longest side, let $S$ be the larger
+of 1, the bounding-box width, and the bounding-box height, and let
+$\varepsilon$ be JavaScript's floating-point epsilon. The effective length
+tolerance is
+
+$$
+\min(0.05,\;0.01L_{max})
++64\varepsilon\max(1,L_{max},S).
+$$
+
+Thus, the existing absolute length tolerance is an upper bound while a 1%
+relative cap prevents very small freely sized quadrilaterals from being
+classified too generously; the final term only absorbs scale-dependent
+floating-point noise. All-four-side equality compares the longest with the
+shortest side, so chained comparisons cannot accumulate tolerance. Parallelism
+uses the normalized cross product
+$|\vec u\times\vec v|/(|\vec u||\vec v|)\leq\sin(1^\circ)$ and therefore treats
+parallel and antiparallel directions alike. Right interior angles are compared
+with $90^\circ$ using the same 1-degree angular tolerance.
+
+Typical combinations are:
+
+``` markdown
+@GeometrieQuiz(`R1;4;Form(Raute);Flaeche(20;0.05)`,`<!-- -->`)
+
+@GeometrieQuiz(`R2;4;Form(Rechteck;exklusiv=Quadrat);Umfang(24;0.05)`,`<!-- -->`)
+
+@GeometrieQuiz(`R3;4;Form(Parallelogramm;exklusiv=Raute|Rechteck);Flaeche(18;0.05)`,`<!-- -->`)
+```
+
+In every case, the form, exclusions, construction properties, area, and
+perimeter are evaluated on one and the same polygon. On an unsuccessful check,
+the quiz reports whether the candidate is invalid or degenerate, misses the
+base form, has an excluded form, or misses another combined condition. These
+messages follow the LiaScript course language in German or English.
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=;id=ex_combined_quiz`)
@@ -1512,6 +1630,31 @@ Construct a rectangle with area 12 and perimeter 14.
 Construct a rectangle with area 12 and perimeter 14.
 
 @KoordQuiz(`ex_combined_quiz;4;Konstruktion(offen;W90,W90,W90,W90);Flaeche(12;0.05);Umfang(14;0.05)`,`<!-- data-solution-button="5" -->`)
+
+---
+
+The following executable example leaves the common side length and orientation
+free while requiring a rhombus with area $20\,FE$:
+
+``` markdown
+@CoordinateSystem(`xmin=-1;xmax=10;ymin=-1;ymax=10;width=500;id=rhombus_area;1;1;1`)
+@AxisLabel(`id=rhombus_area;xlabel=$x$;ylabel=$y$`)
+@DGS(`rhombus_area;tools=[200;510;920]`)
+
+Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
+
+@GeometrieQuiz(`rhombus_area;4;Form(Raute);Flaeche(20;0.05)`,`<!-- data-solution-button="5" -->`)
+```
+
+---
+
+@CoordinateSystem(`xmin=-1;xmax=10;ymin=-1;ymax=10;width=500;id=rhombus_area;1;1;1`)
+@AxisLabel(`id=rhombus_area;xlabel=$x$;ylabel=$y$`)
+@DGS(`rhombus_area;tools=[200;510;920]`)
+
+Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
+
+@GeometrieQuiz(`rhombus_area;4;Form(Raute);Flaeche(20;0.05)`,`<!-- data-solution-button="5" -->`)
 
 
 
@@ -1633,7 +1776,7 @@ Reconstruct or draw the function $f(x) = 2x -1$.
           --{{0}}--
 Creates an adjustable function family with sliders directly on the board.
 
-Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>`
+Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>[;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=ex_schar`)
