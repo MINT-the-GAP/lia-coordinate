@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang=en>
+<head>
+  <meta charset=utf-8>
+  <title>lia-coordinate static claim order fixture</title>
+</head>
+<body>
+  <main id=fixture></main>
+  <script>
+    window.__hostOrderConnections = 0;
+    window.__hostOrderRuntimeCalls = 0;
+    window.__hostOrderClaimAtConnect = null;
+    window.__hostOrderErrors = [];
+
+    window.addEventListener('error', function (event) {
+      window.__hostOrderErrors.push(String(event.message || event.error || 'error'));
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      window.__hostOrderErrors.push(String(event.reason || 'unhandled rejection'));
+    });
+
+    customElements.define('jsx-graph', class extends HTMLElement {
+      connectedCallback() {
+        window.__hostOrderConnections += 1;
+        const marker = document.getElementById('area-spec-order-static-area');
+        window.__hostOrderClaimAtConnect = marker
+          ? marker.getAttribute('data-lia-static-claimed')
+          : null;
+        if (typeof window.__ensureCoordinateDynamicRuntime === 'function') {
+          window.__hostOrderRuntimeCalls += 1;
+          window.__ensureCoordinateDynamicRuntime();
+        }
+      }
+    });
+
+    const root = document.getElementById('fixture');
+    const dynamicHost = document.createElement('lia-coordinate-board');
+    dynamicHost.id = 'order-dynamic-host';
+    dynamicHost.dataset.liaCoordinateKey = 'order-dynamic';
+    dynamicHost.dataset.spec =
+      'xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=order-dynamic;achsen=0;grid=0;border=0';
+    root.appendChild(dynamicHost);
+
+    const staticHost = document.createElement('lia-coordinate-board');
+    staticHost.id = 'order-static-host';
+    staticHost.dataset.liaCoordinateKey = 'order-static';
+    staticHost.dataset.spec =
+      'xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=order-static;' +
+      'achsen=0;grid=0;border=0;static=1';
+    root.appendChild(staticHost);
+
+    const marker = document.createElement('span');
+    marker.id = 'area-spec-order-static-area';
+    marker.dataset.spec = 'order-static;[[0;0];[2;2];[4;0]];#e63946;0.35';
+    root.appendChild(marker);
+  </script>
+  <script src=../../dist/index.js></script>
+  <script>
+    queueMicrotask(function () {
+      window.__coord.bootstrapStaticCoordinateBoards();
+      const dynamicChild = dynamicHost.querySelector('jsx-graph[data-lia-coordinate-dynamic]');
+      const result = {
+        dynamicBeforeStatic: dynamicHost.compareDocumentPosition(staticHost) &
+          Node.DOCUMENT_POSITION_FOLLOWING ? true : false,
+        dynamicConnections: window.__hostOrderConnections,
+        runtimeCalls: window.__hostOrderRuntimeCalls,
+        claimAtDynamicConnect: window.__hostOrderClaimAtConnect,
+        finalClaim: marker.getAttribute('data-lia-static-claimed'),
+        staticSvgCount: staticHost.querySelectorAll('svg[data-lia-static-svg=order-static]').length,
+        dynamicChildCount: dynamicHost.querySelectorAll(
+          'jsx-graph[data-lia-coordinate-dynamic]'
+        ).length,
+        dynamicCodeQueued: !!dynamicChild &&
+          /initializeCoordinateBoard\(jxgbox/.test(dynamicChild.textContent || ''),
+        errorCount: window.__hostOrderErrors.length,
+        errors: window.__hostOrderErrors
+      };
+      document.body.textContent = 'STATIC_HOST_ORDER_RESULT:' + JSON.stringify(result);
+    });
+  </script>
+</body>
+</html>

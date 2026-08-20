@@ -31,6 +31,9 @@ const {
   syncBoardRendererSize
 } = await import('../src/coord/boardHelpers.ts');
 const {
+  buildDynamicCoordinateBoardCode
+} = await import('../src/coord/coordinateElement.ts');
+const {
   MACRO_RENDER_LAYER_COUNT,
   applyMacroCodeOrderLayers,
   ensureBoardRendererLayerCapacity,
@@ -126,48 +129,61 @@ test('the bundled coordinate-system initializer leaves resizing to the template'
 
 test('coordinate-system initializers survive DynFlex quiz blockification', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-  const pattern = /^@CoordinateSystem_\r?\n``` javascript @JSX\.Graph\r?\n([\s\S]*?)\r?\n```\r?\n@end$/gm;
-  const bodies = [...readme.matchAll(pattern)].map((match) => match[1]);
+  const pattern =
+    /^@CoordinateSystem: @CoordinateSystem_\(@uid,`@0`\)\r?\n@Koordinatensystem: @CoordinateSystem_\(@uid,`@0`\)\r?\n\r?\n@CoordinateSystem_\r?\n([^\r\n]+)\r?\n@end$/gm;
+  const hosts = [...readme.matchAll(pattern)].map((match) => match[1]);
 
-  assert.equal(bodies.length, 2, 'header and implementation macro must both be covered');
+  assert.equal(hosts.length, 2, 'header and implementation macro must both be covered');
+  assert.equal(new Set(hosts).size, 1, 'both README macro copies must stay synchronized');
 
-  bodies.forEach((body) => {
-    assert.doesNotMatch(body, /\r?\n[ \t]*\r?\n/);
-    const normalizedBody = body.replace(/\r\n/g, '\n');
-    const runMacro = new Function('window', 'jxgbox', normalizedBody);
-    const jxgbox = {};
-    const queuedCalls = [];
-    const queuedWindow = {};
+  hosts.forEach((host) => {
+    const quote = String.fromCharCode(34);
+    assert.equal(
+      host,
+      '<lia-coordinate-board data-lia-coordinate-key=' + quote + '@0' + quote +
+        ' data-spec=' + quote + '@1' + quote + '></lia-coordinate-board>'
+    );
+    assert.doesNotMatch(host, /@JSX\.Graph|<jsx-graph/i);
 
-    runMacro(queuedWindow, jxgbox);
-    assert.equal(queuedWindow.__liaRunCoordHooks.length, 1);
-    queuedWindow.__coord = {
-      initializeCoordinateBoard(...args) { queuedCalls.push(args); }
-    };
-    queuedWindow.__liaRunCoordHooks[0]();
-    assert.deepEqual(queuedCalls, [[jxgbox, '@0']]);
-
-    const immediateCalls = [];
-    const readyWindow = {
-      __coord: {
-        initializeCoordinateBoard(...args) { immediateCalls.push(args); }
-      },
-      __liaRunCoordHooks: {
-        push(fn) { fn(); }
-      }
-    };
-    runMacro(readyWindow, jxgbox);
-    assert.deepEqual(immediateCalls, [[jxgbox, '@0']]);
-
-    const flexChild = `<jsx-graph>\n${normalizedBody}\n</jsx-graph>\n\n[[quiz]]`;
+    const flexChild = `${host}\n\n[[quiz]]`;
     const parts = flexChild
       .split(/\n[ \t]*\n+/)
       .filter((part) => part.replace(/\s+/g, '').length > 0);
-    const graphParts = parts.filter((part) => part.includes('jsx-graph'));
+    const hostParts = parts.filter((part) => part.includes('lia-coordinate-board'));
 
-    assert.equal(graphParts.length, 1);
-    assert.match(graphParts[0], /^<jsx-graph>[\s\S]*<\/jsx-graph>$/);
+    assert.equal(hostParts.length, 1);
+    assert.equal(hostParts[0], host);
   });
+});
+
+test('dynamic hybrid-host initializer preserves queued and immediate hook semantics', () => {
+  const spec = 'xmin=-2;xmax=4;id=dynamic-' + String.fromCharCode(34) +
+    'quoted' + String.fromCharCode(34) + '\nboard';
+  const source = buildDynamicCoordinateBoardCode(spec);
+  const runInitializer = new Function('window', 'jxgbox', source);
+  const jxgbox = {};
+
+  assert.doesNotMatch(source, /\r|\n/);
+
+  const queuedCalls = [];
+  const queuedWindow = {};
+  runInitializer(queuedWindow, jxgbox);
+  assert.equal(queuedWindow.__liaRunCoordHooks.length, 1);
+  queuedWindow.__coord = {
+    initializeCoordinateBoard(...args) { queuedCalls.push(args); }
+  };
+  queuedWindow.__liaRunCoordHooks[0]();
+  assert.deepEqual(queuedCalls, [[jxgbox, spec]]);
+
+  const immediateCalls = [];
+  const readyWindow = {
+    __coord: {
+      initializeCoordinateBoard(...args) { immediateCalls.push(args); }
+    }
+  };
+  runInitializer(readyWindow, jxgbox);
+  assert.deepEqual(immediateCalls, [[jxgbox, spec]]);
+  assert.equal(readyWindow.__liaRunCoordHooks, undefined);
 });
 
 test('the internal JSXGraph angle helper arc always stays hidden and unfilled', () => {

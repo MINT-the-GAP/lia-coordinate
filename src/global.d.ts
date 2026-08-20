@@ -13,6 +13,17 @@ interface Window {
   __liaCoordHooks: Record<string, () => void> | undefined;
   __liaRunCoordHooks: Array<() => void> | { push(fn: () => void): void } | undefined;
   __coordBoardStates: Record<string, any>;
+  __ensureCoordinateDynamicRuntime: (() => void) | undefined;
+  __coordinateDynamicRuntimeReady: boolean | undefined;
+  __disposeDGSForBoard: ((boardId: string) => void) | undefined;
+  __disposeRegressionForBoard: ((boardId: string) => void) | undefined;
+  __syncCoordinateQuizBindings: (() => void) | undefined;
+
+  // Explicit native-SVG coordinate boards (never mirrored into __boards)
+  __staticCoordinateBoards: Record<string, any> | undefined;
+  __staticCoordinateWarnings: Set<string> | undefined;
+  __staticCoordinateRendererReady: boolean | undefined;
+  __staticCoordinateObserver: MutationObserver | undefined;
 
   // Source-order layers for ordinary coordinate macros
   __macroCodeLayersReady: boolean | undefined;
@@ -52,6 +63,12 @@ interface Window {
     wireBoard: (board: any, cfg: any, initialBBox: number[], initialRatio: number) => void;
     getAccentColor: () => string;
     getNeutralColor: () => string;
+    initializeStaticCoordinateBoard: (container: HTMLElement, cfg: any) => any;
+    disposeStaticCoordinateBoard: (id: string, expectedContainer?: HTMLElement) => void;
+    isStaticCoordinateBoard: (id: string) => boolean;
+    bootstrapStaticCoordinateBoards: () => void;
+    scheduleStaticBootstrap: () => void;
+    initCoordinateBoardElement: () => void;
   } | undefined;
 
   // Axis title subsystem

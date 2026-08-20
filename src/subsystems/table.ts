@@ -106,6 +106,75 @@ function parseSpec(spec) {
   };
 }
 
+function disconnectTableObservers(root) {
+  if (!root) return;
+  const nodes = [root].concat(Array.from(root.querySelectorAll ? root.querySelectorAll('*') : []));
+  nodes.forEach(function(node) {
+    ['__liaFieldWidthRO', '__liaFieldWidthMO', '__liaMiniCanvasRO'].forEach(function(key) {
+      const observer = node && node[key];
+      if (!observer || typeof observer.disconnect !== 'function') return;
+      try { observer.disconnect(); } catch (e) {}
+      node[key] = null;
+    });
+    const resizeHandler = node && node.__liaMiniCanvasResizeHandler;
+    if (resizeHandler) {
+      try { window.removeEventListener('resize', resizeHandler); } catch (e) {}
+      node.__liaMiniCanvasResizeHandler = null;
+    }
+    const fieldResizeHandler = node && node.__liaFieldWidthResizeHandler;
+    if (fieldResizeHandler) {
+      try { window.removeEventListener('resize', fieldResizeHandler); } catch (e) {}
+      node.__liaFieldWidthResizeHandler = null;
+    }
+    const openCloseHandler = node && node.__liaOpenCloseSyncHandler;
+    if (openCloseHandler) {
+      try { node.removeEventListener('click', openCloseHandler, true); } catch (e) {}
+      node.__liaOpenCloseSyncHandler = null;
+    }
+    const dragHandlers = node && node.__liaDragWidthHandlers;
+    if (dragHandlers) {
+      try { node.removeEventListener('pointerdown', dragHandlers.start, true); } catch (e) {}
+      try { window.removeEventListener('pointermove', dragHandlers.move, true); } catch (e) {}
+      try { window.removeEventListener('pointerup', dragHandlers.stop, true); } catch (e) {}
+      try { window.removeEventListener('pointercancel', dragHandlers.stop, true); } catch (e) {}
+      node.__liaDragWidthHandlers = null;
+    }
+    (node && node.__liaFieldWidthRAFs || []).forEach(function(raf) {
+      try { cancelAnimationFrame(raf); } catch (e) {}
+    });
+    (node && node.__liaFieldWidthTimers || []).forEach(function(timer) {
+      try { clearTimeout(timer); } catch (e) {}
+    });
+    if (node) {
+      node.__liaFieldWidthRAFs = [];
+      node.__liaFieldWidthTimers = [];
+      node.__liaCellResizeDragging = false;
+    }
+  });
+  try { document.body.style.userSelect = ''; } catch (e) {}
+}
+
+function tableTargetIsUnavailable(root, boardId) {
+  if (!root || !root.isConnected) return true;
+  if (root.hasAttribute('data-lia-static-claimed')) return true;
+  return !!boardId && !(window.__boards && window.__boards[boardId]);
+}
+
+function disposeTable(uid, root) {
+  const state = window.__tableStates && window.__tableStates[uid];
+  const targetRoot = root || (state && state.root) || getRoot(uid);
+  disconnectTableObservers(targetRoot);
+  const pool = getPoolRoot(uid);
+  disconnectTableObservers(pool);
+  try { if (pool) pool.remove(); } catch (e) {}
+  if (targetRoot) {
+    try { targetRoot.replaceChildren(); } catch (e) { targetRoot.innerHTML = ''; }
+    targetRoot.__liaTableMounted = false;
+    targetRoot.__liaTableLastSpec = '';
+  }
+  if (window.__tableStates) delete window.__tableStates[uid];
+}
+
   function normalizeLabelMath(s, isSecondRow) {
     let out = String(s || '').trim();
 
@@ -945,14 +1014,32 @@ function observeFieldWidth(uid, colIndex, key, stack, input, poolItem) {
   }
 
   function syncSoon() {
-    requestAnimationFrame(syncNow);
+    const raf = requestAnimationFrame(function() {
+      stack.__liaFieldWidthRAFs = (stack.__liaFieldWidthRAFs || []).filter(function(value) {
+        return value !== raf;
+      });
+      syncNow();
+    });
+    stack.__liaFieldWidthRAFs = stack.__liaFieldWidthRAFs || [];
+    stack.__liaFieldWidthRAFs.push(raf);
+  }
+
+  function syncLater(delay) {
+    const timer = setTimeout(function() {
+      stack.__liaFieldWidthTimers = (stack.__liaFieldWidthTimers || []).filter(function(value) {
+        return value !== timer;
+      });
+      syncSoon();
+    }, delay);
+    stack.__liaFieldWidthTimers = stack.__liaFieldWidthTimers || [];
+    stack.__liaFieldWidthTimers.push(timer);
   }
 
   syncSoon();
-  setTimeout(syncSoon, 0);
-  setTimeout(syncSoon, 80);
-  setTimeout(syncSoon, 220);
-  setTimeout(syncSoon, 500);
+  syncLater(0);
+  syncLater(80);
+  syncLater(220);
+  syncLater(500);
 
   if (typeof ResizeObserver === 'function') {
     try {
@@ -977,23 +1064,25 @@ function observeFieldWidth(uid, colIndex, key, stack, input, poolItem) {
   if (poolItem && !poolItem.__liaOpenCloseSyncBound) {
   poolItem.__liaOpenCloseSyncBound = true;
 
-  poolItem.addEventListener('click', function() {
+  const openCloseHandler = function() {
     if (stack.__liaCellResizeDragging) return;
 
     syncSoon();
-    setTimeout(syncSoon, 0);
-    setTimeout(syncSoon, 80);
-    setTimeout(syncSoon, 220);
-    setTimeout(syncSoon, 500);
-  }, true);
+    syncLater(0);
+    syncLater(80);
+    syncLater(220);
+    syncLater(500);
+  };
+  poolItem.__liaOpenCloseSyncHandler = openCloseHandler;
+  poolItem.addEventListener('click', openCloseHandler, true);
 
   try {
       const mo = new MutationObserver(function() {
         if (stack.__liaCellResizeDragging) return;
 
         syncSoon();
-        setTimeout(syncSoon, 80);
-        setTimeout(syncSoon, 220);
+        syncLater(80);
+        syncLater(220);
       });
 
       mo.observe(poolItem, {
@@ -1051,21 +1140,24 @@ function observeFieldWidth(uid, colIndex, key, stack, input, poolItem) {
       stack.__liaCellResizeDragging = false;
 
       syncSoon();
-      setTimeout(syncSoon, 80);
-      setTimeout(syncSoon, 220);
-      setTimeout(syncSoon, 500);
+      syncLater(80);
+      syncLater(220);
+      syncLater(500);
     }
 
     poolItem.addEventListener('pointerdown', start, true);
     window.addEventListener('pointermove', move, true);
     window.addEventListener('pointerup', stop, true);
     window.addEventListener('pointercancel', stop, true);
+    poolItem.__liaDragWidthHandlers = { start, move, stop };
   }
 
-  window.addEventListener('resize', function() {
+  const resizeHandler = function() {
     if (stack.__liaCellResizeDragging) return;
     syncSoon();
-  });
+  };
+  stack.__liaFieldWidthResizeHandler = resizeHandler;
+  window.addEventListener('resize', resizeHandler);
 }
 
 
@@ -1122,9 +1214,11 @@ function observeMiniCanvas(canvas, host) {
     } catch (e) {}
   }
 
-  window.addEventListener('resize', function() {
+  const resizeHandler = function() {
     syncMiniCanvasSize(canvas, host);
-  });
+  };
+  host.__liaMiniCanvasResizeHandler = resizeHandler;
+  window.addEventListener('resize', resizeHandler);
 }
 
 
@@ -1283,6 +1377,7 @@ function rebuildTable(uid, spec) {
   applyThemeToRoot(root);
 
   const st = ensureState(uid, spec);
+  st.root = root;
   const hasPointRow = !!(st.pointPrefix && st.boardId);
 
   root.innerHTML = '';
@@ -1444,15 +1539,30 @@ window.getTableData = function(uid) {
   };
 
   window.__bootstrapTables = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="lia-table-"][data-spec]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="lia-table-"][data-spec]'));
+    const seen = new Set<string>();
 
     nodes.forEach(function(node) {
       const uid = String(node.id || '').replace(/^lia-table-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      seen.add(uid);
+
+      const cfg = parseSpec(spec);
+      if (tableTargetIsUnavailable(node, cfg.boardId)) {
+        disposeTable(uid, node);
+        return;
+      }
 
       window.renderTableFromSpec(uid, spec, false);
       applyThemeToRoot(node);
+    });
+
+    Object.keys(window.__tableStates || {}).forEach(function(uid) {
+      if (seen.has(uid)) return;
+      const state = window.__tableStates[uid];
+      const root = (state && state.root) || getRoot(uid);
+      if (tableTargetIsUnavailable(root, state && state.boardId)) disposeTable(uid, root);
     });
   };
 

@@ -432,7 +432,7 @@ export function init(): void {
   };
 
   window.__bootstrapCircles = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="circle-spec-"][data-spec]');
+    const nodes = document.querySelectorAll<HTMLElement>('[id^="circle-spec-"][data-spec]:not([data-lia-static-claimed])');
     const activeKeys = new Set<string>();
     let pending = false;
 

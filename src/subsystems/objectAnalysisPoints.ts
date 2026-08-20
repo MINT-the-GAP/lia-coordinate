@@ -1088,7 +1088,7 @@ export function init(): void {
   };
 
   window.__bootstrapObjectAnalysisPoints = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="object-analysis-spec-"][data-spec]');
+    const nodes = document.querySelectorAll<HTMLElement>('[id^="object-analysis-spec-"][data-spec]:not([data-lia-static-claimed])');
     const activeKeys = new Set<string>();
     let pending = false;
     nodes.forEach(function(node) {

@@ -10,13 +10,11 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   ./dist/index.js
 
-@CoordinateSystem: @CoordinateSystem_(`@0`)
-@Koordinatensystem: @CoordinateSystem_(`@0`)
+@CoordinateSystem: @CoordinateSystem_(@uid,`@0`)
+@Koordinatensystem: @CoordinateSystem_(@uid,`@0`)
 
 @CoordinateSystem_
-``` javascript @JSX.Graph
-/* Keep this initializer on one line for DynFlex quiz compatibility. */ (function (run) { window.__coord ? run() : (window.__liaRunCoordHooks = window.__liaRunCoordHooks || []).push(run); })(function () { window.__coord.initializeCoordinateBoard(jxgbox, String.raw`@0`); });
-```
+<lia-coordinate-board data-lia-coordinate-key="@0" data-spec="@1"></lia-coordinate-board>
 @end
 
 @AxisLabel: @AxisLabel_(@uid,`@0`)
@@ -329,6 +327,8 @@ script:   ./dist/index.js
           --{{0}}--
 This plugin provides interactive coordinate systems for LiaScript courses, built on JSXGraph.
 Place points, plot functions, draw graphs by hand, and connect value tables to coordinate planes.
+For fixed polygons and polylines, an explicitly enabled static mode renders a
+small native SVG instead; an optional lightweight import avoids JSXGraph entirely.
 
 __Try it on LiaScript:__
 https://liascript.github.io/course/?https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/README.md
@@ -348,6 +348,9 @@ https://github.com/MINT-the-GAP/lia-coordinate
 2. Also requires JSXGraph (already included via the `import:` above):
 
    `import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md`
+
+   An all-static course can instead use the separate lightweight import shown
+   under [Static SVG mode](#static-svg-mode). Do not combine both imports.
 
 ## Drawing order
 
@@ -394,6 +397,76 @@ For `axes;grid`, the combinations are `0;0` (neither), `0;1` (grid only),
 ---
 
 @CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
+
+## Static SVG mode
+
+          --{{0}}--
+For a coordinate system that contains only fixed coordinate-list polygons and
+polylines, add `static=1` or its German alias `statisch=1`. This explicit flag
+uses a native responsive `<svg>` instead of creating a JSXGraph board. The SVG
+keeps the aspect ratio defined by `xmin`, `xmax`, `ymin`, and `ymax`; `width` is
+its maximum width, while `max-width: 100%` and automatic height let the browser
+scale it on narrow screens. Stroke widths remain visually stable while the SVG
+scales.
+
+`border=0` is independent. It only hides the frame and disables the usual
+JSXGraph pan, zoom, and resize interaction. It never activates static mode.
+Without `static=1` or `statisch=1`, including when only `border=0` is present,
+the existing JSXGraph path is used unchanged.
+
+The static subset currently supports:
+
+- `@Area` / `@Flaeche` with a direct coordinate list, rendered as one SVG
+  polygon. Explicit color, opacity, `visible=0` / `sichtbar=0`, and the four
+  line styles `solid`, `dashed`, `dotted`, and `dashdotted` are retained.
+- `@distance` / `@Strecke` with a direct coordinate list, rendered as one SVG
+  polyline. Explicit color, line width, visibility, the four line styles, and
+  an ordinary `design=-` path are retained. Repeating the first coordinate at
+  the end closes the path.
+- Multiple supported objects on one board. Their DOM and drawing order follows
+  their order in the course source.
+
+Named-point references and dynamic or dependent objects are not part of this
+initial subset. This includes points, sliders, function plots, labels and live
+measurements, arrows or end caps, DGS, regression and reconstruction tools,
+tables, and coordinate/construction quizzes. With the normal import, such an
+object targeting a static board produces a developer warning and is not put
+into a retry loop. There is deliberately no automatic whole-board fallback:
+remove the static flag to select JSXGraph reliably and avoid duplicate output.
+
+``` markdown
+@Koordinatensystem(`xmin=0;xmax=10;ymin=0;ymax=10;width=420;id=static_example;achsen=0;grid=0;border=0;static=1`)
+
+@Flaeche(`static_example;[[2;2];[8;2];[5;8]];#e63946;0.35;linienstil=dashed`)
+
+@Strecke(`static_example;[[1;1];[9;1];[9;9];[1;1]];#1d3557;;design=-;3px;linestyle=dashdotted`)
+```
+
+### Normal versus lightweight download
+
+The normal `README.md` import remains fully backward compatible and continues
+to import the JSXGraph template. A board with `static=1` avoids JSXGraph board
+creation and reduces CPU and memory use, but JSXGraph is still downloaded
+because the course header may contain other interactive boards.
+
+If every coordinate system in a course uses only the supported static subset,
+import the lightweight template instead:
+
+``` markdown
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/README.static.md
+```
+
+Alternatively, the same template is available through jsDelivr:
+
+``` markdown
+import: https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/README.static.md
+```
+
+That template loads only `dist/static.js`, contains no JSXGraph import, and
+defines only the supported coordinate-system, area, and distance macro aliases.
+It still requires `static=1` or `statisch=1` on every board and has no dynamic
+fallback. Do not import `README.md` and `README.static.md` together. For a
+reproducible course, replace `main` with a release tag containing this feature.
 
 ## `@AxisLabel`
 
@@ -1925,13 +1998,11 @@ import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
 
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/index.js
 
-@CoordinateSystem: @CoordinateSystem_(`@0`)
-@Koordinatensystem: @CoordinateSystem_(`@0`)
+@CoordinateSystem: @CoordinateSystem_(@uid,`@0`)
+@Koordinatensystem: @CoordinateSystem_(@uid,`@0`)
 
 @CoordinateSystem_
-``` javascript @JSX.Graph
-/* Keep this initializer on one line for DynFlex quiz compatibility. */ (function (run) { window.__coord ? run() : (window.__liaRunCoordHooks = window.__liaRunCoordHooks || []).push(run); })(function () { window.__coord.initializeCoordinateBoard(jxgbox, String.raw`@0`); });
-```
+<lia-coordinate-board data-lia-coordinate-key="@0" data-spec="@1"></lia-coordinate-board>
 @end
 
 @AxisLabel: @AxisLabel_(@uid,`@0`)

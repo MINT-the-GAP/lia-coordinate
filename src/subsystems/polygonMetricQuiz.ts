@@ -151,7 +151,7 @@ export function init(): void {
 
   window.__bootstrapPolygonMetricQuizzes = function(): void {
     document.querySelectorAll<HTMLElement>(
-      '[id^="polygon-metric-quiz-spec-"][data-kind]'
+      '[id^="polygon-metric-quiz-spec-"][data-kind]:not([data-lia-static-claimed])'
     ).forEach(function(node) {
       const uid = String(node.id || '').replace(/^polygon-metric-quiz-spec-/, '');
       if (!uid || !window.__setupPolygonMetricQuiz) return;

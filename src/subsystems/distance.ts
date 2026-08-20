@@ -903,7 +903,7 @@ export function init(): void {
   };
 
   window.__bootstrapDistances = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="distance-spec-"][data-spec]');
+    const nodes = document.querySelectorAll<HTMLElement>('[id^="distance-spec-"][data-spec]:not([data-lia-static-claimed])');
     const activeKeys = new Set<string>();
     let pending = false;
 

@@ -553,9 +553,18 @@ export function init(): void {
     document.querySelectorAll<HTMLElement>('[id^="combined-quiz-spec-"]').forEach(function(node) {
       const uid = String(node.id || '').replace(/^combined-quiz-spec-/, '');
       if (!uid || !window.__setupCombinedQuiz) return;
+      const spec = readQuizSpecNode(node);
+      const config = parseCombinedQuizSpec(spec);
+      if (node.hasAttribute('data-lia-static-claimed') ||
+          !config.boardId || !(window.__boards && window.__boards[config.boardId])) {
+        delete node.dataset.feedback;
+        delete node.dataset.feedbackCode;
+        removeRenderedQuizFeedback(uid);
+        return;
+      }
       window.__setupCombinedQuiz(
         uid,
-        readQuizSpecNode(node),
+        spec,
         node.dataset.language
       );
     });

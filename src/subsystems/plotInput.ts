@@ -687,6 +687,46 @@ export function init(): void {
     if (window.__registerLiaThemeListener) window.__registerLiaThemeListener(fn);
   };
 
+  function cancelPlotInputSchedules(inst) {
+    if (!inst) return;
+    if (inst.themeRAF) {
+      try { cancelAnimationFrame(inst.themeRAF); } catch (e) {}
+      inst.themeRAF = 0;
+    }
+    (inst.themeTimers || []).forEach(function(timer) {
+      try { clearTimeout(timer); } catch (e) {}
+    });
+    inst.themeTimers = [];
+  }
+
+  function plotInputTargetIsUnavailable(root, boardId) {
+    if (!root || !root.isConnected) return true;
+    if (root.hasAttribute('data-lia-static-claimed')) return true;
+    return !!boardId && !(window.__boards && window.__boards[boardId]);
+  }
+
+  function disposePlotInput(uid, root) {
+    const state = window.__plotInputStates && window.__plotInputStates[uid];
+    const inst = window.__plotInputInstances && window.__plotInputInstances[uid];
+    const targetRoot = root || (inst && inst.root) || (state && state.root) ||
+      document.getElementById('lia-plot-input-' + uid);
+    const board = state && ((window.__boards && window.__boards[state.boardId]) ||
+      (state.graph && state.graph.board));
+    if (state && board) {
+      try { H.removePlotObjects(board, state); } catch (e) {}
+      try { board.update(); } catch (e) {}
+    }
+    cancelPlotInputSchedules(inst);
+    if (inst && inst.themeListener && window.__liaThemeSync) {
+      window.__liaThemeSync.listeners.delete(inst.themeListener);
+    }
+    if (targetRoot) {
+      try { targetRoot.replaceChildren(); } catch (e) { targetRoot.innerHTML = ''; }
+    }
+    if (window.__plotInputStates) delete window.__plotInputStates[uid];
+    if (window.__plotInputInstances) delete window.__plotInputInstances[uid];
+  }
+
   window.renderPlotInputFromSpec = function(uid, spec) {
     const root = document.getElementById('lia-plot-input-' + uid);
     if (!root) return false;
@@ -698,6 +738,8 @@ export function init(): void {
     const cfg = H.parseInputSpec(spec);
     const state = window.__plotInputStates[uid] || (window.__plotInputStates[uid] = {});
     const inst = window.__plotInputInstances[uid] || (window.__plotInputInstances[uid] = {});
+    state.root = root;
+    inst.root = root;
     const labelConfigChanged = state.name !== cfg.name ||
       state.showName !== cfg.showName ||
       state.color !== cfg.color ||
@@ -1023,30 +1065,55 @@ export function init(): void {
       inst.themeRegistered = true;
 
       if (window.__registerPlotInputThemeListener) {
-        window.__registerPlotInputThemeListener(function() {
+        inst.themeListener = function() {
           applyTheme();
-        });
+        };
+        window.__registerPlotInputThemeListener(inst.themeListener);
       }
     }
 
-    requestAnimationFrame(applyTheme);
-    setTimeout(applyTheme, 0);
-    setTimeout(applyTheme, 80);
-    setTimeout(applyTheme, 200);
-    setTimeout(applyTheme, 500);
+    cancelPlotInputSchedules(inst);
+    inst.themeRAF = requestAnimationFrame(applyTheme);
+    inst.themeTimers = [
+      setTimeout(applyTheme, 0),
+      setTimeout(applyTheme, 80),
+      setTimeout(applyTheme, 200),
+      setTimeout(applyTheme, 500)
+    ];
 
     return true;
   };
 
   window.__bootstrapPlotInputs = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="lia-plot-input-"][data-spec]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="lia-plot-input-"][data-spec]'));
+    const seen = new Set<string>();
 
     nodes.forEach(function(node) {
       const uid = String(node.id || '').replace(/^lia-plot-input-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      seen.add(uid);
+
+      const cfg = H.parseInputSpec(spec);
+      if (plotInputTargetIsUnavailable(node, cfg.boardId)) {
+        disposePlotInput(uid, node);
+        return;
+      }
 
       window.renderPlotInputFromSpec(uid, spec);
+    });
+
+    const staleUids = new Set<string>([
+      ...Object.keys(window.__plotInputStates || {}),
+      ...Object.keys(window.__plotInputInstances || {})
+    ]);
+    staleUids.forEach(function(uid) {
+      if (seen.has(uid)) return;
+      const state = window.__plotInputStates && window.__plotInputStates[uid];
+      const inst = window.__plotInputInstances && window.__plotInputInstances[uid];
+      const root = (inst && inst.root) || (state && state.root) ||
+        document.getElementById('lia-plot-input-' + uid);
+      if (plotInputTargetIsUnavailable(root, state && state.boardId)) disposePlotInput(uid, root);
     });
   };
 

@@ -875,7 +875,7 @@ export function init(): void {
     const activeSectorKeys = new Set<string>();
     let pending = false;
 
-    document.querySelectorAll<HTMLElement>('[id^="tangent-spec-"][data-spec]').forEach(function(node) {
+    document.querySelectorAll<HTMLElement>('[id^="tangent-spec-"][data-spec]:not([data-lia-static-claimed])').forEach(function(node) {
       const uid = String(node.id || '').replace(/^tangent-spec-/, '');
       const spec = String(node.dataset.spec || '');
       const language = String(node.dataset.language || 'de');
@@ -884,7 +884,7 @@ export function init(): void {
       if (!spec || !window.renderTangentFromSpec || !window.renderTangentFromSpec(uid, spec, language)) pending = true;
     });
 
-    document.querySelectorAll<HTMLElement>('[id^="sector-spec-"][data-spec]').forEach(function(node) {
+    document.querySelectorAll<HTMLElement>('[id^="sector-spec-"][data-spec]:not([data-lia-static-claimed])').forEach(function(node) {
       const uid = String(node.id || '').replace(/^sector-spec-/, '');
       const spec = String(node.dataset.spec || '');
       const language = String(node.dataset.language || 'de');

@@ -754,7 +754,7 @@ export function init(): void {
   };
 
   window.__bootstrapFunctionAnalysisPoints = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="function-analysis-spec-"][data-spec]');
+    const nodes = document.querySelectorAll<HTMLElement>('[id^="function-analysis-spec-"][data-spec]:not([data-lia-static-claimed])');
     const activeKeys = new Set<string>();
     let pending = false;
     nodes.forEach(function(node) {

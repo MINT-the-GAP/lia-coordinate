@@ -384,7 +384,7 @@ export function init(): void {
 
   window.__bootstrapConstructionQuizzes = function(): void {
     document.querySelectorAll<HTMLElement>(
-      '[id^=construction-quiz-spec-]'
+      '[id^=construction-quiz-spec-]:not([data-lia-static-claimed])'
     ).forEach(function(node) {
       const uid = String(node.id || '').replace(/^construction-quiz-spec-/, '');
       if (!uid || !window.__setupConstructionQuiz) return;

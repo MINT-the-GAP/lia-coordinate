@@ -337,9 +337,39 @@ window.__recordDgsHistory = function(boardId: string, before: any, after: any): 
   });
 };
 const pendingRetries: Record<string, number> = {};
+const pendingRetryTimers: Record<string, number | undefined> = {};
+const pendingRetryBoardIds: Record<string, string | undefined> = {};
 const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
 const OVERLAY_DEFAULT_SCALE = 0.58;
+
+function isStaticRegressionTarget(boardId: string, anchor?: HTMLElement | null): boolean {
+  if (anchor && anchor.hasAttribute('data-lia-static-claimed')) return true;
+  try {
+    return !!(
+      boardId &&
+      window.__coord &&
+      typeof window.__coord.isStaticCoordinateBoard === 'function' &&
+      window.__coord.isStaticCoordinateBoard(boardId)
+    );
+  } catch (e) { return false; }
+}
+
+function clearPendingRegressionRetry(uid: string): void {
+  if (pendingRetryTimers[uid] != null) {
+    try { window.clearTimeout(pendingRetryTimers[uid]); } catch (e) {}
+  }
+  pendingRetryTimers[uid] = undefined;
+  pendingRetries[uid] = 0;
+  delete pendingRetryBoardIds[uid];
+}
+
+function stopStaticRegression(uid: string, boardId: string, anchor?: HTMLElement | null): boolean {
+  if (!isStaticRegressionTarget(boardId, anchor)) return false;
+  disposeRegressionForBoard(boardId);
+  clearPendingRegressionRetry(uid);
+  return true;
+}
 
 function clampOverlayScale(value: number): number {
   return Math.max(0.35, Math.min(1.45, value));
@@ -8610,6 +8640,24 @@ function unregisterRegressionState(uid: string, state: RegressionState): void {
   }
 }
 
+/** Release every transient regression state and retry owned by one board. */
+export function disposeRegressionForBoard(boardId: string): void {
+  const key = String(boardId || '').trim();
+  if (!key) return;
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    if (!state || state.boardId !== key) return;
+    disposeRegressionState(state);
+    unregisterRegressionState(uid, state);
+    clearPendingRegressionRetry(uid);
+  });
+  Object.keys(pendingRetryBoardIds).forEach((uid) => {
+    if (pendingRetryBoardIds[uid] === key) clearPendingRegressionRetry(uid);
+  });
+}
+
+window.__disposeRegressionForBoard = disposeRegressionForBoard;
+
 function requestRegressionDgs(
   uid: string,
   boardId: string,
@@ -8625,24 +8673,28 @@ function requestRegressionDgs(
 
 function setupRegressionUI(uid: string, boardId: string, languageCode?: string): void {
   if (!uid || !boardId) return;
+  const anchor = document.getElementById('regression-ui-' + uid) as HTMLElement | null;
+  if (stopStaticRegression(uid, boardId, anchor)) return;
 
   const boardContainer = getBoardContainer(boardId);
   const board = window.__boards && window.__boards[boardId];
   if (!boardContainer || !board) {
+    pendingRetryBoardIds[uid] = boardId;
+    if (pendingRetryTimers[uid] != null) return;
     const retries = (pendingRetries[uid] || 0) + 1;
     pendingRetries[uid] = retries;
 
     if (retries <= MAX_RETRIES) {
-      window.setTimeout(() => {
+      pendingRetryTimers[uid] = window.setTimeout(() => {
+        pendingRetryTimers[uid] = undefined;
         setupRegressionUI(uid, boardId, languageCode);
       }, RETRY_DELAY_MS);
     }
     return;
   }
 
-  pendingRetries[uid] = 0;
+  clearPendingRegressionRetry(uid);
 
-  const anchor = document.getElementById(`regression-ui-${uid}`);
   if (anchor) {
     anchor.style.display = 'none';
     anchor.setAttribute('aria-hidden', 'true');
@@ -9070,13 +9122,15 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
 
 window.__setupRegressionUI = function (uid: string, spec: string, language?: string) {
   const boardId = unquote(String(spec || '').trim());
+  const anchor = document.getElementById('regression-ui-' + uid) as HTMLElement | null;
+  if (stopStaticRegression(uid, boardId, anchor)) return;
   scheduleBootstrap(() => {
     setupRegressionUI(uid, boardId, language);
   });
 };
 
 export function bootstrapRegression(): void {
-  const anchors = document.querySelectorAll('[id^="regression-ui-"][data-spec]');
+  const anchors = document.querySelectorAll('[id^="regression-ui-"][data-spec]:not([data-lia-static-claimed])');
 
   anchors.forEach((el: Element) => {
     const match = String(el.id || '').match(/^regression-ui-(.+)$/);

@@ -777,7 +777,7 @@ export function init(): void {
 
   window.__bootstrapAreas = function(): void {
     runAreaUpdateBatch(function() {
-      const nodes = document.querySelectorAll<HTMLElement>('[id^="area-spec-"][data-spec]');
+      const nodes = document.querySelectorAll<HTMLElement>('[id^="area-spec-"][data-spec]:not([data-lia-static-claimed])');
       const activeKeys = new Set<string>();
       let pending = false;
 

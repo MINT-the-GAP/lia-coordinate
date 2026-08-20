@@ -766,7 +766,17 @@ export function applyMacroCodeOrderLayers(
   ensureMacroLayerCapacity(registryRoot);
 
   let markers: any[] = [];
-  try { markers = Array.from((documentRoot as any).querySelectorAll(MACRO_LAYER_MARKER_SELECTOR)); } catch (e) {}
+  try {
+    markers = Array.from((documentRoot as any).querySelectorAll(MACRO_LAYER_MARKER_SELECTOR))
+      .filter(function(marker: any) {
+        try {
+          if (typeof marker?.hasAttribute === 'function') {
+            return !marker.hasAttribute('data-lia-static-claimed');
+          }
+        } catch (e) {}
+        return !(marker && marker.dataset && marker.dataset.liaStaticClaimed);
+      });
+  } catch (e) {}
   const assignments = assignMacroLayersBySourceOrder(markers);
   result.assignments = assignments.length;
   const changedBoards = new Set<any>();

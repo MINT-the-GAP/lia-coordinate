@@ -128,6 +128,93 @@ export function init(): void {
     scheduleSourceLayers();
   }
 
+  function cancelPointOnGraphTimers(inst) {
+    if (!inst) return;
+    (inst.timers || []).forEach(function(timer) {
+      try { clearTimeout(timer); } catch (e) {}
+    });
+    inst.timers = [];
+  }
+
+  function queuePointOnGraphTimer(inst, callback, delay) {
+    const timer = setTimeout(function() {
+      if (inst && inst.timers) {
+        inst.timers = inst.timers.filter(function(value) { return value !== timer; });
+      }
+      callback();
+    }, delay);
+    inst.timers = inst.timers || [];
+    inst.timers.push(timer);
+    return timer;
+  }
+
+  function pointOnGraphTargetIsUnavailable(root, boardId) {
+    if (!root || !root.isConnected) return true;
+    if (root.hasAttribute('data-lia-static-claimed')) return true;
+    return !!boardId && !(window.__boards && window.__boards[boardId]);
+  }
+
+  function removePointGraphObjects(boardId, graphKey) {
+    const entry = boardId && graphKey && window.__pointGraphs &&
+      window.__pointGraphs[boardId] && window.__pointGraphs[boardId][graphKey];
+    if (entry) {
+      ['graph', 'anchor', 'text'].forEach(function(key) {
+        const object = entry[key];
+        try { if (object && object.board) object.board.removeObject(object); } catch (e) {}
+      });
+    }
+    if (boardId && window.__pointGraphs && window.__pointGraphs[boardId]) {
+      delete window.__pointGraphs[boardId][graphKey];
+    }
+    if (boardId && window.__pointGraphStates && window.__pointGraphStates[boardId]) {
+      delete window.__pointGraphStates[boardId][graphKey];
+    }
+  }
+
+  function disposePointOnGraph(uid, root) {
+    const inst = window.__pointOnGraphInstances && window.__pointOnGraphInstances[uid];
+    const layer = window.__pointOnGraphLayerEntries && window.__pointOnGraphLayerEntries[uid];
+    const uiRoot = root || (inst && inst.uiRoot) || document.getElementById('graph-ui-' + uid);
+    const spec = String((uiRoot && uiRoot.dataset.spec) || (inst && inst.spec) || '');
+    const target = spec ? getTargetFromSpec(spec) : null;
+    const boardId = (layer && layer.boardId) || (target && target.boardId) || '';
+    const names = (layer && layer.names) || (target ? [target.name] : []);
+    const graphKey = (layer && layer.graphKey) || (target && getGraphKey(target)) || '';
+
+    cancelPointOnGraphTimers(inst);
+    const checkRoot = (inst && inst.checkRoot) ||
+      getCoordinateQuizRoot(document.getElementById('graph-check-' + uid));
+    if (inst && inst.observer) {
+      try { inst.observer.disconnect(); } catch (e) {}
+    }
+    if (checkRoot && inst && inst.quizClickHandler) {
+      try { checkRoot.removeEventListener('click', inst.quizClickHandler); } catch (e) {}
+    }
+    if (inst && inst.themeListener && window.__liaThemeSync) {
+      window.__liaThemeSync.listeners.delete(inst.themeListener);
+    }
+    if (checkRoot) {
+      checkRoot.__liaPointGraphUiObserved = false;
+      checkRoot.__liaPointGraphUiScheduled = false;
+    }
+    const taskRoot = (inst && inst.taskRoot) || document.getElementById('graph-task-' + uid);
+    if (taskRoot) {
+      try { taskRoot.replaceChildren(); } catch (e) { taskRoot.innerHTML = ''; }
+    }
+
+    removePointGraphObjects(boardId, graphKey);
+    names.forEach(function(name) {
+      const point = window.__points && window.__points[boardId] && window.__points[boardId][name];
+      try { if (point && point.board) point.board.removeObject(point); } catch (e) {}
+      if (window.__points && window.__points[boardId]) delete window.__points[boardId][name];
+      if (window.__pointStates && window.__pointStates[boardId]) delete window.__pointStates[boardId][name];
+    });
+    if (window.__pointOnGraphInstances) delete window.__pointOnGraphInstances[uid];
+    if (window.__pointOnGraphLocks) delete window.__pointOnGraphLocks[uid];
+    if (window.__pointOnGraphLayerEntries) delete window.__pointOnGraphLayerEntries[uid];
+    scheduleSourceLayers();
+  }
+
   function isLocked(uid) {
     return !!window.__pointOnGraphLocks[String(uid)];
   }
@@ -969,6 +1056,11 @@ export function init(): void {
     const checkRoot = getCoordinateQuizRoot(document.getElementById('graph-check-' + uid));
 
     if (!uiRoot || !taskRoot || !checkRoot) return false;
+    const inst = window.__pointOnGraphInstances[uid] || (window.__pointOnGraphInstances[uid] = {});
+    inst.uiRoot = uiRoot;
+    inst.taskRoot = taskRoot;
+    inst.checkRoot = checkRoot;
+    inst.spec = spec;
     uiRoot.dataset.spec = spec;
     registerSourceLayerEntry(uid, spec);
 
@@ -1007,40 +1099,46 @@ export function init(): void {
           });
         });
         mo.observe(checkRoot, { childList: true, subtree: true });
+        inst.observer = mo;
       } catch (e) {}
 
       try {
-        checkRoot.addEventListener('click', function(e) {
+        inst.quizClickHandler = function(e) {
+          const activeSpec = getGraphUiSpecByUid(uid);
+          if (pointOnGraphTargetIsUnavailable(uiRoot, getTargetFromSpec(activeSpec).boardId)) return;
           const targetBtn = (e.target as HTMLElement)?.closest('button, input[type="button"], input[type="submit"]') ?? null;
 
           if (!targetBtn || !checkRoot.contains(targetBtn)) return;
           if (!isQuizResolveButton(checkRoot, targetBtn)) return;
 
-          setTimeout(function() {
+          queuePointOnGraphTimer(inst, function() {
             const curSpec = getGraphUiSpecByUid(uid);
             if (typeof window.finalizePointGraphFromSpec === 'function') {
               window.finalizePointGraphFromSpec(uid, curSpec);
             }
           }, 0);
 
-          setTimeout(function() {
+          queuePointOnGraphTimer(inst, function() {
             const curSpec = getGraphUiSpecByUid(uid);
             if (typeof window.finalizePointGraphFromSpec === 'function') {
               window.finalizePointGraphFromSpec(uid, curSpec);
             }
           }, 80);
-        });
+        };
+        checkRoot.addEventListener('click', inst.quizClickHandler);
       } catch (e) {}
 
       if (window.__registerLiaThemeListener) {
-        window.__registerLiaThemeListener(function() {
+        inst.themeListener = function() {
           applyPointOnGraphUi(uid);
-        });
+        };
+        window.__registerLiaThemeListener(inst.themeListener);
       }
     }
 
-    setTimeout(function() {
+    queuePointOnGraphTimer(inst, function() {
       const curSpec = getGraphUiSpecByUid(uid);
+      if (pointOnGraphTargetIsUnavailable(uiRoot, getTargetFromSpec(curSpec).boardId)) return;
       if (typeof window.restorePointGraphFromSpec === 'function') {
         window.restorePointGraphFromSpec(curSpec);
       }
@@ -1050,8 +1148,9 @@ export function init(): void {
       applyPointOnGraphUi(uid);
     }, 0);
 
-    setTimeout(function() {
+    queuePointOnGraphTimer(inst, function() {
       const curSpec = getGraphUiSpecByUid(uid);
+      if (pointOnGraphTargetIsUnavailable(uiRoot, getTargetFromSpec(curSpec).boardId)) return;
       if (typeof window.restorePointGraphFromSpec === 'function') {
         window.restorePointGraphFromSpec(curSpec);
       }
@@ -1065,14 +1164,35 @@ export function init(): void {
   };
 
   window.__bootstrapPointOnGraphs = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="graph-ui-"]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="graph-ui-"][data-spec]'));
+    const seen = new Set<string>();
 
     nodes.forEach(function(node) {
       const uid = String(node.id || '').replace(/^graph-ui-/, '');
       const spec = getGraphUiSpecByUid(uid);
       if (!uid || !spec) return;
+      seen.add(uid);
+
+      const target = getTargetFromSpec(spec);
+      if (pointOnGraphTargetIsUnavailable(node, target.boardId)) {
+        disposePointOnGraph(uid, node);
+        return;
+      }
 
       window.renderPointOnGraphFromSpec(uid, spec);
+    });
+
+    const staleUids = new Set<string>([
+      ...Object.keys(window.__pointOnGraphInstances || {}),
+      ...Object.keys(window.__pointOnGraphLocks || {}),
+      ...Object.keys(window.__pointOnGraphLayerEntries || {})
+    ]);
+    staleUids.forEach(function(uid) {
+      if (seen.has(uid)) return;
+      const inst = window.__pointOnGraphInstances && window.__pointOnGraphInstances[uid];
+      const layer = window.__pointOnGraphLayerEntries && window.__pointOnGraphLayerEntries[uid];
+      const root = (inst && inst.uiRoot) || document.getElementById('graph-ui-' + uid);
+      if (pointOnGraphTargetIsUnavailable(root, layer && layer.boardId)) disposePointOnGraph(uid, root);
     });
 
     refreshAllPointLabels();

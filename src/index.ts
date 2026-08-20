@@ -61,12 +61,62 @@ import {
 } from './coord/boardHelpers';
 import { getNeutralColor, getAccentColor } from './shared/theme';
 import { initQuizDom } from './shared/quizDom';
+import { initCoordinateBoardElement } from './coord/coordinateElement';
+import {
+  bootstrapStaticCoordinateBoards,
+  disposeStaticCoordinateBoard,
+  initStaticRenderer,
+  initializeStaticCoordinateBoard,
+  isStaticCoordinateBoard,
+  scheduleStaticBootstrap,
+} from './static/staticSvg';
 
-// Install source-order layer reconciliation before pending board macros run.
-// The initial pass may precede subsystem registration; delayed passes below
-// reconcile the entries once all renderers have been initialized.
-initMacroCodeOrderLayers();
-initQuizDom();
+let dynamicRuntimeReady = false;
+let drainingCoordinateHooks = false;
+let dynamicRuntimeRequested = false;
+
+/** Initialize the JSXGraph-dependent registries only when a dynamic board needs them. */
+export function ensureDynamicRuntime(): void {
+  if (dynamicRuntimeReady) return;
+  if (drainingCoordinateHooks) {
+    dynamicRuntimeRequested = true;
+    return;
+  }
+  dynamicRuntimeReady = true;
+  window.__coordinateDynamicRuntimeReady = true;
+
+  initQuizDom();
+  initMacroCodeOrderLayers();
+  initAxisTitle();
+  initCreatePoint();
+  initSlider();
+  initPlotFunction();
+  initPlotInput();
+  initPointOnGraph();
+  initPointsOnGraph();
+  initFunctionAnalysisPoints();
+  initDistance();
+  initLinearObjects();
+  initArc();
+  initRelationObjects();
+  initArea();
+  initAngle();
+  initCoordText();
+  initCircle();
+  initTangentSector();
+  initObjectAnalysisPoints();
+  initSchar();
+  initTable();
+  initReconstruction();
+  initPolygonMetricQuiz();
+  initConstructionQuiz();
+  initCombinedQuiz();
+  initRegression();
+  initDGS();
+  scheduleMacroCodeOrderLayers();
+}
+
+window.__ensureCoordinateDynamicRuntime = ensureDynamicRuntime;
 
 // Expose board helpers on window.__coord for use by the inline macro code.
 window.__coord = {
@@ -99,7 +149,18 @@ window.__coord = {
   wireBoard,
   getNeutralColor,
   getAccentColor,
+  initializeStaticCoordinateBoard,
+  disposeStaticCoordinateBoard,
+  isStaticCoordinateBoard,
+  bootstrapStaticCoordinateBoards,
+  scheduleStaticBootstrap,
+  initCoordinateBoardElement,
 };
+
+// The static lifecycle observer must be installed before dynamic subsystem
+// observers. Static-only courses therefore never create their retry intervals.
+initStaticRenderer();
+initCoordinateBoardElement();
 
 // Drain any board-init callbacks queued by @CoordinateSystem macros that ran
 // before this script loaded.
@@ -108,7 +169,16 @@ window.__coord = {
     ? (window.__liaRunCoordHooks as unknown as Array<() => void>)
     : [];
 
-  pending.forEach(fn => { try { fn(); } catch (e) {} });
+  drainingCoordinateHooks = true;
+  try {
+    pending.forEach(fn => { try { fn(); } catch (e) {} });
+  } finally {
+    drainingCoordinateHooks = false;
+  }
+  if (dynamicRuntimeRequested) {
+    dynamicRuntimeRequested = false;
+    ensureDynamicRuntime();
+  }
 
   // Future macros call push() — fire immediately since __coord is now ready.
   (window.__liaRunCoordHooks as unknown) = {
@@ -116,30 +186,8 @@ window.__coord = {
   };
 })();
 
-initAxisTitle();
-initCreatePoint();
-initSlider();
-initPlotFunction();
-initPlotInput();
-initPointOnGraph();
-initPointsOnGraph();
-initFunctionAnalysisPoints();
-initDistance();
-initLinearObjects();
-initArc();
-initRelationObjects();
-initArea();
-initAngle();
-initCoordText();
-initCircle();
-initTangentSector();
-initObjectAnalysisPoints();
-initSchar();
-initTable();
-initReconstruction();
-initPolygonMetricQuiz();
-initConstructionQuiz();
-initCombinedQuiz();
-initRegression();
-initDGS();
-scheduleMacroCodeOrderLayers();
+// Preserve hot-reload compatibility if a dynamic board registry already
+// existed before this bundle instance was evaluated.
+if (window.__boards && Object.keys(window.__boards).length > 0) {
+  ensureDynamicRuntime();
+}

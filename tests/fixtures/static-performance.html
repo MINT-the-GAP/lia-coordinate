@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>lia-coordinate static SVG performance fixture</title>
+</head>
+<body>
+  <main id="fixture"></main>
+  <script>
+    window.__staticPerformanceStarted = performance.now();
+    window.__staticPerformanceIntervals = 0;
+    window.__staticPerformanceObservers = 0;
+
+    const nativeSetInterval = window.setInterval;
+    window.setInterval = function () {
+      window.__staticPerformanceIntervals += 1;
+      return nativeSetInterval.apply(this, arguments);
+    };
+
+    const NativeMutationObserver = window.MutationObserver;
+    window.MutationObserver = function (callback) {
+      window.__staticPerformanceObservers += 1;
+      return new NativeMutationObserver(callback);
+    };
+    window.MutationObserver.prototype = NativeMutationObserver.prototype;
+
+    const root = document.getElementById('fixture');
+    for (let boardIndex = 0; boardIndex < 6; boardIndex += 1) {
+      const host = document.createElement('div');
+      host.id = 'static-board-host-' + boardIndex;
+      host.dataset.liaStaticCoordinate = '';
+      host.dataset.spec = 'xmin=0;xmax=18;ymin=0;ymax=18;width=220;id=perf-' +
+        boardIndex + ';achsen=0;grid=0;border=0;static=1';
+      root.appendChild(host);
+    }
+
+    let areaIndex = 0;
+    let distanceIndex = 0;
+    for (let sourceIndex = 0; sourceIndex < 259; sourceIndex += 1) {
+      const boardIndex = sourceIndex % 6;
+      const cellIndex = Math.floor(sourceIndex / 6);
+      const x = 2 + (cellIndex % 4) * 4;
+      const y = 2 + (Math.floor(cellIndex / 4) % 4) * 4;
+      const points = '[[' + x + ';' + (y + 0.75) + '];[' + (x + 0.75) + ';' + y +
+        '];[' + x + ';' + (y - 0.75) + '];[' + (x - 0.75) + ';' + y + ']]';
+      const marker = document.createElement('span');
+      marker.dataset.language = sourceIndex % 2 ? 'de' : 'en';
+      marker.style.display = 'none';
+
+      if (sourceIndex % 2 === 0) {
+        marker.id = 'area-spec-perf-' + areaIndex;
+        marker.dataset.spec = 'perf-' + boardIndex + ';' + points +
+          ';#e63946;0.25;linestyle=dashed';
+        areaIndex += 1;
+      } else {
+        marker.id = 'distance-spec-perf-' + distanceIndex;
+        marker.dataset.spec = 'perf-' + boardIndex + ';' +
+          points.slice(0, -1) + ';[' + x + ';' + (y + 0.75) + ']]' +
+          ';#457b9d;design=-;3px;linestyle=dotted';
+        distanceIndex += 1;
+      }
+      root.appendChild(marker);
+    }
+  </script>
+  <script src="../../dist/static.js"></script>
+  <script>
+    requestAnimationFrame(function () {
+        const hosts = Array.from(document.querySelectorAll('[data-lia-static-coordinate]'));
+        const result = {
+          svgCount: document.querySelectorAll('svg[data-lia-static-svg]').length,
+          polygonCount: document.querySelectorAll('svg[data-lia-static-svg] polygon').length,
+          polylineCount: document.querySelectorAll('svg[data-lia-static-svg] polyline').length,
+          geometryCount: document.querySelectorAll(
+            'svg[data-lia-static-svg] polygon,svg[data-lia-static-svg] polyline,' +
+            'svg[data-lia-static-svg] path,svg[data-lia-static-svg] line,' +
+            'svg[data-lia-static-svg] rect'
+          ).length,
+          claimedCount: document.querySelectorAll('[data-lia-static-claimed]').length,
+          duplicateHostCount: hosts.filter(function (host) {
+            return host.querySelectorAll('svg[data-lia-static-svg]').length !== 1;
+          }).length,
+          jsxBoardCount: window.__boards ? Object.keys(window.__boards).length : 0,
+          intervalCount: window.__staticPerformanceIntervals,
+          observerCount: window.__staticPerformanceObservers,
+          initMs: Number((performance.now() - window.__staticPerformanceStarted).toFixed(3))
+        };
+        document.body.textContent = 'STATIC_PERF_RESULT:' + JSON.stringify(result);
+    });
+  </script>
+</body>
+</html>

@@ -136,6 +136,74 @@ export function init(): void {
     };
   }
 
+  function cancelCreatePointTimers(inst) {
+    if (!inst) return;
+    (inst.timers || []).forEach(function(timer) {
+      try { clearTimeout(timer); } catch (e) {}
+    });
+    inst.timers = [];
+  }
+
+  function queueCreatePointTimer(inst, callback, delay) {
+    const timer = setTimeout(function() {
+      if (inst && inst.timers) {
+        inst.timers = inst.timers.filter(function(value) { return value !== timer; });
+      }
+      callback();
+    }, delay);
+    inst.timers = inst.timers || [];
+    inst.timers.push(timer);
+    return timer;
+  }
+
+  function createPointTargetIsUnavailable(root, boardId) {
+    if (!root || !root.isConnected) return true;
+    if (root.hasAttribute('data-lia-static-claimed')) return true;
+    return !!boardId && !(window.__boards && window.__boards[boardId]);
+  }
+
+  function disposeCreatePoint(uid, root) {
+    const inst = window.__createPointInstances && window.__createPointInstances[uid];
+    const uiRoot = root || (inst && inst.uiRoot) || document.getElementById('point-ui-' + uid);
+    const spec = String((uiRoot && uiRoot.dataset.spec) || (inst && inst.spec) || '');
+    const target = spec ? getPointTargetFromSpec(spec) : null;
+    const boardId = target && target.boardId;
+    const name = target && target.name;
+    const point = boardId && name && window.__points && window.__points[boardId] &&
+      window.__points[boardId][name];
+    const ownsPoint = !!point && point.__liaDgsMacroKey === 'macro:point:' + String(uid);
+    if (ownsPoint) {
+      try { if (point.board) point.board.removeObject(point); } catch (e) {}
+    }
+    if (boardId && name && (ownsPoint || !(window.__boards && window.__boards[boardId]))) {
+      if (window.__points && window.__points[boardId]) delete window.__points[boardId][name];
+      if (window.__pointStates && window.__pointStates[boardId]) delete window.__pointStates[boardId][name];
+    }
+
+    cancelCreatePointTimers(inst);
+    const checkRoot = (inst && inst.checkRoot) ||
+      getCoordinateQuizRoot(document.getElementById('point-check-' + uid));
+    if (inst && inst.observer) {
+      try { inst.observer.disconnect(); } catch (e) {}
+    }
+    if (checkRoot && inst && inst.quizClickHandler) {
+      try { checkRoot.removeEventListener('click', inst.quizClickHandler); } catch (e) {}
+    }
+    if (inst && inst.themeListener && window.__liaThemeSync) {
+      window.__liaThemeSync.listeners.delete(inst.themeListener);
+    }
+    if (checkRoot) {
+      checkRoot.__liaPointUiObserved = false;
+      checkRoot.__liaPointUiScheduled = false;
+    }
+    const taskRoot = (inst && inst.taskRoot) || document.getElementById('point-task-' + uid);
+    if (taskRoot) {
+      try { taskRoot.replaceChildren(); } catch (e) { taskRoot.innerHTML = ''; }
+    }
+    if (window.__createPointInstances) delete window.__createPointInstances[uid];
+    try { window.__scheduleMacroCodeOrderLayers?.(); } catch (e) {}
+  }
+
   function findPointMacroObject(uid, spec) {
     const target = getPointTargetFromSpec(spec);
     const board = window.__boards && window.__boards[target.boardId];
@@ -670,15 +738,58 @@ export function init(): void {
     return false;
   };
 
+  function disposePointMacro(uid, spec, fallbackBoardId, fallbackName) {
+    const target = spec ? getPointTargetFromSpec(spec) : null;
+    const boardId = (target && target.boardId) || fallbackBoardId || '';
+    const name = (target && target.name) || fallbackName || '';
+    const point = boardId && name && window.__points && window.__points[boardId] &&
+      window.__points[boardId][name];
+    if (point && point.__liaDgsMacroKey === 'macro:point:' + String(uid)) {
+      try { if (point.board) point.board.removeObject(point); } catch (e) {}
+      delete window.__points[boardId][name];
+      if (window.__pointStates && window.__pointStates[boardId]) {
+        delete window.__pointStates[boardId][name];
+      }
+    } else if (!(window.__boards && window.__boards[boardId])) {
+      if (window.__points && window.__points[boardId]) delete window.__points[boardId][name];
+      if (window.__pointStates && window.__pointStates[boardId]) {
+        delete window.__pointStates[boardId][name];
+      }
+    }
+  }
+
   window.__bootstrapStaticPoints = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="point-spec-"][data-spec]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="point-spec-"][data-spec]'));
+    const activeUids = new Set<string>();
+    document.querySelectorAll<HTMLElement>('[id^="point-ui-"][data-spec]:not([data-lia-static-claimed])').forEach(function(node) {
+      const uid = String(node.id || '').replace(/^point-ui-/, '');
+      const target = getPointTargetFromSpec(String(node.dataset.spec || ''));
+      if (uid && target.boardId && window.__boards && window.__boards[target.boardId]) activeUids.add(uid);
+    });
 
     nodes.forEach(function(node) {
       const uid = String(node.id || '').replace(/^point-spec-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      const target = getPointTargetFromSpec(spec);
+      if (node.hasAttribute('data-lia-static-claimed') ||
+          !target.boardId || !(window.__boards && window.__boards[target.boardId])) {
+        disposePointMacro(uid, spec, target.boardId, target.name);
+        return;
+      }
+      activeUids.add(uid);
 
       window.renderStaticPointFromSpec(uid, spec);
+    });
+
+    Object.keys(window.__points || {}).forEach(function(boardId) {
+      const points = window.__points[boardId] || {};
+      Object.keys(points).forEach(function(name) {
+        const point = points[name];
+        const match = String(point && point.__liaDgsMacroKey || '').match(/^macro:point:(.+)$/);
+        if (!match || activeUids.has(match[1])) return;
+        disposePointMacro(match[1], String(point.__liaPointMacroSpec || ''), boardId, name);
+      });
     });
 
     refreshAllPointLabels();
@@ -913,6 +1024,12 @@ export function init(): void {
 
     if (!uiRoot || !taskRoot || !checkRoot) return false;
 
+    const inst = window.__createPointInstances[uid] || (window.__createPointInstances[uid] = {});
+    inst.uiRoot = uiRoot;
+    inst.taskRoot = taskRoot;
+    inst.checkRoot = checkRoot;
+    inst.spec = spec;
+
     if ((uiRoot.dataset.spec || '') !== String(spec || '')) {
       uiRoot.dataset.spec = spec;
     }
@@ -954,16 +1071,18 @@ export function init(): void {
           });
         });
         mo.observe(checkRoot, { childList: true, subtree: true });
+        inst.observer = mo;
       } catch (e) {}
 
       try {
-        checkRoot.addEventListener('click', function(e) {
+        inst.quizClickHandler = function(e) {
+          if (createPointTargetIsUnavailable(uiRoot, getPointTargetFromSpec(uiRoot.dataset.spec || '').boardId)) return;
           const targetBtn = (e.target as HTMLElement)?.closest('button, input[type="button"], input[type="submit"]') ?? null;
 
           if (!targetBtn || !checkRoot.contains(targetBtn)) return;
           if (!isQuizResolveButton(checkRoot, targetBtn)) return;
 
-          setTimeout(function() {
+          queueCreatePointTimer(inst, function() {
             const curSpec = uiRoot.dataset.spec || '';
             if (typeof window.finalizePointFromSpec === 'function') {
               window.finalizePointFromSpec(curSpec);
@@ -971,24 +1090,26 @@ export function init(): void {
             assignPointMacroIdentity(uid, curSpec);
           }, 0);
 
-          setTimeout(function() {
+          queueCreatePointTimer(inst, function() {
             const curSpec = uiRoot.dataset.spec || '';
             if (typeof window.finalizePointFromSpec === 'function') {
               window.finalizePointFromSpec(curSpec);
             }
             assignPointMacroIdentity(uid, curSpec);
           }, 80);
-        });
+        };
+        checkRoot.addEventListener('click', inst.quizClickHandler);
       } catch (e) {}
 
       if (window.__registerLiaThemeListener) {
-        window.__registerLiaThemeListener(function() {
+        inst.themeListener = function() {
           applyCreatePointUi(uid);
-        });
+        };
+        window.__registerLiaThemeListener(inst.themeListener);
       }
     }
 
-    setTimeout(function() {
+    queueCreatePointTimer(inst, function() {
       if (!uiRoot.isConnected || String(uiRoot.dataset.spec || '') !== String(spec || '')) return;
       const existing = findPointMacroObject(uid, spec);
       if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
@@ -998,7 +1119,7 @@ export function init(): void {
       assignPointMacroIdentity(uid, spec);
     }, 0);
 
-    setTimeout(function() {
+    queueCreatePointTimer(inst, function() {
       if (!uiRoot.isConnected || String(uiRoot.dataset.spec || '') !== String(spec || '')) return;
       const existing = findPointMacroObject(uid, spec);
       if ((!existing || String(existing.__liaPointMacroSpec || '') !== String(spec || '')) &&
@@ -1012,14 +1133,30 @@ export function init(): void {
   };
 
   window.__bootstrapCreatePoints = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="point-ui-"][data-spec]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="point-ui-"][data-spec]'));
+    const seen = new Set<string>();
 
     nodes.forEach(function(node) {
       const uid = String(node.id || '').replace(/^point-ui-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      seen.add(uid);
+
+      const target = getPointTargetFromSpec(spec);
+      if (createPointTargetIsUnavailable(node, target.boardId)) {
+        disposeCreatePoint(uid, node);
+        return;
+      }
 
       window.renderCreatePointFromSpec(uid, spec);
+    });
+
+    Object.keys(window.__createPointInstances || {}).forEach(function(uid) {
+      if (seen.has(uid)) return;
+      const inst = window.__createPointInstances[uid];
+      const root = (inst && inst.uiRoot) || document.getElementById('point-ui-' + uid);
+      const target = inst && inst.spec ? getPointTargetFromSpec(inst.spec) : null;
+      if (createPointTargetIsUnavailable(root, target && target.boardId)) disposeCreatePoint(uid, root);
     });
 
     refreshAllPointLabels();

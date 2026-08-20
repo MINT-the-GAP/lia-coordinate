@@ -408,7 +408,7 @@ export function init(): void {
   };
 
   window.__bootstrapLinearObjects = function(): void {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="linear-spec-"][data-spec]');
+    const nodes = document.querySelectorAll<HTMLElement>('[id^="linear-spec-"][data-spec]:not([data-lia-static-claimed])');
     const activeKeys = new Set<string>();
     let pending = false;
     nodes.forEach(function(node) {

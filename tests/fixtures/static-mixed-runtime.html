@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang=en>
+<head>
+  <meta charset=utf-8>
+  <title>lia-coordinate mixed dynamic/static lifecycle fixture</title>
+</head>
+<body>
+  <main id=fixture></main>
+  <script>
+    window.__mixedIntervals = [];
+    window.__mixedTimeouts = [];
+    window.__mixedErrors = [];
+    window.__mixedLifecycle = [];
+    const nativeSetInterval = window.setInterval.bind(window);
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    const nativeClearTimeout = window.clearTimeout.bind(window);
+
+    window.setInterval = function (callback, delay) {
+      window.__mixedIntervals.push({ callback: callback, delay: Number(delay) || 0 });
+      return nativeSetInterval.apply(window, arguments);
+    };
+    window.setTimeout = function (callback, delay) {
+      const record = { callback: callback, delay: Number(delay) || 0, id: null };
+      const id = nativeSetTimeout.apply(window, arguments);
+      record.id = id;
+      window.__mixedTimeouts.push(record);
+      return id;
+    };
+    window.addEventListener('error', function (event) {
+      window.__mixedErrors.push(String(event.message || event.error || 'error'));
+      document.documentElement.dataset.mixedError = String(
+        event.message || event.error || 'error'
+      );
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      window.__mixedErrors.push(String(event.reason || 'unhandled rejection'));
+    });
+  </script>
+  <script src=../../dist/index.js></script>
+  <script>
+    window.__ensureCoordinateDynamicRuntime();
+    const root = document.getElementById('fixture');
+    const baselineIntervalCount = window.__mixedIntervals.length;
+
+    const staticBoardId = 'mixed-static-board';
+    const staticHost = document.createElement('lia-coordinate-board');
+    staticHost.dataset.liaCoordinateKey = staticBoardId;
+    staticHost.dataset.spec =
+      'xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=' + staticBoardId +
+      ';achsen=0;grid=0;border=0;static=1';
+    root.appendChild(staticHost);
+
+    function marker(id, spec) {
+      const node = document.createElement('span');
+      node.id = id;
+      node.dataset.spec = spec;
+      node.dataset.language = 'de';
+      root.appendChild(node);
+      return node;
+    }
+
+    const directMarkers = [
+      marker('dgs-ui-mixed-direct-dgs', staticBoardId + ';tools=[0]'),
+      marker('dgs-instrument-ui-mixed-direct-instrument', staticBoardId),
+      marker('regression-ui-mixed-direct-regression', staticBoardId),
+      marker('rek-spec-mixed-direct-reconstruction', staticBoardId + ';2*x-1;0.1')
+    ];
+    directMarkers[1].dataset.instrument = 'compass';
+
+    const unclaimedBeforeDirect = directMarkers.filter(function (node) {
+      return !node.hasAttribute('data-lia-static-claimed');
+    }).length;
+    const timeoutCountBeforeDirect = window.__mixedTimeouts.length;
+    const intervalCountBeforeDirect = window.__mixedIntervals.length;
+    window.__setupDGS('mixed-direct-dgs', staticBoardId + ';tools=[0]', 'de');
+    window.__setupDGSInstrument('mixed-direct-instrument', staticBoardId, 'compass', 'de');
+    window.__setupRegressionUI('mixed-direct-regression', staticBoardId, 'de');
+    window.__setupReconstructionQuiz(
+      'mixed-direct-reconstruction',
+      staticBoardId + ';2*x-1;0.1'
+    );
+    const directTimeoutDelta = window.__mixedTimeouts.length - timeoutCountBeforeDirect;
+    const directIntervalDelta = window.__mixedIntervals.length - intervalCountBeforeDirect;
+    const directUiCountAfterCalls = document.querySelectorAll(
+      '[class*=lia-dgs],[class*=lia-regression]'
+    ).length;
+
+    window.__coord.bootstrapStaticCoordinateBoards();
+
+    // Start a genuine DGS retry while the id is still dynamic/missing. Its
+    // already queued callback must become a no-op after the id turns static.
+    const retryBoardId = 'mixed-late-static';
+    const retryRecordStart = window.__mixedTimeouts.length;
+    window.__setupDGS('mixed-late-retry', retryBoardId, 'de');
+    const retryRecord = window.__mixedTimeouts
+      .slice(retryRecordStart)
+      .find(function (record) { return record.delay === 120; });
+
+    const retryMarker = marker('dgs-ui-mixed-late-retry', retryBoardId);
+    const retryHost = document.createElement('lia-coordinate-board');
+    retryHost.dataset.liaCoordinateKey = retryBoardId;
+    retryHost.dataset.spec =
+      'xmin=0;xmax=2;ymin=0;ymax=2;width=200;id=' + retryBoardId +
+      ';achsen=0;grid=0;border=0;static=1';
+    root.appendChild(retryHost);
+    const retryCountBeforeCallback = window.__mixedTimeouts.filter(function (record) {
+      return record.delay === 120;
+    }).length;
+    if (retryRecord) {
+      nativeClearTimeout(retryRecord.id);
+      retryRecord.callback();
+    }
+    const retryCountAfterCallback = window.__mixedTimeouts.filter(function (record) {
+      return record.delay === 120;
+    }).length;
+
+    // A claimed regression request is ignored and repeatedly bootstrapping DGS
+    // must neither recreate the request's controller nor enqueue a retry.
+    const claimedRegression = marker('regression-ui-mixed-claimed-request', staticBoardId);
+    window.__coord.bootstrapStaticCoordinateBoards();
+    const claimedRetryCountBefore = window.__mixedTimeouts.filter(function (record) {
+      return record.delay === 120;
+    }).length;
+    window.__bootstrapDGS();
+    window.__bootstrapDGS();
+    const claimedRetryCountAfter = window.__mixedTimeouts.filter(function (record) {
+      return record.delay === 120;
+    }).length;
+
+    // Seed real dynamic registries and verify that a synchronous switch to
+    // static prunes them in the same call that frees the old board.
+    const transitionBoardId = 'mixed-transition';
+    const transitionHost = document.createElement('div');
+    transitionHost.style.width = '320px';
+    transitionHost.style.height = '220px';
+    transitionHost.style.position = 'relative';
+    root.appendChild(transitionHost);
+    const lifecycle = window.__mixedLifecycle;
+    const nativeHostRemoveEventListener = transitionHost.removeEventListener.bind(transitionHost);
+    transitionHost.removeEventListener = function (type) {
+      lifecycle.push('host-remove-' + type);
+      return nativeHostRemoveEventListener.apply(transitionHost, arguments);
+    };
+    const nativeDocumentRemoveEventListener = document.removeEventListener.bind(document);
+    document.removeEventListener = function (type) {
+      lifecycle.push('document-remove-' + type);
+      return nativeDocumentRemoveEventListener.apply(document, arguments);
+    };
+    const nativeWindowRemoveEventListener = window.removeEventListener.bind(window);
+    window.removeEventListener = function (type) {
+      lifecycle.push('window-remove-' + type);
+      return nativeWindowRemoveEventListener.apply(window, arguments);
+    };
+    const nativeCancelAnimationFrame = window.cancelAnimationFrame.bind(window);
+    window.cancelAnimationFrame = function () {
+      lifecycle.push('cancel-raf');
+      return nativeCancelAnimationFrame.apply(window, arguments);
+    };
+    const NativeResizeObserver = window.ResizeObserver;
+    window.ResizeObserver = class {
+      constructor(callback) {
+        this.inner = new NativeResizeObserver(callback);
+      }
+      observe() { return this.inner.observe.apply(this.inner, arguments); }
+      unobserve() { return this.inner.unobserve.apply(this.inner, arguments); }
+      disconnect() {
+        lifecycle.push('disconnect-resize-observer');
+        return this.inner.disconnect();
+      }
+    };
+    const oldBoard = {
+      containerObj: transitionHost,
+      unitX: 80,
+      unitY: 80,
+      canvasWidth: 320,
+      canvasHeight: 220,
+      origin: { scrCoords: [1, 160, 110] },
+      objects: {},
+      objectsList: [],
+      defaultAxes: {},
+      __coordCleanup: function () {
+        lifecycle.push('cleanup');
+        oldBoard.__coordCleanup = null;
+      },
+      getBoundingBox: function () { return [0, 2, 2, 0]; },
+      on: function (type) { lifecycle.push('board-on-' + type); },
+      off: function (type) { lifecycle.push('board-off-' + type); },
+      removeObject: function () { lifecycle.push('remove-object'); },
+      suspendUpdate: function () {},
+      unsuspendUpdate: function () {},
+      update: function () {},
+      fullUpdate: function () {}
+    };
+    window.JXG = {
+      Options: { text: {} },
+      JSXGraph: {
+        freeBoard: function (board) {
+          if (board === oldBoard) lifecycle.push('free-board');
+        }
+      }
+    };
+    window.__boards = window.__boards || {};
+    window.__boards[transitionBoardId] = oldBoard;
+    const transitionTable = marker(
+      'lia-table-mixed-transition-table',
+      'n=3,x,f,P,id=' + transitionBoardId
+    );
+    const transitionInput = marker(
+      'lia-plot-input-mixed-transition-input',
+      transitionBoardId + ';f;#0055cc'
+    );
+    const transitionRegression = marker(
+      'regression-ui-mixed-transition-regression',
+      transitionBoardId
+    );
+    const transitionDgs = marker('dgs-ui-mixed-transition-dgs', transitionBoardId);
+    window.__bootstrapTables();
+    window.__bootstrapPlotInputs();
+    window.__setupRegressionUI('mixed-transition-regression', transitionBoardId, 'de');
+    window.__setupDGS('mixed-transition-dgs', transitionBoardId, 'de');
+    const tableStateBeforeStatic = !!window.__tableStates['mixed-transition-table'];
+    const tableUiBeforeStatic = transitionTable.children.length > 0;
+    const inputStateBeforeStatic = !!window.__plotInputStates['mixed-transition-input'] &&
+      !!window.__plotInputInstances['mixed-transition-input'];
+    const inputUiBeforeStatic = transitionInput.children.length > 0;
+    const regressionStateBeforeStatic = Object.values(window.__liaRegressionStates || {})
+      .filter(function (state) { return state && state.boardId === transitionBoardId; }).length;
+    const dgsUiBeforeStatic = transitionHost.querySelectorAll('.lia-dgs-top-menu').length;
+    const realDisposeDgs = window.__disposeDGSForBoard;
+    const realDisposeRegression = window.__disposeRegressionForBoard;
+    window.__disposeDGSForBoard = function (boardId) {
+      if (boardId === transitionBoardId) lifecycle.push('dispose-dgs');
+      return realDisposeDgs(boardId);
+    };
+    window.__disposeRegressionForBoard = function (boardId) {
+      if (boardId === transitionBoardId) lifecycle.push('dispose-regression');
+      return realDisposeRegression(boardId);
+    };
+    const transitionArea = marker(
+      'area-spec-mixed-transition-area',
+      transitionBoardId + ';[[0;0];[1;2];[2;0]];#e63946;0.3'
+    );
+    const transitionDistance = marker(
+      'distance-spec-mixed-transition-distance',
+      transitionBoardId + ';[[0;0];[2;2]];#457b9d;design=-;3px'
+    );
+    window.__areaEntries['area-mixed-transition-area'] = {
+      board: oldBoard,
+      polygon: {},
+      label: {},
+      ownedPoints: [{}]
+    };
+    window.__distanceEntries['distance-mixed-transition-distance'] = {
+      board: oldBoard,
+      segments: [{}],
+      label: {},
+      capSegments: [{}],
+      capPoints: [{}],
+      ownedPoints: [{}]
+    };
+
+    window.__coord.initializeCoordinateBoard(
+      transitionHost,
+      'xmin=0;xmax=2;ymin=0;ymax=2;width=200;id=' + transitionBoardId +
+        ';achsen=0;grid=0;border=0;static=1'
+    );
+    const registriesPrunedImmediately =
+      Object.keys(window.__areaEntries).length === 0 &&
+      Object.keys(window.__distanceEntries).length === 0;
+
+    const result = {
+      dynamicRuntimeWasActive: baselineIntervalCount > 0,
+      unclaimedBeforeDirect: unclaimedBeforeDirect,
+      directTimeoutDelta: directTimeoutDelta,
+      directIntervalDelta: directIntervalDelta,
+      directClaimedCount: directMarkers.filter(function (node) {
+        return node.getAttribute('data-lia-static-claimed') === staticBoardId;
+      }).length,
+      directUiCount: directUiCountAfterCalls,
+      generatedReconstructionAnchors: document.querySelectorAll(
+        '[data-lia-reconstruction-anchor]'
+      ).length,
+      regressionStateCount: Object.keys(window.__liaRegressionStates || {}).length,
+      retryWasQueued: !!retryRecord,
+      lateMarkerClaim: retryMarker.getAttribute('data-lia-static-claimed'),
+      retryDeltaAfterStaticCallback: retryCountAfterCallback - retryCountBeforeCallback,
+      claimedRegressionClaim: claimedRegression.getAttribute('data-lia-static-claimed'),
+      claimedRegressionRetryDelta: claimedRetryCountAfter - claimedRetryCountBefore,
+      cleanupCount: lifecycle.filter(function (value) { return value === 'cleanup'; }).length,
+      freeBoardCount: lifecycle.filter(function (value) { return value === 'free-board'; }).length,
+      dgsDisposeBeforeFree: lifecycle.indexOf('dispose-dgs') >= 0 &&
+        lifecycle.indexOf('dispose-dgs') < lifecycle.indexOf('free-board'),
+      regressionDisposeBeforeFree: lifecycle.indexOf('dispose-regression') >= 0 &&
+        lifecycle.indexOf('dispose-regression') < lifecycle.indexOf('free-board'),
+      cleanupBeforeFree: lifecycle.indexOf('cleanup') >= 0 &&
+        lifecycle.indexOf('cleanup') < lifecycle.indexOf('free-board'),
+      tableStateBeforeStatic: tableStateBeforeStatic,
+      tableUiBeforeStatic: tableUiBeforeStatic,
+      tableStatePruned: !window.__tableStates['mixed-transition-table'],
+      tableUiPruned: transitionTable.children.length === 0,
+      inputStateBeforeStatic: inputStateBeforeStatic,
+      inputUiBeforeStatic: inputUiBeforeStatic,
+      inputStatePruned: !window.__plotInputStates['mixed-transition-input'] &&
+        !window.__plotInputInstances['mixed-transition-input'],
+      inputUiPruned: transitionInput.children.length === 0,
+      regressionStateBeforeStatic: regressionStateBeforeStatic,
+      regressionStatePruned: Object.values(window.__liaRegressionStates || {})
+        .every(function (state) { return !state || state.boardId !== transitionBoardId; }),
+      dgsUiBeforeStatic: dgsUiBeforeStatic,
+      dgsUiPruned: transitionHost.querySelectorAll('.lia-dgs-top-menu').length === 0,
+      residualDynamicUiClasses: Array.from(transitionHost.querySelectorAll(
+        '[class*=lia-dgs],[class*=lia-regression]'
+      )).map(function (node) { return String(node.className || ''); }),
+      hostListenerRemovals: lifecycle.filter(function (value) {
+        return value.indexOf('host-remove-') === 0;
+      }).length,
+      documentListenerRemovals: lifecycle.filter(function (value) {
+        return value.indexOf('document-remove-') === 0;
+      }).length,
+      windowListenerRemovals: lifecycle.filter(function (value) {
+        return value.indexOf('window-remove-') === 0;
+      }).length,
+      boardListenerRemovals: lifecycle.filter(function (value) {
+        return value.indexOf('board-off-') === 0;
+      }).length,
+      resizeObserverDisconnects: lifecycle.filter(function (value) {
+        return value === 'disconnect-resize-observer';
+      }).length,
+      canceledAnimationFrames: lifecycle.filter(function (value) {
+        return value === 'cancel-raf';
+      }).length,
+      removedObjectCount: lifecycle.filter(function (value) {
+        return value === 'remove-object';
+      }).length,
+      oldBoardRegistryRemoved: !window.__boards[transitionBoardId],
+      oldCleanupReleased: oldBoard.__coordCleanup === null,
+      registriesPrunedImmediately: registriesPrunedImmediately,
+      transitionAreaClaim: transitionArea.getAttribute('data-lia-static-claimed'),
+      transitionDistanceClaim: transitionDistance.getAttribute('data-lia-static-claimed'),
+      transitionTableClaim: transitionTable.getAttribute('data-lia-static-claimed'),
+      transitionInputClaim: transitionInput.getAttribute('data-lia-static-claimed'),
+      transitionRegressionClaim: transitionRegression.getAttribute('data-lia-static-claimed'),
+      transitionDgsClaim: transitionDgs.getAttribute('data-lia-static-claimed'),
+      intervalDeltaAfterStaticWork: window.__mixedIntervals.length - baselineIntervalCount,
+      errorCount: window.__mixedErrors.length,
+      errors: window.__mixedErrors
+    };
+    document.body.textContent = 'STATIC_MIXED_RESULT:' + JSON.stringify(result);
+  </script>
+</body>
+</html>

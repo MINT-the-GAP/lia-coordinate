@@ -1118,6 +1118,28 @@ function removeExisting(uid: string): void {
   const prev = window.__scharEntries[key];
   if (!prev) return;
 
+  if (typeof prev.stopDrag === 'function') {
+    try { prev.stopDrag(); } catch (e) {}
+    prev.stopDrag = null;
+  }
+
+  const resizeState = (window as any).__liaScharPanelResize;
+  if (resizeState) {
+    const drag = resizeState.drag;
+    if (drag && drag.entry === prev) {
+      if (drag.rafId) {
+        try { window.cancelAnimationFrame(drag.rafId); } catch (e) {}
+      }
+      resizeState.drag = null;
+      try { document.body.style.userSelect = ''; } catch (e) {}
+    }
+    if (Array.isArray(resizeState.handles)) {
+      resizeState.handles = resizeState.handles.filter(function(record) {
+        return record && record.entry !== prev && record.handle && record.handle.isConnected;
+      });
+    }
+  }
+
   try {
     if (prev.graph && prev.board) prev.board.removeObject(prev.graph);
   } catch (e) {}
@@ -2100,11 +2122,26 @@ export function init(): void {
   };
 
   window.__bootstrapScharen = function () {
-    document.querySelectorAll<HTMLElement>('[id^="schar-spec-"][data-spec]').forEach(function (node) {
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="schar-spec-"][data-spec]'));
+    const activeUids = new Set<string>();
+    nodes.forEach(function (node) {
       const uid = String(node.id || '').replace(/^schar-spec-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      const cfg = parseScharSpec(spec);
+      if (node.hasAttribute('data-lia-static-claimed') ||
+          !cfg.boardId || !(window.__boards && window.__boards[cfg.boardId])) {
+        removeExisting(uid);
+        return;
+      }
+      activeUids.add(uid);
       if (window.renderScharFromSpec) window.renderScharFromSpec(uid, spec);
+    });
+    Object.keys(window.__scharEntries || {}).forEach(function(key) {
+      const entry = window.__scharEntries[key];
+      const uid = String((entry && entry.uid) || key.replace(/^schar-/, ''));
+      const board = entry && window.__boards && window.__boards[entry.boardId];
+      if (!activeUids.has(uid) || !board || entry.board !== board) removeExisting(uid);
     });
   };
 

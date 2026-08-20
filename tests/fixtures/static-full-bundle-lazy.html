@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang=en>
+<head>
+  <meta charset=utf-8>
+  <title>lia-coordinate full bundle static lazy-runtime fixture</title>
+</head>
+<body>
+  <main id=fixture></main>
+  <script>
+    window.__staticFullIntervals = 0;
+    window.__staticFullHookCalls = 0;
+    window.__staticFullJxgAccesses = 0;
+    window.__staticFullJxgAssignments = 0;
+    window.__staticFullErrors = [];
+
+    const nativeSetInterval = window.setInterval;
+    window.setInterval = function () {
+      window.__staticFullIntervals += 1;
+      return nativeSetInterval.apply(this, arguments);
+    };
+
+    Object.defineProperty(window, 'JXG', {
+      configurable: true,
+      get: function () {
+        window.__staticFullJxgAccesses += 1;
+        return undefined;
+      },
+      set: function () {
+        window.__staticFullJxgAssignments += 1;
+      }
+    });
+
+    window.addEventListener('error', function (event) {
+      window.__staticFullErrors.push(String(event.message || event.error || 'error'));
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      window.__staticFullErrors.push(String(event.reason || 'unhandled rejection'));
+    });
+
+    const root = document.getElementById('fixture');
+    const boardSpec =
+      'xmin=-2;xmax=8;ymin=-1;ymax=4;width=240;id=normal-readme-static;' +
+      'achsen=0;grid=0;border=0;static=1';
+    const host = document.createElement('lia-coordinate-board');
+    host.id = 'normal-readme-static-host';
+    host.setAttribute('data-lia-coordinate-key', 'normal-readme-static');
+    host.dataset.spec = boardSpec;
+    root.appendChild(host);
+
+    const area = document.createElement('span');
+    area.id = 'area-spec-normal-readme-area';
+    area.dataset.spec = 'normal-readme-static;[[0;0];[2;3];[4;0]];#e63946;0.35;linestyle=dashed';
+    area.dataset.language = 'de';
+    area.style.display = 'none';
+    root.appendChild(area);
+
+    const distance = document.createElement('span');
+    distance.id = 'distance-spec-normal-readme-distance';
+    distance.dataset.spec =
+      'normal-readme-static;[[0;0];[2;3];[4;0];[0;0]];#457b9d;design=-;3px;linestyle=dotted';
+    distance.dataset.language = 'de';
+    distance.style.display = 'none';
+    root.appendChild(distance);
+
+    window.__liaRunCoordHooks = [function () {
+      window.__staticFullHookCalls += 1;
+      window.__coord.initializeCoordinateBoard(host, boardSpec);
+    }];
+  </script>
+  <script src=../../dist/index.js></script>
+  <script>
+        window.__coord.bootstrapStaticCoordinateBoards();
+        const svg = host.querySelector('svg[data-lia-static-svg]');
+        const viewBox = svg ? svg.getAttribute('viewBox') : '';
+        const viewBoxParts = viewBox.split(/\s+/).map(Number);
+        const result = {
+          hookCalls: window.__staticFullHookCalls,
+          hostName: host.localName,
+          hostKey: host.getAttribute('data-lia-coordinate-key'),
+          customElementDefined: !!window.customElements.get('lia-coordinate-board'),
+          svgCount: document.querySelectorAll('svg[data-lia-static-svg=normal-readme-static]').length,
+          polygonCount: host.querySelectorAll('polygon').length,
+          polylineCount: host.querySelectorAll('polyline').length,
+          dynamicWrapperCount: host.querySelectorAll('jsx-graph').length,
+          viewBox: viewBox,
+          viewBoxRatio: viewBoxParts.length === 4 ? viewBoxParts[2] / viewBoxParts[3] : null,
+          cssAspectRatio: svg ? svg.style.aspectRatio : '',
+          intrinsicWidth: svg ? svg.getAttribute('width') : '',
+          claimedCount: document.querySelectorAll(
+            '[data-lia-static-claimed=normal-readme-static]'
+          ).length,
+          jsxBoardCount: window.__boards ? Object.keys(window.__boards).length : 0,
+          jxgAccessCount: window.__staticFullJxgAccesses,
+          jxgAssignmentCount: window.__staticFullJxgAssignments,
+          intervalCount: window.__staticFullIntervals,
+          errorCount: window.__staticFullErrors.length,
+          errors: window.__staticFullErrors
+        };
+        document.body.textContent = 'STATIC_FULL_RESULT:' + JSON.stringify(result);
+  </script>
+</body>
+</html>

@@ -12,6 +12,23 @@ type RekSpec = {
 
 type NumericModel = Record<string, number>;
 
+function isStaticReconstructionTarget(boardId: string, anchor?: HTMLElement | null): boolean {
+  if (anchor && anchor.hasAttribute('data-lia-static-claimed')) return true;
+  try {
+    return !!(
+      boardId &&
+      window.__coord &&
+      typeof window.__coord.isStaticCoordinateBoard === 'function' &&
+      window.__coord.isStaticCoordinateBoard(boardId)
+    );
+  } catch (e) { return false; }
+}
+
+function removeGeneratedRegressionAnchor(uid: string): void {
+  const node = document.getElementById('regression-ui-' + uid) as HTMLElement | null;
+  if (node && node.dataset.liaReconstructionAnchor === '1') node.remove();
+}
+
 function ensureRegressionAnchor(uid: string, boardId: string): void {
   const id = 'regression-ui-' + uid;
   let node = document.getElementById(id) as HTMLElement | null;
@@ -19,6 +36,7 @@ function ensureRegressionAnchor(uid: string, boardId: string): void {
     node = document.createElement('span');
     node.id = id;
     node.style.display = 'none';
+    node.dataset.liaReconstructionAnchor = '1';
 
     const rekNode = document.getElementById('rek-spec-' + uid);
     if (rekNode && rekNode.parentNode) {
@@ -34,10 +52,20 @@ function ensureRegressionAnchor(uid: string, boardId: string): void {
 function ensureRegressionUiForSpec(uid: string, spec: string): void {
   const cfg = parseSpec(spec);
   if (!cfg.boardId) return;
+  const rekNode = document.getElementById('rek-spec-' + uid) as HTMLElement | null;
+  if (isStaticReconstructionTarget(cfg.boardId, rekNode)) {
+    removeGeneratedRegressionAnchor(uid);
+    return;
+  }
 
   ensureRegressionAnchor(uid, cfg.boardId);
 
   const run = () => {
+    const current = document.getElementById('rek-spec-' + uid) as HTMLElement | null;
+    if (isStaticReconstructionTarget(cfg.boardId, current)) {
+      removeGeneratedRegressionAnchor(uid);
+      return;
+    }
     if (typeof window.__setupRegressionUI === 'function') {
       window.__setupRegressionUI(uid, cfg.boardId);
     }
@@ -339,6 +367,11 @@ export function init(): void {
     if (!node) return;
     const resolved = String(spec || node.dataset.spec || '');
     node.dataset.spec = resolved;
+    const cfg = parseSpec(resolved);
+    if (isStaticReconstructionTarget(cfg.boardId, node)) {
+      removeGeneratedRegressionAnchor(uid);
+      return;
+    }
     ensureRegressionUiForSpec(uid, resolved);
   };
 
@@ -360,11 +393,24 @@ export function init(): void {
   };
 
   window.__bootstrapRekonstruktion = function (): void {
+    const activeUids = new Set<string>();
     document.querySelectorAll<HTMLElement>('[id^="rek-spec-"][data-spec]').forEach(function (node) {
       const uid = String(node.id || '').replace(/^rek-spec-/, '');
       const spec = String(node.dataset.spec || '');
       if (!uid || !spec) return;
+      const cfg = parseSpec(spec);
+      if (node.hasAttribute('data-lia-static-claimed') ||
+          isStaticReconstructionTarget(cfg.boardId, node) ||
+          !cfg.boardId || !(window.__boards && window.__boards[cfg.boardId])) {
+        removeGeneratedRegressionAnchor(uid);
+        return;
+      }
+      activeUids.add(uid);
       if (window.__setupRekonstruktionQuiz) window.__setupRekonstruktionQuiz(uid, spec);
+    });
+    document.querySelectorAll<HTMLElement>('[data-lia-reconstruction-anchor="1"]').forEach(function(anchor) {
+      const uid = String(anchor.id || '').replace(/^regression-ui-/, '');
+      if (!activeUids.has(uid)) anchor.remove();
     });
   };
 

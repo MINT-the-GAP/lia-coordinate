@@ -1721,8 +1721,30 @@ function cloneDgsSnapshot(value: any): any {
 }
 const pendingRetries: Record<string, number> = {};
 const pendingRetryTimers: Record<string, number | undefined> = {};
+const pendingRetryBoardIds: Record<string, string | undefined> = {};
 const MAX_RETRIES = 40;
 const RETRY_DELAY_MS = 120;
+
+function isStaticDgsTarget(boardId: string, anchor?: HTMLElement | null): boolean {
+  if (anchor && anchor.hasAttribute('data-lia-static-claimed')) return true;
+  try {
+    return !!(
+      boardId &&
+      window.__coord &&
+      typeof window.__coord.isStaticCoordinateBoard === 'function' &&
+      window.__coord.isStaticCoordinateBoard(boardId)
+    );
+  } catch (e) { return false; }
+}
+
+function clearPendingDgsRetry(uid: string): void {
+  if (pendingRetryTimers[uid] != null) {
+    try { window.clearTimeout(pendingRetryTimers[uid]); } catch (e) {}
+  }
+  pendingRetryTimers[uid] = undefined;
+  pendingRetries[uid] = 0;
+  delete pendingRetryBoardIds[uid];
+}
 const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
@@ -1815,7 +1837,7 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
 function getExternalDgsMacroSpecSignature(boardId: string): string {
   const objectSpecId = /^(?:(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-|point-ui-)/;
   try {
-    const entries = Array.from(document.querySelectorAll<HTMLElement>('[id][data-spec]')).flatMap((node) => {
+    const entries = Array.from(document.querySelectorAll<HTMLElement>('[id][data-spec]:not([data-lia-static-claimed])')).flatMap((node) => {
       if (!objectSpecId.test(String(node.id || ''))) return [];
       const first = String(
         splitTopLevel(unquote(String(node.dataset.spec || '')), ';')[0] || ''
@@ -12364,7 +12386,7 @@ function findDgsMacroAnchorForBoard(boardId: string): {
   spec: string;
   language?: string;
 } | null {
-  const anchors = document.querySelectorAll<HTMLElement>('[id^=dgs-ui-][data-spec]');
+  const anchors = document.querySelectorAll<HTMLElement>('[id^=dgs-ui-][data-spec]:not([data-lia-static-claimed])');
   let owner: { uid: string; spec: string; language?: string } | null = null;
   for (const anchor of Array.from(anchors)) {
     const match = String(anchor.id || '').match(/^dgs-ui-(.+)$/);
@@ -12382,7 +12404,10 @@ function findDgsMacroAnchorForBoard(boardId: string): {
 function pruneDgsRegressionRequests(): void {
   Object.keys(dgsRegressionRequests).forEach((uid) => {
     const request = dgsRegressionRequests[uid];
-    if (!request.anchor.isConnected) delete dgsRegressionRequests[uid];
+    if (
+      !request.anchor.isConnected ||
+      isStaticDgsTarget(request.boardId, request.anchor)
+    ) delete dgsRegressionRequests[uid];
   });
 }
 
@@ -12396,7 +12421,10 @@ function getDgsRegressionRequestsForBoard(boardId: string): DgsRegressionRequest
 function pruneDgsInstrumentRequests(): void {
   Object.keys(dgsInstrumentRequests).forEach((uid) => {
     const request = dgsInstrumentRequests[uid];
-    if (request.anchor && !request.anchor.isConnected) delete dgsInstrumentRequests[uid];
+    if (
+      (request.anchor && !request.anchor.isConnected) ||
+      isStaticDgsTarget(request.boardId, request.anchor)
+    ) delete dgsInstrumentRequests[uid];
   });
 }
 
@@ -12479,6 +12507,10 @@ function setupDGSRegression(uid: string, spec: string, languageCode?: string): v
   // anchors prevents DGS -> Regression -> DGS recursion and establishes clear
   // authored ownership.
   if (!anchor) return;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    delete dgsRegressionRequests[uid];
+    return;
+  }
 
   dgsRegressionRequests[uid] = {
     uid,
@@ -12532,6 +12564,10 @@ function setupDGSInstrument(
   if (!uid || !boardId || !kind) return;
 
   const anchor = document.getElementById('dgs-instrument-ui-' + uid) as HTMLElement | null;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    delete dgsInstrumentRequests[uid];
+    return;
+  }
   const previous = dgsInstrumentRequests[uid];
   const requestChanged =
     !previous ||
@@ -14364,13 +14400,108 @@ function ensureDgsRegression(uid: string, boardId: string, language: 'de' | 'en'
   } catch (e) {}
 }
 
+function disposeDgsState(existing: DgsState): void {
+  persistDgsSetSquarePose(existing);
+  cancelDgsSetSquareInteraction(existing);
+  setActiveTool(existing, '', false);
+  if (existing.axisAnimationRAF) cancelAnimationFrame(existing.axisAnimationRAF);
+  if (existing.axisSyncRAF) cancelAnimationFrame(existing.axisSyncRAF);
+  if (existing.xAxisAnimationRAF) cancelAnimationFrame(existing.xAxisAnimationRAF);
+  if (existing.xAxisSyncRAF) cancelAnimationFrame(existing.xAxisSyncRAF);
+  if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
+  if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
+  if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
+  if (existing.setSquareLayoutRAF != null) cancelAnimationFrame(existing.setSquareLayoutRAF);
+  cancelScheduledDgsConstructionRestore(existing);
+  restoreAxis(existing);
+  restoreXAxis(existing);
+  if (existing.onBoardViewportChange && existing.board && typeof existing.board.off === 'function') {
+    try { existing.board.off('move', existing.onBoardViewportChange); } catch (e) {}
+    try { existing.board.off('boundingbox', existing.onBoardViewportChange); } catch (e) {}
+  }
+  if (existing.onBoardRootUpdate && existing.board && typeof existing.board.off === 'function') {
+    try { existing.board.off('update', existing.onBoardRootUpdate); } catch (e) {}
+  }
+  if (existing.onBoardPointerDown) {
+    existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
+  }
+  if (existing.onBoardPointerMove) {
+    existing.boardContainer.removeEventListener('pointermove', existing.onBoardPointerMove, true);
+  }
+  if (existing.onBoardLostPointerCapture) {
+    existing.boardContainer.removeEventListener('lostpointercapture', existing.onBoardLostPointerCapture);
+  }
+  if (existing.onBoardContextMenu) {
+    existing.boardContainer.removeEventListener('contextmenu', existing.onBoardContextMenu, true);
+  }
+  if (existing.onDocumentPointerDown) {
+    document.removeEventListener('pointerdown', existing.onDocumentPointerDown, true);
+  }
+  if (existing.onDocumentPointerUp) {
+    document.removeEventListener('pointerup', existing.onDocumentPointerUp, true);
+  }
+  if (existing.onDocumentPointerCancel) {
+    document.removeEventListener('pointercancel', existing.onDocumentPointerCancel, true);
+  }
+  if (existing.onFullscreenChange) {
+    document.removeEventListener('fullscreenchange', existing.onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', existing.onFullscreenChange as EventListener);
+    existing.boardContainer.removeEventListener('fullscreenchange', existing.onFullscreenChange);
+  }
+  if (existing.fullscreenResizeRAF != null) cancelAnimationFrame(existing.fullscreenResizeRAF);
+  if (existing.fullscreenReleaseTimer != null) window.clearTimeout(existing.fullscreenReleaseTimer);
+  if (isDgsFullscreen(existing)) {
+    try {
+      const result = typeof document.exitFullscreen === 'function'
+        ? document.exitFullscreen()
+        : (document as any).webkitExitFullscreen?.();
+      void Promise.resolve(result).then(
+        () => restoreDgsEmbeddedSize(existing),
+        () => restoreDgsEmbeddedSize(existing)
+      );
+    } catch (e) {
+      restoreDgsEmbeddedSize(existing);
+    }
+  } else if (existing.fullscreenSnapshot) {
+    restoreDgsEmbeddedSize(existing);
+  }
+  if (existing.resizeObserver) existing.resizeObserver.disconnect();
+  if (Array.isArray(existing.rootConstructions)) {
+    existing.rootConstructions.slice().forEach((construction) => {
+      removeDgsRootConstruction(existing, construction, false);
+    });
+  }
+  releaseRegressionControls(existing);
+  try { existing.setSquareOverlay.remove(); } catch (e) {}
+  try { existing.button.remove(); } catch (e) {}
+  try { existing.menuClip.remove(); } catch (e) {}
+  try { existing.sideMenuClip.remove(); } catch (e) {}
+  try { existing.objectListClip.remove(); } catch (e) {}
+  try { existing.colorPopup.remove(); } catch (e) {}
+  try { existing.angleDialog.remove(); } catch (e) {}
+  try { existing.compassRadiusDialog.remove(); } catch (e) {}
+  try { existing.arcDialog.remove(); } catch (e) {}
+  try { existing.functionDialog.remove(); } catch (e) {}
+  try { existing.textDialog.remove(); } catch (e) {}
+  try { existing.exportDialog.remove(); } catch (e) {}
+  clearPendingDgsRetry(existing.uid);
+  if (states[existing.uid] === existing) delete states[existing.uid];
+}
+
 function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const config = parseDgsMacroSpec(spec);
   const boardId = config.boardId;
   if (!uid || !boardId) return;
+  const anchor = document.getElementById('dgs-ui-' + uid) as HTMLElement | null;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    disposeDgsForBoard(boardId);
+    clearPendingDgsRetry(uid);
+    return;
+  }
 
   const boardContainer = getBoardContainer(boardId);
   if (!boardContainer) {
+    pendingRetryBoardIds[uid] = boardId;
     if (pendingRetryTimers[uid] != null) return;
     const retries = (pendingRetries[uid] || 0) + 1;
     pendingRetries[uid] = retries;
@@ -14385,9 +14516,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   }
 
   syncDgsInstrumentProfile(boardId);
-  if (pendingRetryTimers[uid] != null) window.clearTimeout(pendingRetryTimers[uid]);
-  pendingRetryTimers[uid] = undefined;
-  pendingRetries[uid] = 0;
+  clearPendingDgsRetry(uid);
   const boardState = getDgsStateForBoard(boardId) ||
     Object.keys(states)
       .map((stateUid) => states[stateUid])
@@ -14397,7 +14526,6 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setupDGS(boardState.uid, spec, languageCode);
     return;
   }
-  const anchor = document.getElementById(`dgs-ui-${uid}`);
   const geometryLanguage = getDgsGeometryLanguage(anchor, languageCode);
   boardContainer.dataset.liaDgsTools = config.toolSelectionKey;
   boardContainer.dataset.liaDgsRestrictions = config.restrictionSelectionKey;
@@ -14636,87 +14764,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   }
 
   if (existing) {
-    persistDgsSetSquarePose(existing);
-    cancelDgsSetSquareInteraction(existing);
-    setActiveTool(existing, '', false);
-    if (existing.axisAnimationRAF) cancelAnimationFrame(existing.axisAnimationRAF);
-    if (existing.axisSyncRAF) cancelAnimationFrame(existing.axisSyncRAF);
-    if (existing.xAxisAnimationRAF) cancelAnimationFrame(existing.xAxisAnimationRAF);
-    if (existing.xAxisSyncRAF) cancelAnimationFrame(existing.xAxisSyncRAF);
-    if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
-    if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
-    if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
-    if (existing.setSquareLayoutRAF != null) cancelAnimationFrame(existing.setSquareLayoutRAF);
-    cancelScheduledDgsConstructionRestore(existing);
-    restoreAxis(existing);
-    restoreXAxis(existing);
-    if (existing.onBoardViewportChange && existing.board && typeof existing.board.off === 'function') {
-      try { existing.board.off('move', existing.onBoardViewportChange); } catch (e) {}
-      try { existing.board.off('boundingbox', existing.onBoardViewportChange); } catch (e) {}
-    }
-    if (existing.onBoardRootUpdate && existing.board && typeof existing.board.off === 'function') {
-      try { existing.board.off('update', existing.onBoardRootUpdate); } catch (e) {}
-    }
-    if (existing.onBoardPointerDown) {
-      existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
-    }
-    if (existing.onBoardPointerMove) {
-      existing.boardContainer.removeEventListener('pointermove', existing.onBoardPointerMove, true);
-    }
-    if (existing.onBoardLostPointerCapture) {
-      existing.boardContainer.removeEventListener('lostpointercapture', existing.onBoardLostPointerCapture);
-    }
-    if (existing.onBoardContextMenu) {
-      existing.boardContainer.removeEventListener('contextmenu', existing.onBoardContextMenu, true);
-    }
-    if (existing.onDocumentPointerDown) {
-      document.removeEventListener('pointerdown', existing.onDocumentPointerDown, true);
-    }
-    if (existing.onDocumentPointerUp) {
-      document.removeEventListener('pointerup', existing.onDocumentPointerUp, true);
-    }
-    if (existing.onDocumentPointerCancel) {
-      document.removeEventListener('pointercancel', existing.onDocumentPointerCancel, true);
-    }
-    if (existing.onFullscreenChange) {
-      document.removeEventListener('fullscreenchange', existing.onFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', existing.onFullscreenChange as EventListener);
-      existing.boardContainer.removeEventListener('fullscreenchange', existing.onFullscreenChange);
-    }
-    if (existing.fullscreenResizeRAF != null) cancelAnimationFrame(existing.fullscreenResizeRAF);
-    if (existing.fullscreenReleaseTimer != null) window.clearTimeout(existing.fullscreenReleaseTimer);
-    if (isDgsFullscreen(existing)) {
-      try {
-        const result = typeof document.exitFullscreen === 'function'
-          ? document.exitFullscreen()
-          : (document as any).webkitExitFullscreen?.();
-        void Promise.resolve(result).then(
-          () => restoreDgsEmbeddedSize(existing),
-          () => restoreDgsEmbeddedSize(existing)
-        );
-      } catch (e) {
-        restoreDgsEmbeddedSize(existing);
-      }
-    } else if (existing.fullscreenSnapshot) {
-      restoreDgsEmbeddedSize(existing);
-    }
-    if (existing.resizeObserver) existing.resizeObserver.disconnect();
-    if (Array.isArray(existing.rootConstructions)) {
-      existing.rootConstructions.slice().forEach((construction) => removeDgsRootConstruction(existing, construction, false));
-    }
-    releaseRegressionControls(existing);
-    try { existing.setSquareOverlay.remove(); } catch (e) {}
-    try { existing.button.remove(); } catch (e) {}
-    try { existing.menuClip.remove(); } catch (e) {}
-    try { existing.sideMenuClip.remove(); } catch (e) {}
-    try { existing.objectListClip.remove(); } catch (e) {}
-    try { existing.colorPopup.remove(); } catch (e) {}
-    try { existing.angleDialog.remove(); } catch (e) {}
-    try { existing.compassRadiusDialog.remove(); } catch (e) {}
-    try { existing.arcDialog.remove(); } catch (e) {}
-    try { existing.functionDialog.remove(); } catch (e) {}
-    try { existing.textDialog.remove(); } catch (e) {}
-    try { existing.exportDialog.remove(); } catch (e) {}
+    disposeDgsState(existing);
   }
 
   const menuClip = document.createElement('div');
@@ -18177,8 +18225,47 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   applyDgsInstrumentRequests(boardId);
 }
 
+/** Release every transient DGS state, request, and retry owned by one board. */
+export function disposeDgsForBoard(boardId: string): void {
+  const key = String(boardId || '').trim();
+  if (!key) return;
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    if (state && state.boardId === key) disposeDgsState(state);
+  });
+  Object.keys(pendingRetryBoardIds).forEach((uid) => {
+    if (pendingRetryBoardIds[uid] === key) clearPendingDgsRetry(uid);
+  });
+  Object.keys(dgsRegressionRequests).forEach((uid) => {
+    if (dgsRegressionRequests[uid].boardId === key) delete dgsRegressionRequests[uid];
+  });
+  Object.keys(dgsInstrumentRequests).forEach((uid) => {
+    if (dgsInstrumentRequests[uid].boardId === key) delete dgsInstrumentRequests[uid];
+  });
+  // Point and graph registries may also contain learner-created, DGS-only
+  // objects that are not owned by a macro entry. Drop the complete board
+  // buckets while the board is still available to the caller for disposal.
+  try { if (window.__points) delete window.__points[key]; } catch (e) {}
+  try { if (window.__pointStates) delete window.__pointStates[key]; } catch (e) {}
+  try { if (window.__pointGraphs) delete window.__pointGraphs[key]; } catch (e) {}
+  try { if (window.__pointGraphStates) delete window.__pointGraphStates[key]; } catch (e) {}
+  // disposeDgsState persists the learner snapshot and temporarily records its
+  // source board. Keep the serializable snapshot, but never retain a freed
+  // JSXGraph board after a host disconnect or dynamic-to-static switch.
+  delete dgsConstructionBoards[key];
+}
+
+window.__disposeDGSForBoard = disposeDgsForBoard;
+
 window.__setupDGS = function (uid: string, spec: string, language?: string): void {
   const rawSpec = String(spec || '').trim();
+  const boardId = parseDgsMacroSpec(rawSpec).boardId;
+  const anchor = document.getElementById('dgs-ui-' + uid) as HTMLElement | null;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    disposeDgsForBoard(boardId);
+    clearPendingDgsRetry(uid);
+    return;
+  }
   scheduleBootstrap(() => setupDGS(uid, rawSpec, language));
 };
 
@@ -18188,6 +18275,12 @@ window.__setupDGSRegression = function (
   language?: string
 ): void {
   const rawSpec = String(spec || '').trim();
+  const boardId = parseDgsMacroSpec(rawSpec).boardId;
+  const anchor = document.getElementById('regression-ui-' + uid) as HTMLElement | null;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    delete dgsRegressionRequests[uid];
+    return;
+  }
   scheduleBootstrap(() => setupDGSRegression(uid, rawSpec, language));
 };
 
@@ -18198,11 +18291,17 @@ window.__setupDGSInstrument = function (
   language?: string
 ): void {
   const rawSpec = String(spec || '').trim();
+  const boardId = parseDgsMacroSpec(rawSpec).boardId;
+  const anchor = document.getElementById('dgs-instrument-ui-' + uid) as HTMLElement | null;
+  if (isStaticDgsTarget(boardId, anchor)) {
+    delete dgsInstrumentRequests[uid];
+    return;
+  }
   scheduleBootstrap(() => setupDGSInstrument(uid, rawSpec, kind, language));
 };
 
 export function bootstrapDGS(): void {
-  const anchors = document.querySelectorAll('[id^="dgs-ui-"][data-spec]');
+  const anchors = document.querySelectorAll('[id^="dgs-ui-"][data-spec]:not([data-lia-static-claimed])');
 
   anchors.forEach((el: Element) => {
     const match = String(el.id || '').match(/^dgs-ui-(.+)$/);
@@ -18215,7 +18314,7 @@ export function bootstrapDGS(): void {
 
   pruneDgsRegressionRequests();
   const regressionAnchors = document.querySelectorAll(
-    '[id^="regression-ui-"][data-spec]'
+    '[id^="regression-ui-"][data-spec]:not([data-lia-static-claimed])'
   );
   regressionAnchors.forEach((el: Element) => {
     const match = String(el.id || '').match(/^regression-ui-(.+)$/);
@@ -18230,7 +18329,7 @@ export function bootstrapDGS(): void {
 
   pruneDgsInstrumentRequests();
   const instrumentAnchors =
-    document.querySelectorAll('[id^=dgs-instrument-ui-][data-spec][data-instrument]');
+    document.querySelectorAll('[id^=dgs-instrument-ui-][data-spec][data-instrument]:not([data-lia-static-claimed])');
   instrumentAnchors.forEach((el: Element) => {
     const match = String(el.id || '').match(/^dgs-instrument-ui-(.+)$/);
     if (!match) return;

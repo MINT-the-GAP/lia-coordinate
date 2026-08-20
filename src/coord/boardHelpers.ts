@@ -4,6 +4,17 @@
 
 import { getNeutralColor, getAccentColor } from '../shared/theme';
 import { applyMacroCodeOrderLayers } from '../shared/macroLayer';
+import { parseCoordSpec } from '../shared/coordSpec';
+import type { BoardConfig } from '../shared/coordSpec';
+import {
+  disposeInteractiveCoordinateBoardsInContainer,
+  disposeStaticCoordinateBoard,
+  disposeStaticCoordinateBoardsInContainer,
+  initializeStaticCoordinateBoard
+} from '../static/staticSvg';
+
+export { parseCoordSpec } from '../shared/coordSpec';
+export type { BoardConfig } from '../shared/coordSpec';
 
 const MAJOR_GRID_COLOR = '#808080';
 const MAJOR_GRID_OPACITY = 0.7;
@@ -906,6 +917,7 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapPlotFunctions);
   call(window.__bootstrapPlotInputs);
   call(window.__bootstrapScharen);
+  call(window.__bootstrapTables);
   call(window.__bootstrapPointOnGraphs);
   call(window.__bootstrapPointsOnGraph);
   call(window.__bootstrapDistances);
@@ -919,109 +931,16 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapTangentSectorObjects);
   call(window.__bootstrapFunctionAnalysisPoints);
   call(window.__bootstrapObjectAnalysisPoints);
+  call(window.__bootstrapPolygonMetricQuizzes);
   call(window.__bootstrapConstructionQuizzes);
   call(window.__bootstrapCombinedQuizzes);
+  call(window.__syncCoordinateQuizBindings);
   call(window.__bootstrapRekonstruktion);
   call(window.__bootstrapRegression);
   // Bootstrap order is dependency based, while the author-facing stacking
   // contract follows the order of macro markers in the course source.
   try { applyMacroCodeOrderLayers(); } catch (e) {}
   call(window.__bootstrapDGS);
-}
-
-// ---------------------------------------------------------------------------
-// Spec parsing (mirrors shared/parser but kept self-contained for the macro)
-// ---------------------------------------------------------------------------
-
-function splitTopLevelLocal(str: string): string[] {
-  const out: string[] = [];
-  let cur = '';
-  let quote = '';
-  let depth = 0;
-  let esc = false;
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-
-    if (esc) { cur += ch; esc = false; continue; }
-    if (ch === '\\') { cur += ch; esc = true; continue; }
-
-    if (quote) {
-      cur += ch;
-      if (ch === quote) quote = '';
-      continue;
-    }
-
-    if (ch === String.fromCharCode(39)) {
-      let previous = i - 1;
-      while (previous >= 0 && /\s/.test(str[previous])) previous -= 1;
-      const atValueStart = previous < 0 || ';,([{=:'.includes(str[previous]);
-      let hasClosingQuote = false;
-      let escapedQuote = false;
-      for (let next = i + 1; atValueStart && next < str.length; next += 1) {
-        if (escapedQuote) {
-          escapedQuote = false;
-          continue;
-        }
-        if (str[next] === String.fromCharCode(92)) {
-          escapedQuote = true;
-          continue;
-        }
-        if (str[next] === ch) {
-          hasClosingQuote = true;
-          break;
-        }
-      }
-      if (!atValueStart || !hasClosingQuote) {
-        cur += ch;
-        continue;
-      }
-    }
-
-    if (ch === '"' || ch === "'" || ch === '`') { cur += ch; quote = ch; continue; }
-    if (ch === '(' || ch === '[') { cur += ch; depth++; continue; }
-    if (ch === ')' || ch === ']') { cur += ch; depth--; continue; }
-
-    if (depth === 0 && (ch === ';' || ch === ',')) {
-      if (cur.trim()) out.push(cur.trim());
-      cur = '';
-      continue;
-    }
-
-    cur += ch;
-  }
-
-  if (cur.trim()) out.push(cur.trim());
-  return out;
-}
-
-function unquoteLocal(v: string): string {
-  v = String(v || '').trim();
-  if (
-    (v.startsWith('"') && v.endsWith('"')) ||
-    (v.startsWith("'") && v.endsWith("'")) ||
-    (v.startsWith('`') && v.endsWith('`'))
-  ) {
-    return v.slice(1, -1);
-  }
-  return v;
-}
-
-function toNum(v: any, fallback: number): number {
-  const n = parseFloat(String(v).replace(',', '.'));
-  return Number.isFinite(n) ? n : fallback;
-}
-
-export interface BoardConfig {
-  xmin: number;
-  xmax: number;
-  ymin: number;
-  ymax: number;
-  width: number | null;
-  id: string;
-  axes: boolean;
-  grid: boolean;
-  border: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1100,7 +1019,9 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   window.__boards = window.__boards || {};
   const previousBoard = window.__boards[cfg.id];
   try {
-    if (previousBoard && typeof previousBoard.__coordViewportCleanup === 'function') {
+    if (previousBoard && typeof previousBoard.__coordCleanup === 'function') {
+      previousBoard.__coordCleanup();
+    } else if (previousBoard && typeof previousBoard.__coordViewportCleanup === 'function') {
       previousBoard.__coordViewportCleanup();
     }
   } catch (e) {}
@@ -1171,7 +1092,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 
   function isCurrentBoard(): boolean {
     return !!board && !!board.containerObj && board.containerObj.isConnected !== false &&
-      (!window.__boards || !window.__boards[cfg.id] || window.__boards[cfg.id] === board);
+      !!window.__boards && window.__boards[cfg.id] === board;
   }
 
   function applyAll(): void {
@@ -1248,11 +1169,16 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   }
 
   // Color scheme change.
+  let colorSchemeMediaQuery: MediaQueryList | null = null;
+  let colorSchemeHandler: (() => void) | null = null;
   try {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = function(): void { if (isCurrentBoard()) applyAll(); };
-    if (mq && typeof mq.addEventListener === 'function') mq.addEventListener('change', handler);
-    else if (mq && typeof (mq as any).addListener === 'function') (mq as any).addListener(handler);
+    colorSchemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    colorSchemeHandler = function(): void { if (isCurrentBoard()) applyAll(); };
+    if (colorSchemeMediaQuery && typeof colorSchemeMediaQuery.addEventListener === 'function') {
+      colorSchemeMediaQuery.addEventListener('change', colorSchemeHandler);
+    } else if (colorSchemeMediaQuery && typeof (colorSchemeMediaQuery as any).addListener === 'function') {
+      (colorSchemeMediaQuery as any).addListener(colorSchemeHandler);
+    }
   } catch (e) {}
 
   // Keep the board inside the available content width. Besides real window
@@ -1357,9 +1283,9 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   let lastGridColor = '';
   const themePoll = window.setInterval(function() {
     if (!isCurrentBoard()) {
-      window.clearInterval(themePoll);
-      try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
-      window.removeEventListener('resize', scheduleLayoutRefit);
+      try {
+        if (typeof board.__coordCleanup === 'function') board.__coordCleanup();
+      } catch (e) {}
       return;
     }
     if (!cfg.grid) return;
@@ -1368,68 +1294,61 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     lastGridColor = c;
     applyGridColor(board, c);
   }, 400);
-}
 
-// ---------------------------------------------------------------------------
-// Spec parsing
-// ---------------------------------------------------------------------------
-
-export function parseCoordSpec(spec: string): BoardConfig {
-  const raw = unquoteLocal(String(spec || '').trim());
-  const obj: Record<string, string> = {};
-  const positional: string[] = [];
-
-  splitTopLevelLocal(raw).forEach(part => {
-    const eq = part.indexOf('=');
-    if (eq < 0) {
-      const value = unquoteLocal(part).trim();
-      if (value) positional.push(value);
-      return;
-    }
-    const key = part.slice(0, eq).trim().toLowerCase();
-    const val = unquoteLocal(part.slice(eq + 1).trim());
-    obj[key] = val;
-  });
-
-  const cfg: BoardConfig = {
-    xmin:  toNum(obj.xmin, -4),
-    xmax:  toNum(obj.xmax,  4),
-    ymin:  toNum(obj.ymin, -3),
-    ymax:  toNum(obj.ymax,  3),
-    width: null,
-    id:    obj.id != null ? obj.id : 'A1',
-    axes:  true,
-    grid:  true,
-    border: true
+  board.__coordCleanup = function(): void {
+    cleanupViewportIntentListeners();
+    try { window.clearInterval(themePoll); } catch (e) {}
+    try {
+      if (layoutResizeRAF) cancelAnimationFrame(layoutResizeRAF);
+      layoutResizeRAF = 0;
+    } catch (e) {}
+    try {
+      if (bboxRAF) cancelAnimationFrame(bboxRAF);
+      bboxRAF = 0;
+    } catch (e) {}
+    try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
+    board.__coordContentResizeObserver = null;
+    try { window.removeEventListener('resize', scheduleLayoutRefit); } catch (e) {}
+    try {
+      if (colorSchemeMediaQuery && colorSchemeHandler) {
+        if (typeof colorSchemeMediaQuery.removeEventListener === 'function') {
+          colorSchemeMediaQuery.removeEventListener('change', colorSchemeHandler);
+        } else if (typeof (colorSchemeMediaQuery as any).removeListener === 'function') {
+          (colorSchemeMediaQuery as any).removeListener(colorSchemeHandler);
+        }
+      }
+    } catch (e) {}
+    try {
+      if (window.__liaCoordHooks && window.__liaCoordHooks[cfg.id] === applyAll) {
+        delete window.__liaCoordHooks[cfg.id];
+      }
+    } catch (e) {}
+    board.__coordCleanup = null;
   };
-
-  function flag(value: string | undefined, fallback: boolean): boolean {
-    const normalized = String(value == null ? '' : value).trim().toLowerCase();
-    if (normalized === '0' || normalized === 'false' || normalized === 'nein' || normalized === 'no' || normalized === 'off') return false;
-    if (normalized === '1' || normalized === 'true' || normalized === 'ja' || normalized === 'yes' || normalized === 'on') return true;
-    return fallback;
-  }
-
-  cfg.axes = flag(obj.achsen != null ? obj.achsen : (obj.axes != null ? obj.axes : positional[0]), true);
-  cfg.grid = flag(obj.grid != null ? obj.grid : positional[1], true);
-  cfg.border = flag(obj.border != null ? obj.border : (obj.rahmen != null ? obj.rahmen : positional[2]), true);
-
-  if (!(cfg.xmax > cfg.xmin)) cfg.xmax = cfg.xmin + 1;
-  if (!(cfg.ymax > cfg.ymin)) cfg.ymax = cfg.ymin + 1;
-
-  const w = toNum(obj.width, NaN);
-  cfg.width = (Number.isFinite(w) && w > 0) ? w : null;
-
-  return cfg;
 }
 
 // Keep the complete board initializer in the bundle. Some layout templates
 // rewrite their child HTML at blank lines; an inline multi-paragraph initializer
 // can then be split and evaluated as invalid JavaScript.
 export function initializeCoordinateBoard(jxgbox: HTMLElement, spec: string): any {
+  const cfg = parseCoordSpec(spec);
+  if (cfg.staticMode) {
+    return initializeStaticCoordinateBoard(jxgbox, cfg);
+  }
+
+  // A LiveEditor remount may replace a static board with a dynamic one using
+  // a different id in the same physical host. Release both container-owned
+  // registries before subsystem bootstrap, then preserve the historical
+  // same-id cleanup for hosts that were replaced outright.
+  disposeStaticCoordinateBoardsInContainer(jxgbox);
+  disposeStaticCoordinateBoard(cfg.id);
+  disposeInteractiveCoordinateBoardsInContainer(jxgbox);
+  try {
+    if (window.__ensureCoordinateDynamicRuntime) window.__ensureCoordinateDynamicRuntime();
+  } catch (e) {}
+
   JXG.Options.text.useMathJax = true;
 
-  const cfg = parseCoordSpec(spec);
   const initialBBox = [cfg.xmin, cfg.ymax, cfg.xmax, cfg.ymin];
   const initialRatio = (cfg.ymax - cfg.ymin) / (cfg.xmax - cfg.xmin);
 

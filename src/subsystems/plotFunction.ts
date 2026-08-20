@@ -620,9 +620,25 @@ export function init(): void {
     }
     plotBootstrapRunning = true;
     try {
-      const nodes = Array.from(
+      const allNodes = Array.from(
         document.querySelectorAll<HTMLElement>('[id^="plot-spec-"][data-spec]')
       );
+      const nodes = allNodes.filter(function(node) {
+        if (node.hasAttribute('data-lia-static-claimed')) return false;
+        const boardId = plotSpecBoardId(String(node.dataset.spec || ''));
+        return !!boardId && !!(window.__boards && window.__boards[boardId]);
+      });
+      const activeUids = new Set(nodes.map(function(node) {
+        return String(node.id || '').replace(/^plot-spec-/, '');
+      }));
+      Object.keys(window.__plotFunctionEntries || {}).forEach(function(key) {
+        const entry = window.__plotFunctionEntries[key];
+        const uid = String((entry && entry.uid) || key.replace(/^plot-/, ''));
+        const board = entry && window.__boards && window.__boards[entry.boardId];
+        if (!activeUids.has(uid) || !board || (entry.graph && entry.graph.board !== board)) {
+          removeExisting(uid);
+        }
+      });
       let pending = nodes.map(function(node) {
         return {
           uid: String(node.id || '').replace(/^plot-spec-/, ''),
@@ -653,6 +669,10 @@ export function init(): void {
       } else {
         unresolvedRetrySignature = '';
         unresolvedRetryCount = 0;
+        if (window.__bootstrapPlotFunctionsRAF) {
+          try { cancelAnimationFrame(window.__bootstrapPlotFunctionsRAF); } catch (e) {}
+          window.__bootstrapPlotFunctionsRAF = 0;
+        }
       }
     } finally {
       plotBootstrapRunning = false;

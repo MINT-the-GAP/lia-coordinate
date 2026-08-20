@@ -254,12 +254,45 @@ export function init(): void {
     Object.keys(specs).forEach(applyAxisTitles);
   };
 
+  function removeAxisTitles(boardId) {
+    const board = window.__boards && window.__boards[boardId];
+    ['__xTitleOverlay', '__yTitleOverlay'].forEach(function(key) {
+      const overlay = board && board[key];
+      try { if (overlay) overlay.remove(); } catch (e) {}
+      if (board) board[key] = null;
+    });
+    delete window.__liaAxisTitleSpecs[boardId];
+  }
+
+  function stopAxisTitleInterval() {
+    if (!window.__axisTitlesInterval) return;
+    clearInterval(window.__axisTitlesInterval);
+    window.__axisTitlesInterval = undefined;
+  }
+
+  function ensureAxisTitleInterval() {
+    if (window.__axisTitlesInterval) return;
+    window.__axisTitlesInterval = setInterval(function() {
+      try { window.__bootstrapAxisTitles?.(); } catch (e) {}
+    }, 400);
+  }
+
   window.__bootstrapAxisTitles = function() {
-    const nodes = document.querySelectorAll<HTMLElement>('[id^="axis-title-spec-"][data-spec]');
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[id^="axis-title-spec-"][data-spec]'));
+    const activeBoardIds = new Set<string>();
 
     nodes.forEach(function(node) {
       const spec = String(node.dataset.spec || '');
       if (!spec) return;
+      const cfg = parseSpec(spec);
+      const board = cfg.id && window.__boards && window.__boards[cfg.id];
+      if (node.hasAttribute('data-lia-static-claimed') || !board) {
+        node.__liaAxisBootstrapped = false;
+        node.__liaAxisLastSpec = '';
+        if (cfg.id) removeAxisTitles(cfg.id);
+        return;
+      }
+      activeBoardIds.add(cfg.id);
 
       if (node.__liaAxisBootstrapped && node.__liaAxisLastSpec === spec) return;
 
@@ -269,7 +302,15 @@ export function init(): void {
       window.renderAxisTitlesFromSpec(spec);
     });
 
+    Object.keys(window.__liaAxisTitleSpecs || {}).forEach(function(boardId) {
+      if (!activeBoardIds.has(boardId) || !(window.__boards && window.__boards[boardId])) {
+        removeAxisTitles(boardId);
+      }
+    });
+
     window.__refreshAllAxisTitles();
+    if (activeBoardIds.size) ensureAxisTitleInterval();
+    else stopAxisTitleInterval();
   };
 
   function kickAxisTitles() {
@@ -309,12 +350,6 @@ export function init(): void {
       });
     }
   } catch (e) {}
-
-  if (!window.__axisTitlesInterval) {
-    window.__axisTitlesInterval = setInterval(function() {
-      kickAxisTitles();
-    }, 400);
-  }
 
   scheduleBootstrap(kickAxisTitles);
 }
