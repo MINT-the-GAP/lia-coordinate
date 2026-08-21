@@ -1177,7 +1177,9 @@ eraser tool is active. Clicking it cancels the current tool and any unfinished m
 selection. Its pointer icon follows the neutral light/dark-mode color, while the vertical
 divider before the construction tools uses the selected theme color.
 The set-square button between the normal pointer and the compass independently toggles a
-screen-space geometry instrument without changing the active drawing tool. Its triangular
+screen-sized geometry instrument without changing the active drawing tool. Its zero mark stays
+anchored to the same board coordinate while the board is panned or zoomed, while its displayed
+angle and size remain screen-space based. Its triangular
 surface uses 10 percent opacity, while the ruler, angle scale, guides, and zero mark remain
 fully legible in the current light/dark and theme colors. The protractor uses one semicircular
 measurement ring with larger values once inside and once outside the ring; its ten-degree
@@ -1191,6 +1193,8 @@ the lower tip to rotate it precisely around the zero mark at the center of the l
 edge; holding Shift snaps the angle in five-degree steps. The handles on both acute corners
 scale the instrument around that fixed zero mark. Visibility, relative position, rotation,
 and scale survive responsive resizing, fullscreen, and LiaScript slide or board replacement.
+If panning carries the anchored instrument completely beyond the viewport, hiding and showing it
+again restores the draggable 5-percent portion at the nearest board edge.
 In freehand mode, new strokes cannot be drawn through the triangular surface. Pointer samples
 near an outer edge snap to one finite edge, allowing a straight ruler-guided stroke even after
 the set square has been rotated or scaled; a free stroke entering the triangle is clipped at
@@ -1736,10 +1740,13 @@ Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
           --{{0}}--
 Adds the set-square instrument to an existing coordinate system and displays it immediately.
 Its ruler subdivision follows the current axis metric, while both catheti carry exact
-radial 1-degree angle marks with stronger 5-degree and 10-degree divisions. Used on its own,
+radial 1-degree angle marks with stronger 5-degree and 10-degree divisions.
+Its zero mark remains anchored to the same board coordinate during panning and zooming, while
+the displayed angle and size remain screen-space based. Used on its own,
 the set square can be pushed roughly 95 percent beyond the board while at least 5 percent of its
 actual triangular surface remains visible and draggable. This limited off-board position persists
-across layout changes. The compact toolbar contains the set square
+across layout changes. If board panning carries it completely out of view, hiding and showing it
+again restores that draggable portion at the nearest board edge. The compact toolbar contains the set square
 but no compass. Repeated LiaScript
 bootstraps do not reopen a set square that the user has deliberately hidden. If `@DGS`,
 `@Zirkel`, or `@Compass` targets the same board, all macros share one DGS controller.

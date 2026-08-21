@@ -24,6 +24,10 @@ import {
 } from '../shared/functionExpression';
 import { resolveRegressionDgsController } from '../shared/dgsRegressionProfile';
 import { applyLineStyle } from '../shared/lineStyle';
+import {
+  screenToUserCoordinates,
+  userToScreenCoordinates
+} from '../shared/boardCoordinates';
 
 type DgsAxisScaleMode = 'cartesian' | 'log-x' | 'log-y' | 'log-log';
 
@@ -340,6 +344,8 @@ type DgsState = {
   setSquareInitialized: boolean;
   setSquarePivotX: number;
   setSquarePivotY: number;
+  setSquarePivotUserX: number | null;
+  setSquarePivotUserY: number | null;
   setSquarePivotXRatio: number;
   setSquarePivotYRatio: number;
   setSquareAngle: number;
@@ -808,7 +814,7 @@ function resizeDgsFullscreenBoard(state: DgsState): void {
   scheduleXAxisSync(state);
   scheduleDgsRootUpdate(state);
   refreshDgsSliderTypography(state);
-  scheduleDgsSetSquareLayout(state, true);
+  scheduleDgsSetSquareLayout(state, 'ratio');
   try { window.__refreshAllAxisTitles?.(); } catch (e) {}
 }
 
@@ -866,7 +872,7 @@ function restoreDgsEmbeddedSize(state: DgsState): void {
   scheduleXAxisSync(state);
   scheduleDgsRootUpdate(state);
   refreshDgsSliderTypography(state);
-  scheduleDgsSetSquareLayout(state, true);
+  scheduleDgsSetSquareLayout(state, 'ratio');
   try { window.__refreshAllAxisTitles?.(); } catch (e) {}
   if (boundingBox) {
     window.__coordBoardStates = window.__coordBoardStates || {};
@@ -1501,7 +1507,42 @@ function renderDgsSetSquareRuler(
   state.setSquareRulerSignature = signature;
 }
 
-function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
+type DgsSetSquareLayoutSource = 'screen' | 'board' | 'ratio';
+
+function syncDgsSetSquareUserPivotFromScreen(state: DgsState): boolean {
+  const pivot = screenToUserCoordinates(state.board, {
+    x: state.setSquarePivotX,
+    y: state.setSquarePivotY
+  });
+  if (!pivot) return false;
+  state.setSquarePivotUserX = pivot.x;
+  state.setSquarePivotUserY = pivot.y;
+  return true;
+}
+
+function projectDgsSetSquareUserPivotToScreen(state: DgsState): boolean {
+  if (
+    typeof state.setSquarePivotUserX !== 'number' ||
+    typeof state.setSquarePivotUserY !== 'number' ||
+    !Number.isFinite(state.setSquarePivotUserX) ||
+    !Number.isFinite(state.setSquarePivotUserY)
+  ) {
+    return false;
+  }
+  const pivot = userToScreenCoordinates(state.board, {
+    x: state.setSquarePivotUserX,
+    y: state.setSquarePivotUserY
+  });
+  if (!pivot) return false;
+  state.setSquarePivotX = pivot.x;
+  state.setSquarePivotY = pivot.y;
+  return true;
+}
+
+function layoutDgsSetSquare(
+  state: DgsState,
+  positionSource: DgsSetSquareLayoutSource = 'screen'
+): boolean {
   const containerWidth = state.boardContainer.clientWidth;
   const containerHeight = state.boardContainer.clientHeight;
   if (!(containerWidth > 0) || !(containerHeight > 0)) return false;
@@ -1512,6 +1553,8 @@ function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
   const containerChanged =
     state.setSquareLastContainerWidth !== containerWidth ||
     state.setSquareLastContainerHeight !== containerHeight;
+  const wasInitialized = state.setSquareInitialized;
+  let projectedFromBoard = false;
   if (!state.setSquareInitialized) {
     state.setSquarePivotX = containerWidth * 0.5;
     state.setSquarePivotY = Math.max(
@@ -1521,9 +1564,13 @@ function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
     state.setSquarePivotXRatio = state.setSquarePivotX / containerWidth;
     state.setSquarePivotYRatio = state.setSquarePivotY / containerHeight;
     state.setSquareInitialized = true;
-  } else if (
-    fromRatios ||
-    containerChanged
+  } else if (positionSource === 'board') {
+    projectedFromBoard = projectDgsSetSquareUserPivotToScreen(state);
+  }
+  if (
+    wasInitialized &&
+    !projectedFromBoard &&
+    (positionSource === 'ratio' || containerChanged)
   ) {
     state.setSquarePivotX = state.setSquarePivotXRatio * containerWidth;
     state.setSquarePivotY = state.setSquarePivotYRatio * containerHeight;
@@ -1532,17 +1579,31 @@ function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
   const angle = normalizeDgsSetSquareAngle(state.setSquareAngle);
   state.setSquareAngle = angle;
   renderDgsSetSquareRuler(state, toolWidth, angle);
-  const constrainedPivot = constrainDgsSetSquarePivot(
-    state,
-    state.setSquarePivotX,
-    state.setSquarePivotY,
-    scale,
-    angle
-  );
+  const constrainedPivot = projectedFromBoard
+    ? {
+        x: state.setSquarePivotX,
+        y: state.setSquarePivotY,
+        visibleFraction: getDgsSetSquareVisibleFraction(
+          state.setSquarePivotX,
+          state.setSquarePivotY,
+          scale,
+          angle,
+          containerWidth,
+          containerHeight
+        )
+      }
+    : constrainDgsSetSquarePivot(
+        state,
+        state.setSquarePivotX,
+        state.setSquarePivotY,
+        scale,
+        angle
+      );
   state.setSquarePivotX = constrainedPivot.x;
   state.setSquarePivotY = constrainedPivot.y;
   state.setSquarePivotXRatio = state.setSquarePivotX / containerWidth;
   state.setSquarePivotYRatio = state.setSquarePivotY / containerHeight;
+  if (!projectedFromBoard) syncDgsSetSquareUserPivotFromScreen(state);
   state.setSquareLastContainerWidth = containerWidth;
   state.setSquareLastContainerHeight = containerHeight;
 
@@ -1565,18 +1626,23 @@ function layoutDgsSetSquare(state: DgsState, fromRatios = false): boolean {
   return true;
 }
 
-function scheduleDgsSetSquareLayout(state: DgsState, fromRatios = true): void {
+function scheduleDgsSetSquareLayout(
+  state: DgsState,
+  positionSource: DgsSetSquareLayoutSource = 'ratio'
+): void {
   if (state.setSquareLayoutRAF != null) cancelAnimationFrame(state.setSquareLayoutRAF);
   state.setSquareLayoutRAF = requestAnimationFrame(() => {
     state.setSquareLayoutRAF = undefined;
-    layoutDgsSetSquare(state, fromRatios);
+    const didLayout = layoutDgsSetSquare(state, positionSource);
+    if (didLayout && positionSource === 'board') persistDgsSetSquarePose(state);
   });
 }
 
 function setDgsSetSquareVisible(state: DgsState, visible: boolean): void {
   if (!visible) cancelDgsSetSquareInteraction(state);
+  const restoreToVisibleArea = visible && !state.setSquareVisible;
   state.setSquareVisible = visible;
-  layoutDgsSetSquare(state, false);
+  layoutDgsSetSquare(state, restoreToVisibleArea ? 'screen' : 'board');
   persistDgsSetSquarePose(state);
   renderToolState(state);
 }
@@ -1679,7 +1745,7 @@ function bindDgsSetSquareInteraction(state: DgsState): void {
         state.setSquareScale = Math.max(bounds.minScale, Math.min(bounds.maxScale, scale));
       }
     }
-    layoutDgsSetSquare(state, false);
+    layoutDgsSetSquare(state, 'screen');
   });
   overlay.addEventListener('pointerup', finish);
   overlay.addEventListener('pointercancel', finish);
@@ -13396,7 +13462,7 @@ function applyLayout(state: DgsState): void {
   state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
   state.boardContainer.style.setProperty('--lia-dgs-neutral-color', tone);
   state.boardContainer.style.setProperty('--lia-dgs-fullscreen-bg', tone === '#fff' ? '#151a1c' : '#fff');
-  layoutDgsSetSquare(state, false);
+  layoutDgsSetSquare(state, 'board');
   styleDgsSegments(state);
   if (state.axisAdjusted) scheduleAxisSync(state);
   if (state.xAxisAdjusted) scheduleXAxisSync(state);
@@ -14758,7 +14824,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (needsDeferredRestore) scheduleDgsConstructionRestore(existing);
     applyDgsProfileRestrictions(existing);
     applyLayout(existing);
-    layoutDgsSetSquare(existing, false);
+    layoutDgsSetSquare(existing, 'board');
     applyDgsInstrumentRequests(boardId);
     return;
   }
@@ -16288,6 +16354,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setSquarePivotY: storedSetSquarePose.initialized
       ? storedSetSquarePose.pivotYRatio * boardContainer.clientHeight
       : 0,
+    setSquarePivotUserX: null,
+    setSquarePivotUserY: null,
     setSquarePivotXRatio: storedSetSquarePose.pivotXRatio,
     setSquarePivotYRatio: storedSetSquarePose.pivotYRatio,
     setSquareAngle: storedSetSquarePose.angle,
@@ -16458,7 +16526,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   };
   states[uid] = state;
   bindDgsSetSquareInteraction(state);
-  layoutDgsSetSquare(state, false);
+  layoutDgsSetSquare(state, 'screen');
   exportToolButtons.forEach((toolButton, toolId) => {
     toolButton.addEventListener('click', (evt) => {
       evt.preventDefault();
@@ -18180,7 +18248,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
     scheduleDgsRootUpdate(state);
     refreshDgsSliderTypography(state);
-    scheduleDgsSetSquareLayout(state, false);
+    scheduleDgsSetSquareLayout(state, 'board');
   };
   state.onBoardRootUpdate = () => {
     syncDgsFixedCompassConstructions(state);
@@ -18205,7 +18273,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       const setSquareSizeChanged =
         state.setSquareLastContainerWidth !== boardContainer.clientWidth ||
         state.setSquareLastContainerHeight !== boardContainer.clientHeight;
-      scheduleDgsSetSquareLayout(state, setSquareSizeChanged);
+      scheduleDgsSetSquareLayout(state, setSquareSizeChanged ? 'ratio' : 'board');
       positionOpenDgsSubmenu(state);
       scheduleAxisSync(state);
       scheduleXAxisSync(state);

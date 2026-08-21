@@ -6,7 +6,7 @@
     "build": "npm run build:full && npm run build:static",
     "build:full": "parcel build src/index.ts --dist-dir dist --no-scope-hoist",
     "build:static": "parcel build src/static.ts --dist-dir dist --no-scope-hoist",
-    "test": "node --test tests/macroLayer.test.mjs tests/combinedQuiz.test.mjs tests/quadrilateralForm.test.mjs tests/constructionQuiz.test.mjs tests/quizMacros.test.mjs tests/area.test.mjs tests/dgsRegressionProfile.test.mjs tests/lineStyle.test.mjs tests/staticSvg.test.mjs",
+    "test": "node --test tests/macroLayer.test.mjs tests/combinedQuiz.test.mjs tests/quadrilateralForm.test.mjs tests/constructionQuiz.test.mjs tests/quizMacros.test.mjs tests/area.test.mjs tests/dgsRegressionProfile.test.mjs tests/dgsSetSquare.test.mjs tests/lineStyle.test.mjs tests/staticSvg.test.mjs",
     "test:browser": "npm run build && node --test tests/staticPerformance.browser.mjs"
   },
   "devDependencies": {
