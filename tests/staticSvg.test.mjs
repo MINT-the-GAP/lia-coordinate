@@ -21,8 +21,11 @@ const {
   initStaticRenderer,
   initializeStaticCoordinateBoard,
   isStaticCoordinateBoard,
+  parseStaticArcSpec,
   parseStaticAreaSpec,
+  parseStaticCoordTextSpec,
   parseStaticDistanceSpec,
+  parseStaticVectorSpec,
   projectStaticPoint,
   renderStaticSvg,
   staticDashArray
@@ -443,6 +446,13 @@ function assertNonScalingStroke(element) {
   assert.equal(element.getAttribute('vector-effect'), 'non-scaling-stroke');
 }
 
+function assertClose(actual, expected, epsilon = 1e-9) {
+  assert.ok(
+    Math.abs(Number(actual) - expected) <= epsilon,
+    `expected ${actual} to be within ${epsilon} of ${expected}`
+  );
+}
+
 test('coordinate parser activates static mode only through static=1 or statisch=1', () => {
   assert.equal(parseCoordSpec('id=english;static=1').staticMode, true);
   assert.equal(parseCoordSpec('id=german;statisch=1').staticMode, true);
@@ -453,7 +463,7 @@ test('coordinate parser activates static mode only through static=1 or statisch=
   assert.equal(borderless.staticMode, false);
 });
 
-test('static parsers accept direct coordinates and reject dependent point names', () => {
+test('legacy parser exports stay direct-only when no point resolver is supplied', () => {
   const area = parseStaticAreaSpec(
     'plot;[[0;0];[2;3];[4;0]];#123456;0.4;sichtbar=0;linienstil=dashed',
     'de'
@@ -469,7 +479,8 @@ test('static parsers accept direct coordinates and reject dependent point names'
     lineStyle: 'dashed',
     strokeWidth: 2,
     showArea: false,
-    showPerimeter: false
+    showPerimeter: false,
+    language: 'de'
   });
   assert.equal(parseStaticAreaSpec('plot;[A;B;C];#123456;0.4'), null);
 
@@ -498,9 +509,116 @@ test('static parsers accept direct coordinates and reject dependent point names'
     endCap: false,
     showLength: false,
     segmentName: '',
-    showName: false
+    showName: false,
+    language: 'en'
   });
   assert.equal(parseStaticDistanceSpec('plot;[A;B];#654321'), null);
+});
+
+test('number-line parsers accept only fixed vectors, arcs, and coordinate texts', () => {
+  const vector = parseStaticVectorSpec(
+    'plot;[[0;0];[76;0]];#102030;u=0;linestyle=dashed;visible=0',
+    'en'
+  );
+  assert.deepEqual(vector, {
+    kind: 'vector',
+    boardId: 'plot',
+    coordinates: [{ x: 0, y: 0 }, { x: 76, y: 0 }],
+    color: '#102030',
+    hasExplicitColor: true,
+    strokeWidth: 3,
+    lineStyle: 'dashed',
+    visible: false,
+    objectName: 'u',
+    showName: false
+  });
+  assert.equal(
+    parseStaticVectorSpec('plot;[[0;0];[1;1];[2;2]];#102030;u=0', 'de'),
+    null,
+    'a static vector requires exactly two coordinates'
+  );
+  assert.equal(parseStaticVectorSpec('plot;[A;B];#102030;u=0', 'de'), null);
+  assert.equal(
+    parseStaticVectorSpec('plot;[[0;0];[1;1]];#102030;name=0', 'de').showName,
+    false
+  );
+
+  const arc = parseStaticArcSpec(
+    'plot;[18;2];35;[54;2];145;;->;5px;#ff0000;linestyle=dashdotted;visible=0',
+    'de'
+  );
+  assert.deepEqual(arc, {
+    kind: 'arc',
+    boardId: 'plot',
+    start: { x: 18, y: 2 },
+    exitAngle: 35,
+    end: { x: 54, y: 2 },
+    entryAngle: 145,
+    caption: '',
+    renderedCaption: '',
+    strokeWidth: 5,
+    color: '#ff0000',
+    hasExplicitColor: true,
+    lineStyle: 'dashdotted',
+    visible: false,
+    normalizedDesign: '->',
+    firstArrow: false,
+    lastArrow: true,
+    startCap: false,
+    endCap: false
+  });
+  assert.equal(parseStaticArcSpec('plot;A;35;B;145;;->;3px;#000000', 'de'), null);
+  assert.deepEqual(
+    ['-', '<-', '<->', '|->|'].map(design => {
+      const parsed = parseStaticArcSpec(
+        `plot;[0;0];45;[3;0];135;$x$;${design};3px;#000000`,
+        'en'
+      );
+      return {
+        caption: parsed.renderedCaption,
+        design: parsed.normalizedDesign,
+        firstArrow: parsed.firstArrow,
+        lastArrow: parsed.lastArrow,
+        startCap: parsed.startCap,
+        endCap: parsed.endCap
+      };
+    }),
+    [
+      { caption: 'x', design: '', firstArrow: false, lastArrow: false, startCap: false, endCap: false },
+      { caption: 'x', design: '<-', firstArrow: true, lastArrow: false, startCap: false, endCap: false },
+      { caption: 'x', design: '<->', firstArrow: true, lastArrow: true, startCap: false, endCap: false },
+      { caption: 'x', design: '|->|', firstArrow: false, lastArrow: true, startCap: true, endCap: true }
+    ]
+  );
+
+  const coordText = parseStaticCoordTextSpec('plot;[9;-5.1];$1250$;#123456;0.35');
+  assert.deepEqual(coordText, {
+    kind: 'coord-text',
+    boardId: 'plot',
+    coordinate: { x: 9, y: -5.1 },
+    x: 9,
+    y: -5.1,
+    content: '$1250$',
+    renderedContent: '1250',
+    color: '#123456',
+    hasExplicitColor: true,
+    opacity: 0.35
+  });
+  assert.equal(parseStaticCoordTextSpec('plot;A;$x$;#123456;1'), null);
+  assert.deepEqual(
+    ['$0$', '$60$', '$1250$', '$x$'].map(content =>
+      parseStaticCoordTextSpec(`plot;[0;0];${content};#000000;1`).renderedContent
+    ),
+    ['0', '60', '1250', 'x']
+  );
+  assert.equal(
+    parseStaticCoordTextSpec('plot;[0;0];plain label;#000000;1').renderedContent,
+    'plain label'
+  );
+  const defaultColorText = parseStaticCoordTextSpec('plot;[0;0];plain label;;0.4');
+  assert.equal(defaultColorText.hasExplicitColor, false);
+  assert.notEqual(defaultColorText.color, '0.4');
+  assert.equal(defaultColorText.opacity, 0.4);
 });
 
 test('static geometry flips the mathematical y-axis and defines four SVG line styles', () => {
@@ -575,6 +693,231 @@ test('native SVG preserves source order, geometry, styles, and responsive aspect
     geometry.forEach(assertNonScalingStroke);
 
     assert.equal(browser.resizeObserverCalls.length, 0, 'responsive SVG must not install ResizeObserver');
+  } finally {
+    browser.restore();
+  }
+});
+
+test('native SVG renders a complete number line in mixed source order', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-numberline';
+  try {
+    const host = appendHost(browser.document);
+    appendSpecMarker(
+      browser.document,
+      'area-spec-numberline-background',
+      `${boardId};[[-3;-8];[80;-8];[80;12];[-3;12]];#ffffff;1`
+    );
+    const vectorMarker = appendSpecMarker(
+      browser.document,
+      'linear-spec-numberline-axis',
+      `${boardId};[[0;0];[76;0]];#000000;u=0;linestyle=dotted`
+    );
+    vectorMarker.dataset.kind = 'vector';
+    appendSpecMarker(
+      browser.document,
+      'distance-spec-numberline-tick',
+      `${boardId};[[0;-0.8];[0;0.8]];#112233;;-;3px;linestyle=dashed`
+    );
+    appendSpecMarker(
+      browser.document,
+      'arc-spec-numberline-jump',
+      `${boardId};[18;2];35;[54;2];145;;->;3px;#000000;linestyle=dashdotted`
+    );
+    appendSpecMarker(
+      browser.document,
+      'arc-spec-numberline-vertical',
+      `${boardId};[36;-0.8];90;[36;0.8];270;;-;5px;#ff0000`
+    );
+    [
+      [0, '$0$', '#000000', 1],
+      [9, '$60$', '#660000', 0.4],
+      [18, '$1250$', '#006600', 0.75],
+      [27, '$x$', '#000066', 1],
+      [36, 'plain label', '#333333', 0.6]
+    ].forEach(([x, content, color, opacity], index) => {
+      const marker = appendSpecMarker(
+        browser.document,
+        `coord-text-spec-numberline-${index}`,
+        `${boardId};[${x};-5.1];${content};${color};${opacity}`
+      );
+      marker.className = 'lia-coord-text-spec';
+    });
+
+    const cfg = parseCoordSpec(
+      `xmin=-3;xmax=80;ymin=-8;ymax=12;width=720;id=${boardId};achsen=0;grid=0;border=0;static=1`
+    );
+    const svg = renderStaticSvg(host, cfg);
+    const groups = svg.querySelectorAll('g[data-lia-static-kind]');
+    assert.deepEqual(
+      groups.map(group => group.getAttribute('data-lia-static-kind')),
+      [
+        'area', 'vector', 'distance', 'arc', 'arc',
+        'coord-text', 'coord-text', 'coord-text', 'coord-text', 'coord-text'
+      ]
+    );
+
+    const vectorGroup = groups[1];
+    const vectorLine = vectorGroup.querySelector('line, polyline');
+    assert.ok(vectorLine, 'vector line is present');
+    if (vectorLine.localName === 'line') {
+      assert.equal(vectorLine.getAttribute('x1'), '3');
+      assert.equal(vectorLine.getAttribute('y1'), '12');
+      assert.equal(vectorLine.getAttribute('x2'), '79');
+      assert.equal(vectorLine.getAttribute('y2'), '12');
+    } else {
+      assert.equal(vectorLine.getAttribute('points'), '3,12 79,12');
+    }
+    assert.equal(vectorLine.getAttribute('stroke'), '#000000');
+    assert.equal(vectorLine.getAttribute('stroke-width'), '3');
+    assert.equal(vectorLine.getAttribute('stroke-dasharray'), staticDashArray('dotted'));
+    assertNonScalingStroke(vectorLine);
+    const vectorMarkerEnd = vectorLine.getAttribute('marker-end');
+    assert.match(vectorMarkerEnd, /^url\(#lia-static-arrow-/);
+    const vectorArrowId = vectorMarkerEnd.match(/^url\(#(.+)\)$/)[1];
+    const vectorArrow = svg.querySelector(`#${vectorArrowId}`);
+    assert.ok(vectorArrow, 'vector arrow marker is defined in the SVG');
+    assert.equal(vectorArrow.getAttribute('orient'), 'auto-start-reverse');
+    assert.equal(vectorArrow.getAttribute('markerUnits'), 'strokeWidth');
+    assert.equal(vectorGroup.querySelectorAll('text').length, 0, 'u=0 suppresses the vector name');
+
+    const tick = groups[2].querySelector('polyline, line');
+    if (tick.localName === 'line') {
+      assert.equal(tick.getAttribute('x1'), '3');
+      assert.equal(tick.getAttribute('y1'), '12.8');
+      assert.equal(tick.getAttribute('x2'), '3');
+      assert.equal(tick.getAttribute('y2'), '11.2');
+    } else {
+      assert.equal(tick.getAttribute('points'), '3,12.8 3,11.2');
+    }
+    assert.equal(tick.getAttribute('stroke'), '#112233');
+    assert.equal(tick.getAttribute('stroke-width'), '3');
+    assert.equal(tick.getAttribute('stroke-dasharray'), staticDashArray('dashed'));
+
+    const jumpArc = groups[3].querySelector('path');
+    const jumpNumbers = (jumpArc.getAttribute('d').match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) || [])
+      .map(Number);
+    assert.equal(jumpNumbers.length, 8, 'arc path contains four cubic Bezier points');
+    const handle = 12;
+    const exitRadians = 35 * Math.PI / 180;
+    const entryRadians = 145 * Math.PI / 180;
+    [
+      21,
+      10,
+      21 + handle * Math.cos(exitRadians),
+      10 - handle * Math.sin(exitRadians),
+      57 + handle * Math.cos(entryRadians),
+      10 - handle * Math.sin(entryRadians),
+      57,
+      10
+    ].forEach((expected, index) => assertClose(jumpNumbers[index], expected));
+    assert.equal(jumpArc.getAttribute('fill'), 'none');
+    assert.equal(jumpArc.getAttribute('stroke'), '#000000');
+    assert.equal(jumpArc.getAttribute('stroke-width'), '3');
+    assert.equal(jumpArc.getAttribute('stroke-dasharray'), staticDashArray('dashdotted'));
+    assert.match(jumpArc.getAttribute('marker-end'), /^url\(#lia-static-arrow-/);
+    assertNonScalingStroke(jumpArc);
+    assert.equal(groups[3].querySelectorAll('text').length, 0, 'an empty arc caption creates no text');
+
+    const verticalArc = groups[4].querySelector('path');
+    const verticalNumbers = (verticalArc.getAttribute('d').match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) || [])
+      .map(Number);
+    assert.equal(verticalNumbers.length, 8);
+    [39, 39, 39, 39].forEach((expected, index) =>
+      assertClose(verticalNumbers[index * 2], expected)
+    );
+    assert.equal(new Set(verticalNumbers.filter((_value, index) => index % 2 === 1)).size, 4);
+    assert.equal(verticalArc.getAttribute('stroke'), '#ff0000');
+    assert.equal(verticalArc.getAttribute('stroke-width'), '5');
+    assert.equal(verticalArc.hasAttribute('marker-end'), false, 'plain - design has no arrow');
+    assert.equal(verticalArc.hasAttribute('stroke-dasharray'), false, 'solid arc has no dash array');
+    assertNonScalingStroke(verticalArc);
+
+    const texts = groups.slice(5).map(group => group.querySelector('text'));
+    assert.deepEqual(texts.map(text => text.textContent), ['0', '60', '1250', 'x', 'plain label']);
+    assert.deepEqual(texts.map(text => text.getAttribute('x')), ['3', '12', '21', '30', '39']);
+    texts.forEach(text => {
+      assert.equal(text.getAttribute('y'), '17.1');
+      assert.equal(text.getAttribute('text-anchor'), 'middle');
+      assert.match(text.getAttribute('dominant-baseline'), /^(?:middle|central)$/);
+      assert.equal(text.children.length, 0, 'fallback text is inserted as textContent, not innerHTML');
+      assert.equal(text.hasAttribute('opacity'), false, 'text opacity is not multiplied twice');
+    });
+    assert.deepEqual(texts.map(text => text.getAttribute('fill')), [
+      '#000000', '#660000', '#006600', '#000066', '#333333'
+    ]);
+    assert.deepEqual(
+      texts.map(text => text.getAttribute('fill-opacity')),
+      ['1', '0.4', '0.75', '1', '0.6']
+    );
+  } finally {
+    browser.restore();
+  }
+});
+
+test('arc arrows, end caps, and caption fallbacks render natively', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-arc-designs';
+  try {
+    const host = appendHost(browser.document);
+    [
+      ['plain', '[0;0]', '[2;0]', 'plain caption', '-', '#111111'],
+      ['left', '[2;0]', '[4;0]', '$x$', '<-', '#222222'],
+      ['both', '[4;0]', '[6;0]', '', '<->', '#333333'],
+      ['capped', '[6;0]', '[8;0]', '$$1250$$', '|->|', '#444444']
+    ].forEach(([uid, start, end, caption, design, color]) => {
+      appendSpecMarker(
+        browser.document,
+        `arc-spec-design-${uid}`,
+        `${boardId};${start};45;${end};135;${caption};${design};3px;${color}`
+      );
+    });
+    const cfg = parseCoordSpec(
+      `xmin=0;xmax=8;ymin=-2;ymax=3;width=400;id=${boardId};achsen=0;grid=0;border=0;static=1`
+    );
+    const svg = renderStaticSvg(host, cfg);
+    const groups = svg.querySelectorAll('g[data-lia-static-kind=arc]');
+    assert.equal(groups.length, 4);
+    const paths = groups.map(group => group.querySelector('path'));
+
+    assert.equal(paths[0].hasAttribute('marker-start'), false);
+    assert.equal(paths[0].hasAttribute('marker-end'), false);
+    assert.match(paths[1].getAttribute('marker-start'), /^url\(#lia-static-arrow-/);
+    assert.equal(paths[1].hasAttribute('marker-end'), false);
+    assert.match(paths[2].getAttribute('marker-start'), /^url\(#lia-static-arrow-/);
+    assert.match(paths[2].getAttribute('marker-end'), /^url\(#lia-static-arrow-/);
+    assert.equal(paths[2].getAttribute('marker-start'), paths[2].getAttribute('marker-end'));
+    assert.equal(paths[3].hasAttribute('marker-start'), false);
+    assert.match(paths[3].getAttribute('marker-end'), /^url\(#lia-static-arrow-/);
+
+    const arrowMarkers = svg.querySelectorAll('marker');
+    assert.equal(arrowMarkers.length, 3);
+    arrowMarkers.forEach(marker => {
+      assert.equal(marker.getAttribute('markerUnits'), 'strokeWidth');
+      assert.equal(marker.getAttribute('orient'), 'auto-start-reverse');
+    });
+
+    assert.deepEqual(groups.map(group => group.querySelectorAll('line').length), [0, 0, 0, 2]);
+    groups[3].querySelectorAll('line').forEach(cap => {
+      assert.equal(cap.getAttribute('stroke'), '#444444');
+      assert.equal(cap.getAttribute('stroke-width'), '3');
+      assertNonScalingStroke(cap);
+    });
+    paths.forEach(assertNonScalingStroke);
+
+    const captions = groups.map(group => group.querySelector('text'));
+    assert.equal(captions[0].textContent, 'plain caption');
+    assert.equal(captions[0].getAttribute('fill'), '#111111');
+    assert.equal(captions[1].textContent, 'x');
+    assert.equal(captions[1].getAttribute('fill'), '#222222');
+    assert.equal(captions[2], null, 'empty caption produces no SVG text');
+    assert.equal(captions[3].textContent, '1250');
+    assert.equal(captions[3].getAttribute('fill'), '#444444');
+    [captions[0], captions[1], captions[3]].forEach(caption => {
+      assert.equal(caption.getAttribute('text-anchor'), 'middle');
+      assert.equal(caption.getAttribute('dominant-baseline'), 'middle');
+      assert.equal(caption.children.length, 0, 'arc captions use safe textContent');
+    });
   } finally {
     browser.restore();
   }
@@ -661,11 +1004,31 @@ test('static board remount is idempotent and replacement/disposal leaves no dupl
   try {
     const firstHost = appendHost(browser.document);
     const secondHost = appendHost(browser.document);
-    appendSpecMarker(
+    const area = appendSpecMarker(
       browser.document,
       'area-spec-remount',
       `${boardId};[[0;0];[1;2];[2;0]];#336699;0.5`
     );
+    const markers = [area];
+    const vector = appendSpecMarker(
+      browser.document,
+      'linear-spec-remount-vector',
+      `${boardId};[[0;0];[2;0]];#000000;u=0`
+    );
+    vector.dataset.kind = 'vector';
+    markers.push(vector);
+    markers.push(appendSpecMarker(
+      browser.document,
+      'arc-spec-remount-arc',
+      `${boardId};[0;0];45;[2;0];135;;->;3px;#000000`
+    ));
+    const coordText = appendSpecMarker(
+      browser.document,
+      'coord-text-spec-remount-text',
+      `${boardId};[1;1];$x$;#000000;1`
+    );
+    coordText.className = 'lia-coord-text-spec';
+    markers.push(coordText);
     const cfg = parseCoordSpec(
       `xmin=0;xmax=2;ymin=0;ymax=2;width=240;id=${boardId};achsen=0;grid=0;border=0;static=1`
     );
@@ -675,7 +1038,10 @@ test('static board remount is idempotent and replacement/disposal leaves no dupl
     initializeStaticCoordinateBoard(firstHost, cfg);
     browser.flushAnimationFrames();
     assert.equal(firstHost.querySelectorAll(`svg[data-lia-static-svg="${boardId}"]`).length, 1);
-    assert.equal(geometryChildren(firstHost.querySelector('svg')).length, 1);
+    bootstrapStaticCoordinateBoards();
+    bootstrapStaticCoordinateBoards();
+    assert.equal(firstHost.querySelectorAll('g[data-lia-static-kind]').length, 4);
+    markers.forEach(marker => assert.equal(marker.dataset.liaStaticClaimed, boardId));
     assert.equal(isStaticCoordinateBoard(boardId), true);
 
     initializeStaticCoordinateBoard(secondHost, cfg);
@@ -683,11 +1049,13 @@ test('static board remount is idempotent and replacement/disposal leaves no dupl
     assert.equal(firstHost.querySelectorAll('svg').length, 0, 'replacement host cleans up the old SVG');
     assert.equal(secondHost.querySelectorAll(`svg[data-lia-static-svg="${boardId}"]`).length, 1);
 
+    assert.equal(secondHost.querySelectorAll('g[data-lia-static-kind]').length, 4);
     disposeStaticCoordinateBoard(boardId, firstHost);
     assert.equal(secondHost.querySelectorAll('svg').length, 1, 'stale-host cleanup must not remove current board');
     disposeStaticCoordinateBoard(boardId, secondHost);
     assert.equal(secondHost.querySelectorAll('svg').length, 0);
     assert.equal(isStaticCoordinateBoard(boardId), false);
+    markers.forEach(marker => assert.equal(marker.hasAttribute('data-lia-static-claimed'), false));
   } finally {
     disposeStaticCoordinateBoard(boardId);
     browser.restore();
@@ -721,6 +1089,66 @@ test('unsupported dependent geometry is claimed and warns only once across repea
     assert.match(warnings[0], /static/i);
     assert.match(warnings[0], /area-spec-unsupported|unsupported|nicht\s+unterst/i);
     assert.equal(geometryChildren(host.querySelector('svg')).length, 0);
+    assert.equal(browser.intervalCalls.length, 0);
+  } finally {
+    console.warn = previousWarn;
+    disposeStaticCoordinateBoard(boardId);
+    browser.restore();
+  }
+});
+
+test('supported number-line markers stay warning-free while one dependent variant warns once', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-numberline-warnings';
+  const warnings = [];
+  const previousWarn = console.warn;
+  console.warn = (...values) => warnings.push(values.map(String).join(' '));
+  try {
+    const host = appendHost(browser.document);
+    const vector = appendSpecMarker(
+      browser.document,
+      'linear-spec-supported-vector',
+      `${boardId};[[0;0];[4;0]];#000000;u=0`
+    );
+    vector.dataset.kind = 'vector';
+    const arc = appendSpecMarker(
+      browser.document,
+      'arc-spec-supported-arc',
+      `${boardId};[0;0];45;[4;0];135;;->;3px;#000000`
+    );
+    const coordText = appendSpecMarker(
+      browser.document,
+      'coord-text-spec-supported-text',
+      `${boardId};[2;-1];$x$;#000000;1`
+    );
+    coordText.className = 'lia-coord-text-spec';
+    const dependentVector = appendSpecMarker(
+      browser.document,
+      'linear-spec-dependent-vector',
+      `${boardId};[A;B];#cc0000;u=0`
+    );
+    dependentVector.dataset.kind = 'vector';
+    const cfg = parseCoordSpec(
+      `xmin=0;xmax=4;ymin=-2;ymax=2;width=240;id=${boardId};achsen=0;grid=0;border=0;static=1`
+    );
+
+    initializeStaticCoordinateBoard(host, cfg);
+    browser.flushAnimationFrames();
+    bootstrapStaticCoordinateBoards();
+    bootstrapStaticCoordinateBoards();
+
+    [vector, arc, coordText, dependentVector].forEach(marker => {
+      assert.equal(marker.dataset.liaStaticClaimed, boardId);
+    });
+    assert.deepEqual(
+      host.querySelectorAll('g[data-lia-static-kind]').map(group =>
+        group.getAttribute('data-lia-static-kind')
+      ),
+      ['vector', 'arc', 'coord-text']
+    );
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /linear-spec-dependent-vector/);
+    assert.doesNotMatch(warnings[0], /supported-(?:vector|arc|text)/);
     assert.equal(browser.intervalCalls.length, 0);
   } finally {
     console.warn = previousWarn;
@@ -766,7 +1194,7 @@ test('a named table on a static board is claimed, warned once, and never starts 
   }
 });
 
-test('comma-separated AxisLabel and Table specs are claimed before dynamic bootstraps', () => {
+test('comma-separated AxisLabel renders while Table is claimed before dynamic bootstraps', () => {
   const browser = installFakeBrowser();
   const boardId = 'S';
   const warnings = [];
@@ -797,9 +1225,15 @@ test('comma-separated AxisLabel and Table specs are claimed before dynamic boots
 
     assert.equal(axis.dataset.liaStaticClaimed, boardId);
     assert.equal(table.dataset.liaStaticClaimed, boardId);
-    assert.equal(warnings.length, 2, 'each unsupported marker warns exactly once');
-    assert.ok(warnings.some(message => /axis-title-spec-comma-axis/.test(message)));
-    assert.ok(warnings.some(message => /lia-table-comma-table/.test(message)));
+    const axisGroup = host.querySelector('g[data-lia-static-kind=axis-label]');
+    assert.ok(axisGroup, 'the supported AxisLabel marker renders into the static SVG');
+    assert.deepEqual(
+      axisGroup.querySelectorAll('text').map(text => text.textContent),
+      ['x', 'y']
+    );
+    assert.equal(warnings.length, 1, 'only the unsupported Table marker warns once');
+    assert.match(warnings[0], /lia-table-comma-table/);
+    assert.doesNotMatch(warnings[0], /axis-title-spec-comma-axis/);
     assert.equal(dynamicRuntimeCalls, 0);
     assert.equal(browser.intervalCalls.length, 0);
   } finally {

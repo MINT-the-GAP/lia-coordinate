@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang=en>
+<head>
+  <meta charset=utf-8>
+  <title>lia-coordinate twelve static number lines fixture</title>
+</head>
+<body>
+  <main id=fixture></main>
+  <script>
+    window.__staticNumberlinesStarted = performance.now();
+    window.__staticNumberlinesIntervals = 0;
+    window.__staticNumberlinesObservers = 0;
+    window.__staticNumberlinesWarnings = 0;
+
+    const nativeSetInterval = window.setInterval;
+    window.setInterval = function () {
+      window.__staticNumberlinesIntervals += 1;
+      return nativeSetInterval.apply(this, arguments);
+    };
+
+    const NativeMutationObserver = window.MutationObserver;
+    window.MutationObserver = function (callback) {
+      window.__staticNumberlinesObservers += 1;
+      return new NativeMutationObserver(callback);
+    };
+    window.MutationObserver.prototype = NativeMutationObserver.prototype;
+
+    const nativeWarn = console.warn;
+    console.warn = function () {
+      window.__staticNumberlinesWarnings += 1;
+      return nativeWarn.apply(this, arguments);
+    };
+
+    const root = document.getElementById('fixture');
+    const labels = ['$0$', '$1$', '$2$', '$3$', '$4$', '$5$', '$60$', '$1250$', '$x$'];
+
+    function appendMarker(id, spec, language, kind, className) {
+      const marker = document.createElement('span');
+      marker.id = id;
+      marker.dataset.spec = spec;
+      marker.dataset.language = language;
+      if (kind) marker.dataset.kind = kind;
+      if (className) marker.className = className;
+      marker.style.display = 'none';
+      root.appendChild(marker);
+    }
+
+    for (let boardIndex = 0; boardIndex < 12; boardIndex += 1) {
+      const boardId = 'numberline-' + boardIndex;
+      const language = boardIndex % 2 ? 'de' : 'en';
+      const host = document.createElement('div');
+      host.id = 'static-numberline-host-' + boardIndex;
+      host.dataset.liaStaticCoordinateHost = '';
+      host.dataset.spec = 'xmin=-3;xmax=80;ymin=-8;ymax=12;width=720;id=' + boardId +
+        ';achsen=0;grid=0;border=0;static=1';
+      root.appendChild(host);
+
+      appendMarker(
+        'area-spec-numberline-background-' + boardIndex,
+        boardId + ';[[-3;-8];[80;-8];[80;12];[-3;12]];#ffffff;1',
+        language
+      );
+      appendMarker(
+        'linear-spec-numberline-axis-' + boardIndex,
+        boardId + ';[[0;0];[76;0]];#000000;u=0',
+        language,
+        'vector'
+      );
+
+      for (let tickIndex = 0; tickIndex < 9; tickIndex += 1) {
+        const x = tickIndex * 9;
+        appendMarker(
+          'distance-spec-numberline-tick-' + boardIndex + '-' + tickIndex,
+          boardId + ';[[' + x + ';-0.8];[' + x + ';0.8]];#000000;;-;3px',
+          language
+        );
+        appendMarker(
+          'coord-text-spec-numberline-label-' + boardIndex + '-' + tickIndex,
+          boardId + ';[' + x + ';-5.1];' + labels[tickIndex] + ';#000000;1',
+          language,
+          '',
+          'lia-coord-text-spec'
+        );
+      }
+
+      appendMarker(
+        'arc-spec-numberline-jump-' + boardIndex,
+        boardId + ';[18;2];35;[54;2];145;;->;3px;#000000',
+        language
+      );
+    }
+  </script>
+  <script src=../../dist/static.js></script>
+  <script>
+    requestAnimationFrame(function () {
+      const hosts = Array.from(document.querySelectorAll('[data-lia-static-coordinate]'));
+      const groups = Array.from(document.querySelectorAll(
+        'svg[data-lia-static-svg] g[data-lia-static-kind]'
+      ));
+      const objectKeys = groups.map(function (group) {
+        return group.getAttribute('data-lia-static-kind') + ':' +
+          group.getAttribute('data-lia-static-uid');
+      });
+      const renderedLabels = Array.from(document.querySelectorAll(
+        'g[data-lia-static-kind=coord-text] text'
+      )).map(function (text) { return text.textContent; });
+      const expectedLabels = ['0', '1', '2', '3', '4', '5', '60', '1250', 'x'];
+      const result = {
+        svgCount: document.querySelectorAll('svg[data-lia-static-svg]').length,
+        areaCount: document.querySelectorAll('g[data-lia-static-kind=area]').length,
+        vectorCount: document.querySelectorAll('g[data-lia-static-kind=vector]').length,
+        distanceCount: document.querySelectorAll('g[data-lia-static-kind=distance]').length,
+        arcCount: document.querySelectorAll('g[data-lia-static-kind=arc]').length,
+        textCount: document.querySelectorAll('g[data-lia-static-kind=coord-text] text').length,
+        vectorArrowCount: document.querySelectorAll('g[data-lia-static-kind=vector] [marker-end]').length,
+        arcArrowCount: document.querySelectorAll('g[data-lia-static-kind=arc] [marker-end]').length,
+        objectCount: groups.length,
+        claimedCount: document.querySelectorAll('[data-lia-static-claimed]').length,
+        duplicateHostCount: hosts.filter(function (host) {
+          return host.querySelectorAll(':scope > svg[data-lia-static-svg]').length !== 1;
+        }).length,
+        duplicateObjectCount: objectKeys.length - new Set(objectKeys).size,
+        labelsRendered: expectedLabels.every(function (label) {
+          return renderedLabels.includes(label);
+        }),
+        jsxBoardCount: window.__boards ? Object.keys(window.__boards).length : 0,
+        intervalCount: window.__staticNumberlinesIntervals,
+        observerCount: window.__staticNumberlinesObservers,
+        warningCount: window.__staticNumberlinesWarnings,
+        initMs: Number((performance.now() - window.__staticNumberlinesStarted).toFixed(3))
+      };
+      document.body.textContent = 'STATIC_NUMBERLINES_RESULT:' + JSON.stringify(result);
+    });
+  </script>
+</body>
+</html>

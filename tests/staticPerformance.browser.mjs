@@ -22,6 +22,8 @@ const fullBundlePath = new URL('../dist/index.js', import.meta.url);
 const fullBundleFixtureUrl = new URL('./fixtures/static-full-bundle-lazy.html', import.meta.url);
 const hostOrderFixtureUrl = new URL('./fixtures/static-host-order.html', import.meta.url);
 const mixedRuntimeFixtureUrl = new URL('./fixtures/static-mixed-runtime.html', import.meta.url);
+const numberlinesFixtureUrl = new URL('./fixtures/static-numberlines.html', import.meta.url);
+const expandedFixtureUrl = new URL('./fixtures/static-expanded.html', import.meta.url);
 
 test('headless browser renders the many-diamonds fixture as 259 native geometries', {
   skip: !browserPath ? 'No supported local Chrome/Edge executable was found' : false,
@@ -94,6 +96,207 @@ test('headless browser renders the many-diamonds fixture as 259 native geometrie
     assert.ok(result.initMs > 0 && result.initMs < 2000, 'unexpected initMs: ' + result.initMs);
 
     console.log('static SVG browser metrics:', JSON.stringify(result));
+  } finally {
+    rmSync(profileDirectory, { recursive: true, force: true });
+  }
+});
+
+test('headless browser renders twelve complete static number lines with one shared lifecycle', {
+  skip: !browserPath ? 'No supported local Chrome/Edge executable was found' : false,
+  timeout: 30_000
+}, () => {
+  assert.equal(
+    existsSync(bundlePath),
+    true,
+    'dist/static.js is required; run npm run build:static first'
+  );
+
+  const profileDirectory = mkdtempSync(join(tmpdir(), 'lia-coordinate-numberlines-browser-'));
+  try {
+    const browser = spawnSync(browserPath, [
+      '--headless=new',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--allow-file-access-from-files',
+      '--run-all-compositor-stages-before-draw',
+      '--virtual-time-budget=2000',
+      '--user-data-dir=' + profileDirectory,
+      '--dump-dom',
+      numberlinesFixtureUrl.href
+    ], {
+      encoding: 'utf8',
+      timeout: 25_000,
+      windowsHide: true
+    });
+
+    assert.equal(
+      browser.status,
+      0,
+      'headless browser failed:\n' + String(browser.stderr || browser.error || '')
+    );
+    const match = String(browser.stdout || '').match(/STATIC_NUMBERLINES_RESULT:(\{[^<]+\})/);
+    assert.ok(
+      match,
+      'number-lines result was not written to the dumped DOM; browser=' + browserPath +
+        '; fixture=' + numberlinesFixtureUrl.href +
+        '; stdout=' + String(browser.stdout || '').slice(0, 1000) +
+        '; stderr=' + String(browser.stderr || '').slice(0, 800)
+    );
+    const result = JSON.parse(match[1].replaceAll('&quot;', String.fromCharCode(34)));
+
+    assert.deepEqual({
+      svgCount: result.svgCount,
+      areaCount: result.areaCount,
+      vectorCount: result.vectorCount,
+      distanceCount: result.distanceCount,
+      arcCount: result.arcCount,
+      textCount: result.textCount,
+      vectorArrowCount: result.vectorArrowCount,
+      arcArrowCount: result.arcArrowCount,
+      objectCount: result.objectCount,
+      claimedCount: result.claimedCount,
+      duplicateHostCount: result.duplicateHostCount,
+      duplicateObjectCount: result.duplicateObjectCount,
+      labelsRendered: result.labelsRendered,
+      jsxBoardCount: result.jsxBoardCount,
+      intervalCount: result.intervalCount,
+      observerCount: result.observerCount,
+      warningCount: result.warningCount
+    }, {
+      svgCount: 12,
+      areaCount: 12,
+      vectorCount: 12,
+      distanceCount: 108,
+      arcCount: 12,
+      textCount: 108,
+      vectorArrowCount: 12,
+      arcArrowCount: 12,
+      objectCount: 252,
+      claimedCount: 252,
+      duplicateHostCount: 0,
+      duplicateObjectCount: 0,
+      labelsRendered: true,
+      jsxBoardCount: 0,
+      intervalCount: 0,
+      observerCount: 1,
+      warningCount: 0
+    });
+    assert.ok(result.initMs > 0 && result.initMs < 2000, 'unexpected initMs: ' + result.initMs);
+
+    console.log('twelve static number lines browser metrics:', JSON.stringify(result));
+  } finally {
+    rmSync(profileDirectory, { recursive: true, force: true });
+  }
+});
+
+test('headless browser resolves the expanded fixed-object subset with one shared lifecycle', {
+  skip: !browserPath
+    ? 'No supported local Chrome/Edge executable was found'
+    : !existsSync(bundlePath)
+      ? 'dist/static.js is not available'
+      : false,
+  timeout: 30_000
+}, () => {
+  const profileDirectory = mkdtempSync(join(tmpdir(), 'lia-coordinate-expanded-browser-'));
+  try {
+    const browser = spawnSync(browserPath, [
+      '--headless=new',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--allow-file-access-from-files',
+      '--run-all-compositor-stages-before-draw',
+      '--virtual-time-budget=2000',
+      '--user-data-dir=' + profileDirectory,
+      '--dump-dom',
+      expandedFixtureUrl.href
+    ], {
+      encoding: 'utf8',
+      timeout: 25_000,
+      windowsHide: true
+    });
+
+    assert.equal(
+      browser.status,
+      0,
+      'headless browser failed:\n' + String(browser.stderr || browser.error || '')
+    );
+    const match = String(browser.stdout || '').match(/STATIC_EXPANDED_RESULT:(\{[^<]+\})/);
+    assert.ok(
+      match,
+      'expanded-static result was not written to the dumped DOM; browser=' + browserPath +
+        '; fixture=' + expandedFixtureUrl.href +
+        '; stdout-head=' + String(browser.stdout || '').slice(0, 1200) +
+        '; stdout-tail=' + String(browser.stdout || '').slice(-5000) +
+        '; stderr=' + String(browser.stderr || '').slice(0, 800)
+    );
+    const result = JSON.parse(match[1].replaceAll('&quot;', String.fromCharCode(34)));
+
+    assert.deepEqual(result.groupKinds, [
+      'axis-label',
+      'line',
+      'ray',
+      'circle',
+      'angle',
+      'sector',
+      'midpoint',
+      'parallel',
+      'plot',
+      'point',
+      'point',
+      'point',
+      'point',
+      'point'
+    ], 'expanded-static diagnostics: ' + JSON.stringify(result));
+    assert.deepEqual({
+      svgCount: result.svgCount,
+      groupCount: result.groupCount,
+      pointCount: result.pointCount,
+      claimedCount: result.claimedCount,
+      unclaimedCount: result.unclaimedCount,
+      duplicateHostCount: result.duplicateHostCount,
+      duplicateObjectCount: result.duplicateObjectCount,
+      jsxBoardCount: result.jsxBoardCount,
+      jxgPresent: result.jxgPresent,
+      intervalCount: result.intervalCount,
+      observerCount: result.observerCount,
+      warningCount: result.warningCount,
+      errorCount: result.errorCount
+    }, {
+      svgCount: 1,
+      groupCount: 14,
+      pointCount: 5,
+      claimedCount: 14,
+      unclaimedCount: 0,
+      duplicateHostCount: 0,
+      duplicateObjectCount: 0,
+      jsxBoardCount: 0,
+      jxgPresent: false,
+      intervalCount: 0,
+      observerCount: 1,
+      warningCount: 0,
+      errorCount: 0
+    });
+    assert.ok(result.plotPathCount >= 1, 'the fixed plot must render at least one path');
+    assert.ok(
+      Number.isInteger(result.plotEvaluationCount) &&
+        result.plotEvaluationCount >= 513 &&
+        result.plotEvaluationCount <= 4097 &&
+        result.plotEvaluationCount % 2 === 1,
+      'unexpected fixed-plot evaluation count: ' + result.plotEvaluationCount
+    );
+    assert.ok(result.initMs > 0 && result.initMs < 2000, 'unexpected initMs: ' + result.initMs);
+
+    console.log('expanded static objects browser metrics:', JSON.stringify(result));
   } finally {
     rmSync(profileDirectory, { recursive: true, force: true });
   }

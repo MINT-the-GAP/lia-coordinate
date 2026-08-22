@@ -4,10 +4,48 @@
 
 import type { BoardConfig } from '../shared/coordSpec';
 import { parseCoordSpec } from '../shared/coordSpec';
-import { isHiddenNameOption, parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import {
+  isHiddenNameOption,
+  parseCoordinateList,
+  parseMacroName,
+  splitTopLevel,
+  unquote
+} from '../shared/parser';
 import type { CoordinatePair } from '../shared/parser';
-import { parseLineStyleOptions, type LineStyle } from '../shared/lineStyle';
+import { isLineStyleOption, parseLineStyleOptions, type LineStyle } from '../shared/lineStyle';
 import { getAccentColor, getNeutralColor, themeDoc } from '../shared/theme';
+import {
+  clipLineToBounds,
+  clipRayToBounds,
+  createDirectedAngleArcGeometry,
+  createDirectedCircularArcGeometry,
+  sampleStaticFunction,
+  staticPointOnCircle
+} from './staticGeometry';
+import type { StaticCircularArcGeometry } from './staticGeometry';
+import {
+  parseStaticAngleSpec,
+  parseStaticAxisLabelSpec,
+  parseStaticCircleSpec,
+  parseStaticLinearSpec,
+  parseStaticPlotFunctionSpec,
+  parseStaticPointReference,
+  parseStaticPointSpec,
+  parseStaticRelationSpec,
+  parseStaticSectorSpec
+} from './staticSpecs';
+import type {
+  StaticAngleSpec,
+  StaticAxisLabelSpec,
+  StaticCircleSpec,
+  StaticLanguage,
+  StaticMidpointSpec,
+  StaticPlotFunctionSpec,
+  StaticPointReference,
+  StaticPointSpec,
+  StaticRelatedLineSpec,
+  StaticSectorSpec
+} from './staticSpecs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 export const STATIC_CLAIM_ATTRIBUTE = 'data-lia-static-claimed';
@@ -37,6 +75,7 @@ export interface StaticAreaSpec {
   strokeWidth: number;
   showArea: boolean;
   showPerimeter: boolean;
+  language: StaticLanguage;
 }
 
 export interface StaticDistanceSpec {
@@ -56,9 +95,114 @@ export interface StaticDistanceSpec {
   showLength: boolean;
   segmentName: string;
   showName: boolean;
+  language: StaticLanguage;
 }
 
-export type StaticGeometrySpec = StaticAreaSpec | StaticDistanceSpec;
+interface StaticLineDesign {
+  normalizedDesign: string;
+  firstArrow: boolean;
+  lastArrow: boolean;
+  startCap: boolean;
+  endCap: boolean;
+}
+
+export interface StaticVectorSpec {
+  kind: 'vector';
+  boardId: string;
+  coordinates: CoordinatePair[];
+  color: string;
+  hasExplicitColor: boolean;
+  strokeWidth: number;
+  lineStyle: LineStyle;
+  visible: boolean;
+  objectName: string;
+  showName: boolean;
+}
+
+export interface StaticArcSpec extends StaticLineDesign {
+  kind: 'arc';
+  boardId: string;
+  start: CoordinatePair;
+  end: CoordinatePair;
+  exitAngle: number;
+  entryAngle: number;
+  caption: string;
+  renderedCaption: string;
+  strokeWidth: number;
+  color: string;
+  hasExplicitColor: boolean;
+  lineStyle: LineStyle;
+  visible: boolean;
+}
+
+export interface StaticCoordTextSpec {
+  kind: 'coord-text';
+  boardId: string;
+  coordinate: CoordinatePair;
+  x: number;
+  y: number;
+  content: string;
+  renderedContent: string;
+  color: string;
+  hasExplicitColor: boolean;
+  opacity: number;
+}
+
+interface StaticLineSpec {
+  kind: 'line' | 'ray';
+  boardId: string;
+  coordinates: [CoordinatePair, CoordinatePair];
+  color: string;
+  hasExplicitColor: boolean;
+  strokeWidth: number;
+  lineStyle: LineStyle;
+  visible: boolean;
+  objectName: string;
+  showName: boolean;
+  language: StaticLanguage;
+}
+
+interface StaticMidpointGeometry extends Omit<StaticMidpointSpec, 'points'> {
+  coordinate: CoordinatePair;
+}
+
+interface StaticRelatedLineGeometry extends Omit<StaticRelatedLineSpec, 'base' | 'through'> {
+  coordinates: [CoordinatePair, CoordinatePair];
+}
+
+type StaticCircleGeometry = Omit<StaticCircleSpec, 'center' | 'radius'> & {
+  center: CoordinatePair;
+  radius: number;
+};
+
+type StaticAngleGeometry = Omit<StaticAngleSpec, 'points'> & {
+  points: [CoordinatePair, CoordinatePair, CoordinatePair];
+};
+
+type StaticSectorGeometry = Omit<StaticSectorSpec, 'points'> & {
+  points: [CoordinatePair, CoordinatePair, CoordinatePair];
+};
+
+type StaticPlotGeometry = Omit<StaticPlotFunctionSpec, 'evaluate'> & {
+  segments: CoordinatePair[][];
+  evaluationCount: number;
+};
+
+export type StaticGeometrySpec =
+  | StaticAreaSpec
+  | StaticDistanceSpec
+  | StaticVectorSpec
+  | StaticArcSpec
+  | StaticCoordTextSpec
+  | StaticAxisLabelSpec
+  | StaticPointSpec
+  | StaticLineSpec
+  | StaticMidpointGeometry
+  | StaticRelatedLineGeometry
+  | StaticCircleGeometry
+  | StaticAngleGeometry
+  | StaticSectorGeometry
+  | StaticPlotGeometry;
 
 export interface StaticBoardHandle {
   id: string;
@@ -67,7 +211,20 @@ export interface StaticBoardHandle {
   svg: SVGSVGElement | null;
 }
 
-type StaticMarkerKind = 'area' | 'distance' | 'unsupported';
+type StaticMarkerKind =
+  | 'area'
+  | 'distance'
+  | 'axis-label'
+  | 'point'
+  | 'coord-text'
+  | 'linear'
+  | 'arc'
+  | 'relation'
+  | 'angle'
+  | 'circle'
+  | 'sector'
+  | 'plot'
+  | 'unsupported';
 
 interface StaticMarkerInfo {
   kind: StaticMarkerKind;
@@ -92,18 +249,18 @@ const STATIC_MARKER_PREFIXES: ReadonlyArray<{
 }> = [
   { prefix: 'area-spec-', kind: 'area' },
   { prefix: 'distance-spec-', kind: 'distance' },
-  { prefix: 'axis-title-spec-', kind: 'unsupported' },
+  { prefix: 'axis-title-spec-', kind: 'axis-label' },
   { prefix: 'point-ui-', kind: 'unsupported' },
-  { prefix: 'point-spec-', kind: 'unsupported' },
-  { prefix: 'coord-text-spec-', kind: 'unsupported' },
-  { prefix: 'linear-spec-', kind: 'unsupported' },
-  { prefix: 'arc-spec-', kind: 'unsupported' },
-  { prefix: 'relation-spec-', kind: 'unsupported' },
-  { prefix: 'angle-spec-', kind: 'unsupported' },
-  { prefix: 'circle-spec-', kind: 'unsupported' },
+  { prefix: 'point-spec-', kind: 'point' },
+  { prefix: 'coord-text-spec-', kind: 'coord-text' },
+  { prefix: 'linear-spec-', kind: 'linear' },
+  { prefix: 'arc-spec-', kind: 'arc' },
+  { prefix: 'relation-spec-', kind: 'relation' },
+  { prefix: 'angle-spec-', kind: 'angle' },
+  { prefix: 'circle-spec-', kind: 'circle' },
   { prefix: 'tangent-spec-', kind: 'unsupported' },
-  { prefix: 'sector-spec-', kind: 'unsupported' },
-  { prefix: 'plot-spec-', kind: 'unsupported' },
+  { prefix: 'sector-spec-', kind: 'sector' },
+  { prefix: 'plot-spec-', kind: 'plot' },
   { prefix: 'function-analysis-spec-', kind: 'unsupported' },
   { prefix: 'object-analysis-spec-', kind: 'unsupported' },
   { prefix: 'slider-spec-', kind: 'unsupported' },
@@ -128,6 +285,7 @@ const MARKER_SELECTOR = STATIC_MARKER_PREFIXES
 
 let fallbackRegistry: Record<string, StaticBoardHandle> = {};
 let bootstrapFrame = 0;
+let bootstrapTimeout = 0;
 let bootstrapRunning = false;
 let staticObserver: MutationObserver | null = null;
 let markerSerial = 0;
@@ -192,10 +350,154 @@ function optionParts(spec: string): string[] {
     .map(function(part) { return unquote(part).trim(); });
 }
 
-/** Parse only the direct-coordinate subset supported by the native renderer. */
-export function parseStaticAreaSpec(spec: string, language?: string): StaticAreaSpec | null {
+/**
+ * Split a positional marker while retaining empty top-level fields. Arc
+ * captions and optional style slots use empty values as meaningful placeholders.
+ */
+function positionalParts(spec: string): string[] {
+  const input = unquote(String(spec || ''));
+  const result: string[] = [];
+  let current = '';
+  let quote = '';
+  let escaped = false;
+  let depth = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (escaped) {
+      current += character;
+      escaped = false;
+      continue;
+    }
+    if (character === '\\') {
+      current += character;
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      current += character;
+      if (character === quote) quote = '';
+      continue;
+    }
+    if (character === String.fromCharCode(39)) {
+      let previous = index - 1;
+      while (previous >= 0 && /\s/.test(input[previous])) previous -= 1;
+      const atValueStart = previous < 0 || ';,([{=:'.includes(input[previous]);
+      let hasClosingQuote = false;
+      let escapedQuote = false;
+      for (let next = index + 1; atValueStart && next < input.length; next += 1) {
+        if (escapedQuote) {
+          escapedQuote = false;
+          continue;
+        }
+        if (input[next] === String.fromCharCode(92)) {
+          escapedQuote = true;
+          continue;
+        }
+        if (input[next] === character) {
+          hasClosingQuote = true;
+          break;
+        }
+      }
+      if (!atValueStart || !hasClosingQuote) {
+        current += character;
+        continue;
+      }
+    }
+    if (
+      character === String.fromCharCode(34) ||
+      character === String.fromCharCode(39) ||
+      character === String.fromCharCode(96)
+    ) {
+      current += character;
+      quote = character;
+      continue;
+    }
+    if (character === '(' || character === '[' || character === '{') {
+      depth += 1;
+      current += character;
+      continue;
+    }
+    if (character === ')' || character === ']' || character === '}') {
+      depth = Math.max(0, depth - 1);
+      current += character;
+      continue;
+    }
+    if (character === ';' && depth === 0) {
+      result.push(unquote(current).trim());
+      current = '';
+      continue;
+    }
+    current += character;
+  }
+  result.push(unquote(current).trim());
+  return result;
+}
+
+function parseDirectCoordinate(value: unknown): CoordinatePair | null {
+  const coordinate = unquote(String(value == null ? '' : value)).trim();
+  const parsed = parseCoordinateList('[' + coordinate + ']');
+  return parsed && parsed.length === 1 ? parsed[0] : null;
+}
+
+type StaticPointResolver = (name: string) => CoordinatePair | null;
+
+function parseNamedPointList(value: unknown): string[] | null {
+  const raw = unquote(String(value == null ? '' : value)).trim();
+  if (!raw.startsWith('[') || !raw.endsWith(']')) return null;
+  const names = splitTopLevel(raw.slice(1, -1), ';')
+    .map(function(name) {
+      const reference = parseStaticPointReference(name);
+      return reference && reference.kind === 'point' ? reference.name : '';
+    });
+  return names.length && names.every(Boolean) ? names : null;
+}
+
+function resolveCoordinateList(
+  value: unknown,
+  resolvePoint?: StaticPointResolver
+): CoordinatePair[] | null {
+  const coordinates = parseCoordinateList(value);
+  if (coordinates) return coordinates;
+  if (!resolvePoint) return null;
+  const names = parseNamedPointList(value);
+  if (!names) return null;
+  const resolved = names.map(resolvePoint);
+  return resolved.every(function(point): point is CoordinatePair { return !!point; })
+    ? resolved.map(function(point) { return { x: point.x, y: point.y }; })
+    : null;
+}
+
+function resolvePointToken(value: unknown, resolvePoint?: StaticPointResolver): CoordinatePair | null {
+  const direct = parseDirectCoordinate(value);
+  if (direct) return direct;
+  if (!resolvePoint) return null;
+  const reference = parseStaticPointReference(value);
+  return reference && reference.kind === 'point' ? resolvePoint(reference.name) : null;
+}
+
+function decodeLegacyParentheses(value: unknown): string {
+  return String(value == null ? '' : value)
+    .replace(/\{\{/g, '(')
+    .replace(/\}\}/g, ')');
+}
+
+/** Safe readable fallback for authored plain text and dollar-delimited TeX. */
+function staticTextFallback(value: unknown): string {
+  return decodeLegacyParentheses(value)
+    .replace(/\$\$([\s\S]+?)\$\$/g, function(_match, tex) { return tex; })
+    .replace(/\$([^$\r\n]+?)\$/g, function(_match, tex) { return tex; })
+    .replace(/\\\[([\s\S]+?)\\\]/g, function(_match, tex) { return tex; })
+    .replace(/\\\(([^\r\n]+?)\\\)/g, function(_match, tex) { return tex; });
+}
+
+/** Parse a direct coordinate list or a list resolved from immutable static points. */
+export function parseStaticAreaSpec(
+  spec: string,
+  language?: string,
+  resolvePoint?: StaticPointResolver
+): StaticAreaSpec | null {
   const parts = optionParts(spec);
-  const coordinates = parseCoordinateList(parts[1]);
+  const coordinates = resolveCoordinateList(parts[1], resolvePoint);
   if (!coordinates || coordinates.length < 3) return null;
   const distinct = new Set(coordinates.map(function(point) { return point.x + ':' + point.y; }));
   if (distinct.size < 3) return null;
@@ -215,6 +517,7 @@ export function parseStaticAreaSpec(spec: string, language?: string): StaticArea
     }),
     lineStyle: parseLineStyleOptions(options),
     strokeWidth: 2,
+    language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
     showArea: options.some(function(option) { return /^(?:inhalt|area)\s*=\s*1$/i.test(option); }),
     showPerimeter: options.some(function(option) { return /^(?:umfang|perimeter)\s*=\s*1$/i.test(option); })
   };
@@ -240,8 +543,7 @@ function designOptionValue(value: unknown): string | null {
   return token === '-' || /^\|?(?:->|<-|<->)\|?$/.test(token) ? token : null;
 }
 
-function parseDesign(value: unknown): Pick<StaticDistanceSpec,
-  'normalizedDesign' | 'firstArrow' | 'lastArrow' | 'startCap' | 'endCap'> {
+function parseDesign(value: unknown): StaticLineDesign {
   let raw = normalizeDesignToken(value);
   if (raw === '-') raw = '';
   const startCap = raw.startsWith('|');
@@ -285,14 +587,168 @@ function visibilityOptionValue(value: unknown): boolean | null {
   return match ? !/^(?:0|false)$/i.test(match[1]) : null;
 }
 
-/** Parse only direct coordinate lists; named/dependent points return null. */
-export function parseStaticDistanceSpec(spec: string, language?: string): StaticDistanceSpec | null {
+/** Parse the native subset of @Vector/@Vektor: exactly two fixed coordinates. */
+export function parseStaticVectorSpec(spec: string, language?: string): StaticVectorSpec | null {
   const parts = optionParts(spec);
   const coordinates = parseCoordinateList(parts[1]);
-  if (!coordinates || coordinates.length < 2) return null;
+  if (!coordinates || coordinates.length !== 2) return null;
 
   const explicitColor = String(parts[2] || '').trim();
-  const trailingOptions = parts.slice(3).map(function(part) { return String(part || '').trim(); }).filter(Boolean);
+  const trailingOptions = parts.slice(3)
+    .map(function(part) { return String(part || '').trim(); })
+    .filter(Boolean);
+  const standaloneHiddenName = trailingOptions.some(isHiddenNameOption);
+  const visibilityOptions = trailingOptions
+    .map(visibilityOptionValue)
+    .filter(function(value): value is boolean { return value != null; });
+  const nameOptions = trailingOptions.filter(function(part) {
+    return !isHiddenNameOption(part) &&
+      !isLineStyleOption(part) &&
+      visibilityOptionValue(part) == null;
+  });
+  const namedOption = nameOptions.map(function(part) {
+    const match = part.match(/^name\s*=\s*(.+)$/i);
+    return match ? String(match[1] || '').trim() : '';
+  }).find(Boolean) || '';
+  const rawObjectName = namedOption || nameOptions.find(function(part) {
+    return !/^name\s*=/i.test(part);
+  }) || '';
+  const parsedName = parseMacroName(rawObjectName);
+  return {
+    kind: 'vector',
+    boardId: String(parts[0] || '').trim(),
+    coordinates,
+    color: explicitColor || getAccentColor(),
+    hasExplicitColor: !!explicitColor,
+    strokeWidth: 3,
+    lineStyle: parseLineStyleOptions(trailingOptions),
+    visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
+    objectName: parsedName.name,
+    showName: parsedName.showName && !standaloneHiddenName
+  };
+}
+
+function parseArcAngle(value: unknown): number | null {
+  const raw = String(value == null ? '' : value)
+    .trim()
+    .toLowerCase()
+    .replace(/(?:\s*(?:deg|grad|°))$/, '')
+    .replace(',', '.');
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  const normalized = ((parsed % 360) + 360) % 360;
+  return Math.abs(normalized - 360) < 1e-12 ? 0 : normalized;
+}
+
+function isArcDesignToken(value: unknown): boolean {
+  const raw = normalizeDesignToken(value);
+  return raw === '' || raw === '-' || /^\|?(?:->|<-|<->)\|?$/.test(raw);
+}
+
+/** Parse arcs with direct endpoints or endpoints from immutable static points. */
+export function parseStaticArcSpec(
+  spec: string,
+  language?: string,
+  resolvePoint?: StaticPointResolver
+): StaticArcSpec | null {
+  const parts = positionalParts(spec);
+  const start = resolvePointToken(parts[1], resolvePoint);
+  const exitAngle = parseArcAngle(parts[2]);
+  const end = resolvePointToken(parts[3], resolvePoint);
+  const entryAngle = parseArcAngle(parts[4]);
+  if (!parts[0] || !start || exitAngle == null || !end || entryAngle == null) return null;
+
+  const caption = decodeLegacyParentheses(parts[5] || '');
+  const visibilityOptions = parts.slice(6)
+    .map(visibilityOptionValue)
+    .filter(function(value): value is boolean { return value != null; });
+  const styleParts = parts.slice(6).filter(function(part) {
+    return visibilityOptionValue(part) == null && !isLineStyleOption(part);
+  });
+  let designToken = styleParts[0] || '';
+  let strokeWidthToken = styleParts[1] || '';
+  let colorToken = styleParts[2] || '';
+  if (!isArcDesignToken(designToken) && isArcDesignToken(strokeWidthToken)) {
+    colorToken = designToken;
+    designToken = strokeWidthToken;
+    strokeWidthToken = styleParts[2] || '';
+  } else if (!colorToken && strokeWidthToken && !isStrokeWidthToken(strokeWidthToken)) {
+    colorToken = strokeWidthToken;
+    strokeWidthToken = '';
+  }
+  const explicitColor = String(colorToken || '').trim();
+  return {
+    kind: 'arc',
+    boardId: String(parts[0] || '').trim(),
+    start,
+    end,
+    exitAngle,
+    entryAngle,
+    caption,
+    renderedCaption: staticTextFallback(caption),
+    strokeWidth: parseStrokeWidth(strokeWidthToken),
+    color: explicitColor || getAccentColor(),
+    hasExplicitColor: !!explicitColor,
+    lineStyle: parseLineStyleOptions(parts.slice(6)),
+    visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
+    ...parseDesign(designToken)
+  };
+}
+
+/** Parse one fixed @CoordText/@KoordText declaration for native SVG text. */
+export function parseStaticCoordTextSpec(spec: string): StaticCoordTextSpec | null {
+  // Color and opacity are positional. Keep an empty color slot so
+  // `id;[x;y];content;;0.4` still applies the requested opacity.
+  const parts = positionalParts(spec);
+  const coordinate = parseDirectCoordinate(parts[1]);
+  if (!coordinate) return null;
+  const content = String(parts[2] || '');
+  const explicitColor = String(parts[3] || '').trim();
+  const parsedOpacity = parseFloat(String(parts[4] || '').replace(',', '.'));
+  return {
+    kind: 'coord-text',
+    boardId: String(parts[0] || '').trim(),
+    coordinate,
+    x: coordinate.x,
+    y: coordinate.y,
+    content,
+    renderedContent: staticTextFallback(content),
+    color: explicitColor || getAccentColor(),
+    hasExplicitColor: !!explicitColor,
+    opacity: Number.isFinite(parsedOpacity)
+      ? Math.max(0, Math.min(1, parsedOpacity))
+      : 1
+  };
+}
+
+/** Parse direct paths or paths resolved from immutable static points. */
+export function parseStaticDistanceSpec(
+  spec: string,
+  language?: string,
+  resolvePoint?: StaticPointResolver
+): StaticDistanceSpec | null {
+  const parts = optionParts(spec);
+  const pointToken = String(parts[1] || '').trim();
+  let coordinates = resolveCoordinateList(pointToken, resolvePoint);
+  let colorIndex = 2;
+  if (!coordinates && resolvePoint && pointToken && !pointToken.startsWith('[')) {
+    const first = resolvePoint(pointToken);
+    const second = resolvePoint(String(parts[2] || '').trim());
+    if (first && second) {
+      coordinates = [
+        { x: first.x, y: first.y },
+        { x: second.x, y: second.y }
+      ];
+      colorIndex = 3;
+    }
+  }
+  if (!coordinates || coordinates.length < 2) return null;
+
+  const explicitColor = String(parts[colorIndex] || '').trim();
+  const trailingOptions = parts.slice(colorIndex + 1)
+    .map(function(part) { return String(part || '').trim(); })
+    .filter(Boolean);
   const designIndex = trailingOptions.findIndex(function(part) { return designOptionValue(part) != null; });
   let strokeWidthIndex = trailingOptions.findIndex(function(part) {
     return strokeWidthOptionValue(part, false) != null;
@@ -331,6 +787,7 @@ export function parseStaticDistanceSpec(spec: string, language?: string): Static
     showLength: trailingOptions.some(function(part) { return /^length\s*=\s*1$/i.test(part); }),
     segmentName,
     showName: !!segmentName && !hiddenName && !standaloneHiddenName,
+    language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
     ...design
   };
 }
@@ -421,25 +878,110 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
     const axes = svgElement(doc, 'g');
     axes.setAttribute('data-lia-static-decoration', 'axes');
     const color = getNeutralColor();
+    const step = niceGridStep(Math.max(width, height));
+    const unit = logicalUnitsPerPixel(config);
+    const tickHalf = 4 * unit;
+    const edgeTolerance = Math.max(width, height) * 1e-12;
     if (config.ymin <= 0 && config.ymax >= 0) {
       const xAxis = svgElement(doc, 'line');
       const py = config.ymax;
+      const atBottomEdge = Math.abs(config.ymin) <= edgeTolerance;
+      const atTopEdge = Math.abs(config.ymax) <= edgeTolerance;
+      xAxis.setAttribute('data-lia-static-axis', 'x');
       xAxis.setAttribute('x1', '0');
       xAxis.setAttribute('x2', String(width));
       xAxis.setAttribute('y1', String(py));
       xAxis.setAttribute('y2', String(py));
       setStableStroke(xAxis, color, 2.5, 'solid');
+      xAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config.id) + ')');
       axes.appendChild(xAxis);
+      for (let x = Math.ceil(config.xmin / step) * step; x <= config.xmax + step * 1e-9; x += step) {
+        const normalizedX = Math.abs(x) <= step * 1e-9 ? 0 : x;
+        const xNumberOffset = Math.abs(normalizedX - config.xmin) <= edgeTolerance
+          ? 8
+          : Math.abs(normalizedX - config.xmax) <= edgeTolerance ? -8 : 0;
+        const projected = projectStaticPoint({ x: normalizedX, y: 0 }, config);
+        const tick = svgElement(doc, 'line');
+        tick.setAttribute('data-lia-static-axis-tick', 'x');
+        tick.setAttribute('x1', String(projected.x));
+        tick.setAttribute('x2', String(projected.x));
+        tick.setAttribute('y1', String(
+          atBottomEdge ? projected.y - 2 * tickHalf :
+            atTopEdge ? projected.y : projected.y - tickHalf
+        ));
+        tick.setAttribute('y2', String(
+          atBottomEdge ? projected.y :
+            atTopEdge ? projected.y + 2 * tickHalf : projected.y + tickHalf
+        ));
+        setStableStroke(tick, color, 1.5, 'solid');
+        axes.appendChild(tick);
+        const label = appendCenteredText(
+          axes,
+          doc,
+          projectedLabelPoint(
+            { x: normalizedX, y: 0 },
+            config,
+            xNumberOffset,
+            atBottomEdge ? -14 : 14
+          ),
+          formatStaticNumber(normalizedX, 'en'),
+          color,
+          config
+        );
+        label.setAttribute('data-lia-static-axis-number', 'x');
+        label.setAttribute('font-size', String(13 * unit));
+      }
     }
     if (config.xmin <= 0 && config.xmax >= 0) {
       const yAxis = svgElement(doc, 'line');
       const px = -config.xmin;
+      const atLeftEdge = Math.abs(config.xmin) <= edgeTolerance;
+      const atRightEdge = Math.abs(config.xmax) <= edgeTolerance;
+      yAxis.setAttribute('data-lia-static-axis', 'y');
       yAxis.setAttribute('x1', String(px));
       yAxis.setAttribute('x2', String(px));
-      yAxis.setAttribute('y1', '0');
-      yAxis.setAttribute('y2', String(height));
+      yAxis.setAttribute('y1', String(height));
+      yAxis.setAttribute('y2', '0');
       setStableStroke(yAxis, color, 2.5, 'solid');
+      yAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config.id) + ')');
       axes.appendChild(yAxis);
+      for (let y = Math.ceil(config.ymin / step) * step; y <= config.ymax + step * 1e-9; y += step) {
+        const normalizedY = Math.abs(y) <= step * 1e-9 ? 0 : y;
+        if (normalizedY === 0 && config.ymin <= 0 && config.ymax >= 0) continue;
+        const yNumberOffset = Math.abs(normalizedY - config.ymin) <= edgeTolerance
+          ? -8
+          : Math.abs(normalizedY - config.ymax) <= edgeTolerance ? 8 : 0;
+        const projected = projectStaticPoint({ x: 0, y: normalizedY }, config);
+        const tick = svgElement(doc, 'line');
+        tick.setAttribute('data-lia-static-axis-tick', 'y');
+        tick.setAttribute('x1', String(
+          atLeftEdge ? projected.x :
+            atRightEdge ? projected.x - 2 * tickHalf : projected.x - tickHalf
+        ));
+        tick.setAttribute('x2', String(
+          atLeftEdge ? projected.x + 2 * tickHalf :
+            atRightEdge ? projected.x : projected.x + tickHalf
+        ));
+        tick.setAttribute('y1', String(projected.y));
+        tick.setAttribute('y2', String(projected.y));
+        setStableStroke(tick, color, 1.5, 'solid');
+        axes.appendChild(tick);
+        const label = appendCenteredText(
+          axes,
+          doc,
+          projectedLabelPoint(
+            { x: 0, y: normalizedY },
+            config,
+            atLeftEdge ? 14 : -14,
+            yNumberOffset
+          ),
+          formatStaticNumber(normalizedY, 'en'),
+          color,
+          config
+        );
+        label.setAttribute('data-lia-static-axis-number', 'y');
+        label.setAttribute('font-size', String(13 * unit));
+      }
     }
     svg.appendChild(axes);
   }
@@ -513,6 +1055,336 @@ function appendCap(
   group.appendChild(cap);
 }
 
+function logicalUnitsPerPixel(config: BoardConfig): number {
+  return (config.xmax - config.xmin) / Math.max(config.width || 640, 1);
+}
+
+interface StaticArcGeometry {
+  p0: CoordinatePair;
+  p1: CoordinatePair;
+  p2: CoordinatePair;
+  p3: CoordinatePair;
+  chord: number;
+}
+
+function staticArcGeometry(geometry: StaticArcSpec): StaticArcGeometry {
+  const chord = Math.hypot(geometry.end.x - geometry.start.x, geometry.end.y - geometry.start.y);
+  const handle = chord / 3;
+  const exitRadians = geometry.exitAngle * Math.PI / 180;
+  const entryRadians = geometry.entryAngle * Math.PI / 180;
+  return {
+    p0: geometry.start,
+    p1: {
+      x: geometry.start.x + handle * Math.cos(exitRadians),
+      y: geometry.start.y + handle * Math.sin(exitRadians)
+    },
+    // TikZ-like in-angle: the angle points from the end to its control arm.
+    p2: {
+      x: geometry.end.x + handle * Math.cos(entryRadians),
+      y: geometry.end.y + handle * Math.sin(entryRadians)
+    },
+    p3: geometry.end,
+    chord
+  };
+}
+
+function cubicPoint(geometry: StaticArcGeometry, t: number): CoordinatePair {
+  const u = 1 - t;
+  return {
+    x: u * u * u * geometry.p0.x +
+      3 * u * u * t * geometry.p1.x +
+      3 * u * t * t * geometry.p2.x +
+      t * t * t * geometry.p3.x,
+    y: u * u * u * geometry.p0.y +
+      3 * u * u * t * geometry.p1.y +
+      3 * u * t * t * geometry.p2.y +
+      t * t * t * geometry.p3.y
+  };
+}
+
+function cubicDerivative(geometry: StaticArcGeometry, t: number): CoordinatePair {
+  const u = 1 - t;
+  return {
+    x: 3 * u * u * (geometry.p1.x - geometry.p0.x) +
+      6 * u * t * (geometry.p2.x - geometry.p1.x) +
+      3 * t * t * (geometry.p3.x - geometry.p2.x),
+    y: 3 * u * u * (geometry.p1.y - geometry.p0.y) +
+      6 * u * t * (geometry.p2.y - geometry.p1.y) +
+      3 * t * t * (geometry.p3.y - geometry.p2.y)
+  };
+}
+
+function appendArcCap(
+  group: SVGGElement,
+  doc: Document,
+  geometry: StaticArcSpec,
+  config: BoardConfig,
+  atStart: boolean
+): void {
+  const endpoint = projectStaticPoint(atStart ? geometry.start : geometry.end, config);
+  const angle = (atStart ? geometry.exitAngle : geometry.entryAngle) * Math.PI / 180;
+  const halfLength = 6 * logicalUnitsPerPixel(config);
+  // Project the mathematical tangent (cos, sin) into SVG (cos, -sin), then
+  // rotate it by 90 degrees in screen space.
+  const nx = Math.sin(angle) * halfLength;
+  const ny = Math.cos(angle) * halfLength;
+  const cap = svgElement(doc, 'line');
+  cap.setAttribute('x1', String(endpoint.x - nx));
+  cap.setAttribute('y1', String(endpoint.y - ny));
+  cap.setAttribute('x2', String(endpoint.x + nx));
+  cap.setAttribute('y2', String(endpoint.y + ny));
+  setStableStroke(cap, geometry.color, geometry.strokeWidth, 'solid');
+  cap.setAttribute('stroke-linecap', 'round');
+  group.appendChild(cap);
+}
+
+function appendCenteredText(
+  group: SVGGElement,
+  doc: Document,
+  point: CoordinatePair,
+  content: string,
+  color: string,
+  config: BoardConfig,
+  opacity?: number
+): SVGTextElement {
+  const text = svgElement(doc, 'text');
+  text.setAttribute('x', String(point.x));
+  text.setAttribute('y', String(point.y));
+  text.setAttribute('fill', color);
+  if (opacity != null) text.setAttribute('fill-opacity', String(opacity));
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('dominant-baseline', 'middle');
+  text.setAttribute('alignment-baseline', 'middle');
+  text.setAttribute('font-size', String(18 * logicalUnitsPerPixel(config)));
+  text.setAttribute('font-family', 'system-ui, sans-serif');
+  text.setAttribute('pointer-events', 'none');
+  text.textContent = content;
+  group.appendChild(text);
+  return text;
+}
+
+function arcCaptionPoint(geometry: StaticArcSpec, config: BoardConfig): CoordinatePair {
+  const mathematical = staticArcGeometry(geometry);
+  const projected: StaticArcGeometry = {
+    p0: projectStaticPoint(mathematical.p0, config),
+    p1: projectStaticPoint(mathematical.p1, config),
+    p2: projectStaticPoint(mathematical.p2, config),
+    p3: projectStaticPoint(mathematical.p3, config),
+    chord: mathematical.chord
+  };
+  const midpoint = cubicPoint(projected, 0.5);
+  let derivative = cubicDerivative(projected, 0.5);
+  if (Math.hypot(derivative.x, derivative.y) < 1e-12) {
+    derivative = {
+      x: projected.p3.x - projected.p0.x,
+      y: projected.p3.y - projected.p0.y
+    };
+  }
+  let normalX = -derivative.y;
+  let normalY = derivative.x;
+  const normalLength = Math.hypot(normalX, normalY);
+  if (normalLength < 1e-12) {
+    normalX = 0;
+    normalY = -1;
+  } else {
+    normalX /= normalLength;
+    normalY /= normalLength;
+  }
+  if (normalY > 0 || (Math.abs(normalY) < 1e-12 && normalX < 0)) {
+    normalX = -normalX;
+    normalY = -normalY;
+  }
+  const offset = Math.max(11, Math.min(20, 10 + geometry.strokeWidth)) *
+    logicalUnitsPerPixel(config);
+  return {
+    x: midpoint.x + normalX * offset,
+    y: midpoint.y + normalY * offset
+  };
+}
+
+function formatStaticNumber(
+  value: number,
+  language: StaticLanguage = 'en',
+  maximumDecimals = 3
+): string {
+  if (!Number.isFinite(value)) return '?';
+  const factor = Math.pow(10, maximumDecimals);
+  const rounded = Math.abs(value) < 0.5 / factor
+    ? 0
+    : Math.round((value + Number.EPSILON) * factor) / factor;
+  let text = rounded.toFixed(maximumDecimals).replace(/\.?0+$/, '');
+  if (text === '-0') text = '0';
+  return language === 'de' ? text.replace('.', ',') : text;
+}
+
+function polylineLength(coordinates: readonly CoordinatePair[]): number {
+  let length = 0;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    length += Math.hypot(
+      coordinates[index].x - coordinates[index - 1].x,
+      coordinates[index].y - coordinates[index - 1].y
+    );
+  }
+  return length;
+}
+
+function polylineMidpoint(coordinates: readonly CoordinatePair[]): CoordinatePair {
+  if (!coordinates.length) return { x: 0, y: 0 };
+  const total = polylineLength(coordinates);
+  if (total <= 1e-12) return { ...coordinates[0] };
+  const target = total / 2;
+  let traversed = 0;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const first = coordinates[index - 1];
+    const second = coordinates[index];
+    const length = Math.hypot(second.x - first.x, second.y - first.y);
+    if (traversed + length >= target && length > 1e-12) {
+      const ratio = (target - traversed) / length;
+      return {
+        x: first.x + ratio * (second.x - first.x),
+        y: first.y + ratio * (second.y - first.y)
+      };
+    }
+    traversed += length;
+  }
+  return { ...coordinates[coordinates.length - 1] };
+}
+
+function polygonMetrics(coordinates: readonly CoordinatePair[]): {
+  area: number;
+  perimeter: number;
+  centroid: CoordinatePair;
+} {
+  let signedTwiceArea = 0;
+  let centroidX = 0;
+  let centroidY = 0;
+  let perimeter = 0;
+  for (let index = 0; index < coordinates.length; index += 1) {
+    const first = coordinates[index];
+    const second = coordinates[(index + 1) % coordinates.length];
+    const cross = first.x * second.y - second.x * first.y;
+    signedTwiceArea += cross;
+    centroidX += (first.x + second.x) * cross;
+    centroidY += (first.y + second.y) * cross;
+    perimeter += Math.hypot(second.x - first.x, second.y - first.y);
+  }
+  let centroid: CoordinatePair;
+  if (Math.abs(signedTwiceArea) > 1e-12) {
+    centroid = {
+      x: centroidX / (3 * signedTwiceArea),
+      y: centroidY / (3 * signedTwiceArea)
+    };
+  } else {
+    centroid = {
+      x: coordinates.reduce(function(sum, point) { return sum + point.x; }, 0) /
+        Math.max(1, coordinates.length),
+      y: coordinates.reduce(function(sum, point) { return sum + point.y; }, 0) /
+        Math.max(1, coordinates.length)
+    };
+  }
+  return { area: Math.abs(signedTwiceArea) / 2, perimeter, centroid };
+}
+
+function projectedLabelPoint(
+  point: CoordinatePair,
+  config: BoardConfig,
+  offsetXInPixels = 0,
+  offsetYInPixels = -12
+): CoordinatePair {
+  const projected = projectStaticPoint(point, config);
+  const unit = logicalUnitsPerPixel(config);
+  return {
+    x: projected.x + offsetXInPixels * unit,
+    y: projected.y + offsetYInPixels * unit
+  };
+}
+
+function appendPointGlyph(
+  group: SVGGElement,
+  doc: Document,
+  coordinate: CoordinatePair,
+  color: string,
+  opacity: number,
+  config: BoardConfig,
+  labelContent = '',
+  labelColor = color
+): void {
+  const center = projectStaticPoint(coordinate, config);
+  const halfSize = 7 * logicalUnitsPerPixel(config);
+  [
+    [-halfSize, -halfSize, halfSize, halfSize],
+    [-halfSize, halfSize, halfSize, -halfSize]
+  ].forEach(function(values) {
+    const line = svgElement(doc, 'line');
+    line.setAttribute('x1', String(center.x + values[0]));
+    line.setAttribute('y1', String(center.y + values[1]));
+    line.setAttribute('x2', String(center.x + values[2]));
+    line.setAttribute('y2', String(center.y + values[3]));
+    line.setAttribute('stroke-opacity', String(opacity));
+    setStableStroke(line, color, 3, 'solid');
+    line.setAttribute('stroke-linecap', 'round');
+    group.appendChild(line);
+  });
+  if (labelContent) {
+    const label = appendCenteredText(
+      group,
+      doc,
+      projectedLabelPoint(coordinate, config, 12, -12),
+      staticTextFallback(labelContent),
+      labelColor,
+      config,
+      opacity
+    );
+    label.setAttribute('font-size', String(24 * logicalUnitsPerPixel(config)));
+  }
+}
+
+function circularArcPathData(
+  arc: StaticCircularArcGeometry,
+  config: BoardConfig,
+  includeCenter: boolean
+): string {
+  const center = projectStaticPoint(arc.center, config);
+  const start = projectStaticPoint(arc.start, config);
+  let path = includeCenter
+    ? 'M ' + center.x + ' ' + center.y + ' L ' + start.x + ' ' + start.y
+    : 'M ' + start.x + ' ' + start.y;
+  arc.segments.forEach(function(segment) {
+    const end = projectStaticPoint(segment.end, config);
+    path += ' A ' + arc.radius + ' ' + arc.radius + ' 0 ' +
+      segment.svgLargeArcFlag + ' ' + segment.svgSweepFlag + ' ' +
+      end.x + ' ' + end.y;
+  });
+  return includeCenter ? path + ' Z' : path;
+}
+
+function appendClippedInfiniteLine(
+  group: SVGGElement,
+  doc: Document,
+  coordinates: [CoordinatePair, CoordinatePair],
+  kind: 'line' | 'ray',
+  color: string,
+  strokeWidth: number,
+  lineStyle: LineStyle,
+  config: BoardConfig
+): [CoordinatePair, CoordinatePair] | null {
+  const clipped = kind === 'ray'
+    ? clipRayToBounds(coordinates[0], coordinates[1], config)
+    : clipLineToBounds(coordinates[0], coordinates[1], config);
+  if (!clipped) return null;
+  const start = projectStaticPoint(clipped.start, config);
+  const end = projectStaticPoint(clipped.end, config);
+  const line = svgElement(doc, 'line');
+  line.setAttribute('x1', String(start.x));
+  line.setAttribute('y1', String(start.y));
+  line.setAttribute('x2', String(end.x));
+  line.setAttribute('y2', String(end.y));
+  line.setAttribute('fill', 'none');
+  setStableStroke(line, color, strokeWidth, lineStyle);
+  group.appendChild(line);
+  return [clipped.start, clipped.end];
+}
+
 function appendGeometry(
   svg: SVGSVGElement,
   entry: StaticGeometryEntry,
@@ -522,7 +1394,7 @@ function appendGeometry(
   const group = svgElement(doc, 'g');
   group.setAttribute('data-lia-static-kind', entry.geometry.kind);
   group.setAttribute('data-lia-static-uid', entry.info.uid);
-  if (!entry.geometry.visible) {
+  if ('visible' in entry.geometry && !entry.geometry.visible) {
     group.setAttribute('visibility', 'hidden');
     group.setAttribute('display', 'none');
   }
@@ -535,7 +1407,31 @@ function appendGeometry(
     polygon.setAttribute('stroke-opacity', '1');
     setStableStroke(polygon, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
     group.appendChild(polygon);
-  } else {
+    if (entry.geometry.showArea || entry.geometry.showPerimeter) {
+      const metrics = polygonMetrics(entry.geometry.coordinates);
+      const labels: string[] = [];
+      if (entry.geometry.showArea) {
+        labels.push(
+          'A ≈ ' + formatStaticNumber(metrics.area, entry.geometry.language) + ' ' +
+          (entry.geometry.language === 'de' ? 'FE' : 'AU')
+        );
+      }
+      if (entry.geometry.showPerimeter) {
+        labels.push(
+          'u ≈ ' + formatStaticNumber(metrics.perimeter, entry.geometry.language) + ' ' +
+          (entry.geometry.language === 'de' ? 'LE' : 'LU')
+        );
+      }
+      appendCenteredText(
+        group,
+        doc,
+        projectStaticPoint(metrics.centroid, config),
+        labels.join(' · '),
+        getNeutralColor(),
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'distance') {
     const polyline = svgElement(doc, 'polyline');
     polyline.setAttribute('points', pointsAttribute(entry.geometry.coordinates, config));
     polyline.setAttribute('fill', 'none');
@@ -548,14 +1444,631 @@ function appendGeometry(
     group.appendChild(polyline);
     if (entry.geometry.startCap) appendCap(group, doc, entry.geometry, config, true);
     if (entry.geometry.endCap) appendCap(group, doc, entry.geometry, config, false);
+    if (entry.geometry.showLength || entry.geometry.showName) {
+      const labels: string[] = [];
+      if (entry.geometry.showName && entry.geometry.segmentName) {
+        labels.push(staticTextFallback(entry.geometry.segmentName));
+      }
+      if (entry.geometry.showLength) {
+        labels.push(
+          formatStaticNumber(polylineLength(entry.geometry.coordinates), entry.geometry.language) +
+          ' ' + (entry.geometry.language === 'de' ? 'LE' : 'LU')
+        );
+      }
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(polylineMidpoint(entry.geometry.coordinates), config),
+        labels.join(' ≈ '),
+        entry.geometry.color,
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'vector') {
+    const start = projectStaticPoint(entry.geometry.coordinates[0], config);
+    const end = projectStaticPoint(entry.geometry.coordinates[1], config);
+    const line = svgElement(doc, 'line');
+    line.setAttribute('x1', String(start.x));
+    line.setAttribute('y1', String(start.y));
+    line.setAttribute('x2', String(end.x));
+    line.setAttribute('y2', String(end.y));
+    line.setAttribute('fill', 'none');
+    setStableStroke(line, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
+    const markerId = addArrowMarker(svg, doc, entry.geometry.color, config.id);
+    line.setAttribute('marker-end', 'url(#' + markerId + ')');
+    group.appendChild(line);
+    if (entry.geometry.showName && entry.geometry.objectName) {
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(polylineMidpoint(entry.geometry.coordinates), config),
+        staticTextFallback('→' + entry.geometry.objectName),
+        entry.geometry.color,
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'line' || entry.geometry.kind === 'ray') {
+    const clipped = appendClippedInfiniteLine(
+      group,
+      doc,
+      entry.geometry.coordinates,
+      entry.geometry.kind,
+      entry.geometry.color,
+      entry.geometry.strokeWidth,
+      entry.geometry.lineStyle,
+      config
+    );
+    if (clipped && entry.geometry.showName && entry.geometry.objectName) {
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(polylineMidpoint(clipped), config),
+        staticTextFallback(entry.geometry.objectName),
+        entry.geometry.color,
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'arc') {
+    const mathematical = staticArcGeometry(entry.geometry);
+    const p0 = projectStaticPoint(mathematical.p0, config);
+    const p1 = projectStaticPoint(mathematical.p1, config);
+    const p2 = projectStaticPoint(mathematical.p2, config);
+    const p3 = projectStaticPoint(mathematical.p3, config);
+    const path = svgElement(doc, 'path');
+    path.setAttribute(
+      'd',
+      'M ' + p0.x + ' ' + p0.y +
+      ' C ' + p1.x + ' ' + p1.y +
+      ', ' + p2.x + ' ' + p2.y +
+      ', ' + p3.x + ' ' + p3.y
+    );
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-linecap', 'round');
+    setStableStroke(path, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
+    if (entry.geometry.firstArrow || entry.geometry.lastArrow) {
+      const markerId = addArrowMarker(svg, doc, entry.geometry.color, config.id);
+      if (entry.geometry.firstArrow) path.setAttribute('marker-start', 'url(#' + markerId + ')');
+      if (entry.geometry.lastArrow) path.setAttribute('marker-end', 'url(#' + markerId + ')');
+    }
+    group.appendChild(path);
+    if (entry.geometry.startCap) appendArcCap(group, doc, entry.geometry, config, true);
+    if (entry.geometry.endCap) appendArcCap(group, doc, entry.geometry, config, false);
+    if (entry.geometry.caption) {
+      appendCenteredText(
+        group,
+        doc,
+        arcCaptionPoint(entry.geometry, config),
+        entry.geometry.renderedCaption,
+        entry.geometry.color,
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'coord-text') {
+    appendCenteredText(
+      group,
+      doc,
+      projectStaticPoint(entry.geometry.coordinate, config),
+      entry.geometry.renderedContent,
+      entry.geometry.color,
+      config,
+      entry.geometry.opacity
+    );
+  } else if (entry.geometry.kind === 'axis-label') {
+    const xAxisY = Math.max(config.ymin, Math.min(config.ymax, 0));
+    const yAxisX = Math.max(config.xmin, Math.min(config.xmax, 0));
+    if (entry.geometry.xLabel.trim()) {
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(
+          { x: config.xmax, y: xAxisY },
+          config,
+          -16,
+          xAxisY === config.ymax ? 16 : -16
+        ),
+        staticTextFallback(entry.geometry.xLabel),
+        getNeutralColor(),
+        config
+      );
+    }
+    if (entry.geometry.yLabel.trim()) {
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(
+          { x: yAxisX, y: config.ymax },
+          config,
+          yAxisX === config.xmax ? -16 : 16,
+          16
+        ),
+        staticTextFallback(entry.geometry.yLabel),
+        getNeutralColor(),
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'point') {
+    appendPointGlyph(
+      group,
+      doc,
+      entry.geometry.coordinate,
+      entry.geometry.color,
+      entry.geometry.opacity,
+      config,
+      entry.geometry.showName ? entry.geometry.name : '',
+      entry.geometry.hasExplicitColor ? entry.geometry.color : getNeutralColor()
+    );
+  } else if (entry.geometry.kind === 'midpoint') {
+    const labels: string[] = [];
+    if (entry.geometry.showName && entry.geometry.objectName) {
+      labels.push(entry.geometry.objectName);
+    }
+    if (entry.geometry.showValue) {
+      labels.push(
+        '(' + formatStaticNumber(entry.geometry.coordinate.x, entry.geometry.language) +
+        ' | ' + formatStaticNumber(entry.geometry.coordinate.y, entry.geometry.language) + ')'
+      );
+    }
+    appendPointGlyph(
+      group,
+      doc,
+      entry.geometry.coordinate,
+      entry.geometry.color,
+      1,
+      config,
+      labels.join(' '),
+      entry.geometry.hasExplicitColor ? entry.geometry.color : getNeutralColor()
+    );
+  } else if (entry.geometry.kind === 'parallel' || entry.geometry.kind === 'orthogonal') {
+    const clipped = appendClippedInfiniteLine(
+      group,
+      doc,
+      entry.geometry.coordinates,
+      'line',
+      entry.geometry.color,
+      3,
+      entry.geometry.lineStyle,
+      config
+    );
+    if (clipped && entry.geometry.showName && entry.geometry.objectName) {
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(polylineMidpoint(clipped), config),
+        staticTextFallback(entry.geometry.objectName),
+        entry.geometry.color,
+        config
+      );
+    }
+  } else if (entry.geometry.kind === 'circle') {
+    const center = projectStaticPoint(entry.geometry.center, config);
+    const circle = svgElement(doc, 'circle');
+    circle.setAttribute('cx', String(center.x));
+    circle.setAttribute('cy', String(center.y));
+    circle.setAttribute('r', String(entry.geometry.radius));
+    circle.setAttribute('fill', entry.geometry.color);
+    circle.setAttribute('fill-opacity', String(entry.geometry.opacity));
+    setStableStroke(circle, entry.geometry.color, 2.5, entry.geometry.lineStyle);
+    group.appendChild(circle);
+    if (entry.geometry.showName && entry.geometry.name) {
+      const namePoint = staticPointOnCircle(
+        entry.geometry.center,
+        entry.geometry.radius * Math.SQRT1_2,
+        Math.PI / 4
+      );
+      const nameLabel = appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(namePoint, config, 8, -8),
+        staticTextFallback(entry.geometry.name),
+        entry.geometry.color,
+        config
+      );
+      nameLabel.setAttribute('font-size', String(14 * logicalUnitsPerPixel(config)));
+    }
+    const measurements: string[] = [];
+    if (entry.geometry.showArea) {
+      measurements.push(
+        'A ≈ ' + formatStaticNumber(
+          Math.PI * entry.geometry.radius * entry.geometry.radius,
+          entry.geometry.language
+        ) + ' ' + (entry.geometry.language === 'de' ? 'FE' : 'AU')
+      );
+    }
+    if (entry.geometry.showCircumference) {
+      measurements.push(
+        'u ≈ ' + formatStaticNumber(
+          2 * Math.PI * entry.geometry.radius,
+          entry.geometry.language
+        ) + ' ' + (entry.geometry.language === 'de' ? 'LE' : 'LU')
+      );
+    }
+    if (measurements.length) {
+      const measurementLabel = appendCenteredText(
+        group,
+        doc,
+        center,
+        measurements.join(' · '),
+        getNeutralColor(),
+        config
+      );
+      measurementLabel.setAttribute('font-size', String(14 * logicalUnitsPerPixel(config)));
+    }
+  } else if (entry.geometry.kind === 'angle') {
+    const first = entry.geometry.points[0];
+    const vertex = entry.geometry.points[1];
+    const third = entry.geometry.points[2];
+    const shortestArm = Math.min(
+      Math.hypot(first.x - vertex.x, first.y - vertex.y),
+      Math.hypot(third.x - vertex.x, third.y - vertex.y)
+    );
+    const radius = Math.max(0.05, Math.min(0.8, shortestArm * 0.35));
+    const arc = createDirectedAngleArcGeometry(vertex, first, third, radius, { direction: 'ccw' });
+    if (arc && arc.segments.length) {
+      const path = svgElement(doc, 'path');
+      path.setAttribute('d', circularArcPathData(arc, config, true));
+      path.setAttribute('fill', entry.geometry.color);
+      path.setAttribute('fill-opacity', String(entry.geometry.opacity * 0.2));
+      setStableStroke(path, entry.geometry.color, 2.5, entry.geometry.lineStyle);
+      group.appendChild(path);
+      const labels: string[] = [];
+      if (entry.geometry.showName && entry.geometry.name) {
+        labels.push(staticTextFallback(entry.geometry.name));
+      }
+      if (entry.geometry.showValue) {
+        labels.push(
+          formatStaticNumber(
+            Math.abs(arc.sweepRadians) * 180 / Math.PI,
+            entry.geometry.language,
+            1
+          ) + '°'
+        );
+      }
+      if (labels.length) {
+        const labelAngle = arc.startAngleRadians + arc.sweepRadians / 2;
+        const labelRadius = radius * 1.35 + 10 * logicalUnitsPerPixel(config);
+        const label = appendCenteredText(
+          group,
+          doc,
+          projectStaticPoint(staticPointOnCircle(vertex, labelRadius, labelAngle), config),
+          labels.join(' ≈ '),
+          entry.geometry.color,
+          config,
+          entry.geometry.opacity
+        );
+        label.setAttribute('font-size', String(16 * logicalUnitsPerPixel(config)));
+      }
+    }
+  } else if (entry.geometry.kind === 'sector') {
+    const center = entry.geometry.points[0];
+    const startPoint = entry.geometry.points[1];
+    const directionPoint = entry.geometry.points[2];
+    const radius = Math.hypot(startPoint.x - center.x, startPoint.y - center.y);
+    const startAngle = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+    const endAngle = Math.atan2(directionPoint.y - center.y, directionPoint.x - center.x);
+    const arc = createDirectedCircularArcGeometry(
+      center,
+      radius,
+      startAngle,
+      endAngle,
+      { direction: 'ccw' }
+    );
+    if (arc && arc.segments.length) {
+      const path = svgElement(doc, 'path');
+      path.setAttribute('d', circularArcPathData(arc, config, true));
+      path.setAttribute('fill', entry.geometry.color);
+      path.setAttribute('fill-opacity', String(entry.geometry.opacity));
+      setStableStroke(path, entry.geometry.color, 3, entry.geometry.lineStyle);
+      group.appendChild(path);
+      const labels: string[] = [];
+      if (entry.geometry.showName && entry.geometry.objectName) {
+        labels.push(staticTextFallback(entry.geometry.objectName));
+      }
+      if (entry.geometry.showArea) {
+        labels.push(
+          'A ≈ ' + formatStaticNumber(
+            radius * radius * Math.abs(arc.sweepRadians) / 2,
+            entry.geometry.language
+          ) + ' ' + (entry.geometry.language === 'de' ? 'FE' : 'AU')
+        );
+      }
+      if (entry.geometry.showPerimeter) {
+        labels.push(
+          'u ≈ ' + formatStaticNumber(
+            radius * (2 + Math.abs(arc.sweepRadians)),
+            entry.geometry.language
+          ) + ' ' + (entry.geometry.language === 'de' ? 'LE' : 'LU')
+        );
+      }
+      if (labels.length) {
+        const labelAngle = arc.startAngleRadians + arc.sweepRadians / 2;
+        appendCenteredText(
+          group,
+          doc,
+          projectStaticPoint(staticPointOnCircle(center, radius * 0.58, labelAngle), config),
+          labels.join(' · '),
+          entry.geometry.color,
+          config
+        );
+      }
+    }
+  } else if (entry.geometry.kind === 'plot') {
+    const plot = entry.geometry;
+    group.setAttribute('data-lia-static-evaluations', String(plot.evaluationCount));
+    plot.segments.forEach(function(segment) {
+      if (segment.length < 2) return;
+      const projected = segment.map(function(point) { return projectStaticPoint(point, config); });
+      const path = svgElement(doc, 'path');
+      path.setAttribute(
+        'd',
+        projected.map(function(point, index) {
+          return (index === 0 ? 'M ' : 'L ') + point.x + ' ' + point.y;
+        }).join(' ')
+      );
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      setStableStroke(path, plot.color, 3, plot.lineStyle);
+      group.appendChild(path);
+    });
+    if (plot.showName && plot.name && plot.segments.length) {
+      const labelSegment = plot.segments.reduce(function(longest, segment) {
+        return segment.length > longest.length ? segment : longest;
+      });
+      const labelPoint = labelSegment[labelSegment.length - 1];
+      appendCenteredText(
+        group,
+        doc,
+        projectedLabelPoint(labelPoint, config, -10, -12),
+        staticTextFallback(plot.name),
+        plot.color,
+        config
+      );
+    }
   }
   svg.appendChild(group);
+}
+
+interface StaticPointRegistry {
+  points: Map<string, CoordinatePair>;
+  ambiguous: Set<string>;
+}
+
+function createStaticPointRegistry(
+  config: BoardConfig,
+  nodes: HTMLElement[]
+): StaticPointRegistry {
+  const points = new Map<string, CoordinatePair>();
+  const ambiguous = new Set<string>();
+  nodes.forEach(function(node) {
+    const info = markerInfo(node);
+    if (!info || info.kind !== 'point' || markerBoardId(node, info) !== config.id) return;
+    const parsed = parseStaticPointSpec(String(node.dataset && node.dataset.spec || ''));
+    if (!parsed || parsed.boardId !== config.id || !parsed.name) return;
+    if (ambiguous.has(parsed.name) || points.has(parsed.name)) {
+      points.delete(parsed.name);
+      ambiguous.add(parsed.name);
+      warnOnce(
+        config.id + ':duplicate-static-point:' + parsed.name,
+        'Static point name [' + parsed.name + '] is ambiguous on board [' + config.id +
+          '] and cannot be used by dependent objects.'
+      );
+      return;
+    }
+    points.set(parsed.name, { x: parsed.coordinate.x, y: parsed.coordinate.y });
+  });
+  return { points, ambiguous };
+}
+
+function pointResolver(registry: StaticPointRegistry): StaticPointResolver {
+  return function(name: string): CoordinatePair | null {
+    const key = String(name || '').trim();
+    if (!key || registry.ambiguous.has(key)) return null;
+    const point = registry.points.get(key);
+    return point ? { x: point.x, y: point.y } : null;
+  };
+}
+
+function resolvePointReference(
+  reference: StaticPointReference,
+  resolvePoint: StaticPointResolver
+): CoordinatePair | null {
+  if (reference.kind === 'coordinate') {
+    return { x: reference.coordinate.x, y: reference.coordinate.y };
+  }
+  return resolvePoint(reference.name);
+}
+
+function resolvePointReferences(
+  references: readonly StaticPointReference[],
+  resolvePoint: StaticPointResolver
+): CoordinatePair[] | null {
+  const points = references.map(function(reference) {
+    return resolvePointReference(reference, resolvePoint);
+  });
+  return points.every(function(point): point is CoordinatePair { return !!point; })
+    ? points
+    : null;
+}
+
+function accentColor<T extends { color: string; hasExplicitColor: boolean }>(spec: T): T {
+  if (!spec.hasExplicitColor) spec.color = getAccentColor();
+  return spec;
+}
+
+function resolvedLinearGeometry(
+  spec: string,
+  markerKind: unknown,
+  language: string,
+  resolvePoint: StaticPointResolver
+): StaticVectorSpec | StaticLineSpec | null {
+  const parsed = parseStaticLinearSpec(spec, markerKind, language);
+  if (!parsed) return null;
+  const points = resolvePointReferences(parsed.points, resolvePoint);
+  if (!points || points.length !== 2 ||
+      Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) <= 1e-12) {
+    return null;
+  }
+  accentColor(parsed);
+  let objectName = parsed.objectName;
+  if (!objectName && parsed.kind === 'vector') {
+    objectName = parsed.points[0].kind === 'point' && parsed.points[1].kind === 'point'
+      ? parsed.points[0].name + parsed.points[1].name
+      : 'a';
+  }
+  if (parsed.kind === 'vector') {
+    return {
+      kind: 'vector',
+      boardId: parsed.boardId,
+      coordinates: [points[0], points[1]],
+      color: parsed.color,
+      hasExplicitColor: parsed.hasExplicitColor,
+      strokeWidth: 3,
+      lineStyle: parsed.lineStyle,
+      visible: parsed.visible,
+      objectName,
+      showName: parsed.showName && !!objectName
+    };
+  }
+  return {
+    kind: parsed.kind,
+    boardId: parsed.boardId,
+    coordinates: [points[0], points[1]],
+    color: parsed.color,
+    hasExplicitColor: parsed.hasExplicitColor,
+    strokeWidth: 3,
+    lineStyle: parsed.lineStyle,
+    visible: parsed.visible,
+    objectName,
+    showName: parsed.showName && !!objectName,
+    language: parsed.language
+  };
+}
+
+function resolvedRelationGeometry(
+  spec: string,
+  markerKind: unknown,
+  language: string,
+  resolvePoint: StaticPointResolver
+): StaticMidpointGeometry | StaticRelatedLineGeometry | null {
+  const parsed = parseStaticRelationSpec(spec, markerKind, language);
+  if (!parsed) return null;
+  if (parsed.kind === 'midpoint') {
+    const points = resolvePointReferences(parsed.points, resolvePoint);
+    if (!points || points.length !== 2) return null;
+    return {
+      ...parsed,
+      color: parsed.hasExplicitColor ? parsed.color : '#ff00ff',
+      coordinate: {
+        x: (points[0].x + points[1].x) / 2,
+        y: (points[0].y + points[1].y) / 2
+      }
+    };
+  }
+  // Named line-like bases need an object dependency graph and stay dynamic.
+  if (parsed.base.kind !== 'points') return null;
+  const base = resolvePointReferences(parsed.base.points, resolvePoint);
+  const through = resolvePointReference(parsed.through, resolvePoint);
+  if (!base || base.length !== 2 || !through) return null;
+  const dx = base[1].x - base[0].x;
+  const dy = base[1].y - base[0].y;
+  if (Math.hypot(dx, dy) <= 1e-12) return null;
+  accentColor(parsed);
+  const direction = parsed.kind === 'orthogonal'
+    ? { x: -dy, y: dx }
+    : { x: dx, y: dy };
+  return {
+    ...parsed,
+    coordinates: [
+      { x: through.x, y: through.y },
+      { x: through.x + direction.x, y: through.y + direction.y }
+    ]
+  };
+}
+
+function resolvedCircleGeometry(
+  spec: string,
+  language: string,
+  resolvePoint: StaticPointResolver
+): StaticCircleGeometry | null {
+  const parsed = parseStaticCircleSpec(spec, language);
+  if (!parsed) return null;
+  const center = resolvePointReference(parsed.center, resolvePoint);
+  if (!center) return null;
+  let radius = parsed.radius.kind === 'number' ? parsed.radius.value : NaN;
+  if (parsed.radius.kind === 'point') {
+    const radiusPoint = resolvePointReference(parsed.radius.point, resolvePoint);
+    if (!radiusPoint) return null;
+    radius = Math.hypot(radiusPoint.x - center.x, radiusPoint.y - center.y);
+  }
+  if (!Number.isFinite(radius) || radius <= 1e-12) return null;
+  accentColor(parsed);
+  return { ...parsed, center, radius };
+}
+
+function resolvedAngleGeometry(
+  spec: string,
+  language: string,
+  resolvePoint: StaticPointResolver
+): StaticAngleGeometry | null {
+  const parsed = parseStaticAngleSpec(spec, language);
+  if (!parsed) return null;
+  const points = resolvePointReferences(parsed.points, resolvePoint);
+  if (!points || points.length !== 3) return null;
+  accentColor(parsed);
+  const fallbackName = !parsed.name && parsed.points.every(function(point) {
+    return point.kind === 'point';
+  })
+    ? '∠' + parsed.points.map(function(point) {
+        return point.kind === 'point' ? point.name : '';
+      }).join('')
+    : '';
+  return {
+    ...parsed,
+    name: parsed.name || fallbackName,
+    points: [points[0], points[1], points[2]]
+  };
+}
+
+function resolvedSectorGeometry(
+  spec: string,
+  language: string,
+  resolvePoint: StaticPointResolver
+): StaticSectorGeometry | null {
+  const parsed = parseStaticSectorSpec(spec, language);
+  if (!parsed) return null;
+  const points = resolvePointReferences(parsed.points, resolvePoint);
+  if (!points || points.length !== 3 ||
+      Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) <= 1e-12 ||
+      Math.hypot(points[2].x - points[0].x, points[2].y - points[0].y) <= 1e-12) {
+    return null;
+  }
+  accentColor(parsed);
+  return {
+    ...parsed,
+    points: [points[0], points[1], points[2]]
+  };
+}
+
+function resolvedPlotGeometry(spec: string, config: BoardConfig): StaticPlotGeometry | null {
+  const parsed = parseStaticPlotFunctionSpec(spec);
+  if (!parsed) return null;
+  const sampled = sampleStaticFunction(parsed.evaluate, config, {
+    sampleCount: Math.max(256, Math.min(2048, Math.round((config.width || 640) * 1.25)))
+  });
+  if (!sampled || !sampled.segments.length) return null;
+  const { evaluate: _evaluate, ...geometry } = parsed;
+  return {
+    ...geometry,
+    segments: sampled.segments,
+    evaluationCount: sampled.evaluationCount
+  };
 }
 
 function collectGeometry(config: BoardConfig, doc: Document): StaticGeometryEntry[] {
   const result: StaticGeometryEntry[] = [];
   let nodes: HTMLElement[] = [];
   try { nodes = Array.from(doc.querySelectorAll<HTMLElement>(MARKER_SELECTOR)); } catch (e) {}
+  const resolvePoint = pointResolver(createStaticPointRegistry(config, nodes));
   nodes.forEach(function(node) {
     const info = markerInfo(node);
     if (!info || markerBoardId(node, info) !== config.id) return;
@@ -564,24 +2077,47 @@ function collectGeometry(config: BoardConfig, doc: Document): StaticGeometryEntr
     if (info.kind === 'unsupported') {
       warnOnce(config.id + ':' + node.id + ':' + spec,
         'Board "' + config.id + '" ignores unsupported marker #' + node.id + '. ' +
-        'Static mode currently supports only direct @Area/@Flaeche and @distance/@Strecke coordinates.');
+        'Static mode supports only its documented deterministic marker subset.');
       return;
     }
-    const geometry = info.kind === 'area'
-      ? parseStaticAreaSpec(spec, language)
-      : parseStaticDistanceSpec(spec, language);
+    if (info.kind === 'linear' &&
+        !/^(?:line|ray|vector)$/.test(
+          String(node.dataset && node.dataset.kind || '').trim().toLowerCase()
+        )) {
+      warnOnce(config.id + ':' + node.id + ':' + spec + ':linear-kind',
+        'Static mode ignores a linear marker with an unknown kind at #' + node.id + '.');
+      return;
+    }
+    let geometry: StaticGeometrySpec | null = null;
+    if (info.kind === 'area') geometry = parseStaticAreaSpec(spec, language, resolvePoint);
+    else if (info.kind === 'distance') geometry = parseStaticDistanceSpec(spec, language, resolvePoint);
+    else if (info.kind === 'axis-label') geometry = parseStaticAxisLabelSpec(spec);
+    else if (info.kind === 'point') geometry = parseStaticPointSpec(spec);
+    else if (info.kind === 'coord-text') geometry = parseStaticCoordTextSpec(spec);
+    else if (info.kind === 'linear') {
+      geometry = resolvedLinearGeometry(
+        spec,
+        String(node.dataset && node.dataset.kind || ''),
+        language,
+        resolvePoint
+      );
+    } else if (info.kind === 'arc') geometry = parseStaticArcSpec(spec, language, resolvePoint);
+    else if (info.kind === 'relation') {
+      geometry = resolvedRelationGeometry(
+        spec,
+        String(node.dataset && node.dataset.kind || ''),
+        language,
+        resolvePoint
+      );
+    } else if (info.kind === 'angle') geometry = resolvedAngleGeometry(spec, language, resolvePoint);
+    else if (info.kind === 'circle') geometry = resolvedCircleGeometry(spec, language, resolvePoint);
+    else if (info.kind === 'sector') geometry = resolvedSectorGeometry(spec, language, resolvePoint);
+    else if (info.kind === 'plot') geometry = resolvedPlotGeometry(spec, config);
     if (!geometry) {
       warnOnce(config.id + ':' + node.id + ':' + spec,
-        'Marker #' + node.id + ' on static board "' + config.id + '" requires a valid direct coordinate list.');
+        'Marker #' + node.id + ' on static board "' + config.id + '" could not be resolved ' +
+        'from deterministic syntax and the board-local fixed-point registry.');
       return;
-    }
-    if (geometry.kind === 'area' && (geometry.showArea || geometry.showPerimeter)) {
-      warnOnce(config.id + ':' + node.id + ':measurement',
-        'Static area measurements are not rendered for #' + node.id + '; the polygon itself is rendered.');
-    }
-    if (geometry.kind === 'distance' && (geometry.showLength || geometry.showName)) {
-      warnOnce(config.id + ':' + node.id + ':label',
-        'Static distance labels are not rendered for #' + node.id + '; the path itself is rendered.');
     }
     result.push({ marker: node, info, geometry });
   });
@@ -884,18 +2420,36 @@ export function bootstrapStaticCoordinateBoards(): void {
   }
 }
 
-/** Batch all board/object changes into one animation frame. */
+/** Batch changes into one frame, with a bounded fallback for throttled frames. */
 export function scheduleStaticBootstrap(): void {
-  if (bootstrapFrame) return;
+  if (bootstrapFrame || bootstrapTimeout) return;
+  let completed = false;
   const run = function() {
+    if (completed) return;
+    completed = true;
+    const frame = bootstrapFrame;
+    const timeout = bootstrapTimeout;
     bootstrapFrame = 0;
+    bootstrapTimeout = 0;
+    try { if (frame) cancelAnimationFrame(frame); } catch (e) {}
+    try {
+      if (timeout && typeof window.clearTimeout === 'function') window.clearTimeout(timeout);
+    } catch (e) {}
     bootstrapStaticCoordinateBoards();
   };
   try {
     bootstrapFrame = requestAnimationFrame(run);
   } catch (e) {
-    try { bootstrapFrame = window.setTimeout(run, 0) as unknown as number; } catch (timeoutError) { run(); }
+    bootstrapFrame = 0;
   }
+  try {
+    if (typeof window.setTimeout === 'function') {
+      bootstrapTimeout = window.setTimeout(run, 50) as unknown as number;
+    }
+  } catch (e) {
+    bootstrapTimeout = 0;
+  }
+  if (!bootstrapFrame && !bootstrapTimeout) run();
 }
 
 function elementContainsStaticInput(node: Node): boolean {
@@ -956,6 +2510,7 @@ export function initStaticRenderer(): void {
         attributeFilter: [
           'data-spec',
           'data-language',
+          'data-kind',
           STATIC_DECLARATIVE_HOST_ATTRIBUTE,
           'class',
           'style',
@@ -985,7 +2540,7 @@ export function initStaticRenderer(): void {
   } catch (e) {}
 
   // Register declarative lightweight hosts and claim already mounted markers
-  // synchronously, but defer all SVG construction to the shared frame.
+  // synchronously, but defer all SVG construction to the shared scheduled batch.
   initializeDeclarativeHosts(document);
   syncMarkerClaims(document);
   scheduleStaticBootstrap();

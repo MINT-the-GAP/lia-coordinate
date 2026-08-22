@@ -1,6 +1,6 @@
 <!--
 author:   MINT-the-GAP, Martin Lommatzsch, Jihad Hyadi
-version:  0.0.1
+version:  0.0.3
 language: en
 edit: true
 narrator: US English Female
@@ -327,8 +327,9 @@ script:   ./dist/index.js
           --{{0}}--
 This plugin provides interactive coordinate systems for LiaScript courses, built on JSXGraph.
 Place points, plot functions, draw graphs by hand, and connect value tables to coordinate planes.
-For fixed polygons and polylines, an explicitly enabled static mode renders a
-small native SVG instead; an optional lightweight import avoids JSXGraph entirely.
+For fixed and statically resolvable geometry, measurements, labels, and
+self-contained plots, an explicitly enabled static mode renders a small native
+SVG instead; an optional lightweight import avoids JSXGraph entirely.
 
 __Try it on LiaScript:__
 https://liascript.github.io/course/?https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/README.md
@@ -343,7 +344,7 @@ https://github.com/MINT-the-GAP/lia-coordinate
 
    or pin to a specific version:
 
-   `import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.1/README.md`
+   `import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.3/README.md`
 
 2. Also requires JSXGraph (already included via the `import:` above):
 
@@ -401,45 +402,127 @@ For `axes;grid`, the combinations are `0;0` (neither), `0;1` (grid only),
 ## Static SVG mode
 
           --{{0}}--
-For a coordinate system that contains only fixed coordinate-list polygons and
-polylines, add `static=1` or its German alias `statisch=1`. This explicit flag
-uses a native responsive `<svg>` instead of creating a JSXGraph board. The SVG
-keeps the aspect ratio defined by `xmin`, `xmax`, `ymin`, and `ymax`; `width` is
-its maximum width, while `max-width: 100%` and automatic height let the browser
-scale it on narrow screens. Stroke widths remain visually stable while the SVG
-scales.
+For a coordinate system that contains only the fixed and statically resolvable
+objects listed below, add `static=1` or its German alias `statisch=1`. This
+explicit flag renders one native responsive `<svg>` instead of creating a
+JSXGraph board. The SVG keeps the aspect ratio defined by `xmin`, `xmax`,
+`ymin`, and `ymax`; `width` is its maximum width, while `max-width: 100%` and
+automatic height let the browser scale it on narrow screens. Non-scaling
+strokes keep line widths stable; ticks, arrowheads, and labels scale with the
+responsive SVG. Mathematical y coordinates are projected to the SVG's
+downward y axis.
 
 `border=0` is independent. It only hides the frame and disables the usual
 JSXGraph pan, zoom, and resize interaction. It never activates static mode.
 Without `static=1` or `statisch=1`, including when only `border=0` is present,
 the existing JSXGraph path is used unchanged.
 
-The static subset currently supports:
+### Fixed-point registry and dependency boundary
 
-- `@Area` / `@Flaeche` with a direct coordinate list, rendered as one SVG
-  polygon. Explicit color, opacity, `visible=0` / `sichtbar=0`, and the four
-  line styles `solid`, `dashed`, `dotted`, and `dashdotted` are retained.
-- `@distance` / `@Strecke` with a direct coordinate list, rendered as one SVG
-  polyline. Explicit color, line width, visibility, the four line styles, and
-  an ordinary `design=-` path are retained. Repeating the first coordinate at
-  the end closes the path.
-- Multiple supported objects on one board. Their DOM and drawing order follows
-  their order in the course source.
+`@Point` / `@Punkt` contributes to a board-local immutable
+name-to-coordinate registry only when both coordinates are finite numeric
+literals. Static mode freezes such a point even when `fix` is omitted.
+`opacity=0` hides its marker and label but keeps it referenceable. A terminal
+`=0`, for example `A=0`, hides only the displayed name and also keeps `A`
+referenceable. Expressions and runtime bindings including `xexpr=...`,
+`yexpr=...`, `parameter=...`, and `param=...` are rejected.
 
-Named-point references and dynamic or dependent objects are not part of this
-initial subset. This includes points, sliders, function plots, labels and live
-measurements, arrows or end caps, DGS, regression and reconstruction tools,
-tables, and coordinate/construction quizzes. With the normal import, such an
-object targeting a static board produces a developer warning and is not put
-into a retry loop. There is deliberately no automatic whole-board fallback:
-remove the static flag to select JSXGraph reliably and avoid duplicate output.
+Named references in supported static macros resolve only against those
+directly authored literal points on the same board. Derived points and objects
+are not registered: in particular, a rendered midpoint cannot be referenced
+later. Names assigned to lines, circles, sectors, or other objects are labels,
+not dependency targets. Perpendicular and parallel constructions therefore
+accept only a direct base point pair or a pair of fixed-point names; the name
+of an earlier line, ray, vector, or segment is not a static relation basis.
+
+### Supported objects
+
+- `@AxisLabel` / `@AchsenBeschriftung` renders `xlabel` and `ylabel`. When
+  axes are enabled, the SVG also supplies stable axis arrowheads,
+  automatically spaced ticks, and numeric tick labels.
+- `@Point` / `@Punkt` renders each accepted literal fixed point and creates
+  the registry entry described above.
+- `@CoordText` / `@KoordText` places text at one direct coordinate.
+- `@distance` / `@Strecke` and `@Area` / `@Flaeche` accept either direct
+  coordinate lists or names from the fixed-point registry. Segment names and
+  requested length labels are rendered. Requested polygon area and perimeter
+  measurements are rendered at the polygon center.
+- `@Line` / `@Gerade`, `@Ray` / `@Strahl`, and `@Vector` / `@Vektor`
+  accept exactly two direct coordinates or two fixed-point names. Lines and
+  rays are clipped to the board; vectors retain their endpoint arrow. Visible
+  object names are rendered.
+- `@Arc` / `@Bogen` accepts direct endpoints or fixed-point names and is rendered
+  as a cubic Bézier path. Exit and entry angles follow the unit-circle
+  convention, and each control arm is one third of the endpoint distance.
+  Designs `-`, `->`, `<-`, and `<->`, plus leading or trailing `|` end caps,
+  are supported. Color, line width, visibility, and line style are retained,
+  including for vertical curves. A non-empty caption is centered on the curve;
+  an empty caption does not create a text element.
+- `@Midpoint` / `@Mittelpunkt` accepts a direct or named point pair and can
+  render its name and `wert=1` / `value=1` coordinate label. The result is not
+  inserted into the fixed-point registry.
+- `@Perpendicular` / `@Orthogonale` and `@Parallel` / `@Parallele`
+  accept the base and through-point forms described above; a named basis object
+  is not resolved.
+- `@angle` / `@Winkel` accepts three names from the fixed-point registry.
+  The middle entry is the vertex; the directed angle,
+  optional name, and `Wert=1` / `value=1` measurement are rendered.
+- `@Circle` / `@Kreis` accepts a center from the fixed-point registry and
+  either a numeric radius or another registered point as radius reference.
+  Circle name, fill, and
+  requested area and circumference measurements are retained.
+- `@CircularSector`, `@Sector`, `@CircleSegment`, `@CircularSegment`,
+  `@Kreissektor`, and `@Kreissegment` share the same three-point,
+  counterclockwise sector rendering. The second point determines the radius
+  and the third its end direction. The segment aliases remain sectors rather
+  than chord-bounded circular segments. Names and requested measurements are
+  rendered.
+- `@PlotFunction` / `@PlotFunktion` accepts only a self-contained expression
+  using `x`, built-in constants, and supported built-in mathematical functions.
+  The shared safe expression compiler runs without slider, parameter,
+  custom-variable, foreign-function, or previously defined function bindings.
+  Deterministic sampling clips the graph to the board and splits SVG paths at
+  non-finite values and detected discontinuities instead of bridging poles.
+
+Names ending in `=0`, and `name=0` where accepted, suppress only the visible
+label. German measurements retain decimal commas and `FE` / `LE`; English
+measurements retain decimal points and `AU` / `LU`. Plain and dollar-delimited
+text uses a safe readable SVG fallback without MathJax. Complex TeX remains
+readable source text rather than fully typeset output.
+
+Color, opacity, `visible=0` / `sichtbar=0`, line width, supported arrow and
+end-cap designs, and `linestyle=solid|dashed|dotted|dashdotted` (German:
+`linienstil=...`) are retained where the public macro accepts them. Supported
+objects preserve their course-source drawing order.
+
+### Remaining interactive-only features
+
+`@CreatePoint` / `@ErzeugePunkt`, tangents, sliders, plot input, function
+families, function and object analysis points, DGS, regression,
+reconstruction, tables, point-on-graph tasks, and all coordinate/construction
+quiz macros remain interactive. With the normal import, an unsupported object
+targeting a static board produces a developer warning and is not put into a
+retry loop. There is deliberately no automatic whole-board fallback: remove
+`static=1` / `statisch=1` to select JSXGraph and avoid duplicate output.
 
 ``` markdown
-@Koordinatensystem(`xmin=0;xmax=10;ymin=0;ymax=10;width=420;id=static_example;achsen=0;grid=0;border=0;static=1`)
+@Koordinatensystem(`xmin=-5;xmax=5;ymin=-4;ymax=5;width=720;id=static_geometry;achsen=1;grid=1;border=1;statisch=1`)
 
-@Flaeche(`static_example;[[2;2];[8;2];[5;8]];#e63946;0.35;linienstil=dashed`)
+@AchsenBeschriftung(`id=static_geometry;xlabel=$x$;ylabel=$y$`)
 
-@Strecke(`static_example;[[1;1];[9;1];[9;9];[1;1]];#1d3557;;design=-;3px;linestyle=dashdotted`)
+@Punkt(`static_geometry;A;-3;-1;#e63946;0;fix`)
+@Punkt(`static_geometry;B;3;-1;#e63946;0;fix`)
+@Punkt(`static_geometry;C;0;3;#e63946;0;fix`)
+@Punkt(`static_geometry;M;0;0;#457b9d;0`)
+@Punkt(`static_geometry;P;2;0;#457b9d;0`)
+@Punkt(`static_geometry;Q;0;2;#457b9d;0`)
+
+@Flaeche(`static_geometry;[A;B;C];#e63946;0.18;inhalt=1;umfang=1`)
+@Strecke(`static_geometry;[A;B];#1d3557;c;length=1;->;2px`)
+@Winkel(`static_geometry;alpha;[B;A;C];#ff8800;0.8;Wert=1`)
+@Kreis(`static_geometry;k;M;#457b9d;0.08;radius=P`)
+@Kreissektor(`static_geometry;[M;P;Q];#457b9d;0.25;s=0`)
+@PlotFunktion(`static_geometry;f=0;0.12*x^2-2.5;#6a4c93;linestyle=dashed`)
 ```
 
 ### Normal versus lightweight download
@@ -456,6 +539,12 @@ import the lightweight template instead:
 import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/README.static.md
 ```
 
+Or pin the static template to this release:
+
+``` markdown
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.3/README.static.md
+```
+
 Alternatively, the same template is available through jsDelivr:
 
 ``` markdown
@@ -463,10 +552,13 @@ import: https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/README.stat
 ```
 
 That template loads only `dist/static.js`, contains no JSXGraph import, and
-defines only the supported coordinate-system, area, and distance macro aliases.
-It still requires `static=1` or `statisch=1` on every board and has no dynamic
-fallback. Do not import `README.md` and `README.static.md` together. For a
-reproducible course, replace `main` with a release tag containing this feature.
+defines the English and German static aliases for coordinate systems, axis
+labels, points, coordinate text, distances, lines, rays, vectors, arcs,
+perpendiculars, parallels, midpoints, areas, angles, circles, all six
+sector/segment aliases, and function plots. It still requires `static=1` or
+`statisch=1` on every board and has no dynamic fallback. Do not import
+`README.md` and `README.static.md` together. Use the pinned URL above for a
+reproducible course.
 
 ## `@AxisLabel`
 

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <title>lia-coordinate expanded static objects fixture</title>
+</head>
+<body>
+  <main id='fixture'>
+    <div
+      id='static-expanded-host'
+      data-lia-static-coordinate-host
+      data-spec='xmin=-4;xmax=4;ymin=-3;ymax=4;width=480;id=expanded-browser;achsen=1;grid=0;border=0;static=1'
+    ></div>
+
+    <span id='axis-title-spec-expanded-axis' data-spec='id=expanded-browser;xlabel=$x$;ylabel=$y$' style='display:none'></span>
+    <span id='linear-spec-expanded-line' data-kind='line' data-language='en' data-spec='expanded-browser;[A;B];#e63946;g;linestyle=dashed' style='display:none'></span>
+    <span id='linear-spec-expanded-ray' data-kind='ray' data-language='en' data-spec='expanded-browser;[O;C];#654321;r;linestyle=dotted' style='display:none'></span>
+    <span id='circle-spec-expanded-circle' data-language='de' data-spec='expanded-browser;k;O;#457b9d;0.25;radius=R;inhalt=1;umfang=1' style='display:none'></span>
+    <span id='angle-spec-expanded-angle' data-language='de' data-spec='expanded-browser;alpha;[B;O;C];#ff8800;0.8;Wert=1' style='display:none'></span>
+    <span id='sector-spec-expanded-sector' data-language='en' data-spec='expanded-browser;[O;R;C];#2a9d8f;0.3;s;area=1;perimeter=1' style='display:none'></span>
+    <span id='relation-spec-expanded-midpoint' data-kind='midpoint' data-language='de' data-spec='expanded-browser;[A;B];#ff00ff;M;wert=1' style='display:none'></span>
+    <span id='relation-spec-expanded-parallel' data-kind='parallel' data-language='de' data-spec='expanded-browser;[A;B];C;#0088ff;p;linienstil=dashdotted' style='display:none'></span>
+    <span id='plot-spec-expanded-plot' data-spec='expanded-browser;f=0;x^2-1;#6a4c93;linestyle=dotted' style='display:none'></span>
+
+    <span id='point-spec-expanded-a' data-spec='expanded-browser;A=0;-3;-1;#e63946;0;fix' style='display:none'></span>
+    <span id='point-spec-expanded-b' data-spec='expanded-browser;B=0;3;-1;#e63946;0;fix' style='display:none'></span>
+    <span id='point-spec-expanded-c' data-spec='expanded-browser;C=0;0;3;#e63946;0;fix' style='display:none'></span>
+    <span id='point-spec-expanded-o' data-spec='expanded-browser;O=0;0;0;#457b9d;0;fix' style='display:none'></span>
+    <span id='point-spec-expanded-r' data-spec='expanded-browser;R=0;2;0;#457b9d;0;fix' style='display:none'></span>
+  </main>
+
+  <script>
+    window.__staticExpandedStarted = performance.now();
+    window.__staticExpandedIntervals = 0;
+    window.__staticExpandedObservers = 0;
+    window.__staticExpandedWarnings = 0;
+    window.__staticExpandedErrors = 0;
+    window.__staticExpandedErrorMessages = [];
+
+    window.addEventListener('error', function (event) {
+      window.__staticExpandedErrors += 1;
+      window.__staticExpandedErrorMessages.push(String(event && event.message || 'unknown error'));
+    });
+
+    const nativeSetInterval = window.setInterval;
+    window.setInterval = function () {
+      window.__staticExpandedIntervals += 1;
+      return nativeSetInterval.apply(this, arguments);
+    };
+
+    const NativeMutationObserver = window.MutationObserver;
+    window.MutationObserver = function (callback) {
+      window.__staticExpandedObservers += 1;
+      return new NativeMutationObserver(callback);
+    };
+    window.MutationObserver.prototype = NativeMutationObserver.prototype;
+
+    const nativeWarn = console.warn;
+    console.warn = function () {
+      window.__staticExpandedWarnings += 1;
+      return nativeWarn.apply(this, arguments);
+    };
+
+    const nativeError = console.error;
+    console.error = function () {
+      window.__staticExpandedErrors += 1;
+      return nativeError.apply(this, arguments);
+    };
+  </script>
+  <script src='../../dist/static.js'></script>
+  <script>
+    function collectStaticExpandedResult() {
+      const boardId = 'expanded-browser';
+      const host = document.getElementById('static-expanded-host');
+      const markers = Array.from(document.querySelectorAll('#fixture > span[data-spec]'));
+      const groups = Array.from(host.querySelectorAll('g[data-lia-static-kind]'));
+      const svgCount = host.querySelectorAll(':scope > svg[data-lia-static-svg]').length;
+      const elapsed = performance.now() - window.__staticExpandedStarted;
+      if ((svgCount !== 1 || groups.length !== markers.length) && elapsed < 1800) {
+        setTimeout(collectStaticExpandedResult, 250);
+        return;
+      }
+      const kinds = groups.map(function (group) {
+        return group.getAttribute('data-lia-static-kind');
+      });
+      const objectKeys = groups.map(function (group) {
+        return group.getAttribute('data-lia-static-kind') + ':' +
+          group.getAttribute('data-lia-static-uid');
+      });
+      const uniqueObjectKeys = new Set(objectKeys);
+      const plotGroup = host.querySelector('g[data-lia-static-kind=plot]');
+      const result = {
+        svgCount: svgCount,
+        groupCount: groups.length,
+        groupKinds: kinds,
+        pointCount: kinds.filter(function (kind) { return kind === 'point'; }).length,
+        claimedCount: markers.filter(function (marker) {
+          return marker.getAttribute('data-lia-static-claimed') === boardId;
+        }).length,
+        unclaimedCount: markers.filter(function (marker) {
+          return marker.getAttribute('data-lia-static-claimed') !== boardId;
+        }).length,
+        duplicateHostCount: host.querySelectorAll(':scope > svg[data-lia-static-svg]').length === 1 ? 0 : 1,
+        duplicateObjectCount: objectKeys.length - uniqueObjectKeys.size,
+        plotPathCount: plotGroup ? plotGroup.querySelectorAll('path').length : 0,
+        plotEvaluationCount: plotGroup
+          ? Number(plotGroup.getAttribute('data-lia-static-evaluations'))
+          : 0,
+        jsxBoardCount: window.__boards ? Object.keys(window.__boards).length : 0,
+        jxgPresent: typeof window.JXG !== 'undefined',
+        intervalCount: window.__staticExpandedIntervals,
+        observerCount: window.__staticExpandedObservers,
+          warningCount: window.__staticExpandedWarnings,
+          errorCount: window.__staticExpandedErrors,
+          errorMessages: window.__staticExpandedErrorMessages,
+          initMs: Number(elapsed.toFixed(3))
+        };
+        document.body.textContent = 'STATIC_EXPANDED_RESULT:' + JSON.stringify(result);
+      }
+      setTimeout(collectStaticExpandedResult, 750);
+  </script>
+</body>
+</html>
