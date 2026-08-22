@@ -24,6 +24,8 @@ const hostOrderFixtureUrl = new URL('./fixtures/static-host-order.html', import.
 const mixedRuntimeFixtureUrl = new URL('./fixtures/static-mixed-runtime.html', import.meta.url);
 const numberlinesFixtureUrl = new URL('./fixtures/static-numberlines.html', import.meta.url);
 const expandedFixtureUrl = new URL('./fixtures/static-expanded.html', import.meta.url);
+const dynamicDynFlexFixtureUrl =
+  new URL('./fixtures/dynamic-dynflex-performance.html', import.meta.url);
 
 test('headless browser renders the many-diamonds fixture as 259 native geometries', {
   skip: !browserPath ? 'No supported local Chrome/Edge executable was found' : false,
@@ -496,6 +498,129 @@ test('active dynamic runtime respects static guards and prunes a dynamic board s
       errorCount: 0,
       errors: []
     });
+  } finally {
+    rmSync(profileDirectory, { recursive: true, force: true });
+  }
+});
+
+test('six DynFlex boards keep angle and standalone set-square bootstraps and viewport bursts cheap', {
+  skip: !browserPath ? 'No supported local Chrome/Edge executable was found' : false,
+  timeout: 30_000
+}, () => {
+  assert.equal(
+    existsSync(fullBundlePath),
+    true,
+    'dist/index.js is required; run npm run build:full first'
+  );
+
+  const profileDirectory = mkdtempSync(join(tmpdir(), 'lia-coordinate-dynflex-browser-'));
+  try {
+    const browser = spawnSync(browserPath, [
+      '--headless=new',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-extensions',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--allow-file-access-from-files',
+      '--run-all-compositor-stages-before-draw',
+      '--virtual-time-budget=2500',
+      '--user-data-dir=' + profileDirectory,
+      '--dump-dom',
+      dynamicDynFlexFixtureUrl.href
+    ], {
+      encoding: 'utf8',
+      timeout: 25_000,
+      windowsHide: true
+    });
+
+    assert.equal(
+      browser.status,
+      0,
+      'headless browser failed:\n' + String(browser.stderr || browser.error || '')
+    );
+    const match = String(browser.stdout || '')
+      .match(/DYNAMIC_DYNFLEX_PERF_RESULT:(\{[^<]+\})/);
+    assert.ok(
+      match,
+      'dynamic DynFlex result missing; browser=' + browserPath +
+        '; fixture=' + dynamicDynFlexFixtureUrl.href +
+        '; stdout-head=' + String(browser.stdout || '').slice(0, 1600) +
+        '; stdout-tail=' + String(browser.stdout || '').slice(-4000) +
+        '; stderr=' + String(browser.stderr || '').slice(0, 1000)
+    );
+    const result = JSON.parse(match[1].replaceAll('&quot;', String.fromCharCode(34)));
+
+    assert.deepEqual({
+      boardCount: result.boardCount,
+      dynFlexChildCount: result.dynFlexChildCount,
+      setSquareOverlayCount: result.setSquareOverlayCount,
+      visibleSetSquareCount: result.visibleSetSquareCount,
+      standaloneMenuCount: result.standaloneMenuCount,
+      fullSideMenuCount: result.fullSideMenuCount,
+      regressionCanvasCount: result.regressionCanvasCount,
+      angleEntryCount: result.angleEntryCount,
+      createDeltaAfterRepeatedBootstraps: result.createDeltaAfterRepeatedBootstraps,
+      updateDeltaAfterRepeatedBootstraps: result.updateDeltaAfterRepeatedBootstraps,
+      overlayIdentityPreserved: result.overlayIdentityPreserved,
+      repairedOverlayCount: result.repairedOverlayCount,
+      completeStandaloneUiCount: result.completeStandaloneUiCount,
+      resizeDisconnectDeltaAfterRepair: result.resizeDisconnectDeltaAfterRepair,
+      panScheduledRafCount: result.panScheduledRafCount,
+      panCanceledRafCount: result.panCanceledRafCount,
+      panTransformMutationCount: result.panTransformMutationCount,
+      panPivotChangedCount: result.panPivotChangedCount,
+      updateDeltaAfterPan: result.updateDeltaAfterPan,
+      resizeObserverCallbackDelta: result.resizeObserverCallbackDelta,
+      resizeScheduledRafCount: result.resizeScheduledRafCount,
+      resizeCanceledRafCount: result.resizeCanceledRafCount,
+      resizeWidthBefore: result.resizeWidthBefore,
+      resizeWidthAfter: result.resizeWidthAfter,
+      resizePivotChanged: result.resizePivotChanged,
+      resizeTransformChanged: result.resizeTransformChanged,
+      moveListenerCount: result.moveListenerCount,
+      boundingBoxListenerCount: result.boundingBoxListenerCount,
+      errorCount: result.errorCount
+    }, {
+      boardCount: 6,
+      dynFlexChildCount: 6,
+      setSquareOverlayCount: 6,
+      visibleSetSquareCount: 6,
+      standaloneMenuCount: 6,
+      fullSideMenuCount: 0,
+      regressionCanvasCount: 0,
+      angleEntryCount: 6,
+      createDeltaAfterRepeatedBootstraps: 0,
+      updateDeltaAfterRepeatedBootstraps: 0,
+      overlayIdentityPreserved: true,
+      repairedOverlayCount: 3,
+      completeStandaloneUiCount: 6,
+      resizeDisconnectDeltaAfterRepair: 3,
+      panScheduledRafCount: 6,
+      panCanceledRafCount: 0,
+      panTransformMutationCount: 6,
+      panPivotChangedCount: 6,
+      updateDeltaAfterPan: 0,
+      resizeObserverCallbackDelta: 1,
+      resizeScheduledRafCount: 1,
+      resizeCanceledRafCount: 0,
+      resizeWidthBefore: 320,
+      resizeWidthAfter: 400,
+      resizePivotChanged: true,
+      resizeTransformChanged: true,
+      moveListenerCount: 6,
+      boundingBoxListenerCount: 6,
+      errorCount: 0
+    }, 'dynamic DynFlex diagnostics: ' + JSON.stringify(result));
+    assert.ok(
+      result.resizePivotXRatioError < 1e-6,
+      'container resize should preserve the set-square x-pivot ratio: ' +
+        JSON.stringify(result)
+    );
+
+    console.log('dynamic DynFlex browser metrics:', JSON.stringify(result));
   } finally {
     rmSync(profileDirectory, { recursive: true, force: true });
   }

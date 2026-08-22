@@ -77,6 +77,7 @@ interface Window {
   __liaAxisTitleSpecs: Record<string, any>;
   __bootstrapAxisTitles: (() => void) | undefined;
   __refreshAllAxisTitles: (() => void) | undefined;
+  __refreshAxisTitlesForBoard: ((boardId: string) => void) | undefined;
   renderAxisTitlesFromSpec: ((spec: string) => boolean) | undefined;
 
   // Theme sync

@@ -505,6 +505,26 @@ export function applyNavColors(board: any): void {
 
 export function applyGridColor(board: any, color: string): void {
   if (!board || !color) return;
+  const gridSignature = {
+    color,
+    majorGrid: board.__liaMajorGrid,
+    minorGrid: board.__liaMinorGrid,
+    grids: board.grids,
+    gridCount: Array.isArray(board.grids) ? board.grids.length : 0,
+    objects: board.objectsList,
+    objectCount: Array.isArray(board.objectsList) ? board.objectsList.length : 0
+  };
+  const cachedGrid = gridColorCache.get(board);
+  if (
+    cachedGrid &&
+    cachedGrid.color === gridSignature.color &&
+    cachedGrid.majorGrid === gridSignature.majorGrid &&
+    cachedGrid.minorGrid === gridSignature.minorGrid &&
+    cachedGrid.grids === gridSignature.grids &&
+    cachedGrid.gridCount === gridSignature.gridCount &&
+    cachedGrid.objects === gridSignature.objects &&
+    cachedGrid.objectCount === gridSignature.objectCount
+  ) return;
 
   function colorGridElement(grid: any, isMinor: boolean): void {
     if (!grid || typeof grid.setAttribute !== 'function') return;
@@ -548,13 +568,35 @@ export function applyGridColor(board: any, color: string): void {
       });
     }
   } catch (e) {}
+  gridColorCache.set(board, gridSignature);
 }
+
+const gridColorCache = new WeakMap<object, {
+  color: string;
+  majorGrid: any;
+  minorGrid: any;
+  grids: any;
+  gridCount: number;
+  objects: any;
+  objectCount: number;
+}>();
+const axisColorCache = new WeakMap<object, {
+  color: string;
+  xAxis: any;
+  yAxis: any;
+}>();
 
 export function applyAxisColors(board: any): void {
   if (!board || !board.defaultAxes) return;
 
   const col = getNeutralColor();
-
+  const cached = axisColorCache.get(board);
+  if (
+    cached &&
+    cached.color === col &&
+    cached.xAxis === board.defaultAxes.x &&
+    cached.yAxis === board.defaultAxes.y
+  ) return;
   ['x', 'y'].forEach((axisKey: string) => {
     const ax = board.defaultAxes[axisKey];
     if (!ax) return;
@@ -578,6 +620,11 @@ export function applyAxisColors(board: any): void {
     if (typeof board.fullUpdate === 'function') board.fullUpdate();
     else board.update();
   } catch (e) {}
+  axisColorCache.set(board, {
+    color: col,
+    xAxis: board.defaultAxes.x,
+    yAxis: board.defaultAxes.y
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -640,7 +687,11 @@ export function getAdaptiveTickMetric(
 }
 
 // Per-board last-sig cache to avoid redundant setAttribute calls.
-const adaptiveSigCache = new WeakMap<object, string>();
+const adaptiveSigCache = new WeakMap<object, {
+  signature: string;
+  xAxis: any;
+  yAxis: any;
+}>();
 
 export function applyAdaptiveTicks(board: any): void {
   if (!board || !board.defaultAxes) return;
@@ -657,8 +708,13 @@ export function applyAdaptiveTicks(board: any): void {
   if (Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor) < 55) font = 14;
 
   const sig = [majorStepX, majorStepY, minorX, minorY, font].join('|');
-  if (adaptiveSigCache.get(board) === sig) return;
-  adaptiveSigCache.set(board, sig);
+  const cachedTicks = adaptiveSigCache.get(board);
+  if (
+    cachedTicks &&
+    cachedTicks.signature === sig &&
+    cachedTicks.xAxis === board.defaultAxes.x &&
+    cachedTicks.yAxis === board.defaultAxes.y
+  ) return;
 
   try {
     board.defaultAxes.x.setAttribute({ ticks: { insertTicks: false, ticksDistance: majorStepX, minorTicks: minorX, label: { fontSize: font } } });
@@ -674,6 +730,11 @@ export function applyAdaptiveTicks(board: any): void {
     if (typeof board.fullUpdate === 'function') board.fullUpdate();
     else board.update();
   } catch (e) {}
+  adaptiveSigCache.set(board, {
+    signature: sig,
+    xAxis: board.defaultAxes.x,
+    yAxis: board.defaultAxes.y
+  });
 }
 
 export function updateStickyTickLabelPositions(board: any): void {
@@ -686,6 +747,14 @@ export function updateStickyTickLabelPositions(board: any): void {
   const [xmin, ymax, xmax, ymin] = bb;
   const xAxis = board.defaultAxes.x;
   const yAxis = board.defaultAxes.y;
+  const signature = (0 < ymin ? 'below' : 'above') + '|' + (0 < xmin ? 'right' : 'left');
+  const cachedPosition = stickyTickPositionCache.get(board);
+  if (
+    cachedPosition &&
+    cachedPosition.signature === signature &&
+    cachedPosition.xAxis === xAxis &&
+    cachedPosition.yAxis === yAxis
+  ) return;
 
   const xLabel = (0 < ymin)
     ? { anchorX: 'middle', anchorY: 'bottom', offset: [0, 5] }
@@ -700,7 +769,14 @@ export function updateStickyTickLabelPositions(board: any): void {
   try { if (xAxis.defaultTicks) xAxis.defaultTicks.setAttribute({ label: xLabel }); } catch (e) {}
   try { if (yAxis.defaultTicks) yAxis.defaultTicks.setAttribute({ label: yLabel }); } catch (e) {}
   try { board.update(); } catch (e) {}
+  stickyTickPositionCache.set(board, { signature, xAxis, yAxis });
 }
+
+const stickyTickPositionCache = new WeakMap<object, {
+  signature: string;
+  xAxis: any;
+  yAxis: any;
+}>();
 
 // ---------------------------------------------------------------------------
 // Resize handle
@@ -943,6 +1019,16 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapDGS);
 }
 
+let externalBootstrapRAF = 0;
+
+function scheduleExternalBootstraps(): void {
+  if (externalBootstrapRAF) return;
+  externalBootstrapRAF = requestAnimationFrame(() => {
+    externalBootstrapRAF = 0;
+    runExternalBootstraps();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // JSXGraph object creation — called with a live board reference
 // ---------------------------------------------------------------------------
@@ -1095,7 +1181,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       !!window.__boards && window.__boards[cfg.id] === board;
   }
 
-  function applyAll(): void {
+  function applyAppearance(): void {
     if (cfg.border) {
       applyBoardFrame(board);
     } else {
@@ -1123,18 +1209,27 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       updateStickyTickLabelPositions(board);
     }
     if (cfg.border) {
-      ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
+      ensureResizeHandle(board, initialBBox, cfg.id, applyAppearance);
     } else {
       try {
         const handle = board.containerObj.querySelector('.lia-jxg-resize-handle') as HTMLElement | null;
         if (handle) handle.remove();
       } catch (e) {}
     }
+  }
+
+  function applyAll(): void {
+    applyAppearance();
+    scheduleExternalBootstraps();
+  }
+
+  function applyPublicHook(): void {
+    applyAppearance();
     runExternalBootstraps();
   }
 
   window.__liaCoordHooks = window.__liaCoordHooks || {};
-  window.__liaCoordHooks[cfg.id] = applyAll;
+  window.__liaCoordHooks[cfg.id] = applyPublicHook;
 
 
   // Initial sizing.
@@ -1173,7 +1268,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   let colorSchemeHandler: (() => void) | null = null;
   try {
     colorSchemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    colorSchemeHandler = function(): void { if (isCurrentBoard()) applyAll(); };
+    colorSchemeHandler = function(): void { if (isCurrentBoard()) applyAppearance(); };
     if (colorSchemeMediaQuery && typeof colorSchemeMediaQuery.addEventListener === 'function') {
       colorSchemeMediaQuery.addEventListener('change', colorSchemeHandler);
     } else if (colorSchemeMediaQuery && typeof (colorSchemeMediaQuery as any).addListener === 'function') {
@@ -1204,7 +1299,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       fitBoardSize(board, initialBBox, cfg.width, initialRatio, cfg.id);
       lastRenderedWidth = readRenderedOuterSize(board.containerObj, 'width');
       lastRenderedHeight = readRenderedOuterSize(board.containerObj, 'height');
-      applyAll();
+      applyAppearance();
     });
   }
 
@@ -1245,6 +1340,14 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 
   // Bounding-box change (pan/zoom).
   let bboxRAF = 0;
+  let boardStateSaveTimer = 0;
+  const scheduleBoardStateSave = function(): void {
+    if (boardStateSaveTimer) window.clearTimeout(boardStateSaveTimer);
+    boardStateSaveTimer = window.setTimeout(function() {
+      boardStateSaveTimer = 0;
+      if (isCurrentBoard()) saveBoardState(board, cfg.id, initialBBox);
+    }, 140);
+  };
   board.on('boundingbox', function() {
     if (bboxRAF) return;
     bboxRAF = requestAnimationFrame(function() {
@@ -1252,7 +1355,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       if (userViewportPointerActive || Date.now() <= userViewportIntentUntil) {
         board.__coordExportBBox = getSafeBBox(board, initialBBox);
       }
-      saveBoardState(board, cfg.id, initialBBox);
+      scheduleBoardStateSave();
 
       // Suspend all internal updates during pan/zoom for massive performance boost
       try {
@@ -1262,14 +1365,12 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       try {
         if (cfg.axes) {
           applyAdaptiveTicks(board);
-          applyAxisColors(board);
           updateStickyTickLabelPositions(board);
         }
-        if (cfg.border) ensureResizeHandle(board, initialBBox, cfg.id, applyAll);
 
         // Keep pan/zoom lightweight: avoid full DOM bootstrap scans on each move.
         // Axis titles need positional refresh on bounding-box changes.
-        if (window.__refreshAllAxisTitles) window.__refreshAllAxisTitles();
+        if (window.__refreshAxisTitlesForBoard) window.__refreshAxisTitlesForBoard(cfg.id);
       } catch (e) {}
 
       // Resume updates at the very end
@@ -1306,6 +1407,13 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       if (bboxRAF) cancelAnimationFrame(bboxRAF);
       bboxRAF = 0;
     } catch (e) {}
+    try {
+      if (boardStateSaveTimer) {
+        window.clearTimeout(boardStateSaveTimer);
+        boardStateSaveTimer = 0;
+        saveBoardState(board, cfg.id, initialBBox);
+      }
+    } catch (e) {}
     try { board.__coordContentResizeObserver?.disconnect(); } catch (e) {}
     board.__coordContentResizeObserver = null;
     try { window.removeEventListener('resize', scheduleLayoutRefit); } catch (e) {}
@@ -1319,7 +1427,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       }
     } catch (e) {}
     try {
-      if (window.__liaCoordHooks && window.__liaCoordHooks[cfg.id] === applyAll) {
+      if (window.__liaCoordHooks && window.__liaCoordHooks[cfg.id] === applyPublicHook) {
         delete window.__liaCoordHooks[cfg.id];
       }
     } catch (e) {}

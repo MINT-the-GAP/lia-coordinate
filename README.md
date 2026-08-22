@@ -1,6 +1,6 @@
 <!--
 author:   MINT-the-GAP, Martin Lommatzsch, Jihad Hyadi
-version:  0.0.3
+version:  0.0.4
 language: en
 edit: true
 narrator: US English Female
@@ -344,7 +344,7 @@ https://github.com/MINT-the-GAP/lia-coordinate
 
    or pin to a specific version:
 
-   `import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.3/README.md`
+   `import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.4/README.md`
 
 2. Also requires JSXGraph (already included via the `import:` above):
 
@@ -542,7 +542,7 @@ import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/READM
 Or pin the static template to this release:
 
 ``` markdown
-import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.3/README.static.md
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.4/README.static.md
 ```
 
 Alternatively, the same template is available through jsDelivr:
@@ -1840,8 +1840,10 @@ actual triangular surface remains visible and draggable. This limited off-board 
 across layout changes. If board panning carries it completely out of view, hiding and showing it
 again restores that draggable portion at the nearest board edge. The compact toolbar contains the set square
 but no compass. Repeated LiaScript
-bootstraps do not reopen a set square that the user has deliberately hidden. If `@DGS`,
-`@Zirkel`, or `@Compass` targets the same board, all macros share one DGS controller.
+bootstraps do not reopen a set square that the user has deliberately hidden. On its own, the
+set square uses a lightweight overlay controller, avoiding the full DGS and regression UI. If
+`@DGS`, `@Zirkel`, or `@Compass` targets the same board, all macros share one full DGS
+controller; removing those macros switches the board back to the lightweight controller.
 
 Parameters: `<boardId>`
 

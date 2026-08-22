@@ -1,6 +1,6 @@
 <!--
 author:   MINT-the-GAP, Martin Lommatzsch, Jihad Hyadi
-version:  0.0.3
+version:  0.0.4
 language: en
 comment:  Lightweight static SVG subset of lia-coordinate without JSXGraph.
 
@@ -136,7 +136,7 @@ import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/main/READM
 For a reproducible course, pin this release:
 
 ``` markdown
-import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.3/README.static.md
+import: https://raw.githubusercontent.com/MINT-the-GAP/lia-coordinate/0.0.4/README.static.md
 ```
 
 The equivalent jsDelivr URL is:

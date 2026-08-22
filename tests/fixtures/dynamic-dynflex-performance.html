@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang=de>
+<head>
+  <meta charset=utf-8>
+  <title>lia-coordinate dynamic DynFlex performance fixture</title>
+  <style>
+    .dynFlex {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      width: 1020px;
+    }
+
+    .dynFlex > .flex-child {
+      flex: 0 0 330px;
+      min-width: 0;
+    }
+
+    .jxgbox {
+      position: relative;
+      width: 320px;
+      height: 240px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <main id=fixture class=dynFlex></main>
+  <pre id=result>running</pre>
+  <script>
+    (function () {
+      const nativeRequestAnimationFrame = window.requestAnimationFrame.bind(window);
+      const NativeResizeObserver = window.ResizeObserver;
+      const errors = [];
+      const animationFrameQueue = new Map();
+      const resizeObservers = new Set();
+      let nextAnimationFrameHandle = 1;
+      let requestedAnimationFrames = 0;
+      let canceledAnimationFrames = 0;
+      let resizeObserverCallbacks = 0;
+      let resizeObserverDisconnects = 0;
+
+      window.requestAnimationFrame = function (callback) {
+        requestedAnimationFrames += 1;
+        const handle = nextAnimationFrameHandle;
+        nextAnimationFrameHandle += 1;
+        animationFrameQueue.set(handle, callback);
+        return handle;
+      };
+      window.cancelAnimationFrame = function (handle) {
+        canceledAnimationFrames += 1;
+        animationFrameQueue.delete(handle);
+      };
+      window.ResizeObserver = class {
+        constructor(callback) {
+          const owner = this;
+          this.callback = callback;
+          this.targets = new Set();
+          this.inner = new NativeResizeObserver(function (entries) {
+            resizeObserverCallbacks += 1;
+            callback(entries, owner);
+          });
+          resizeObservers.add(this);
+        }
+        observe(target) {
+          this.targets.add(target);
+          return this.inner.observe(target);
+        }
+        unobserve(target) {
+          this.targets.delete(target);
+          return this.inner.unobserve(target);
+        }
+        disconnect() {
+          resizeObserverDisconnects += 1;
+          this.targets.clear();
+          resizeObservers.delete(this);
+          return this.inner.disconnect();
+        }
+      };
+      window.addEventListener('error', function (event) {
+        errors.push(String(event.error && event.error.stack || event.message || 'unknown error'));
+      });
+      window.addEventListener('unhandledrejection', function (event) {
+        errors.push(String(event.reason && event.reason.stack || event.reason || 'unknown rejection'));
+      });
+
+      function createRenderedNode(type) {
+        const node = document.createElement(type === 'text' ? 'span' : 'div');
+        node.style.display = 'none';
+        return node;
+      }
+
+      function createBoard(boardId, container) {
+        const listeners = Object.create(null);
+        const metrics = {
+          creates: 0,
+          removes: 0,
+          updates: 0,
+          emits: 0
+        };
+        const board = {
+          id: boardId,
+          container: boardId,
+          containerObj: container,
+          origin: { scrCoords: [1, 160, 120] },
+          unitX: 40,
+          unitY: 40,
+          canvasWidth: 320,
+          canvasHeight: 240,
+          objects: Object.create(null),
+          objectsList: [],
+          metrics: metrics,
+          on: function (name, callback) {
+            if (!listeners[name]) listeners[name] = new Set();
+            listeners[name].add(callback);
+          },
+          off: function (name, callback) {
+            if (listeners[name]) listeners[name].delete(callback);
+          },
+          emit: function (name) {
+            metrics.emits += 1;
+            Array.from(listeners[name] || []).forEach(function (callback) {
+              callback();
+            });
+          },
+          listenerCount: function (name) {
+            return listeners[name] ? listeners[name].size : 0;
+          },
+          create: function (type, parents, attributes) {
+            metrics.creates += 1;
+            const object = {
+              id: boardId + '-object-' + metrics.creates,
+              board: board,
+              elType: type,
+              type: type,
+              parents: parents,
+              attributes: Object.assign({}, attributes),
+              visProp: Object.assign({}, attributes),
+              rendNode: createRenderedNode(type),
+              setAttribute: function (next) {
+                Object.assign(object.attributes, next || {});
+                Object.assign(object.visProp, next || {});
+              },
+              showElement: function () {
+                object.visProp.visible = true;
+              },
+              hideElement: function () {
+                object.visProp.visible = false;
+              }
+            };
+            if (type === 'angle') {
+              object.arc = {
+                visProp: {},
+                setAttribute: function (next) {
+                  Object.assign(object.arc.visProp, next || {});
+                },
+                hideElement: function () {
+                  object.arc.visProp.visible = false;
+                }
+              };
+            }
+            board.objects[object.id] = object;
+            board.objectsList.push(object);
+            return object;
+          },
+          removeObject: function (object) {
+            metrics.removes += 1;
+            const index = board.objectsList.indexOf(object);
+            if (index >= 0) board.objectsList.splice(index, 1);
+            if (object && object.id) delete board.objects[object.id];
+          },
+          update: function () {
+            metrics.updates += 1;
+          }
+        };
+        return board;
+      }
+
+      function createPoint(board, name, x, y) {
+        return {
+          id: board.id + '-point-' + name,
+          name: name,
+          board: board,
+          elType: 'point',
+          X: function () { return x; },
+          Y: function () { return y; }
+        };
+      }
+
+      window.__boards = Object.create(null);
+      window.__points = Object.create(null);
+      const root = document.getElementById('fixture');
+      const boardIds = [];
+
+      for (let index = 0; index < 6; index += 1) {
+        const boardId = 'dynflex-perf-' + index;
+        boardIds.push(boardId);
+
+        const flexChild = document.createElement('section');
+        flexChild.className = 'flex-child';
+        flexChild.style.setProperty('--w', '330px');
+        const boardContainer = document.createElement('div');
+        boardContainer.id = boardId;
+        boardContainer.className = 'jxgbox';
+        flexChild.appendChild(boardContainer);
+        root.appendChild(flexChild);
+
+        const board = createBoard(boardId, boardContainer);
+        window.__boards[boardId] = board;
+        window.__points[boardId] = {
+          A: createPoint(board, 'A', -2, 0),
+          B: createPoint(board, 'B', 0, 0),
+          C: createPoint(board, 'C', 0, 2)
+        };
+
+        const angleMarker = document.createElement('span');
+        angleMarker.id = 'angle-spec-dynflex-perf-' + index;
+        angleMarker.dataset.spec =
+          boardId + ';alpha;[A;B;C];#e63946;0.85;Wert=1';
+        angleMarker.dataset.language = 'de';
+        angleMarker.hidden = true;
+        flexChild.appendChild(angleMarker);
+
+        const setSquareMarker = document.createElement('span');
+        setSquareMarker.id = 'dgs-instrument-ui-dynflex-perf-' + index;
+        setSquareMarker.dataset.spec = boardId;
+        setSquareMarker.dataset.instrument = 'set-square';
+        setSquareMarker.dataset.language = 'de';
+        setSquareMarker.hidden = true;
+        flexChild.appendChild(setSquareMarker);
+      }
+
+      window.__dynFlexPerformanceFixture = {
+        boardIds: boardIds,
+        errors: errors,
+        nativeRequestAnimationFrame: nativeRequestAnimationFrame,
+        flushAnimationFrames: function () {
+          const callbacks = Array.from(animationFrameQueue.values());
+          animationFrameQueue.clear();
+          callbacks.forEach(function (callback) {
+            callback(performance.now());
+          });
+          return callbacks.length;
+        },
+        flushResizeObservers: function (target) {
+          resizeObservers.forEach(function (observer) {
+            if (!observer.targets.has(target)) return;
+            resizeObserverCallbacks += 1;
+            observer.callback([{
+              target: target,
+              contentRect: target.getBoundingClientRect()
+            }], observer);
+          });
+        },
+        requestedAnimationFrames: function () { return requestedAnimationFrames; },
+        canceledAnimationFrames: function () { return canceledAnimationFrames; },
+        resizeObserverCallbacks: function () { return resizeObserverCallbacks; },
+        resizeObserverDisconnects: function () { return resizeObserverDisconnects; }
+      };
+    })();
+  </script>
+  <script src=../../dist/index.js></script>
+  <script>
+    (function () {
+      const fixture = window.__dynFlexPerformanceFixture;
+      const boardIds = fixture.boardIds;
+      const nativeRAF = fixture.nativeRequestAnimationFrame;
+      let nativeFrameSeen = false;
+
+      function sumMetric(name) {
+        return boardIds.reduce(function (sum, boardId) {
+          return sum + Number(window.__boards[boardId].metrics[name] || 0);
+        }, 0);
+      }
+
+      function afterRendering(callback) {
+        if (nativeFrameSeen) {
+          fixture.flushAnimationFrames();
+          callback();
+          return;
+        }
+        nativeRAF(function () {
+          nativeFrameSeen = true;
+          for (let pass = 0; pass < 8; pass += 1) {
+            if (!fixture.flushAnimationFrames()) break;
+          }
+          callback();
+        });
+      }
+
+      function readPivot(overlay) {
+        return {
+          x: Number(overlay && overlay.dataset.pivotX),
+          y: Number(overlay && overlay.dataset.pivotY)
+        };
+      }
+
+      function getStandaloneUi(boardId) {
+        const container = window.__boards[boardId].containerObj;
+        return {
+          container: container,
+          overlay: container.querySelector('.lia-dgs-set-square-overlay'),
+          menuClip: container.querySelector('.lia-dgs-standalone-set-square-menu'),
+          menuBar: container.querySelector(
+            '.lia-dgs-standalone-set-square-menu > .lia-dgs-top-menu'
+          ),
+          hamburger: container.querySelector(
+            '.lia-dgs-menu-button.lia-dgs-standalone-set-square-button'
+          ),
+          setSquareButton: container.querySelector(
+            '.lia-dgs-standalone-set-square-menu .lia-dgs-set-square-button'
+          )
+        };
+      }
+
+      function isCompleteStandaloneUi(boardId) {
+        const ui = getStandaloneUi(boardId);
+        return !!(
+          ui.overlay &&
+          ui.menuClip &&
+          ui.menuBar &&
+          ui.hamburger &&
+          ui.setSquareButton &&
+          ui.overlay.parentElement === ui.container &&
+          ui.menuClip.parentElement === ui.container &&
+          ui.hamburger.parentElement === ui.container &&
+          ui.overlay.querySelector('.lia-dgs-set-square-surface') &&
+          ui.container.querySelectorAll('.lia-dgs-set-square-overlay').length === 1 &&
+          ui.container.querySelectorAll('.lia-dgs-standalone-set-square-menu').length === 1 &&
+          ui.container.querySelectorAll(
+            '.lia-dgs-menu-button.lia-dgs-standalone-set-square-button'
+          ).length === 1 &&
+          ui.container.querySelectorAll(
+            '.lia-dgs-standalone-set-square-menu .lia-dgs-set-square-button'
+          ).length === 1
+        );
+      }
+
+      afterRendering(function () {
+        const initialOverlays = boardIds.map(function (boardId) {
+          return window.__boards[boardId].containerObj.querySelector(
+            '.lia-dgs-set-square-overlay'
+          );
+        });
+        const createsBeforeRepeat = sumMetric('creates');
+        const updatesBeforeRepeat = sumMetric('updates');
+
+        for (let repeat = 0; repeat < 20; repeat += 1) {
+          window.__bootstrapAngles();
+          window.__bootstrapDGS();
+        }
+
+        afterRendering(function () {
+          const createsAfterRepeat = sumMetric('creates');
+          const updatesAfterRepeat = sumMetric('updates');
+          const overlaysAfterRepeat = boardIds.map(function (boardId) {
+            return window.__boards[boardId].containerObj.querySelector(
+              '.lia-dgs-set-square-overlay'
+            );
+          });
+          const overlayIdentityPreserved = initialOverlays.every(function (overlay, index) {
+            return overlay && overlay === overlaysAfterRepeat[index];
+          });
+
+          const resizeDisconnectsBeforeRepair = fixture.resizeObserverDisconnects();
+          const connectedStash = document.createElement('div');
+          document.body.appendChild(connectedStash);
+          connectedStash.appendChild(getStandaloneUi(boardIds[0]).hamburger);
+          getStandaloneUi(boardIds[1]).overlay.replaceChildren();
+          getStandaloneUi(boardIds[2]).menuBar.remove();
+          window.__bootstrapDGS();
+
+          afterRendering(function () {
+            const overlaysAfterRepair = boardIds.map(function (boardId) {
+              return getStandaloneUi(boardId).overlay;
+            });
+            const repairedOverlayCount = overlaysAfterRepair.reduce(function (
+              count,
+              overlay,
+              index
+            ) {
+              return count + (overlay !== overlaysAfterRepeat[index] ? 1 : 0);
+            }, 0);
+            const completeStandaloneUiCount = boardIds.filter(function (boardId) {
+              return isCompleteStandaloneUi(boardId);
+            }).length;
+            const resizeDisconnectDeltaAfterRepair =
+              fixture.resizeObserverDisconnects() - resizeDisconnectsBeforeRepair;
+
+          let transformMutationCount = 0;
+          const observers = overlaysAfterRepair.map(function (overlay) {
+            const observer = new MutationObserver(function (records) {
+              transformMutationCount += records.filter(function (record) {
+                return record.type === 'attributes' && record.attributeName === 'style';
+              }).length;
+            });
+            observer.observe(overlay, { attributes: true, attributeFilter: ['style'] });
+            return observer;
+          });
+          const pivotsBeforePan = overlaysAfterRepair.map(readPivot);
+          const transformsBeforePan = overlaysAfterRepair.map(function (overlay) {
+            return overlay.style.transform;
+          });
+
+          const rafBeforePan = fixture.requestedAnimationFrames();
+          const canceledBeforePan = fixture.canceledAnimationFrames();
+          const updatesBeforePan = sumMetric('updates');
+          boardIds.forEach(function (boardId, boardIndex) {
+            const board = window.__boards[boardId];
+            for (let step = 0; step < 24; step += 1) {
+              board.origin.scrCoords[1] = 160 + step + boardIndex;
+              board.origin.scrCoords[2] = 120 - step;
+              board.unitX = 40 + step * 0.05;
+              board.unitY = 40 + step * 0.05;
+              board.emit('move');
+              board.emit('boundingbox');
+            }
+          });
+          const panScheduledRafCount = fixture.requestedAnimationFrames() - rafBeforePan;
+          const panCanceledRafCount = fixture.canceledAnimationFrames() - canceledBeforePan;
+
+          afterRendering(function () {
+            observers.forEach(function (observer) {
+              transformMutationCount += observer.takeRecords().filter(function (record) {
+                return record.type === 'attributes' && record.attributeName === 'style';
+              }).length;
+              observer.disconnect();
+            });
+            const pivotsAfterPan = overlaysAfterRepair.map(readPivot);
+            const panPivotChangedCount = pivotsAfterPan.reduce(function (count, pivot, index) {
+              const before = pivotsBeforePan[index];
+              const transformChanged =
+                overlaysAfterRepair[index].style.transform !== transformsBeforePan[index];
+              const pivotChanged =
+                Math.abs(pivot.x - before.x) > 1e-6 ||
+                Math.abs(pivot.y - before.y) > 1e-6;
+              return count + (transformChanged && pivotChanged ? 1 : 0);
+            }, 0);
+
+            const resizeBoard = window.__boards[boardIds[2]];
+            const resizeContainer = resizeBoard.containerObj;
+            const resizeOverlay = getStandaloneUi(boardIds[2]).overlay;
+            const widthBeforeResize = resizeContainer.clientWidth;
+            const pivotBeforeResize = readPivot(resizeOverlay);
+            const pivotXRatioBeforeResize = pivotBeforeResize.x / widthBeforeResize;
+            const transformBeforeResize = resizeOverlay.style.transform;
+            const rafBeforeResize = fixture.requestedAnimationFrames();
+            const canceledBeforeResize = fixture.canceledAnimationFrames();
+            const callbacksBeforeResize = fixture.resizeObserverCallbacks();
+            resizeContainer.style.width = '400px';
+            resizeBoard.canvasWidth = 400;
+            fixture.flushResizeObservers(resizeContainer);
+            resizeBoard.emit('boundingbox');
+
+            afterRendering(function () {
+              const pivotAfterResize = readPivot(resizeOverlay);
+              const widthAfterResize = resizeContainer.clientWidth;
+              const resizePivotXRatioError = Math.abs(
+                pivotAfterResize.x / widthAfterResize - pivotXRatioBeforeResize
+              );
+            const result = {
+              boardCount: boardIds.length,
+              dynFlexChildCount: document.querySelectorAll('.dynFlex > .flex-child').length,
+              setSquareOverlayCount: document.querySelectorAll(
+                '.lia-dgs-set-square-overlay'
+              ).length,
+              visibleSetSquareCount: document.querySelectorAll(
+                '.lia-dgs-set-square-overlay.is-visible'
+              ).length,
+              standaloneMenuCount: document.querySelectorAll(
+                '.lia-dgs-standalone-set-square-menu'
+              ).length,
+              fullSideMenuCount: document.querySelectorAll('.lia-dgs-side-menu').length,
+              regressionCanvasCount: document.querySelectorAll('.lia-plot-draw-layer').length,
+              angleEntryCount: Object.keys(window.__angleEntries || {}).length,
+              createDeltaAfterRepeatedBootstraps: createsAfterRepeat - createsBeforeRepeat,
+              updateDeltaAfterRepeatedBootstraps: updatesAfterRepeat - updatesBeforeRepeat,
+              overlayIdentityPreserved: overlayIdentityPreserved,
+              repairedOverlayCount: repairedOverlayCount,
+              completeStandaloneUiCount: completeStandaloneUiCount,
+              resizeDisconnectDeltaAfterRepair: resizeDisconnectDeltaAfterRepair,
+              panScheduledRafCount: panScheduledRafCount,
+              panCanceledRafCount: panCanceledRafCount,
+              panTransformMutationCount: transformMutationCount,
+              panPivotChangedCount: panPivotChangedCount,
+              updateDeltaAfterPan: sumMetric('updates') - updatesBeforePan,
+              resizeObserverCallbackDelta:
+                fixture.resizeObserverCallbacks() - callbacksBeforeResize,
+              resizeScheduledRafCount:
+                fixture.requestedAnimationFrames() - rafBeforeResize,
+              resizeCanceledRafCount:
+                fixture.canceledAnimationFrames() - canceledBeforeResize,
+              resizeWidthBefore: widthBeforeResize,
+              resizeWidthAfter: widthAfterResize,
+              resizePivotChanged:
+                Math.abs(pivotAfterResize.x - pivotBeforeResize.x) > 1e-6,
+              resizeTransformChanged: resizeOverlay.style.transform !== transformBeforeResize,
+              resizePivotXRatioError: resizePivotXRatioError,
+              moveListenerCount: boardIds.reduce(function (sum, boardId) {
+                return sum + window.__boards[boardId].listenerCount('move');
+              }, 0),
+              boundingBoxListenerCount: boardIds.reduce(function (sum, boardId) {
+                return sum + window.__boards[boardId].listenerCount('boundingbox');
+              }, 0),
+              errorCount: fixture.errors.length,
+              errors: fixture.errors
+            };
+            document.body.textContent =
+              'DYNAMIC_DYNFLEX_PERF_RESULT:' + JSON.stringify(result);
+            });
+          });
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

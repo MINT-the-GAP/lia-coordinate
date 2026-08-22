@@ -335,7 +335,7 @@ export function init(): void {
   }
 
   function createLabel(board: any, points: any[], cfg: AngleConfig): any {
-    const label = board.create('text', [
+    return board.create('text', [
       function() { return labelPosition(board, points).x; },
       function() { return labelPosition(board, points).y; },
       function() { return labelText(cfg, points); }
@@ -356,11 +356,6 @@ export function init(): void {
       cssStyle: 'opacity:' + cfg.opacity + ';',
       fontSize: 16
     });
-
-    scheduleBootstrap(function() {
-      try { board.update(); } catch (e) {}
-    });
-    return label;
   }
 
   function samePoints(a: any[], b: any[]): boolean {
@@ -395,6 +390,7 @@ export function init(): void {
     }
 
     const old = window.__angleEntries[key];
+    const valueDisplayAllowed = mayDisplayDgsValues(cfg.boardId);
     if (
       old &&
       old.board === board &&
@@ -407,11 +403,20 @@ export function init(): void {
       old.angle &&
       (!(cfg.showName || cfg.showValue) || old.label)
     ) {
+      if (
+        old.color === cfg.color &&
+        old.opacity === cfg.opacity &&
+        old.hasExplicitColor === cfg.hasExplicitColor &&
+        old.visible === cfg.visible &&
+        old.lineStyle === cfg.lineStyle &&
+        old.valueDisplayAllowed === valueDisplayAllowed
+      ) return true;
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
       old.lineStyle = cfg.lineStyle;
+      old.valueDisplayAllowed = valueDisplayAllowed;
       applyAngleStyle(old.angle, cfg.color, cfg.opacity);
       applyLabelStyle(old.label, cfg.color, cfg.opacity);
       applyAngleVisibility(old.angle, old.label, cfg);
@@ -477,6 +482,7 @@ export function init(): void {
         language: cfg.language,
         visible: cfg.visible,
         lineStyle: cfg.lineStyle,
+        valueDisplayAllowed: valueDisplayAllowed,
         board: board,
         angle: angle,
         label: label

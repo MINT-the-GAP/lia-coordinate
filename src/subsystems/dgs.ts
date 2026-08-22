@@ -235,6 +235,7 @@ type DgsState = {
   uid: string;
   boardId: string;
   language: 'de' | 'en';
+  macroOwned: boolean;
   macroSpecSignature: string;
   board: any;
   boardContainer: HTMLElement;
@@ -364,6 +365,8 @@ type DgsState = {
   setSquareLastContainerHeight: number;
   setSquareRulerSignature: string;
   setSquareLayoutRAF?: number;
+  setSquareLayoutSource?: DgsSetSquareLayoutSource;
+  setSquarePersistTimer?: number;
   compassButton: HTMLButtonElement;
   compassSubmenu: HTMLDivElement;
   compassToolButton: HTMLButtonElement;
@@ -532,12 +535,60 @@ type DgsState = {
   onDocumentPointerCancel?: (evt: PointerEvent) => void;
   onFullscreenChange?: () => void;
   resizeObserver?: ResizeObserver;
+  menuResizeObserver?: ResizeObserver;
   fullscreenResizeRAF?: number;
   fullscreenReleaseTimer?: number;
   axisAnimationRAF?: number;
   axisSyncRAF?: number;
   xAxisAnimationRAF?: number;
   xAxisSyncRAF?: number;
+};
+
+type DgsSetSquareState = Pick<DgsState,
+  'boardId' |
+  'language' |
+  'board' |
+  'boardContainer' |
+  'setSquareButton' |
+  'setSquareOverlay' |
+  'setSquareVisible' |
+  'setSquareInitialized' |
+  'setSquarePivotX' |
+  'setSquarePivotY' |
+  'setSquarePivotUserX' |
+  'setSquarePivotUserY' |
+  'setSquarePivotXRatio' |
+  'setSquarePivotYRatio' |
+  'setSquareAngle' |
+  'setSquareScale' |
+  'setSquarePointerId' |
+  'setSquareInteraction' |
+  'setSquareStartClientX' |
+  'setSquareStartClientY' |
+  'setSquareStartPivotX' |
+  'setSquareStartPivotY' |
+  'setSquareStartAngle' |
+  'setSquareStartPointerAngle' |
+  'setSquareStartScale' |
+  'setSquareStartPointerDistance' |
+  'setSquareLastContainerWidth' |
+  'setSquareLastContainerHeight' |
+  'setSquareRulerSignature' |
+  'setSquareLayoutRAF' |
+  'setSquareLayoutSource' |
+  'setSquarePersistTimer'
+>;
+
+type DgsStandaloneSetSquareState = DgsSetSquareState & {
+  uid: string;
+  button: HTMLButtonElement;
+  menuClip: HTMLDivElement;
+  menuBar: HTMLDivElement;
+  setSquareGraphic: SVGSVGElement;
+  setSquareSurface: SVGPathElement;
+  open: boolean;
+  onBoardViewportChange?: () => void;
+  resizeObserver?: ResizeObserver;
 };
 
 type DgsObjectPropertiesMode = 'full' | 'colors-trace' | 'locked';
@@ -632,7 +683,10 @@ const DGS_SET_SQUARE_ICON =
   '<path class=lia-dgs-set-square-icon-accent d=M12,4.5V17.6M10.7,4.5H13.3></path>' +
   '</svg>';
 
+let dgsSetSquareGraphicCache = '';
+
 function createDgsSetSquareGraphic(): string {
+  if (dgsSetSquareGraphicCache) return dgsSetSquareGraphicCache;
   const number = (value: number): string => {
     const rounded = Math.round(value * 100) / 100;
     return String(rounded);
@@ -706,7 +760,7 @@ function createDgsSetSquareGraphic(): string {
     else edgeAngleTicksMinor += tick;
   }
 
-  return [
+  dgsSetSquareGraphicCache = [
     '<svg viewBox=0,0,' + DGS_SET_SQUARE_VIEW_WIDTH + ',' +
       DGS_SET_SQUARE_VIEW_HEIGHT + ' aria-hidden=true>',
     '<title class=lia-dgs-set-square-svg-title></title>',
@@ -749,6 +803,7 @@ function createDgsSetSquareGraphic(): string {
     '</g>',
     '</svg>'
   ].join('');
+  return dgsSetSquareGraphicCache;
 }
 
 const DGS_ZOOM_ICONS: Record<'both' | 'vertical' | 'horizontal', string> = {
@@ -1140,6 +1195,31 @@ function setDgsAxisScaleMode(state: DgsState, modeValue: unknown, save = true): 
 }
 
 const states: Record<string, DgsState> = {};
+const standaloneSetSquares: Record<string, DgsStandaloneSetSquareState> = {};
+
+function isLiveStandaloneSetSquare(
+  state: DgsStandaloneSetSquareState | null | undefined
+): state is DgsStandaloneSetSquareState {
+  if (!state) return false;
+  const board = window.__boards && window.__boards[state.boardId];
+  const boardContainer = getBoardContainer(state.boardId);
+  return state.board === board &&
+    state.boardContainer === boardContainer &&
+    state.setSquareOverlay.isConnected &&
+    state.setSquareOverlay.parentElement === state.boardContainer &&
+    state.button.isConnected &&
+    state.button.parentElement === state.boardContainer &&
+    state.menuClip.isConnected &&
+    state.menuClip.parentElement === state.boardContainer &&
+    state.menuBar.isConnected &&
+    state.setSquareButton.isConnected &&
+    state.menuBar.parentElement === state.menuClip &&
+    state.setSquareButton.parentElement === state.menuBar &&
+    state.setSquareGraphic.isConnected &&
+    state.setSquareGraphic.parentElement === state.setSquareOverlay &&
+    state.setSquareSurface.isConnected &&
+    state.setSquareSurface.parentNode === state.setSquareGraphic;
+}
 
 type DgsInstrumentKind = 'compass' | 'set-square';
 
@@ -1149,7 +1229,7 @@ type DgsInstrumentRequest = {
   kind: DgsInstrumentKind;
   language?: string;
   anchor: HTMLElement | null;
-  appliedState: DgsState | null;
+  appliedState: DgsState | DgsStandaloneSetSquareState | null;
 };
 
 const dgsInstrumentRequests: Record<string, DgsInstrumentRequest> = {};
@@ -1200,7 +1280,11 @@ function readDgsSetSquarePose(boardId: string): DgsSetSquareStoredPose {
   };
 }
 
-function persistDgsSetSquarePose(state: DgsState): void {
+function persistDgsSetSquarePose(state: DgsSetSquareState): void {
+  if (state.setSquarePersistTimer != null) {
+    window.clearTimeout(state.setSquarePersistTimer);
+    state.setSquarePersistTimer = undefined;
+  }
   const width = state.boardContainer.clientWidth;
   const height = state.boardContainer.clientHeight;
   if (state.setSquareInitialized && width > 0 && height > 0) {
@@ -1238,7 +1322,7 @@ function getDgsSetSquareScaleBounds(containerWidth: number): {
   };
 }
 
-function getDgsSetSquareSizing(state: DgsState, containerWidth: number): {
+function getDgsSetSquareSizing(state: DgsSetSquareState, containerWidth: number): {
   width: number;
   scale: number;
 } {
@@ -1340,7 +1424,7 @@ function getDgsSetSquareVisibleFraction(
 }
 
 function constrainDgsSetSquarePivot(
-  state: DgsState,
+  state: DgsSetSquareState,
   proposedX: number,
   proposedY: number,
   scale: number,
@@ -1424,7 +1508,7 @@ function formatDgsSetSquareRulerValue(
 }
 
 function renderDgsSetSquareRuler(
-  state: DgsState,
+  state: DgsSetSquareState,
   toolWidth: number,
   angle: number
 ): void {
@@ -1509,7 +1593,7 @@ function renderDgsSetSquareRuler(
 
 type DgsSetSquareLayoutSource = 'screen' | 'board' | 'ratio';
 
-function syncDgsSetSquareUserPivotFromScreen(state: DgsState): boolean {
+function syncDgsSetSquareUserPivotFromScreen(state: DgsSetSquareState): boolean {
   const pivot = screenToUserCoordinates(state.board, {
     x: state.setSquarePivotX,
     y: state.setSquarePivotY
@@ -1520,7 +1604,7 @@ function syncDgsSetSquareUserPivotFromScreen(state: DgsState): boolean {
   return true;
 }
 
-function projectDgsSetSquareUserPivotToScreen(state: DgsState): boolean {
+function projectDgsSetSquareUserPivotToScreen(state: DgsSetSquareState): boolean {
   if (
     typeof state.setSquarePivotUserX !== 'number' ||
     typeof state.setSquarePivotUserY !== 'number' ||
@@ -1540,7 +1624,7 @@ function projectDgsSetSquareUserPivotToScreen(state: DgsState): boolean {
 }
 
 function layoutDgsSetSquare(
-  state: DgsState,
+  state: DgsSetSquareState,
   positionSource: DgsSetSquareLayoutSource = 'screen'
 ): boolean {
   const containerWidth = state.boardContainer.clientWidth;
@@ -1609,45 +1693,82 @@ function layoutDgsSetSquare(
 
   const pivotLeft = DGS_SET_SQUARE_PIVOT_X * scale;
   const pivotTop = DGS_SET_SQUARE_PIVOT_Y * scale;
-  state.setSquareOverlay.style.width = toolWidth + 'px';
-  state.setSquareOverlay.style.left = (state.setSquarePivotX - pivotLeft) + 'px';
-  state.setSquareOverlay.style.top = (state.setSquarePivotY - pivotTop) + 'px';
-  state.setSquareOverlay.style.transformOrigin = pivotLeft + 'px ' + pivotTop + 'px';
-  state.setSquareOverlay.style.transform = 'rotate(' + angle + 'deg)';
-  state.setSquareOverlay.dataset.visible = state.setSquareVisible ? '1' : '0';
-  state.setSquareOverlay.classList.toggle('is-visible', state.setSquareVisible);
-  state.setSquareOverlay.dataset.angle = String(angle);
-  state.setSquareOverlay.dataset.scale = String(sizing.scale);
-  state.setSquareOverlay.dataset.toolWidth = String(toolWidth);
-  state.setSquareOverlay.dataset.pivotX = String(state.setSquarePivotX);
-  state.setSquareOverlay.dataset.pivotY = String(state.setSquarePivotY);
-  state.setSquareOverlay.dataset.visibleFraction = constrainedPivot.visibleFraction.toFixed(6);
-  state.setSquareOverlay.setAttribute('aria-hidden', state.setSquareVisible ? 'false' : 'true');
+  const overlay = state.setSquareOverlay;
+  const toolWidthCss = toolWidth + 'px';
+  const transformOrigin = pivotLeft + 'px ' + pivotTop + 'px';
+  const transform = 'translate3d(' +
+    (state.setSquarePivotX - pivotLeft) + 'px,' +
+    (state.setSquarePivotY - pivotTop) + 'px,0) rotate(' + angle + 'deg)';
+  if (overlay.style.width !== toolWidthCss) overlay.style.width = toolWidthCss;
+  if (overlay.style.left !== '0px') overlay.style.left = '0px';
+  if (overlay.style.top !== '0px') overlay.style.top = '0px';
+  if (overlay.style.transformOrigin !== transformOrigin) {
+    overlay.style.transformOrigin = transformOrigin;
+  }
+  if (overlay.style.transform !== transform) overlay.style.transform = transform;
+  overlay.dataset.visible = state.setSquareVisible ? '1' : '0';
+  overlay.classList.toggle('is-visible', state.setSquareVisible);
+  overlay.dataset.angle = String(angle);
+  overlay.dataset.scale = String(sizing.scale);
+  overlay.dataset.toolWidth = String(toolWidth);
+  overlay.dataset.pivotX = String(state.setSquarePivotX);
+  overlay.dataset.pivotY = String(state.setSquarePivotY);
+  overlay.dataset.visibleFraction = constrainedPivot.visibleFraction.toFixed(6);
+  overlay.setAttribute('aria-hidden', state.setSquareVisible ? 'false' : 'true');
   return true;
 }
 
 function scheduleDgsSetSquareLayout(
-  state: DgsState,
+  state: DgsSetSquareState,
   positionSource: DgsSetSquareLayoutSource = 'ratio'
 ): void {
-  if (state.setSquareLayoutRAF != null) cancelAnimationFrame(state.setSquareLayoutRAF);
+  if (positionSource === 'ratio' || !state.setSquareLayoutSource) {
+    state.setSquareLayoutSource = positionSource;
+  }
+  if (state.setSquareLayoutRAF != null) return;
   state.setSquareLayoutRAF = requestAnimationFrame(() => {
     state.setSquareLayoutRAF = undefined;
-    const didLayout = layoutDgsSetSquare(state, positionSource);
-    if (didLayout && positionSource === 'board') persistDgsSetSquarePose(state);
+    const sizeChanged =
+      state.setSquareLastContainerWidth !== state.boardContainer.clientWidth ||
+      state.setSquareLastContainerHeight !== state.boardContainer.clientHeight;
+    const source = sizeChanged
+      ? 'ratio'
+      : (state.setSquareLayoutSource || positionSource);
+    state.setSquareLayoutSource = undefined;
+    const didLayout = layoutDgsSetSquare(state, source);
+    if (didLayout && source === 'board') scheduleDgsSetSquarePosePersist(state);
   });
 }
 
-function setDgsSetSquareVisible(state: DgsState, visible: boolean): void {
+function scheduleDgsSetSquarePosePersist(state: DgsSetSquareState): void {
+  if (state.setSquarePersistTimer != null) {
+    window.clearTimeout(state.setSquarePersistTimer);
+  }
+  state.setSquarePersistTimer = window.setTimeout(() => {
+    state.setSquarePersistTimer = undefined;
+    persistDgsSetSquarePose(state);
+  }, 140);
+}
+
+function renderDgsSetSquareButtonState(state: DgsSetSquareState): void {
+  const text = dgsText(state.language);
+  state.setSquareButton.classList.toggle('is-active', state.setSquareVisible);
+  state.setSquareButton.setAttribute('aria-pressed', state.setSquareVisible ? 'true' : 'false');
+  const label = state.setSquareVisible ? text.hideSetSquare : text.showSetSquare;
+  state.setSquareButton.setAttribute('aria-label', label);
+  state.setSquareButton.title = label;
+}
+
+function setDgsSetSquareVisible(state: DgsSetSquareState, visible: boolean): void {
   if (!visible) cancelDgsSetSquareInteraction(state);
   const restoreToVisibleArea = visible && !state.setSquareVisible;
   state.setSquareVisible = visible;
   layoutDgsSetSquare(state, restoreToVisibleArea ? 'screen' : 'board');
   persistDgsSetSquarePose(state);
-  renderToolState(state);
+  renderDgsSetSquareButtonState(state);
 }
 
-function bindDgsSetSquareInteraction(state: DgsState): void {
+function bindDgsSetSquareInteraction(state: DgsSetSquareState): void {
   const overlay = state.setSquareOverlay;
   const pointerPosition = (evt: PointerEvent): { x: number; y: number } => {
     const rect = state.boardContainer.getBoundingClientRect();
@@ -1752,7 +1873,7 @@ function bindDgsSetSquareInteraction(state: DgsState): void {
   overlay.addEventListener('lostpointercapture', finish);
 }
 
-function cancelDgsSetSquareInteraction(state: DgsState): void {
+function cancelDgsSetSquareInteraction(state: DgsSetSquareState): void {
   if (state.setSquarePointerId != null) {
     const pointerId = state.setSquarePointerId;
     state.setSquarePointerId = null;
@@ -1815,7 +1936,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-07-18-10';
+const DGS_STYLE_VERSION = '2026-08-22-1';
 
 function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   if (!board) return;
@@ -3267,7 +3388,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       user-select: none;
       -webkit-user-select: none;
       transform-origin: 50% 9.7142857%;
-      will-change: left, top, transform;
+      will-change: transform;
       filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2));
     }
 
@@ -12587,24 +12708,269 @@ function setupDGSRegression(uid: string, spec: string, languageCode?: string): v
   syncDgsRegressionController(boardId, languageCode);
 }
 
+function getDgsInstrumentRequestsForBoard(boardId: string): DgsInstrumentRequest[] {
+  pruneDgsInstrumentRequests();
+  return Object.keys(dgsInstrumentRequests)
+    .map((uid) => dgsInstrumentRequests[uid])
+    .filter((request) => request.boardId === boardId);
+}
+
+function canUseStandaloneSetSquare(boardId: string): boolean {
+  const requests = getDgsInstrumentRequestsForBoard(boardId);
+  return requests.length > 0 &&
+    requests.every((request) => request.kind === 'set-square') &&
+    !findDgsMacroAnchorForBoard(boardId) &&
+    getDgsRegressionRequestsForBoard(boardId).length === 0;
+}
+
+function setStandaloneSetSquareMenuOpen(
+  state: DgsStandaloneSetSquareState,
+  open: boolean
+): void {
+  state.open = open;
+  state.menuBar.dataset.open = open ? '1' : '0';
+  state.menuBar.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  state.button.classList.toggle('is-active', open);
+  state.setSquareButton.tabIndex = open ? 0 : -1;
+}
+
+function applyStandaloneSetSquareTheme(state: DgsStandaloneSetSquareState): void {
+  const tone = getNeutralColor();
+  const accent = getAccentColor();
+  const menuBackground = tone === '#fff' ? '#151a1c' : '#fff';
+  state.button.style.color = tone;
+  state.menuBar.style.color = tone;
+  state.menuBar.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.menuBar.style.setProperty('--lia-dgs-theme-color', accent);
+  state.menuBar.style.setProperty('--lia-dgs-neutral-color', tone);
+  state.boardContainer.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.boardContainer.style.setProperty('--lia-dgs-theme-color', accent);
+  state.boardContainer.style.setProperty('--lia-dgs-neutral-color', tone);
+  layoutDgsSetSquare(state, 'board');
+}
+
+function disposeStandaloneSetSquare(boardId: string): void {
+  const state = standaloneSetSquares[boardId];
+  if (!state) return;
+  persistDgsSetSquarePose(state);
+  cancelDgsSetSquareInteraction(state);
+  if (state.setSquareLayoutRAF != null) cancelAnimationFrame(state.setSquareLayoutRAF);
+  if (state.setSquarePersistTimer != null) window.clearTimeout(state.setSquarePersistTimer);
+  if (state.onBoardViewportChange && state.board && typeof state.board.off === 'function') {
+    try { state.board.off('move', state.onBoardViewportChange); } catch (e) {}
+    try { state.board.off('boundingbox', state.onBoardViewportChange); } catch (e) {}
+  }
+  if (state.resizeObserver) state.resizeObserver.disconnect();
+  try { state.setSquareOverlay.remove(); } catch (e) {}
+  try { state.button.remove(); } catch (e) {}
+  try { state.menuClip.remove(); } catch (e) {}
+  Object.keys(dgsInstrumentRequests).forEach((uid) => {
+    if (dgsInstrumentRequests[uid].appliedState === state) {
+      dgsInstrumentRequests[uid].appliedState = null;
+    }
+  });
+  if (standaloneSetSquares[boardId] === state) delete standaloneSetSquares[boardId];
+}
+
+function createStandaloneSetSquareUi(
+  boardContainer: HTMLElement,
+  uid: string,
+  language: 'de' | 'en'
+) {
+  const text = dgsText(language);
+  const menuClip = document.createElement('div');
+  menuClip.className = 'lia-dgs-menu-clip lia-dgs-standalone-set-square-menu';
+  const menuBar = document.createElement('div');
+  menuBar.id = 'dgs-menu-' + uid;
+  menuBar.className = 'lia-dgs-top-menu';
+  menuBar.setAttribute('role', 'navigation');
+  menuBar.setAttribute('aria-label', text.setSquare);
+
+  const setSquareButton = document.createElement('button');
+  setSquareButton.type = 'button';
+  setSquareButton.className = 'lia-dgs-geometry-button lia-dgs-set-square-button';
+  setSquareButton.style.left = '52px';
+  setSquareButton.innerHTML = DGS_SET_SQUARE_ICON;
+  setSquareButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(setSquareButton);
+  menuClip.appendChild(menuBar);
+
+  const setSquareOverlay = document.createElement('div');
+  setSquareOverlay.className = 'lia-dgs-set-square-overlay';
+  setSquareOverlay.setAttribute('role', 'group');
+  setSquareOverlay.setAttribute('aria-label', text.setSquare);
+  setSquareOverlay.setAttribute('aria-hidden', 'true');
+  setSquareOverlay.dataset.visible = '0';
+  setSquareOverlay.innerHTML = createDgsSetSquareGraphic();
+  const setSquareGraphic = setSquareOverlay.querySelector('svg') as SVGSVGElement;
+  const setSquareSurface = setSquareOverlay.querySelector(
+    '.lia-dgs-set-square-surface'
+  ) as SVGPathElement;
+  const title = setSquareOverlay.querySelector('.lia-dgs-set-square-svg-title');
+  if (title) title.textContent = text.rotateSetSquare;
+  setSquareOverlay.addEventListener('contextmenu', (evt) => {
+    evt.preventDefault();
+    evt.stopImmediatePropagation();
+  });
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'lia-dgs-menu-button lia-dgs-standalone-set-square-button';
+  button.setAttribute('aria-label', text.setSquare);
+  button.setAttribute('aria-controls', menuBar.id);
+  button.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14"></path>' +
+    '<path d="M5 12h14"></path><path d="M5 17h14"></path></svg>';
+  button.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.addEventListener('wheel', (evt) => evt.stopPropagation(), { passive: true });
+
+  boardContainer.appendChild(setSquareOverlay);
+  boardContainer.appendChild(menuClip);
+  boardContainer.appendChild(button);
+  return {
+    button,
+    menuClip,
+    menuBar,
+    setSquareButton,
+    setSquareOverlay,
+    setSquareGraphic,
+    setSquareSurface
+  };
+}
+
+function ensureStandaloneSetSquare(
+  boardId: string,
+  languageCode?: string
+): DgsStandaloneSetSquareState | null {
+  if (!canUseStandaloneSetSquare(boardId) || getDgsStateForBoard(boardId)) return null;
+  const boardContainer = getBoardContainer(boardId);
+  const board = window.__boards && window.__boards[boardId];
+  if (!boardContainer || !board) return null;
+
+  const requests = getDgsInstrumentRequestsForBoard(boardId);
+  const latestRequest = requests[requests.length - 1];
+  const language = getDgsGeometryLanguage(
+    latestRequest?.anchor || null,
+    latestRequest?.language || languageCode
+  );
+  const existing = standaloneSetSquares[boardId];
+  if (isLiveStandaloneSetSquare(existing)) {
+    existing.language = language;
+    const text = dgsText(language);
+    existing.menuBar.setAttribute('aria-label', text.setSquare);
+    existing.button.setAttribute('aria-label', text.setSquare);
+    existing.setSquareOverlay.setAttribute('aria-label', text.setSquare);
+    const title = existing.setSquareOverlay.querySelector('.lia-dgs-set-square-svg-title');
+    if (title) title.textContent = text.rotateSetSquare;
+    renderDgsSetSquareButtonState(existing);
+    applyStandaloneSetSquareTheme(existing);
+    return existing;
+  }
+  if (existing) disposeStandaloneSetSquare(boardId);
+
+  const rootNode = (boardContainer.getRootNode && boardContainer.getRootNode()) || document;
+  ensureStyles(rootNode as Document | ShadowRoot);
+  const uid = getDgsInstrumentControllerUid(boardId) + '-set-square';
+  const ui = createStandaloneSetSquareUi(boardContainer, uid, language);
+  const storedPose = readDgsSetSquarePose(boardId);
+  const state: DgsStandaloneSetSquareState = {
+    uid,
+    boardId,
+    language,
+    board,
+    boardContainer,
+    ...ui,
+    open: false,
+    setSquareVisible: storedPose.visible,
+    setSquareInitialized: storedPose.initialized,
+    setSquarePivotX: storedPose.initialized
+      ? storedPose.pivotXRatio * boardContainer.clientWidth
+      : 0,
+    setSquarePivotY: storedPose.initialized
+      ? storedPose.pivotYRatio * boardContainer.clientHeight
+      : 0,
+    setSquarePivotUserX: null,
+    setSquarePivotUserY: null,
+    setSquarePivotXRatio: storedPose.pivotXRatio,
+    setSquarePivotYRatio: storedPose.pivotYRatio,
+    setSquareAngle: storedPose.angle,
+    setSquareScale: storedPose.scale,
+    setSquarePointerId: null,
+    setSquareInteraction: null,
+    setSquareStartClientX: 0,
+    setSquareStartClientY: 0,
+    setSquareStartPivotX: 0,
+    setSquareStartPivotY: 0,
+    setSquareStartAngle: 0,
+    setSquareStartPointerAngle: 0,
+    setSquareStartScale: storedPose.scale,
+    setSquareStartPointerDistance: 1,
+    setSquareLastContainerWidth: storedPose.initialized
+      ? boardContainer.clientWidth
+      : 0,
+    setSquareLastContainerHeight: storedPose.initialized
+      ? boardContainer.clientHeight
+      : 0,
+    setSquareRulerSignature: ''
+  };
+  standaloneSetSquares[boardId] = state;
+  bindDgsSetSquareInteraction(state);
+  layoutDgsSetSquare(state, 'screen');
+  renderDgsSetSquareButtonState(state);
+  applyStandaloneSetSquareTheme(state);
+  setStandaloneSetSquareMenuOpen(state, false);
+
+  ui.setSquareButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setDgsSetSquareVisible(state, !state.setSquareVisible);
+  });
+  ui.button.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setStandaloneSetSquareMenuOpen(state, !state.open);
+  });
+
+  state.onBoardViewportChange = () => scheduleDgsSetSquareLayout(state, 'board');
+  if (typeof board.on === 'function') {
+    try { board.on('move', state.onBoardViewportChange); } catch (e) {}
+    try { board.on('boundingbox', state.onBoardViewportChange); } catch (e) {}
+  }
+  if (typeof ResizeObserver === 'function') {
+    state.resizeObserver = new ResizeObserver(() => {
+      const sizeChanged =
+        state.setSquareLastContainerWidth !== boardContainer.clientWidth ||
+        state.setSquareLastContainerHeight !== boardContainer.clientHeight;
+      scheduleDgsSetSquareLayout(state, sizeChanged ? 'ratio' : 'board');
+    });
+    state.resizeObserver.observe(boardContainer);
+  }
+  return state;
+}
+
 function applyDgsInstrumentRequests(boardId: string): boolean {
   const state = getDgsStateForBoard(boardId);
-  if (!state) return false;
-
   pruneDgsInstrumentRequests();
+  const standalone = standaloneSetSquares[boardId];
+  const appliedState = state ||
+    (isLiveStandaloneSetSquare(standalone) ? standalone : null);
+  if (!appliedState) return false;
   const pending = Object.keys(dgsInstrumentRequests)
     .map((uid) => dgsInstrumentRequests[uid])
     .filter((request) =>
       request.boardId === boardId &&
-      request.appliedState !== state
+      request.appliedState !== appliedState
     );
   if (!pending.length) return true;
 
-  setMenuOpen(state, true);
+  if (state) setMenuOpen(state, true);
+  else setStandaloneSetSquareMenuOpen(appliedState as DgsStandaloneSetSquareState, true);
   if (pending.some((request) => request.kind === 'set-square')) {
-    setDgsSetSquareVisible(state, true);
+    setDgsSetSquareVisible(appliedState, true);
   }
-  if (pending.some((request) => request.kind === 'compass')) {
+  if (state && pending.some((request) => request.kind === 'compass')) {
     setActiveTool(state, '', false);
     state.compassMode = 'free';
     const compassToolIcon = state.compassToolButton.querySelector('svg');
@@ -12615,7 +12981,7 @@ function applyDgsInstrumentRequests(boardId: string): boolean {
     setCompassSubmenuOpen(state, false);
     setActiveTool(state, 'compass');
   }
-  pending.forEach((request) => { request.appliedState = state; });
+  pending.forEach((request) => { request.appliedState = appliedState; });
   return true;
 }
 
@@ -12639,7 +13005,8 @@ function setupDGSInstrument(
     !previous ||
     previous.boardId !== boardId ||
     previous.kind !== kind ||
-    previous.anchor !== anchor;
+    previous.anchor !== anchor ||
+    previous.language !== languageCode;
   dgsInstrumentRequests[uid] = {
     uid,
     boardId,
@@ -12648,6 +13015,12 @@ function setupDGSInstrument(
     anchor,
     appliedState: requestChanged ? null : previous.appliedState
   };
+  const currentStandalone = standaloneSetSquares[boardId];
+  if (
+    !requestChanged &&
+    isLiveStandaloneSetSquare(currentStandalone) &&
+    previous.appliedState === currentStandalone
+  ) return;
   syncDgsInstrumentProfile(boardId);
 
   const existing = getDgsStateForBoard(boardId);
@@ -12656,6 +13029,13 @@ function setupDGSInstrument(
     return;
   }
 
+  if (canUseStandaloneSetSquare(boardId)) {
+    ensureStandaloneSetSquare(boardId, languageCode);
+    applyDgsInstrumentRequests(boardId);
+    return;
+  }
+
+  disposeStandaloneSetSquare(boardId);
   const dgsMacro = findDgsMacroAnchorForBoard(boardId);
   const controllerUid = dgsMacro?.uid || getDgsInstrumentControllerUid(boardId);
   const controllerSpec = dgsMacro?.spec || (boardId + ';tools=[0]');
@@ -12969,11 +13349,7 @@ function renderToolState(state: DgsState): void {
   const textActive = state.activeTool === 'text';
   state.selectButton.classList.toggle('is-active', normalActive);
   state.selectButton.setAttribute('aria-pressed', normalActive ? 'true' : 'false');
-  state.setSquareButton.classList.toggle('is-active', state.setSquareVisible);
-  state.setSquareButton.setAttribute('aria-pressed', state.setSquareVisible ? 'true' : 'false');
-  const setSquareLabel = state.setSquareVisible ? text.hideSetSquare : text.showSetSquare;
-  state.setSquareButton.setAttribute('aria-label', setSquareLabel);
-  state.setSquareButton.title = setSquareLabel;
+  renderDgsSetSquareButtonState(state);
   state.compassButton.classList.toggle('is-active', compassActive);
   state.compassButton.setAttribute('aria-pressed', compassActive ? 'true' : 'false');
   const freeCompassActive = state.activeTool === 'compass' && state.compassMode === 'free';
@@ -14466,6 +14842,27 @@ function ensureDgsRegression(uid: string, boardId: string, language: 'de' | 'en'
   } catch (e) {}
 }
 
+function restoreDgsBoardModes(state: DgsState): void {
+  const board = state.board;
+  if (!board) return;
+  state.zoomMode = 'both';
+  state.axisScaleMode = 'cartesian';
+  board.__liaDgsZoomMode = 'both';
+  board.__liaDgsAxisScaleMode = 'cartesian';
+  board.__liaDgsValueDisplayLocked = false;
+  applyDgsLogTickGenerator(state, state.xAxis, 'x', false);
+  applyDgsLogTickGenerator(state, state.yAxis, 'y', false);
+  getDgsBoardObjects(board).filter(isDgsFunction).forEach((graph) => {
+    if (typeof graph.__liaDgsFunctionEvaluator !== 'function') return;
+    graph.Y = graph.__liaDgsFunctionEvaluator;
+    graph.needsUpdate = true;
+    try { graph.updateCurve?.(); } catch (e) {}
+  });
+  // This also refreshes macro-managed angle and measurement labels after a
+  // value-display restriction disappears.
+  refreshDgsValueDisplayRestriction(state);
+}
+
 function disposeDgsState(existing: DgsState): void {
   persistDgsSetSquarePose(existing);
   cancelDgsSetSquareInteraction(existing);
@@ -14478,9 +14875,8 @@ function disposeDgsState(existing: DgsState): void {
   if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
   if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
   if (existing.setSquareLayoutRAF != null) cancelAnimationFrame(existing.setSquareLayoutRAF);
+  if (existing.setSquarePersistTimer != null) window.clearTimeout(existing.setSquarePersistTimer);
   cancelScheduledDgsConstructionRestore(existing);
-  restoreAxis(existing);
-  restoreXAxis(existing);
   if (existing.onBoardViewportChange && existing.board && typeof existing.board.off === 'function') {
     try { existing.board.off('move', existing.onBoardViewportChange); } catch (e) {}
     try { existing.board.off('boundingbox', existing.onBoardViewportChange); } catch (e) {}
@@ -14488,6 +14884,9 @@ function disposeDgsState(existing: DgsState): void {
   if (existing.onBoardRootUpdate && existing.board && typeof existing.board.off === 'function') {
     try { existing.board.off('update', existing.onBoardRootUpdate); } catch (e) {}
   }
+  restoreAxis(existing);
+  restoreXAxis(existing);
+  restoreDgsBoardModes(existing);
   if (existing.onBoardPointerDown) {
     existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
   }
@@ -14532,6 +14931,7 @@ function disposeDgsState(existing: DgsState): void {
     restoreDgsEmbeddedSize(existing);
   }
   if (existing.resizeObserver) existing.resizeObserver.disconnect();
+  if (existing.menuResizeObserver) existing.menuResizeObserver.disconnect();
   if (Array.isArray(existing.rootConstructions)) {
     existing.rootConstructions.slice().forEach((construction) => {
       removeDgsRootConstruction(existing, construction, false);
@@ -14550,6 +14950,11 @@ function disposeDgsState(existing: DgsState): void {
   try { existing.functionDialog.remove(); } catch (e) {}
   try { existing.textDialog.remove(); } catch (e) {}
   try { existing.exportDialog.remove(); } catch (e) {}
+  Object.keys(dgsInstrumentRequests).forEach((uid) => {
+    if (dgsInstrumentRequests[uid].appliedState === existing) {
+      dgsInstrumentRequests[uid].appliedState = null;
+    }
+  });
   clearPendingDgsRetry(existing.uid);
   if (states[existing.uid] === existing) delete states[existing.uid];
 }
@@ -14575,12 +14980,35 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (retries <= MAX_RETRIES) {
       pendingRetryTimers[uid] = window.setTimeout(() => {
         pendingRetryTimers[uid] = undefined;
+        const implicitInstrumentOwnerMissing =
+          !anchor &&
+          uid === getDgsInstrumentControllerUid(boardId) &&
+          !getDgsInstrumentRequestsForBoard(boardId).some(
+            (request) => request.kind === 'compass'
+          );
+        const implicitRegressionOwnerMissing =
+          !anchor &&
+          uid === getDgsRegressionControllerUid(boardId) &&
+          getDgsRegressionRequestsForBoard(boardId).length === 0;
+        if (
+          implicitInstrumentOwnerMissing ||
+          implicitRegressionOwnerMissing ||
+          anchor &&
+          (!anchor.isConnected || document.getElementById('dgs-ui-' + uid) !== anchor)
+        ) {
+          clearPendingDgsRetry(uid);
+          bootstrapDGS();
+          return;
+        }
         setupDGS(uid, spec, languageCode);
       }, RETRY_DELAY_MS);
     }
     return;
   }
 
+  // A standalone set square owns only its overlay and compact toolbar. A real
+  // DGS, compass, or regression request upgrades that board to the full shell.
+  disposeStandaloneSetSquare(boardId);
   syncDgsInstrumentProfile(boardId);
   clearPendingDgsRetry(uid);
   const boardState = getDgsStateForBoard(boardId) ||
@@ -15305,9 +15733,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     menuScrollFadeEnd.setAttribute('data-visible', menuBar.scrollLeft < maxScrollLeft - 1 ? '1' : '0');
   };
   menuBar.addEventListener('scroll', updateMenuScrollFades, { passive: true });
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(updateMenuScrollFades).observe(menuBar);
-  }
+  const menuResizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(updateMenuScrollFades)
+    : undefined;
+  if (menuResizeObserver) menuResizeObserver.observe(menuBar);
   updateMenuScrollFades();
 
   const sideMenuClip = document.createElement('div');
@@ -16237,6 +16666,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     uid,
     boardId,
     language: geometryLanguage,
+    macroOwned: !!anchor,
     macroSpecSignature: currentMacroSpecSignature,
     board,
     boardContainer,
@@ -16377,6 +16807,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       ? boardContainer.clientHeight
       : 0,
     setSquareRulerSignature: '',
+    menuResizeObserver,
     compassButton,
     compassSubmenu,
     compassToolButton,
@@ -18297,6 +18728,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
 export function disposeDgsForBoard(boardId: string): void {
   const key = String(boardId || '').trim();
   if (!key) return;
+  disposeStandaloneSetSquare(key);
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
     if (state && state.boardId === key) disposeDgsState(state);
@@ -18334,7 +18766,17 @@ window.__setupDGS = function (uid: string, spec: string, language?: string): voi
     clearPendingDgsRetry(uid);
     return;
   }
-  scheduleBootstrap(() => setupDGS(uid, rawSpec, language));
+  scheduleBootstrap(() => {
+    if (
+      anchor &&
+      (!anchor.isConnected || document.getElementById('dgs-ui-' + uid) !== anchor)
+    ) {
+      clearPendingDgsRetry(uid);
+      bootstrapDGS();
+      return;
+    }
+    setupDGS(uid, rawSpec, language);
+  });
 };
 
 window.__setupDGSRegression = function (
@@ -18349,7 +18791,18 @@ window.__setupDGSRegression = function (
     delete dgsRegressionRequests[uid];
     return;
   }
-  scheduleBootstrap(() => setupDGSRegression(uid, rawSpec, language));
+  scheduleBootstrap(() => {
+    if (
+      anchor &&
+      (!anchor.isConnected || document.getElementById('regression-ui-' + uid) !== anchor)
+    ) {
+      delete dgsRegressionRequests[uid];
+      clearPendingDgsRetry(getDgsRegressionControllerUid(boardId));
+      bootstrapDGS();
+      return;
+    }
+    setupDGSRegression(uid, rawSpec, language);
+  });
 };
 
 window.__setupDGSInstrument = function (
@@ -18365,7 +18818,18 @@ window.__setupDGSInstrument = function (
     delete dgsInstrumentRequests[uid];
     return;
   }
-  scheduleBootstrap(() => setupDGSInstrument(uid, rawSpec, kind, language));
+  scheduleBootstrap(() => {
+    if (
+      anchor &&
+      (!anchor.isConnected || document.getElementById('dgs-instrument-ui-' + uid) !== anchor)
+    ) {
+      delete dgsInstrumentRequests[uid];
+      clearPendingDgsRetry(getDgsInstrumentControllerUid(boardId));
+      bootstrapDGS();
+      return;
+    }
+    setupDGSInstrument(uid, rawSpec, kind, language);
+  });
 };
 
 export function bootstrapDGS(): void {
@@ -18416,9 +18880,47 @@ export function bootstrapDGS(): void {
       .filter(Boolean)
       .map((state) => state.boardId)
       .concat(Object.keys(dgsRegressionRequests).map((uid) => dgsRegressionRequests[uid].boardId))
+      .concat(Object.keys(dgsInstrumentRequests).map((uid) => dgsInstrumentRequests[uid].boardId))
+      .concat(Object.keys(standaloneSetSquares))
   )).forEach((boardId) => {
     syncDgsInstrumentProfile(boardId);
-    syncDgsRegressionController(boardId);
+    if (canUseStandaloneSetSquare(boardId)) {
+      const fullState = getDgsStateForBoard(boardId);
+      if (
+        fullState &&
+        (
+          fullState.macroOwned ||
+          fullState.uid === getDgsInstrumentControllerUid(boardId) ||
+          fullState.uid === getDgsRegressionControllerUid(boardId)
+        )
+      ) disposeDgsState(fullState);
+      const standalone = standaloneSetSquares[boardId];
+      if (!isLiveStandaloneSetSquare(standalone)) {
+        ensureStandaloneSetSquare(boardId);
+      }
+      applyDgsInstrumentRequests(boardId);
+    } else {
+      disposeStandaloneSetSquare(boardId);
+      const hasRegressionOwner = syncDgsRegressionController(boardId);
+      const hasMacroOwner = !!findDgsMacroAnchorForBoard(boardId);
+      const hasInstrumentOwner = getDgsInstrumentRequestsForBoard(boardId).length > 0;
+      const fullState = getDgsStateForBoard(boardId);
+      if (
+        fullState &&
+        !hasRegressionOwner &&
+        !hasMacroOwner &&
+        !hasInstrumentOwner &&
+        (
+          fullState.macroOwned ||
+          fullState.uid === getDgsInstrumentControllerUid(boardId) ||
+          fullState.uid === getDgsRegressionControllerUid(boardId)
+        )
+      ) {
+        disposeDgsState(fullState);
+      } else if (fullState) {
+        applyDgsInstrumentRequests(boardId);
+      }
+    }
   });
 }
 
@@ -18437,6 +18939,10 @@ export function init(): void {
       Object.keys(states).forEach(function (uid) {
         const state = states[uid];
         if (state) applyLayout(state);
+      });
+      Object.keys(standaloneSetSquares).forEach(function (boardId) {
+        const state = standaloneSetSquares[boardId];
+        if (state) applyStandaloneSetSquareTheme(state);
       });
     });
   }

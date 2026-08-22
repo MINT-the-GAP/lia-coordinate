@@ -253,6 +253,9 @@ export function init(): void {
     const specs = window.__liaAxisTitleSpecs || {};
     Object.keys(specs).forEach(applyAxisTitles);
   };
+  window.__refreshAxisTitlesForBoard = function(boardId: string) {
+    applyAxisTitles(String(boardId || ''));
+  };
 
   function removeAxisTitles(boardId) {
     const board = window.__boards && window.__boards[boardId];
@@ -313,10 +316,21 @@ export function init(): void {
     else stopAxisTitleInterval();
   };
 
+  let kickRAF = 0;
   function kickAxisTitles() {
-    try {
-      if (window.__bootstrapAxisTitles) window.__bootstrapAxisTitles();
-    } catch (e) {}
+    if (kickRAF) return;
+    kickRAF = requestAnimationFrame(function() {
+      kickRAF = 0;
+      try {
+        if (window.__bootstrapAxisTitles) window.__bootstrapAxisTitles();
+      } catch (e) {}
+    });
+  }
+
+  function containsAxisTitleMarker(node: Node): boolean {
+    if (!(node instanceof Element)) return false;
+    if (node.matches('[id^="axis-title-spec-"][data-spec]')) return true;
+    return !!node.querySelector('[id^="axis-title-spec-"][data-spec]');
   }
 
   try {
@@ -336,8 +350,17 @@ export function init(): void {
   });
 
   try {
-    const mo = new MutationObserver(function() {
-      kickAxisTitles();
+    const mo = new MutationObserver(function(mutations) {
+      const relevant = mutations.some(function(mutation) {
+        if (
+          mutation.type === 'attributes' &&
+          mutation.target instanceof Element &&
+          mutation.target.matches('[id^="axis-title-spec-"]')
+        ) return true;
+        return Array.from(mutation.addedNodes).some(containsAxisTitleMarker) ||
+          Array.from(mutation.removedNodes).some(containsAxisTitleMarker);
+      });
+      if (relevant) kickAxisTitles();
     });
 
     const root = document.body || document.documentElement;
