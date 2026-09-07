@@ -3,6 +3,7 @@
 // DOM observer for all static boards and macro markers.
 
 import type { BoardConfig } from '../shared/coordSpec';
+import { splitStaticText, typesetStaticText } from './staticTex';
 import { parseCoordSpec } from '../shared/coordSpec';
 import {
   isHiddenNameOption,
@@ -476,18 +477,26 @@ function resolvePointToken(value: unknown, resolvePoint?: StaticPointResolver): 
 }
 
 function decodeLegacyParentheses(value: unknown): string {
-  return String(value == null ? '' : value)
-    .replace(/\{\{/g, '(')
-    .replace(/\}\}/g, ')');
+  const source = String(value == null ? '' : value);
+  let offset = 0;
+  return splitStaticText(source).map(function(run) {
+    if (run.math) {
+      // Preserve every TeX byte, including nested braces and original delimiters.
+      const delimiterLength = source[offset] === '$' && !run.display ? 1 : 2;
+      const length = run.text.length + 2 * delimiterLength;
+      const original = source.slice(offset, offset + length);
+      offset += length;
+      return original;
+    }
+    offset += run.text.length;
+    return run.text.replace(/\{\{/g, '(').replace(/\}\}/g, ')');
+  }).join('');
 }
 
-/** Safe readable fallback for authored plain text and dollar-delimited TeX. */
+/** Fallback uses the same delimiter rules as typesetting, preserving plain text. */
 function staticTextFallback(value: unknown): string {
-  return decodeLegacyParentheses(value)
-    .replace(/\$\$([\s\S]+?)\$\$/g, function(_match, tex) { return tex; })
-    .replace(/\$([^$\r\n]+?)\$/g, function(_match, tex) { return tex; })
-    .replace(/\\\[([\s\S]+?)\\\]/g, function(_match, tex) { return tex; })
-    .replace(/\\\(([^\r\n]+?)\\\)/g, function(_match, tex) { return tex; });
+  return splitStaticText(decodeLegacyParentheses(value))
+    .map(function(run) { return run.text; }).join('');
 }
 
 /** Parse a direct coordinate list or a list resolved from immutable static points. */
@@ -1158,8 +1167,9 @@ function appendCenteredText(
   text.setAttribute('font-size', String(18 * logicalUnitsPerPixel(config)));
   text.setAttribute('font-family', 'system-ui, sans-serif');
   text.setAttribute('pointer-events', 'none');
-  text.textContent = content;
+  text.textContent = staticTextFallback(content);
   group.appendChild(text);
+  typesetStaticText(text, content);
   return text;
 }
 
@@ -1330,7 +1340,7 @@ function appendPointGlyph(
       group,
       doc,
       projectedLabelPoint(coordinate, config, 12, -12),
-      staticTextFallback(labelContent),
+      decodeLegacyParentheses(labelContent),
       labelColor,
       config,
       opacity
@@ -1447,7 +1457,7 @@ function appendGeometry(
     if (entry.geometry.showLength || entry.geometry.showName) {
       const labels: string[] = [];
       if (entry.geometry.showName && entry.geometry.segmentName) {
-        labels.push(staticTextFallback(entry.geometry.segmentName));
+        labels.push(decodeLegacyParentheses(entry.geometry.segmentName));
       }
       if (entry.geometry.showLength) {
         labels.push(
@@ -1482,7 +1492,7 @@ function appendGeometry(
         group,
         doc,
         projectedLabelPoint(polylineMidpoint(entry.geometry.coordinates), config),
-        staticTextFallback('→' + entry.geometry.objectName),
+        decodeLegacyParentheses('→' + entry.geometry.objectName),
         entry.geometry.color,
         config
       );
@@ -1503,7 +1513,7 @@ function appendGeometry(
         group,
         doc,
         projectedLabelPoint(polylineMidpoint(clipped), config),
-        staticTextFallback(entry.geometry.objectName),
+        decodeLegacyParentheses(entry.geometry.objectName),
         entry.geometry.color,
         config
       );
@@ -1538,7 +1548,7 @@ function appendGeometry(
         group,
         doc,
         arcCaptionPoint(entry.geometry, config),
-        entry.geometry.renderedCaption,
+        decodeLegacyParentheses(entry.geometry.caption),
         entry.geometry.color,
         config
       );
@@ -1548,7 +1558,7 @@ function appendGeometry(
       group,
       doc,
       projectStaticPoint(entry.geometry.coordinate, config),
-      entry.geometry.renderedContent,
+      decodeLegacyParentheses(entry.geometry.content),
       entry.geometry.color,
       config,
       entry.geometry.opacity
@@ -1566,7 +1576,7 @@ function appendGeometry(
           -16,
           xAxisY === config.ymax ? 16 : -16
         ),
-        staticTextFallback(entry.geometry.xLabel),
+        decodeLegacyParentheses(entry.geometry.xLabel),
         getNeutralColor(),
         config
       );
@@ -1581,7 +1591,7 @@ function appendGeometry(
           yAxisX === config.xmax ? -16 : 16,
           16
         ),
-        staticTextFallback(entry.geometry.yLabel),
+        decodeLegacyParentheses(entry.geometry.yLabel),
         getNeutralColor(),
         config
       );
@@ -1634,7 +1644,7 @@ function appendGeometry(
         group,
         doc,
         projectedLabelPoint(polylineMidpoint(clipped), config),
-        staticTextFallback(entry.geometry.objectName),
+        decodeLegacyParentheses(entry.geometry.objectName),
         entry.geometry.color,
         config
       );
@@ -1659,7 +1669,7 @@ function appendGeometry(
         group,
         doc,
         projectedLabelPoint(namePoint, config, 8, -8),
-        staticTextFallback(entry.geometry.name),
+        decodeLegacyParentheses(entry.geometry.name),
         entry.geometry.color,
         config
       );
@@ -1712,7 +1722,7 @@ function appendGeometry(
       group.appendChild(path);
       const labels: string[] = [];
       if (entry.geometry.showName && entry.geometry.name) {
-        labels.push(staticTextFallback(entry.geometry.name));
+        labels.push(decodeLegacyParentheses(entry.geometry.name));
       }
       if (entry.geometry.showValue) {
         labels.push(
@@ -1761,7 +1771,7 @@ function appendGeometry(
       group.appendChild(path);
       const labels: string[] = [];
       if (entry.geometry.showName && entry.geometry.objectName) {
-        labels.push(staticTextFallback(entry.geometry.objectName));
+        labels.push(decodeLegacyParentheses(entry.geometry.objectName));
       }
       if (entry.geometry.showArea) {
         labels.push(
@@ -1819,7 +1829,7 @@ function appendGeometry(
         group,
         doc,
         projectedLabelPoint(labelPoint, config, -10, -12),
-        staticTextFallback(plot.name),
+        decodeLegacyParentheses(plot.name),
         plot.color,
         config
       );

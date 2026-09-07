@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Static TeX: real MathJax and both README imports</title>
+  <style>
+    body { margin: 8px; background: white; font-family: system-ui, sans-serif; }
+    main { max-width: 720px; min-width: 0; }
+    #interactive { max-width: 300px; }
+  </style>
+</head>
+<body>
+  <p id="prose">Ordinary course mathematics: \(v_0 = \frac{p}{m}\).</p>
+  <main id="fixture"></main>
+  <div id="interactive"></div>
+  <script type="module">
+    const mode = new URL(location.href).searchParams.get('mode');
+    const definitions = await (await fetch('/imports.json')).json();
+    const templates = definitions[mode];
+    const root = document.getElementById('fixture');
+    const detached = [];
+    const errors = [];
+    window.addEventListener('error', event => errors.push(String(event.message)));
+    window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
+
+    // Expand the actual macro bodies from the selected README, guarding both
+    // imports against changes to their host and marker markup.
+    const expand = (kind, uid, spec) => templates[kind]
+      .replaceAll('@0', uid).replaceAll('@1', spec.replaceAll('&', '&amp;').replaceAll('"', '&quot;'));
+    const spec = 'xmin=-1;xmax=8;ymin=-1;ymax=6;width=720;id=diagramm;achsen=1;grid=0;border=0;static=1';
+    const labels = [
+      ['vector', String.raw`diagramm;[1.5;0.35];$\vec{a}$;#0000ff;1`],
+      ['difference', String.raw`diagramm;[4;3];$\vec{a} - \vec{b}$;#0000ff;1`],
+      ['subscript', String.raw`diagramm;[6;-0.35];$v_0$;#ff0000;1`],
+      ['momentum', 'diagramm;[5;5];$p(v) = mv$;#0000ff;1'],
+      ['fraction', String.raw`diagramm;[1;4];$\frac{1}{2}$;#008800;0.4`],
+      ['plain', String.raw`diagramm;[3;2];Ordinary \vec{a} text;#654321;0.7`],
+      ['nested', String.raw`diagramm;[6.2;2];$\frac{1}{\sqrt{2}}$;#000080;1`],
+      ['money', String.raw`diagramm;[2;5];Price \$5 and \$10;#654321;1`],
+      ['mixed', String.raw`diagramm;[4;4];Force $\vec{a}$ and $v_0$;#800080;0.6`]
+    ];
+    const markup = () => expand('board', 'tex-host', spec) +
+      labels.map(([uid, text], index) => expand('text', uid, text) +
+        (index === 1 ? '<span id="distance-spec-order" data-spec="diagramm;[[1;1];[5;1]];#00aaaa;design=-;3px" style="display:none"></span>' : '')).join('') +
+      expand('axis', 'axes', 'id=diagramm;xlabel=$x$;ylabel=$y$');
+    const loadScript = url => new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = url;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Cannot load ' + url));
+      document.head.appendChild(script);
+    });
+    const waitFor = async predicate => {
+      const deadline = performance.now() + 30000;
+      while (!predicate()) {
+        if (performance.now() > deadline) throw new Error('Fixture condition timed out');
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+    };
+    root.innerHTML = expand('board', 'tex-host', spec) +
+      expand('text', 'plain-first', 'diagramm;[3;2];Plain text first;#654321;0.7');
+
+    let originalOutput, originalMathDocument, originalChtml, interactivePoint, interactiveBoard;
+    if (mode === 'normal') {
+      // Exactly the dependencies of the JSXGraph template imported by README.md.
+      await loadScript(definitions.jsxgraph.mathjax);
+      await MathJax.startup.promise;
+      await MathJax.typesetPromise([document.getElementById('prose')]);
+      originalOutput = MathJax.startup.output;
+      originalMathDocument = MathJax.startup.document;
+      originalChtml = document.querySelector('#prose mjx-container').outerHTML;
+      await loadScript(definitions.jsxgraph.bundle);
+    }
+    await loadScript(mode === 'normal' ? '/dist/index.js' : '/dist/static.js');
+    await waitFor(() => root.querySelector('svg[data-lia-static-svg] text'));
+    if (mode === 'normal') {
+      document.getElementById('interactive').innerHTML = expand('board', 'dynamic-host',
+        'xmin=-2;xmax=4;ymin=-2;ymax=4;width=300;id=interactive-tex;achsen=1;grid=0;border=0');
+      await waitFor(() => window.__boards && window.__boards['interactive-tex']);
+      interactiveBoard = window.__boards['interactive-tex'];
+      interactivePoint = interactiveBoard.create('point', [1, 1], { name: 'A', fixed: false });
+      interactiveBoard.update();
+    }
+    const groups = () => Array.from(root.querySelectorAll('g[data-lia-static-kind]'));
+    window.staticTexFixture = {
+      mode, errors,
+      start() { root.innerHTML = markup(); },
+      renderHidden() { root.style.display = 'none'; root.innerHTML = markup(); },
+      reveal() { root.style.display = ''; },
+      async remountWhileLoading() {
+        detached.push(root.querySelector('[data-lia-static-svg]'));
+        root.querySelector('#coord-text-spec-vector').dataset.spec =
+          String.raw`diagramm;[1.5;0.35];$\vec{z}$;#0000ff;1`;
+        await new Promise(resolve => setTimeout(resolve, 100));
+        detached.push(root.querySelector('[data-lia-static-svg]'));
+        root.replaceChildren();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        root.innerHTML = markup();
+      },
+      async rerender() {
+        const marker = root.querySelector('#coord-text-spec-vector');
+        marker.dataset.spec += ';';
+        await new Promise(resolve => setTimeout(resolve, 100));
+        marker.dataset.spec = labels[0][1];
+        window.__coord?.bootstrapStaticCoordinateBoards();
+        await new Promise(resolve => setTimeout(resolve, 100));
+      },
+      async remount() {
+        root.replaceChildren();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        root.innerHTML = markup();
+      },
+      ready() { return root.querySelectorAll('[data-lia-static-tex="ready"]').length === 9; },
+      snapshot() {
+        const svg = root.querySelector('[data-lia-static-svg]');
+        const ids = Array.from(document.querySelectorAll('[id]'), node => node.id);
+        const rect = svg.getBoundingClientRect();
+        const measured = groups().filter(group => group.dataset.liaStaticKind === 'coord-text').map(group => {
+          const label = group.querySelector('[data-lia-static-tex]') || group.querySelector('text');
+          const bbox = label.getBBox();
+          const bounds = label.getBoundingClientRect();
+          const path = label.querySelector('path');
+          return {
+            uid: group.dataset.liaStaticUid, tex: label.dataset.liaStaticTex || null,
+            aria: label.getAttribute('aria-label'), text: label.textContent,
+            fill: label.getAttribute('fill'),
+            opacity: label.getAttribute('fill-opacity') || label.getAttribute('opacity'),
+            color: path && getComputedStyle(path).fill,
+            bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+            bbox: { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height },
+            mathNodes: Array.from(label.querySelectorAll('[data-mml-node]'), node => node.getAttribute('data-mml-node')),
+            glyphs: Array.from(label.querySelectorAll('path'), node => ({ code: node.getAttribute('data-c'), path: node.getAttribute('d') })),
+            plainRuns: Array.from(label.querySelectorAll('text'), node => node.textContent)
+          };
+        });
+        const ordered = groups().map(group => group.dataset.liaStaticKind + ':' + group.dataset.liaStaticUid);
+        const chtml = document.querySelector('#prose mjx-container');
+        return {
+          mode, errors: [...errors], mathJaxVersion: window.MathJax?.version,
+          hostName: svg.parentElement.localName,
+          svgCount: root.querySelectorAll('svg[data-lia-static-svg]').length,
+          readyCount: root.querySelectorAll('[data-lia-static-tex="ready"]').length,
+          pendingCount: root.querySelectorAll('[data-lia-static-tex="pending"]').length,
+          foreignObjectCount: svg.querySelectorAll('foreignObject, image').length,
+          duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
+          duplicateObjects: ordered.length - new Set(ordered).size,
+          missingReferences: Array.from(svg.querySelectorAll('use')).map(node => node.getAttribute('href') || node.getAttributeNS('http://www.w3.org/1999/xlink', 'href')).filter(href => !href?.startsWith('#') || !document.getElementById(href.slice(1))),
+          axisMathCount: root.querySelectorAll('[data-lia-static-kind="axis-label"] [data-lia-static-tex="ready"]').length,
+          detachedReadyCount: detached.reduce((count, old) => count + (old?.querySelectorAll('[data-lia-static-tex="ready"]').length || 0), 0),
+          detachedConnected: detached.some(old => old?.isConnected),
+          native: Array.from(svg.querySelectorAll('*')).every(node => node.namespaceURI === 'http://www.w3.org/2000/svg'),
+          staticHasJsx: !!root.querySelector('jsx-graph'), staticHasBoard: !!window.__boards?.diagramm,
+          jsxPresent: typeof window.JXG !== 'undefined', ordered, measured,
+          size: { width: rect.width, height: rect.height, x: rect.x, y: rect.y, viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth },
+          chtmlUnchanged: mode !== 'normal' || (MathJax.startup.output === originalOutput && MathJax.startup.document === originalMathDocument && chtml.outerHTML === originalChtml && chtml.getAttribute('jax') === 'CHTML'),
+          interactiveUnchanged: mode !== 'normal' || (window.__boards['interactive-tex'] === interactiveBoard && interactivePoint.X() === 1)
+        };
+      },
+      async verifyInteractive() {
+        if (mode !== 'normal') return true;
+        interactivePoint.setPosition(JXG.COORDS_BY_USER, [2, 1]);
+        interactiveBoard.update();
+        const moved = interactivePoint.X() === 2 && interactivePoint.Y() === 1;
+        const node = document.createElement('span');
+        node.textContent = String.raw`\(\vec{a}+\frac{1}{2}\)`;
+        document.getElementById('prose').appendChild(node);
+        await MathJax.typesetPromise([node]);
+        return moved && node.querySelector('mjx-container')?.getAttribute('jax') === 'CHTML';
+      }
+    };
+  </script>
+</body>
+</html>

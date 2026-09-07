@@ -218,14 +218,52 @@ objects are labels rather than dependency targets.
 Names ending in `=0`, and `name=0` where the macro supports it, suppress
 only the visible label. German measurement macros retain decimal commas and
 `FE` / `LE`; English macros retain decimal points and `AU` / `LU`.
-Plain and dollar-delimited text use a safe readable SVG fallback without
-loading MathJax; complex TeX remains readable source text rather than fully
-typeset output.
+Ordinary text and mathematical captions share the TeX label support described
+below.
 
 Color, opacity, `visible=0` / `sichtbar=0`, line width, designs, and
 `linestyle=solid|dashed|dotted|dashdotted` (German:
 `linienstil=...`) are retained where the corresponding public macro accepts
 them. Supported objects keep their course-source drawing order.
+
+## TeX labels in static SVG
+
+`@CoordText` / `@KoordText` and `@AxisLabel` / `@AchsenBeschriftung`
+typeset `$...$` as native SVG mathematics, including vectors, subscripts, and
+fractions. Ordinary text remains SVG text; mixed labels such as
+`Speed $v_0$` retain both parts. `$$...$$`, `\(...\)`, and `\[...\]` are also
+recognized. An unmatched or escaped dollar is ordinary text. The same shared
+renderer handles explicitly delimited mathematical captions on other supported
+static objects.
+
+``` markdown
+@Koordinatensystem(`xmin=-1;xmax=8;ymin=-1;ymax=6;width=720;id=diagramm;static=1`)
+@KoordText(`diagramm;[1.5;0.35];$\vec{a}$;#0000ff;1`)
+@KoordText(`diagramm;[4;3];$\vec{a} - \vec{b}$;#0000ff;1`)
+@KoordText(`diagramm;[6;-0.35];$v_0$;#ff0000;1`)
+@KoordText(`diagramm;[5;5];$p(v) = mv$;#0000ff;1`)
+@KoordText(`diagramm;[2;4];$\frac{a}{b}$;#0000ff;0.6`)
+@KoordText(`diagramm;[5;2];ordinary text;#333333;1`)
+@AchsenBeschriftung(`id=diagramm;xlabel=$x$;ylabel=$y$`)
+```
+
+Both the normal import and `README.static.md` support this syntax without
+additional course files. MathJax's SVG output is loaded only when a mounted
+static label contains mathematics. With the normal import, it extends the
+existing MathJax 3 CHTML engine through a separate math document and preserves
+the page's CHTML output and interactive boards. When no MathJax engine exists,
+the lightweight import loads MathJax 3.2.2 from jsDelivr on demand. Plain labels
+need no MathJax download.
+
+The board remains native SVG. Glyph paths are embedded without an external
+font cache, and color, opacity, centered coordinates, source drawing order,
+and responsive scaling are retained. Loading is shared; stale results after
+slide changes or rerenders are discarded. Labels also retain their layout when
+a slide is first rendered while hidden and then revealed. A failed load or invalid formula
+keeps a readable text fallback and emits a console warning. Corrected labels
+are tried again on rerender; after a failed MathJax component download, reload
+the page to retry. Loading the renderer for the first time requires network
+access.
 
 ## Remaining dynamic-only features
 
