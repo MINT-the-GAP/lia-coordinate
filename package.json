@@ -1,6 +1,6 @@
 {
   "name": "lia-coordinate",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "LiaScript plugin for interactive coordinate systems using JSXGraph",
   "scripts": {
     "build": "npm run build:full && npm run build:static",

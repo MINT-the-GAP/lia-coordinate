@@ -936,6 +936,103 @@ function renderAnalysisFormula(host: HTMLElement, tex: string): void {
   typesetOverlayMath(host);
 }
 
+/**
+ * Wire the drag-to-scale handle of an analysis overlay panel.
+ *
+ * Pointer and mouse gestures are tracked separately so browsers that emit both
+ * event families never apply the delta twice. Move/up listeners live on the
+ * window only for the duration of a gesture; the document-level mousedown
+ * fallback catches handle presses that never reach the handle itself.
+ *
+ * Returns the teardown function for `entry.disposeUi`.
+ */
+function wireAnalysisPanelResize(
+  state: RegressionState,
+  panel: HTMLElement,
+  resizeHandle: HTMLElement,
+  initialScale: number,
+  minScale: number
+): () => void {
+  let resizeStartX = 0;
+  let resizeStartY = 0;
+  let resizeStartScale = initialScale;
+  let panelScale = initialScale;
+  let resizeMode: 'pointer' | 'mouse' | null = null;
+  let resizePointerId: number | null = null;
+
+  const applyScale = (evt: { clientX: number; clientY: number }): void => {
+    const dx = evt.clientX - resizeStartX;
+    const dy = evt.clientY - resizeStartY;
+    panelScale = Math.max(minScale, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
+    panel.style.transformOrigin = 'top left';
+    panel.style.transform = 'scale(' + panelScale + ')';
+    relayoutAnalysisPanels(state);
+  };
+
+  const onResizeMove = (evt: PointerEvent) => {
+    if (resizeMode !== 'pointer') return;
+    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
+    applyScale(evt);
+  };
+  const onResizeMoveMouse = (evt: MouseEvent) => {
+    if (resizeMode !== 'mouse') return;
+    applyScale(evt);
+  };
+  const onResizeEnd = () => {
+    resizeMode = null;
+    resizePointerId = null;
+    window.removeEventListener('pointermove', onResizeMove, true);
+    window.removeEventListener('pointerup', onResizeEnd, true);
+    window.removeEventListener('pointercancel', onResizeEnd, true);
+    window.removeEventListener('mousemove', onResizeMoveMouse, true);
+    window.removeEventListener('mouseup', onResizeEnd, true);
+    relayoutAnalysisPanels(state);
+  };
+
+  const beginMouse = (evt: MouseEvent) => {
+    resizeMode = 'mouse';
+    resizePointerId = null;
+    resizeStartX = evt.clientX;
+    resizeStartY = evt.clientY;
+    resizeStartScale = panelScale;
+    window.addEventListener('mousemove', onResizeMoveMouse, true);
+    window.addEventListener('mouseup', onResizeEnd, true);
+  };
+
+  const onDocMouseDown = (evt: MouseEvent) => {
+    if (resizeMode) return;
+    const rect = resizeHandle.getBoundingClientRect();
+    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
+    evt.preventDefault();
+    evt.stopPropagation();
+    beginMouse(evt);
+  };
+
+  resizeHandle.addEventListener('pointerdown', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    resizeMode = 'pointer';
+    resizePointerId = evt.pointerId;
+    resizeStartX = evt.clientX;
+    resizeStartY = evt.clientY;
+    resizeStartScale = panelScale;
+    window.addEventListener('pointermove', onResizeMove, true);
+    window.addEventListener('pointerup', onResizeEnd, true);
+    window.addEventListener('pointercancel', onResizeEnd, true);
+  }, true);
+  resizeHandle.addEventListener('mousedown', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    beginMouse(evt);
+  }, true);
+  document.addEventListener('mousedown', onDocMouseDown, true);
+
+  return () => {
+    document.removeEventListener('mousedown', onDocMouseDown, true);
+    onResizeEnd();
+  };
+}
+
 function getLinearOverlayCandidate(m: number, n: number): AnalysisOverlayCandidate {
   return {
     name: 'linear',
@@ -4419,88 +4516,13 @@ function openLinearAnalysisOverlay(state: RegressionState, m: number, n: number,
     }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
   panel.style.transform = 'scale(' + initialScale + ')';
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.55, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.55, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.55);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -4945,88 +4967,13 @@ function openQuadraticAnalysisOverlay(state: RegressionState, a: number, c: numb
     }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
   panel.style.transform = 'scale(' + initialScale + ')';
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.55, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.55, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.55);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -5289,87 +5236,12 @@ function openCubicAnalysisOverlay(state: RegressionState, a: number, b: number, 
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -5823,87 +5695,12 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
       if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
     }, true);
 
-    let resizeStartX = 0;
-    let resizeStartY = 0;
-    let resizeStartScale = initialScale;
-    let panelScale = initialScale;
-    let resizeMode: 'pointer' | 'mouse' | null = null;
-    let resizePointerId: number | null = null;
-    const onResizeMove = (evt: PointerEvent) => {
-      if (resizeMode !== 'pointer') return;
-      if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-      const dx = evt.clientX - resizeStartX;
-      const dy = evt.clientY - resizeStartY;
-      panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-      panel.style.transformOrigin = 'top left';
-      panel.style.transform = 'scale(' + panelScale + ')';
-      relayoutAnalysisPanels(state);
-    };
-    const onResizeMoveMouse = (evt: MouseEvent) => {
-      if (resizeMode !== 'mouse') return;
-      const dx = evt.clientX - resizeStartX;
-      const dy = evt.clientY - resizeStartY;
-      panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-      panel.style.transformOrigin = 'top left';
-      panel.style.transform = 'scale(' + panelScale + ')';
-      relayoutAnalysisPanels(state);
-    };
-    const onResizeEnd = () => {
-      resizeMode = null;
-      resizePointerId = null;
-      window.removeEventListener('pointermove', onResizeMove, true);
-      window.removeEventListener('pointerup', onResizeEnd, true);
-      window.removeEventListener('pointercancel', onResizeEnd, true);
-      window.removeEventListener('mousemove', onResizeMoveMouse, true);
-      window.removeEventListener('mouseup', onResizeEnd, true);
-      relayoutAnalysisPanels(state);
-    };
-    const onDocMouseDown = (evt: MouseEvent) => {
-      if (resizeMode) return;
-      const rect = resizeHandle.getBoundingClientRect();
-      if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-      evt.preventDefault();
-      evt.stopPropagation();
-      resizeMode = 'mouse';
-      resizePointerId = null;
-      resizeStartX = evt.clientX;
-      resizeStartY = evt.clientY;
-      resizeStartScale = panelScale;
-      window.addEventListener('mousemove', onResizeMoveMouse, true);
-      window.addEventListener('mouseup', onResizeEnd, true);
-    };
-    resizeHandle.addEventListener('pointerdown', (evt) => {
-      evt.preventDefault();
-      evt.stopPropagation();
-      resizeMode = 'pointer';
-      resizePointerId = evt.pointerId;
-      resizeStartX = evt.clientX;
-      resizeStartY = evt.clientY;
-      resizeStartScale = panelScale;
-      window.addEventListener('pointermove', onResizeMove, true);
-      window.addEventListener('pointerup', onResizeEnd, true);
-      window.addEventListener('pointercancel', onResizeEnd, true);
-    }, true);
-    resizeHandle.addEventListener('mousedown', (evt) => {
-      evt.preventDefault();
-      evt.stopPropagation();
-      resizeMode = 'mouse';
-      resizePointerId = null;
-      resizeStartX = evt.clientX;
-      resizeStartY = evt.clientY;
-      resizeStartScale = panelScale;
-      window.addEventListener('mousemove', onResizeMoveMouse, true);
-      window.addEventListener('mouseup', onResizeEnd, true);
-    }, true);
-    document.addEventListener('mousedown', onDocMouseDown, true);
+    const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
     setAnalysisOverlayPanelWidth(panel, state.boardContainer);
     state.boardContainer.appendChild(panel);
     entry.panel = panel;
-    entry.disposeUi = () => {
-      document.removeEventListener('mousedown', onDocMouseDown, true);
-      onResizeEnd();
-    };
+    entry.disposeUi = disposeResize;
     window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
     updateButtonStates(state);
     syncGraph();
@@ -5953,87 +5750,12 @@ function openQuarticAnalysisOverlay(state: RegressionState, a: number, b: number
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -6282,86 +6004,11 @@ function openSinAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -6611,87 +6258,12 @@ function openExpAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -6942,87 +6514,12 @@ function openLogAnalysisOverlay(state: RegressionState, A: number, b: number, c:
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -7274,87 +6771,12 @@ function openSqrtAnalysisOverlay(state: RegressionState, A: number, b: number, c
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -7584,87 +7006,12 @@ function openHyperbolaAnalysisOverlay(state: RegressionState, A: number, b: numb
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
@@ -7895,87 +7242,12 @@ function openHyperbola2AnalysisOverlay(state: RegressionState, A: number, b: num
     if (target === miniWrap || miniWrap.contains(target)) { evt.preventDefault(); evt.stopPropagation(); setMinimized(false); }
   }, true);
 
-  let resizeStartX = 0;
-  let resizeStartY = 0;
-  let resizeStartScale = initialScale;
-  let panelScale = initialScale;
-  let resizeMode: 'pointer' | 'mouse' | null = null;
-  let resizePointerId: number | null = null;
-  const onResizeMove = (evt: PointerEvent) => {
-    if (resizeMode !== 'pointer') return;
-    if (resizePointerId !== null && evt.pointerId !== resizePointerId) return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeMoveMouse = (evt: MouseEvent) => {
-    if (resizeMode !== 'mouse') return;
-    const dx = evt.clientX - resizeStartX;
-    const dy = evt.clientY - resizeStartY;
-    panelScale = Math.max(0.35, Math.min(1.45, resizeStartScale + (Math.max(dx, dy) / 260)));
-    panel.style.transformOrigin = 'top left';
-    panel.style.transform = 'scale(' + panelScale + ')';
-    relayoutAnalysisPanels(state);
-  };
-  const onResizeEnd = () => {
-    resizeMode = null;
-    resizePointerId = null;
-    window.removeEventListener('pointermove', onResizeMove, true);
-    window.removeEventListener('pointerup', onResizeEnd, true);
-    window.removeEventListener('pointercancel', onResizeEnd, true);
-    window.removeEventListener('mousemove', onResizeMoveMouse, true);
-    window.removeEventListener('mouseup', onResizeEnd, true);
-    relayoutAnalysisPanels(state);
-  };
-  const onDocMouseDown = (evt: MouseEvent) => {
-    if (resizeMode) return;
-    const rect = resizeHandle.getBoundingClientRect();
-    if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) return;
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  };
-  resizeHandle.addEventListener('pointerdown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'pointer';
-    resizePointerId = evt.pointerId;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('pointermove', onResizeMove, true);
-    window.addEventListener('pointerup', onResizeEnd, true);
-    window.addEventListener('pointercancel', onResizeEnd, true);
-  }, true);
-  resizeHandle.addEventListener('mousedown', (evt) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    resizeMode = 'mouse';
-    resizePointerId = null;
-    resizeStartX = evt.clientX;
-    resizeStartY = evt.clientY;
-    resizeStartScale = panelScale;
-    window.addEventListener('mousemove', onResizeMoveMouse, true);
-    window.addEventListener('mouseup', onResizeEnd, true);
-  }, true);
-  document.addEventListener('mousedown', onDocMouseDown, true);
+  const disposeResize = wireAnalysisPanelResize(state, panel, resizeHandle, initialScale, 0.35);
 
   setAnalysisOverlayPanelWidth(panel, state.boardContainer);
   state.boardContainer.appendChild(panel);
   entry.panel = panel;
-  entry.disposeUi = () => {
-    document.removeEventListener('mousedown', onDocMouseDown, true);
-    onResizeEnd();
-  };
+  entry.disposeUi = disposeResize;
   window.requestAnimationFrame(() => relayoutAnalysisPanels(state));
   updateButtonStates(state);
   syncGraph();
