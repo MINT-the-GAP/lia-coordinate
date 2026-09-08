@@ -4,6 +4,7 @@
 import { splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { setStyleIfChanged } from '../shared/domUpdates';
 
 export function init(): void {
   if (window.__axisTitlesReady) {
@@ -75,14 +76,14 @@ export function init(): void {
 
   function createOverlay(board) {
     const el = document.createElement('div');
-    el.style.position = 'absolute';
-    el.style.pointerEvents = 'none';
-    el.style.zIndex = '40';
-    el.style.whiteSpace = 'nowrap';
-    el.style.lineHeight = '1.2';
-    el.style.fontSize = '20px';
-    el.style.maxWidth = 'none';
-    el.style.display = 'none';
+    setStyleIfChanged(el, 'position', 'absolute');
+    setStyleIfChanged(el, 'pointerEvents', 'none');
+    setStyleIfChanged(el, 'zIndex', '40');
+    setStyleIfChanged(el, 'whiteSpace', 'nowrap');
+    setStyleIfChanged(el, 'lineHeight', '1.2');
+    setStyleIfChanged(el, 'fontSize', '20px');
+    setStyleIfChanged(el, 'maxWidth', 'none');
+    setStyleIfChanged(el, 'display', 'none');
     board.containerObj.appendChild(el);
     return el;
   }
@@ -103,11 +104,11 @@ export function init(): void {
     if (!el) return;
 
     if (!html) {
-      el.style.display = 'none';
+      setStyleIfChanged(el, 'display', 'none');
       return;
     }
 
-    el.style.display = 'block';
+    setStyleIfChanged(el, 'display', 'block');
 
     if (el.__liaHtml === html) return;
     el.__liaHtml = html;
@@ -154,16 +155,6 @@ export function init(): void {
     const xEl = board.__xTitleOverlay;
     const yEl = board.__yTitleOverlay;
 
-    const col = getNeutralColor();
-    if (xEl) xEl.style.color = col;
-    if (yEl) yEl.style.color = col;
-
-    const xHTML = normalizeAxisLabelMath(cfg.xlabel || '');
-    const yHTML = normalizeAxisLabelMath(cfg.ylabel || '');
-
-    setOverlayContent(xEl, xHTML);
-    setOverlayContent(yEl, yHTML);
-
     const bb = getSafeBBox(board);
     const xmin = bb[0];
     const ymax = bb[1];
@@ -183,58 +174,68 @@ export function init(): void {
     const yAxisLeft = 0 < xmin;
     const yAxisRight = 0 > xmax;
 
+    const col = getNeutralColor();
+    if (xEl) setStyleIfChanged(xEl, 'color', col);
+    if (yEl) setStyleIfChanged(yEl, 'color', col);
+
+    const xHTML = normalizeAxisLabelMath(cfg.xlabel || '');
+    const yHTML = normalizeAxisLabelMath(cfg.ylabel || '');
+
+    setOverlayContent(xEl, xHTML);
+    setOverlayContent(yEl, yHTML);
+
     if (xEl && xHTML) {
-      xEl.style.left = 'auto';
-      xEl.style.right = (dgsSideMenuOpen ? 202 : 12) + 'px';
-      xEl.style.textAlign = 'right';
-      xEl.style.transform = 'none';
+      setStyleIfChanged(xEl, 'left', 'auto');
+      setStyleIfChanged(xEl, 'right', (dgsSideMenuOpen ? 202 : 12) + 'px');
+      setStyleIfChanged(xEl, 'textAlign', 'right');
+      setStyleIfChanged(xEl, 'transform', 'none');
 
       if (xAxisTop) {
-        xEl.style.top = (dgsMenuOpen ? 62 : 44) + 'px';
-        xEl.style.bottom = 'auto';
+        setStyleIfChanged(xEl, 'top', (dgsMenuOpen ? 62 : 44) + 'px');
+        setStyleIfChanged(xEl, 'bottom', 'auto');
       } else if (xAxisBottom) {
-        xEl.style.top = 'auto';
-        xEl.style.bottom = '12px';
+        setStyleIfChanged(xEl, 'top', 'auto');
+        setStyleIfChanged(xEl, 'bottom', '12px');
       } else {
         const scrY = userToScrY(board, 0);
 
         if (scrY < h / 2) {
-          xEl.style.top = Math.max(safeTop, Math.round(scrY + 16)) + 'px';
-          xEl.style.bottom = 'auto';
+          setStyleIfChanged(xEl, 'top', Math.max(safeTop, Math.round(scrY + 16)) + 'px');
+          setStyleIfChanged(xEl, 'bottom', 'auto');
         } else {
-          xEl.style.top = Math.max(safeTop, Math.round(scrY - 34)) + 'px';
-          xEl.style.bottom = 'auto';
+          setStyleIfChanged(xEl, 'top', Math.max(safeTop, Math.round(scrY - 34)) + 'px');
+          setStyleIfChanged(xEl, 'bottom', 'auto');
         }
       }
     }
 
     if (yEl && yHTML) {
-      yEl.style.top = Math.max(safeTop, xAxisTop ? 64 : 12) + 'px';
-      yEl.style.bottom = 'auto';
+      setStyleIfChanged(yEl, 'top', Math.max(safeTop, xAxisTop ? 64 : 12) + 'px');
+      setStyleIfChanged(yEl, 'bottom', 'auto');
 
       if (yAxisLeft) {
-        yEl.style.left = '40px';
-        yEl.style.right = 'auto';
-        yEl.style.textAlign = 'left';
-        yEl.style.transform = 'none';
+        setStyleIfChanged(yEl, 'left', '40px');
+        setStyleIfChanged(yEl, 'right', 'auto');
+        setStyleIfChanged(yEl, 'textAlign', 'left');
+        setStyleIfChanged(yEl, 'transform', 'none');
       } else if (yAxisRight) {
-        yEl.style.left = Math.max(0, w - 40) + 'px';
-        yEl.style.right = 'auto';
-        yEl.style.textAlign = 'right';
-        yEl.style.transform = 'translateX(-100%)';
+        setStyleIfChanged(yEl, 'left', Math.max(0, w - 40) + 'px');
+        setStyleIfChanged(yEl, 'right', 'auto');
+        setStyleIfChanged(yEl, 'textAlign', 'right');
+        setStyleIfChanged(yEl, 'transform', 'translateX(-100%)');
       } else {
         const scrX = userToScrX(board, 0);
 
         if (scrX < w / 2) {
-          yEl.style.left = Math.round(scrX + 18) + 'px';
-          yEl.style.right = 'auto';
-          yEl.style.textAlign = 'left';
-          yEl.style.transform = 'none';
+          setStyleIfChanged(yEl, 'left', Math.round(scrX + 18) + 'px');
+          setStyleIfChanged(yEl, 'right', 'auto');
+          setStyleIfChanged(yEl, 'textAlign', 'left');
+          setStyleIfChanged(yEl, 'transform', 'none');
         } else {
-          yEl.style.left = Math.round(scrX - 18) + 'px';
-          yEl.style.right = 'auto';
-          yEl.style.textAlign = 'right';
-          yEl.style.transform = 'translateX(-100%)';
+          setStyleIfChanged(yEl, 'left', Math.round(scrX - 18) + 'px');
+          setStyleIfChanged(yEl, 'right', 'auto');
+          setStyleIfChanged(yEl, 'textAlign', 'right');
+          setStyleIfChanged(yEl, 'transform', 'translateX(-100%)');
         }
       }
     }

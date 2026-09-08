@@ -17,6 +17,18 @@ export function isQuizResolveButton(checkRoot: Element | null, target: Element |
 }
 
 const QUIZ_ANCHOR = '[data-lia-coordinate-quiz-anchor]';
+const QUIZ_SOURCE_PREFIXES: Record<string, string> = {
+  'create-point': 'point-ui-',
+  'polygon-metric': 'polygon-metric-quiz-spec-',
+  construction: 'construction-quiz-spec-',
+  combined: 'combined-quiz-spec-',
+  reconstruction: 'rek-spec-',
+  'point-on-graph': 'graph-ui-',
+  'points-on-graph': 'multi-graph-ui-'
+};
+const QUIZ_SOURCE_SELECTOR = Object.values(QUIZ_SOURCE_PREFIXES)
+  .map((prefix) => '[id^="' + prefix + '"]').join(',');
+const QUIZ_LIFECYCLE_SELECTOR = QUIZ_ANCHOR + ',.lia-quiz,' + QUIZ_SOURCE_SELECTOR;
 const QUIZ_TOKEN = 'lia-coordinate-check';
 const QUIZ_STYLE_ID = 'lia-coordinate-quiz-style';
 const quizBindings = new Map<HTMLElement, {
@@ -140,16 +152,7 @@ function updateCoordinateQuizFeedback(
 function sourceMarkerForAnchor(anchor: HTMLElement): HTMLElement | null {
   const uid = anchorUid(anchor);
   const kind = String(anchor.dataset.liaCoordinateQuizKind || '');
-  const prefixes: Record<string, string> = {
-    'create-point': 'point-ui-',
-    'polygon-metric': 'polygon-metric-quiz-spec-',
-    construction: 'construction-quiz-spec-',
-    combined: 'combined-quiz-spec-',
-    reconstruction: 'rek-spec-',
-    'point-on-graph': 'graph-ui-',
-    'points-on-graph': 'multi-graph-ui-'
-  };
-  const prefix = prefixes[kind];
+  const prefix = QUIZ_SOURCE_PREFIXES[kind];
   return prefix ? document.getElementById(prefix + uid) : null;
 }
 
@@ -245,6 +248,25 @@ export function syncCoordinateQuizBindings(root: ParentNode = document): void {
   root.querySelectorAll<HTMLElement>(QUIZ_ANCHOR).forEach(bindAnchor);
 }
 
+function containsQuizLifecycleNode(node: Node): boolean {
+  if (node.nodeType !== 1) return false;
+  const element = node as Element;
+  return element.matches(QUIZ_LIFECYCLE_SELECTOR) ||
+    !!element.querySelector(QUIZ_LIFECYCLE_SELECTOR);
+}
+
+function quizMutationIsRelevant(mutation: MutationRecord): boolean {
+  const target = mutation.target as Element;
+  if (mutation.type === 'attributes') {
+    return target.nodeType === 1 && target.matches(QUIZ_ANCHOR + ',' + QUIZ_SOURCE_SELECTOR);
+  }
+  if (mutation.type !== 'childList') return false;
+  // A source marker can store its spec as textContent instead of data-spec.
+  if (target.nodeType === 1 && target.matches(QUIZ_SOURCE_SELECTOR)) return true;
+  return Array.from(mutation.addedNodes).some(containsQuizLifecycleNode) ||
+    Array.from(mutation.removedNodes).some(containsQuizLifecycleNode);
+}
+
 /** Install native quiz validation and keep it attached across LiaScript rerenders. */
 export function initQuizDom(): void {
   window.__syncCoordinateQuizBindings = function() {
@@ -267,7 +289,9 @@ export function initQuizDom(): void {
   const state = window as any;
   if (state[observerKey] || !document.documentElement) return;
 
-  const observer = new MutationObserver(() => syncCoordinateQuizBindings());
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.some(quizMutationIsRelevant)) syncCoordinateQuizBindings();
+  });
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,

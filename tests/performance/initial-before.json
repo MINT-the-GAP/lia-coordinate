@@ -1,0 +1,447 @@
+{
+  "mode": "before",
+  "date": "2026-09-08T13:54:52.162Z",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.82",
+    "revision": "@d04cdb24d67b081f6cf80200ffc5233f44b61109",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "bundleSha256": "e31ced523ea6a947b13d5e985dc331fa33f7f83a217295e81c3f869f3a69c2a7",
+  "jsxgraphSha256": "e753abd735baa6c6a778db6e28785b94cb83ee620f7da85a0de1adae30d097fd",
+  "scenarios": [
+    {
+      "options": {
+        "name": "exact-nine-points"
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 540,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 63962,
+        "childList": 1442,
+        "attributes": 62426,
+        "characterData": 94,
+        "overlayMutations": 0
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665921787709497,
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999727,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 1.642777763472663,
+        "p50": 1.5999999046325684,
+        "p95": 2.3999996185302734,
+        "max": 2.9000000953674316
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3007.699999809265,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": []
+    },
+    {
+      "options": {
+        "name": "menu-closed-square-hidden",
+        "dgs": true
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 540,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 66523,
+        "childList": 1560,
+        "attributes": 64869,
+        "characterData": 94,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.6659217877095,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.1161111195882163,
+        "p50": 2.0999999046325684,
+        "p95": 2.5999999046325684,
+        "max": 3.200000286102295
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3010.2999997138977,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "squareDisplay": "",
+      "errors": []
+    },
+    {
+      "options": {
+        "name": "menu-open-square-hidden",
+        "dgs": true,
+        "menu": true
+      },
+      "menuOpen": true,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 721,
+        "fullUpdate": 541,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 77520,
+        "childList": 2283,
+        "attributes": 75132,
+        "characterData": 105,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665921787709497,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.1005555338329738,
+        "p50": 2,
+        "p95": 3,
+        "max": 3.6999998092651367
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3017.2999997138977,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "squareDisplay": "",
+      "errors": []
+    },
+    {
+      "options": {
+        "name": "menu-open-square-visible",
+        "dgs": true,
+        "menu": true,
+        "square": true
+      },
+      "menuOpen": true,
+      "squareVisible": true,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 721,
+        "fullUpdate": 541,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 77520,
+        "childList": 2283,
+        "attributes": 75132,
+        "characterData": 105,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665631284916202,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.477777769830492,
+        "p50": 2.3000001907348633,
+        "p95": 3.5,
+        "max": 4.700000286102295
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3005.9000000953674,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "squareDisplay": "",
+      "errors": []
+    },
+    {
+      "options": {
+        "name": "moving-point",
+        "dgs": true,
+        "moving": true
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 600,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 67182,
+        "childList": 1560,
+        "attributes": 65528,
+        "characterData": 94,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665363128491624,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.171666653951009,
+        "p50": 2,
+        "p95": 3.299999713897705,
+        "max": 4.900000095367432
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3005.800000190735,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -2.181978236545306,
+          -9.075187269082402
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "squareDisplay": "",
+      "errors": []
+    }
+  ]
+}

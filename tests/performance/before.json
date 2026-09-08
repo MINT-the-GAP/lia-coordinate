@@ -1,0 +1,632 @@
+{
+  "mode": "before",
+  "date": "2026-09-08T14:07:49.622Z",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.82",
+    "revision": "@d04cdb24d67b081f6cf80200ffc5233f44b61109",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "bundleSha256": "e31ced523ea6a947b13d5e985dc331fa33f7f83a217295e81c3f869f3a69c2a7",
+  "jsxgraphSha256": "e753abd735baa6c6a778db6e28785b94cb83ee620f7da85a0de1adae30d097fd",
+  "mathjaxSha256": "0a6ded5abbce13331658dd239f34382abd06492c74b71b61e8caa8112ec55fa5",
+  "fixtureSha256": "86b22983bec207df1e399ddce74bae2013431f8665f5b5aea216e4fef785b358",
+  "integrationAssets": {
+    "timer.js": "90af1847188404d256867c24ff4e5fd24ed8e756ea56f6fe2eacaa7633c5474a",
+    "dynflex.js": "f1e2622cb0b6cd69823af58e375002a096ce669666eb800573405c51cca99599",
+    "freeze.js": "0a0ab034e0288d0bca8cef9345503f2b04def7fd189bcfe6998037f20850e75b",
+    "freeze-coordinate-state.ts": "76bed59915b48ce8beaa618f27aee72f7d6014127cdd734868b71424f2caf7da"
+  },
+  "scenarios": [
+    {
+      "options": {
+        "name": "exact-nine-points"
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 540,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 63962,
+        "childList": 1442,
+        "attributes": 62426,
+        "characterData": 94,
+        "overlayMutations": 0
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.666480446927377,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 1.6805555396609837,
+        "p50": 1.5999999046325684,
+        "p95": 2.4000000953674316,
+        "max": 4.900000095367432
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3006,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-exact-nine-points.trace.json"
+    },
+    {
+      "options": {
+        "name": "menu-closed-square-hidden",
+        "dgs": true
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 540,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 66523,
+        "childList": 1560,
+        "attributes": 64869,
+        "characterData": 94,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.666480446927373,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.077222222752041,
+        "p50": 2,
+        "p95": 2.4000000953674316,
+        "max": 3.5
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3002.0999999046326,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-menu-closed-square-hidden.trace.json"
+    },
+    {
+      "options": {
+        "name": "menu-open-square-hidden",
+        "dgs": true,
+        "menu": true
+      },
+      "menuOpen": true,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 721,
+        "fullUpdate": 541,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 77520,
+        "childList": 2283,
+        "attributes": 75132,
+        "characterData": 105,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.666480446927377,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 1.8122222158643935,
+        "p50": 1.799999713897705,
+        "p95": 2.1000003814697266,
+        "max": 2.8000001907348633
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3016.699999809265,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-menu-open-square-hidden.trace.json"
+    },
+    {
+      "options": {
+        "name": "menu-open-square-visible",
+        "dgs": true,
+        "menu": true,
+        "square": true
+      },
+      "menuOpen": true,
+      "squareVisible": true,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 721,
+        "fullUpdate": 541,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 77520,
+        "childList": 2283,
+        "attributes": 75132,
+        "characterData": 105,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665363128491624,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.269444441795349,
+        "p50": 2.1999998092651367,
+        "p95": 3,
+        "max": 4.5
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3004.2999997138977,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-menu-open-square-visible.trace.json"
+    },
+    {
+      "options": {
+        "name": "moving-point",
+        "dgs": true,
+        "moving": true
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 600,
+        "fullUpdate": 360,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 67182,
+        "childList": 1560,
+        "attributes": 65528,
+        "characterData": 94,
+        "overlayMutations": 2561
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.6659217877095,
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.08166667620341,
+        "p50": 2,
+        "p95": 2.6999998092651367,
+        "max": 4.400000095367432
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3013,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -2.181978236545306,
+          -9.075187269082402
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-moving-point.trace.json"
+    },
+    {
+      "options": {
+        "name": "integration-hidden",
+        "dgs": true,
+        "integration": true
+      },
+      "menuOpen": false,
+      "squareVisible": false,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 624,
+        "fullUpdate": 363,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 70866,
+        "childList": 1722,
+        "attributes": 69050,
+        "characterData": 94,
+        "overlayMutations": 2609
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.665921787709497,
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999727,
+        "max": 16.800000000000182
+      },
+      "frameOver25ms": 0,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.096111112170749,
+        "p50": 2,
+        "p95": 2.5999999046325684,
+        "max": 4.800000190734863
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3014.2000002861023,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-integration-hidden.trace.json"
+    },
+    {
+      "options": {
+        "name": "integration-visible",
+        "dgs": true,
+        "menu": true,
+        "square": true,
+        "integration": true
+      },
+      "menuOpen": true,
+      "squareVisible": true,
+      "jsxgraphVersion": "1.11.1",
+      "counts": {
+        "update": 805,
+        "fullUpdate": 544,
+        "suspendUpdate": 180,
+        "unsuspendUpdate": 180,
+        "boundingbox": 180,
+        "mutations": 81872,
+        "childList": 2445,
+        "attributes": 79322,
+        "characterData": 105,
+        "overlayMutations": 2609
+      },
+      "frames": {
+        "count": 179,
+        "mean": 16.759217877094972,
+        "p50": 16.699999999999818,
+        "p95": 16.799999999999727,
+        "max": 33.30000000000018
+      },
+      "frameOver25ms": 1,
+      "actionTimes": {
+        "count": 180,
+        "mean": 2.40277775393592,
+        "p50": 2.3000001907348633,
+        "p95": 3,
+        "max": 6.699999809265137
+      },
+      "longTasks": [],
+      "longTaskCount": 0,
+      "duration": 3045,
+      "pointCount": 9,
+      "points": {
+        "A": [
+          -5,
+          -3
+        ],
+        "B": [
+          4,
+          -2
+        ],
+        "D": [
+          -3,
+          6
+        ],
+        "C": [
+          -3,
+          -8.5
+        ],
+        "M": [
+          -2,
+          -8.5
+        ],
+        "E": [
+          -3,
+          -1
+        ],
+        "G": [
+          -7,
+          -1
+        ],
+        "F": [
+          -4,
+          -8.5
+        ],
+        "P": [
+          1,
+          -6
+        ]
+      },
+      "bbox": [
+        -10,
+        10,
+        10,
+        -10
+      ],
+      "errors": [],
+      "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\before-integration-visible.trace.json"
+    }
+  ]
+}

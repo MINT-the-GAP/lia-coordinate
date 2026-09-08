@@ -2,6 +2,8 @@
 // Adds a menu button and a sliding top menu bar to a coordinate board.
 
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { setAttributeIfChanged, setStyleIfChanged } from '../shared/domUpdates';
+import { getDgsUpdateTargets, trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { getAdaptiveTickMetric } from '../coord/boardHelpers';
 import { formatMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
@@ -538,10 +540,9 @@ type DgsState = {
   menuResizeObserver?: ResizeObserver;
   fullscreenResizeRAF?: number;
   fullscreenReleaseTimer?: number;
-  axisAnimationRAF?: number;
+  axisAnimationUntil?: number;
   axisSyncRAF?: number;
-  xAxisAnimationRAF?: number;
-  xAxisSyncRAF?: number;
+  xAxisAnimationUntil?: number;
 };
 
 type DgsSetSquareState = Pick<DgsState,
@@ -1118,15 +1119,19 @@ function applyDgsLogTickGenerator(state: DgsState, axis: any, key: 'x' | 'y', lo
   if (!('__liaDgsOriginalGenerateLabelText' in ticks)) {
     ticks.__liaDgsOriginalGenerateLabelText = ticks.generateLabelText;
   }
-  if (logarithmic) {
-    ticks.generateLabelText = function(tick: any, zero: any) {
+  if (logarithmic && (!ticks.__liaDgsLogGenerator || ticks.__liaDgsLogGeneratorKey !== key)) {
+    ticks.__liaDgsLogGeneratorKey = key;
+    ticks.__liaDgsLogGenerator = function(tick: any, zero: any) {
       const index = key === 'x' ? 1 : 2;
       const exponent = Number(tick?.usrCoords?.[index]) - Number(zero?.usrCoords?.[index]);
-      return formatDgsLogTickLabel(exponent, state.language);
+      return formatDgsLogTickLabel(exponent, ticks.__liaDgsLogLanguage);
     };
-  } else {
-    ticks.generateLabelText = ticks.__liaDgsOriginalGenerateLabelText;
   }
+  const generator = logarithmic ? ticks.__liaDgsLogGenerator : ticks.__liaDgsOriginalGenerateLabelText;
+  const languageChanged = logarithmic && ticks.__liaDgsLogLanguage !== state.language;
+  ticks.__liaDgsLogLanguage = state.language;
+  if (ticks.generateLabelText === generator && !languageChanged) return;
+  ticks.generateLabelText = generator;
   ticks.needsUpdate = true;
 }
 
@@ -1281,6 +1286,7 @@ function readDgsSetSquarePose(boardId: string): DgsSetSquareStoredPose {
 }
 
 function persistDgsSetSquarePose(state: DgsSetSquareState): void {
+  if (state.setSquareLayoutSource) flushDgsSetSquareLayout(state);
   if (state.setSquarePersistTimer != null) {
     window.clearTimeout(state.setSquarePersistTimer);
     state.setSquarePersistTimer = undefined;
@@ -1556,7 +1562,7 @@ function renderDgsSetSquareRuler(
 
   const halfWidth = 278;
   let path = '';
-  let markup = '';
+  const numbers: Array<{ x: string; value: string; text: string }> = [];
   const firstIndex = Math.ceil(-halfWidth / minorView);
   const lastIndex = Math.floor(halfWidth / minorView);
   for (let index = firstIndex; index <= lastIndex; index += 1) {
@@ -1573,21 +1579,34 @@ function renderDgsSetSquareRuler(
     if (isMajor) {
       const majorIndex = index / subdivisions;
       const value = majorIndex * majorStep;
-      markup += '<text class=lia-dgs-set-square-ruler-number x=' + x.toFixed(2) +
-        ' y=68 text-anchor=middle data-value=' + String(value) + '>' +
-        formatDgsSetSquareRulerValue(value, majorStep, state.language) +
-        '</text>';
+      numbers.push({ x: x.toFixed(2), value: String(value),
+        text: formatDgsSetSquareRulerValue(value, majorStep, state.language) });
     }
   }
 
-  ticks.setAttribute('d', path);
-  labels.innerHTML = markup;
-  state.setSquareOverlay.dataset.rulerStep = String(majorStep);
-  state.setSquareOverlay.dataset.rulerMajorPixels = String(majorPixels);
-  state.setSquareOverlay.dataset.rulerUnitsPerPixel = String(coordinateUnitsPerPixel);
-  state.setSquareOverlay.dataset.rulerAxisMinorTicks = String(rulerMetric.minorTicks);
-  state.setSquareOverlay.dataset.rulerMinorTicks = String(subdivisions - 1);
-  state.setSquareOverlay.dataset.rulerSubdivisions = String(subdivisions);
+  setAttributeIfChanged(ticks, 'd', path);
+  const existing = new Map(Array.from(labels.children).map(node => [node.getAttribute('data-value'), node]));
+  numbers.forEach((number, index) => {
+    let node = existing.get(number.value);
+    if (!node) {
+      node = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      node.setAttribute('class', 'lia-dgs-set-square-ruler-number');
+      node.setAttribute('y', '68');
+      node.setAttribute('text-anchor', 'middle');
+      node.setAttribute('data-value', number.value);
+    }
+    existing.delete(number.value);
+    setAttributeIfChanged(node, 'x', number.x);
+    if (node.textContent !== number.text) node.textContent = number.text;
+    if (labels.children[index] !== node) labels.insertBefore(node, labels.children[index] || null);
+  });
+  existing.forEach(node => node.remove());
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-step', String(majorStep));
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-major-pixels', String(majorPixels));
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-units-per-pixel', String(coordinateUnitsPerPixel));
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-axis-minor-ticks', String(rulerMetric.minorTicks));
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-minor-ticks', String(subdivisions - 1));
+  setAttributeIfChanged(state.setSquareOverlay, 'data-ruler-subdivisions', String(subdivisions));
   state.setSquareRulerSignature = signature;
 }
 
@@ -1662,19 +1681,18 @@ function layoutDgsSetSquare(
 
   const angle = normalizeDgsSetSquareAngle(state.setSquareAngle);
   state.setSquareAngle = angle;
-  renderDgsSetSquareRuler(state, toolWidth, angle);
   const constrainedPivot = projectedFromBoard
     ? {
         x: state.setSquarePivotX,
         y: state.setSquarePivotY,
-        visibleFraction: getDgsSetSquareVisibleFraction(
+        visibleFraction: state.setSquareVisible ? getDgsSetSquareVisibleFraction(
           state.setSquarePivotX,
           state.setSquarePivotY,
           scale,
           angle,
           containerWidth,
           containerHeight
-        )
+        ) : 0
       }
     : constrainDgsSetSquarePivot(
         state,
@@ -1691,6 +1709,10 @@ function layoutDgsSetSquare(
   state.setSquareLastContainerWidth = containerWidth;
   state.setSquareLastContainerHeight = containerHeight;
 
+  // Keep the pose current for persistence, but do not render an invisible tool.
+  if (!state.setSquareVisible) return true;
+  renderDgsSetSquareRuler(state, toolWidth, angle);
+
   const pivotLeft = DGS_SET_SQUARE_PIVOT_X * scale;
   const pivotTop = DGS_SET_SQUARE_PIVOT_Y * scale;
   const overlay = state.setSquareOverlay;
@@ -1699,22 +1721,20 @@ function layoutDgsSetSquare(
   const transform = 'translate3d(' +
     (state.setSquarePivotX - pivotLeft) + 'px,' +
     (state.setSquarePivotY - pivotTop) + 'px,0) rotate(' + angle + 'deg)';
-  if (overlay.style.width !== toolWidthCss) overlay.style.width = toolWidthCss;
-  if (overlay.style.left !== '0px') overlay.style.left = '0px';
-  if (overlay.style.top !== '0px') overlay.style.top = '0px';
-  if (overlay.style.transformOrigin !== transformOrigin) {
-    overlay.style.transformOrigin = transformOrigin;
-  }
-  if (overlay.style.transform !== transform) overlay.style.transform = transform;
-  overlay.dataset.visible = state.setSquareVisible ? '1' : '0';
-  overlay.classList.toggle('is-visible', state.setSquareVisible);
-  overlay.dataset.angle = String(angle);
-  overlay.dataset.scale = String(sizing.scale);
-  overlay.dataset.toolWidth = String(toolWidth);
-  overlay.dataset.pivotX = String(state.setSquarePivotX);
-  overlay.dataset.pivotY = String(state.setSquarePivotY);
-  overlay.dataset.visibleFraction = constrainedPivot.visibleFraction.toFixed(6);
-  overlay.setAttribute('aria-hidden', state.setSquareVisible ? 'false' : 'true');
+  setStyleIfChanged(overlay, 'width', toolWidthCss);
+  setStyleIfChanged(overlay, 'left', '0px');
+  setStyleIfChanged(overlay, 'top', '0px');
+  setStyleIfChanged(overlay, 'transformOrigin', transformOrigin);
+  setStyleIfChanged(overlay, 'transform', transform);
+  setAttributeIfChanged(overlay, 'data-visible', state.setSquareVisible ? '1' : '0');
+  if (!overlay.classList.contains('is-visible')) overlay.classList.add('is-visible');
+  setAttributeIfChanged(overlay, 'data-angle', String(angle));
+  setAttributeIfChanged(overlay, 'data-scale', String(sizing.scale));
+  setAttributeIfChanged(overlay, 'data-tool-width', String(toolWidth));
+  setAttributeIfChanged(overlay, 'data-pivot-x', String(state.setSquarePivotX));
+  setAttributeIfChanged(overlay, 'data-pivot-y', String(state.setSquarePivotY));
+  setAttributeIfChanged(overlay, 'data-visible-fraction', constrainedPivot.visibleFraction.toFixed(6));
+  setAttributeIfChanged(overlay, 'aria-hidden', 'false');
   return true;
 }
 
@@ -1728,16 +1748,22 @@ function scheduleDgsSetSquareLayout(
   if (state.setSquareLayoutRAF != null) return;
   state.setSquareLayoutRAF = requestAnimationFrame(() => {
     state.setSquareLayoutRAF = undefined;
-    const sizeChanged =
-      state.setSquareLastContainerWidth !== state.boardContainer.clientWidth ||
-      state.setSquareLastContainerHeight !== state.boardContainer.clientHeight;
-    const source = sizeChanged
-      ? 'ratio'
-      : (state.setSquareLayoutSource || positionSource);
-    state.setSquareLayoutSource = undefined;
-    const didLayout = layoutDgsSetSquare(state, source);
-    if (didLayout && source === 'board') scheduleDgsSetSquarePosePersist(state);
+    flushDgsSetSquareLayout(state);
   });
+}
+
+function flushDgsSetSquareLayout(state: DgsSetSquareState): void {
+  if (state.setSquareLayoutRAF != null) cancelAnimationFrame(state.setSquareLayoutRAF);
+  state.setSquareLayoutRAF = undefined;
+  const sizeChanged =
+    state.setSquareLastContainerWidth !== state.boardContainer.clientWidth ||
+    state.setSquareLastContainerHeight !== state.boardContainer.clientHeight;
+  const source = sizeChanged
+    ? 'ratio'
+    : (state.setSquareLayoutSource || 'board');
+  state.setSquareLayoutSource = undefined;
+  const didLayout = layoutDgsSetSquare(state, source);
+  if (didLayout && source === 'board') scheduleDgsSetSquarePosePersist(state);
 }
 
 function scheduleDgsSetSquarePosePersist(state: DgsSetSquareState): void {
@@ -1762,7 +1788,15 @@ function renderDgsSetSquareButtonState(state: DgsSetSquareState): void {
 function setDgsSetSquareVisible(state: DgsSetSquareState, visible: boolean): void {
   if (!visible) cancelDgsSetSquareInteraction(state);
   const restoreToVisibleArea = visible && !state.setSquareVisible;
+  if (state.setSquareLayoutSource) flushDgsSetSquareLayout(state);
   state.setSquareVisible = visible;
+  if (!visible) {
+    setAttributeIfChanged(state.setSquareOverlay, 'data-visible', '0');
+    setAttributeIfChanged(state.setSquareOverlay, 'aria-hidden', 'true');
+    if (state.setSquareOverlay.classList.contains('is-visible')) {
+      state.setSquareOverlay.classList.remove('is-visible');
+    }
+  }
   layoutDgsSetSquare(state, restoreToVisibleArea ? 'screen' : 'board');
   persistDgsSetSquarePose(state);
   renderDgsSetSquareButtonState(state);
@@ -6609,6 +6643,7 @@ function finalizeDgsCompassArc(state: DgsState, arc: any): boolean {
       !Number.isFinite(geometry.sweepAngle) || Math.abs(geometry.sweepAngle) <= 1e-7) return false;
   arc.__liaDgsCompassDraft = false;
   arc.__liaDgsCompassFixedRadius = state.compassMode === 'fixed';
+  trackDgsUpdateObject(state.board, arc);
   if (arc.__liaDgsCompassFixedRadius) {
     const center = readDgsPointPosition(arc.__liaDgsCompassCenterPoint);
     const point = readDgsPointPosition(arc.__liaDgsCompassRadiusPoint);
@@ -7655,10 +7690,7 @@ function isDgsFixedCompassFollowerBlocked(point: any): boolean {
 
 function translateDgsFixedCompassComponent(state: DgsState, driver: any): boolean {
   if (!state || !state.board || !driver || state.restoring || state.fixedCompassSyncing) return false;
-  const availableArcs = getDgsBoardObjects(state.board).filter((object) =>
-    isDgsCompassArc(object) && !object.__liaDgsCompassDraft &&
-    object.__liaDgsCompassFixedRadius === true
-  );
+  const availableArcs = getDgsUpdateTargets(state.board, 'compass');
   const componentPoints = new Set<any>([driver]);
   const componentArcs = new Set<any>();
   const queue = [driver];
@@ -7756,10 +7788,7 @@ function translateDgsFixedCompassComponent(state: DgsState, driver: any): boolea
 
 function syncDgsFixedCompassConstructions(state: DgsState): boolean {
   if (!state || !state.board || state.restoring || state.fixedCompassSyncing) return false;
-  const arcs = getDgsBoardObjects(state.board).filter((object) =>
-    isDgsCompassArc(object) && !object.__liaDgsCompassDraft &&
-    object.__liaDgsCompassFixedRadius === true
-  );
+  const arcs = getDgsUpdateTargets(state.board, 'compass');
   if (!arcs.length) return false;
 
   const movedPoints = new Set<any>();
@@ -8140,7 +8169,7 @@ function refreshDgsSliderTypography(state: DgsState): void {
     Math.max(1e-9, Math.abs(Number(state.board && state.board.unitX) || 1)) *
     Math.max(1e-9, Math.abs(Number(state.board && state.board.unitY) || 1))
   );
-  getDgsBoardObjects(state.board).filter(isDgsSlider).forEach((slider) => {
+  getDgsUpdateTargets(state.board, 'slider').forEach((slider) => {
     const baseScale = Number(slider.__liaDgsSliderFontBaseScale) || currentScale;
     slider.__liaDgsSliderFontBaseScale = baseScale;
     const baseFontSize = Math.max(8, Math.min(96, Number(slider.__liaDgsFormatFontSize) || 18));
@@ -8223,6 +8252,7 @@ function createDgsSlider(
       frozen: false
     });
     slider.__liaDgsSlider = true;
+    trackDgsUpdateObject(state.board, slider);
     slider.__liaDgsSliderName = name;
     slider.__liaDgsSliderMinimum = settings.minimum;
     slider.__liaDgsSliderMaximum = settings.maximum;
@@ -9038,6 +9068,7 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
     if (Number.isFinite(Number(record.startAngle))) object.__liaDgsCompassStartAngle = Number(record.startAngle);
     object.__liaDgsCompassDraft = false;
     object.__liaDgsCompassFixedRadius = record.fixedRadius === true;
+    trackDgsUpdateObject(state.board, object);
     if (object.__liaDgsCompassFixedRadius) {
       let fixedDx = Number(record.fixedDx);
       let fixedDy = Number(record.fixedDy);
@@ -9180,6 +9211,7 @@ function restoreDgsPointTraceState(state: DgsState, point: any, record: any): vo
   point.__liaDgsTraceMarkers = [];
   point.__liaDgsTraceCoordinates = [];
   point.__liaDgsTraceEnabled = !!record.traceEnabled;
+  trackDgsUpdateObject(state.board, point);
   point.__liaDgsTraceColor = normalizeHexColor(record.traceColor) || '#ff00ff';
   (Array.isArray(record.tracePoints) ? record.tracePoints : []).forEach((entry: any) => {
     createDgsTraceMarker(state, point, Number(entry.x), Number(entry.y));
@@ -9468,6 +9500,7 @@ function restoreDgsConstruction(state: DgsState): boolean {
           ? Number(record.coordinateParameter)
           : Number(record.x);
         point.__liaDgsCoordinateCompiled = null;
+        trackDgsUpdateObject(state.board, point);
       }
       existingById.set(record.id, point);
       if (record.macroKey) existingById.set(String(record.macroKey), point);
@@ -11988,6 +12021,7 @@ function seedDgsPointTrace(state: DgsState, point: any): void {
 function setDgsPointTraceEnabled(state: DgsState, point: any, enabled: boolean): void {
   if (!isDgsPoint(point)) return;
   point.__liaDgsTraceEnabled = enabled;
+  trackDgsUpdateObject(state.board, point);
   if (enabled) seedDgsPointTrace(state, point);
   else point.__liaDgsTraceCursor = null;
   updateDgsTraceControls(state, point);
@@ -12026,7 +12060,7 @@ function recordDgsPointTraceMotion(state: DgsState, point: any): boolean {
 
 function recordAllDgsPointTraces(state: DgsState): boolean {
   let created = false;
-  getDgsBoardObjects(state.board).forEach((object) => {
+  getDgsUpdateTargets(state.board, 'trace').forEach((object) => {
     if (isDgsPoint(object) && object.__liaDgsTraceEnabled) {
       created = recordDgsPointTraceMotion(state, object) || created;
     }
@@ -12150,7 +12184,7 @@ function syncDgsCoordinatePoints(state: DgsState): boolean {
   state.coordinateSyncing = true;
   let moved = false;
   try {
-    getDgsBoardObjects(state.board).forEach((object) => {
+    getDgsUpdateTargets(state.board, 'coordinates').forEach((object) => {
       if (isDgsPoint(object) && object.__liaDgsCoordinateExpressions) {
         moved = syncDgsCoordinatePoint(state, object) || moved;
       }
@@ -12162,7 +12196,8 @@ function syncDgsCoordinatePoints(state: DgsState): boolean {
 }
 
 function scheduleDgsCoordinateSync(state: DgsState): void {
-  if (!state || state.coordinateSyncRAF != null || state.coordinateSyncing) return;
+  if (!state || state.coordinateSyncRAF != null || state.coordinateSyncing ||
+      !getDgsUpdateTargets(state.board, 'coordinates').length) return;
   state.coordinateSyncRAF = requestAnimationFrame(() => {
     state.coordinateSyncRAF = undefined;
     const moved = syncDgsCoordinatePoints(state);
@@ -12211,6 +12246,7 @@ function applyCoordinateInputs(state: DgsState): boolean {
     point.__liaDgsCoordinateCompiled = { x: expressionsX.fn, y: expressionsY.fn };
     point.__liaDgsCoordinateParameter = parameter;
   }
+  trackDgsUpdateObject(state.board, point);
 
   let moved = false;
   try {
@@ -13895,21 +13931,86 @@ function resetAxisPoint1ToOriginal(axis: any): void {
   } catch (e) {}
 }
 
-function updateBoardForAxis(state: DgsState): void {
-  if (!state.board || state.axisSyncing) return;
+type DgsMenuAxisChange = { axis: any; apply: () => void };
+
+function prepareMenuAxisChange(
+  state: DgsState,
+  key: 'x' | 'y',
+  insetPx: number | null
+): DgsMenuAxisChange | null {
+  const axis = key === 'x' ? state.xAxis : state.yAxis;
+  const original = key === 'x' ? state.xAxisOriginalPoint2 : state.axisOriginalPoint2;
+  const adjusted = key === 'x' ? state.xAxisAdjusted : state.axisAdjusted;
+  if (!axis || !original || !state.board || (insetPx == null && !adjusted)) return null;
+  const shouldAdjust = insetPx != null;
+  const straightLast = shouldAdjust ? false : key === 'x'
+    ? state.xAxisOriginalStraightLast : state.axisOriginalStraightLast;
+  let endpoint = original.slice();
+  if (shouldAdjust) {
+    let bbox: number[];
+    try { bbox = state.board.getBoundingBox(); } catch (e) { return null; }
+    if (!Array.isArray(bbox) || bbox.length < 4) return null;
+    const z = Number(original[0]) || 1;
+    const unit = Math.max(1e-9, Math.abs(Number(key === 'x' ? state.board.unitX : state.board.unitY) || 1));
+    endpoint = key === 'x'
+      ? [1, Number(bbox[2]) - Math.max(0, insetPx!) / unit, Number(original[2]) / z]
+      : [1, Number(original[1]) / z, Number(bbox[1]) - Math.max(0, insetPx!) / unit];
+  }
+  // Sticky axes reproject their live points during updates. Compare the source
+  // endpoint that JSXGraph uses, rather than its derived screen position.
+  const current = readAxisPoint2(axis);
+  const endpointChanged = !current || endpoint.some((value, index) => value !== current[index]);
+  const straightChanged = readAxisStraightLast(axis) !== straightLast;
+  if (!endpointChanged && !straightChanged && adjusted === shouldAdjust) return null;
+  return {
+    axis,
+    apply: () => {
+      if (endpointChanged) axis._point2UsrCoordsOrg = endpoint.slice();
+      if (endpointChanged || straightChanged) {
+        resetAxisPoint1ToOriginal(axis);
+        setAxisPoint2(axis, endpoint);
+      }
+      if (straightChanged) {
+        try { axis.setAttribute({ straightLast }); } catch (e) {
+          if (axis.visProp) axis.visProp.straightlast = straightLast;
+        }
+      }
+      if (key === 'x') state.xAxisAdjusted = shouldAdjust;
+      else state.axisAdjusted = shouldAdjust;
+    }
+  };
+}
+
+function applyMenuAxisChanges(state: DgsState, changes: Array<DgsMenuAxisChange | null>): void {
+  const pending = changes.filter((change): change is DgsMenuAxisChange => !!change);
+  const board = state.board;
+  if (!board || state.axisSyncing || !pending.length) return;
+  const wasSuspended = !!board.isSuspendedUpdate;
+  let suspendedHere = false;
   state.axisSyncing = true;
   try {
-    if (state.xAxis) state.xAxis.needsUpdate = true;
-    if (state.xAxis && state.xAxis.point2) state.xAxis.point2.needsUpdate = true;
-    if (state.xAxis && state.xAxis.defaultTicks) state.xAxis.defaultTicks.needsUpdate = true;
-    if (state.yAxis) state.yAxis.needsUpdate = true;
-    if (state.yAxis && state.yAxis.point2) state.yAxis.point2.needsUpdate = true;
-    if (state.yAxis && state.yAxis.defaultTicks) state.yAxis.defaultTicks.needsUpdate = true;
-    if (typeof state.board.fullUpdate === 'function') state.board.fullUpdate();
-    else if (typeof state.board.update === 'function') state.board.update();
-  } catch (e) {
+    if (!wasSuspended && typeof board.suspendUpdate === 'function' &&
+        typeof board.unsuspendUpdate === 'function') {
+      try { board.suspendUpdate(); } catch (e) {}
+      suspendedHere = board.isSuspendedUpdate === true;
+    }
+    pending.forEach(({ axis, apply }) => {
+      apply();
+      axis.needsUpdate = true;
+      if (axis.point2) axis.point2.needsUpdate = true;
+      if (axis.defaultTicks) axis.defaultTicks.needsUpdate = true;
+    });
   } finally {
-    state.axisSyncing = false;
+    try {
+      if (suspendedHere) board.unsuspendUpdate();
+      else if (!wasSuspended) {
+        if (typeof board.fullUpdate === 'function') board.fullUpdate();
+        else if (typeof board.update === 'function') board.update();
+      }
+    } catch (e) {
+    } finally {
+      state.axisSyncing = false;
+    }
   }
 }
 
@@ -13922,87 +14023,6 @@ function currentMenuInset(state: DgsState): number {
   } catch (e) {
     return state.open ? MENU_HEIGHT_PX : 0;
   }
-}
-
-function applyAxisInset(state: DgsState, insetPx: number): void {
-  const axis = state.yAxis;
-  const original = state.axisOriginalPoint2;
-  if (!axis || !original || !state.board) return;
-
-  let bbox: number[];
-  try { bbox = state.board.getBoundingBox(); } catch (e) { return; }
-  if (!Array.isArray(bbox) || bbox.length < 4) return;
-
-  const unitY = Math.max(1e-9, Math.abs(Number(state.board.unitY) || 1));
-  const z = Number(original[0]) || 1;
-  const x = Number(original[1]) / z;
-  const y = Number(bbox[1]) - Math.max(0, insetPx) / unitY;
-  const endpoint = [1, x, y];
-
-  axis._point2UsrCoordsOrg = endpoint.slice();
-  resetAxisPoint1ToOriginal(axis);
-  setAxisPoint2(axis, endpoint);
-
-  if (!state.axisAdjusted) {
-    state.axisAdjusted = true;
-    try { axis.setAttribute({ straightLast: false }); } catch (e) {
-      if (axis.visProp) axis.visProp.straightlast = false;
-    }
-  }
-
-  updateBoardForAxis(state);
-}
-
-function restoreAxis(state: DgsState): void {
-  const axis = state.yAxis;
-  const original = state.axisOriginalPoint2;
-  if (!state.axisAdjusted || !axis || !original) return;
-
-  axis._point2UsrCoordsOrg = original.slice();
-  resetAxisPoint1ToOriginal(axis);
-  setAxisPoint2(axis, original);
-  try { axis.setAttribute({ straightLast: state.axisOriginalStraightLast }); } catch (e) {
-    if (axis.visProp) axis.visProp.straightlast = state.axisOriginalStraightLast;
-  }
-  state.axisAdjusted = false;
-  updateBoardForAxis(state);
-}
-
-function scheduleAxisSync(state: DgsState): void {
-  if (!state.axisAdjusted || state.axisAnimationRAF || state.axisSyncRAF) return;
-  state.axisSyncRAF = requestAnimationFrame(() => {
-    state.axisSyncRAF = 0;
-    if (state.axisAdjusted) applyAxisInset(state, currentMenuInset(state));
-  });
-}
-
-function trackAxisWithMenu(state: DgsState): void {
-  if (!state.yAxis || !state.axisOriginalPoint2) return;
-  if (state.axisAnimationRAF) cancelAnimationFrame(state.axisAnimationRAF);
-  if (state.axisSyncRAF) {
-    cancelAnimationFrame(state.axisSyncRAF);
-    state.axisSyncRAF = 0;
-  }
-
-  if (state.open && !state.axisAdjusted) {
-    applyAxisInset(state, currentMenuInset(state));
-  }
-
-  const startedAt = performance.now();
-  const frame = (now: number) => {
-    state.axisAnimationRAF = 0;
-    if (state.axisAdjusted) applyAxisInset(state, currentMenuInset(state));
-
-    if (now - startedAt < MENU_TRANSITION_MS + 80) {
-      state.axisAnimationRAF = requestAnimationFrame(frame);
-      return;
-    }
-
-    if (state.open) applyAxisInset(state, MENU_HEIGHT_PX);
-    else restoreAxis(state);
-  };
-
-  state.axisAnimationRAF = requestAnimationFrame(frame);
 }
 
 function targetRightPanelInset(state: DgsState): number {
@@ -14036,84 +14056,61 @@ function currentSideMenuInset(state: DgsState): number {
   }
 }
 
-function applyXAxisInset(state: DgsState, insetPx: number): void {
-  const axis = state.xAxis;
-  const original = state.xAxisOriginalPoint2;
-  if (!axis || !original || !state.board) return;
-
-  let bbox: number[];
-  try { bbox = state.board.getBoundingBox(); } catch (e) { return; }
-  if (!Array.isArray(bbox) || bbox.length < 4) return;
-
-  const unitX = Math.max(1e-9, Math.abs(Number(state.board.unitX) || 1));
-  const z = Number(original[0]) || 1;
-  const x = Number(bbox[2]) - Math.max(0, insetPx) / unitX;
-  const y = Number(original[2]) / z;
-  const endpoint = [1, x, y];
-
-  axis._point2UsrCoordsOrg = endpoint.slice();
-  resetAxisPoint1ToOriginal(axis);
-  setAxisPoint2(axis, endpoint);
-  if (!state.xAxisAdjusted) {
-    state.xAxisAdjusted = true;
-    try { axis.setAttribute({ straightLast: false }); } catch (e) {
-      if (axis.visProp) axis.visProp.straightlast = false;
-    }
-  }
-  updateBoardForAxis(state);
+function restoreAxis(state: DgsState): void {
+  applyMenuAxisChanges(state, [prepareMenuAxisChange(state, 'y', null)]);
 }
 
 function restoreXAxis(state: DgsState): void {
-  const axis = state.xAxis;
-  const original = state.xAxisOriginalPoint2;
-  if (!state.xAxisAdjusted || !axis || !original) return;
+  applyMenuAxisChanges(state, [prepareMenuAxisChange(state, 'x', null)]);
+}
 
-  axis._point2UsrCoordsOrg = original.slice();
-  resetAxisPoint1ToOriginal(axis);
-  setAxisPoint2(axis, original);
-  try { axis.setAttribute({ straightLast: state.xAxisOriginalStraightLast }); } catch (e) {
-    if (axis.visProp) axis.visProp.straightlast = state.xAxisOriginalStraightLast;
-  }
-  state.xAxisAdjusted = false;
-  updateBoardForAxis(state);
+function syncMenuAxes(state: DgsState, now: number): void {
+  const yAnimating = state.axisAnimationUntil != null;
+  const xAnimating = state.xAxisAnimationUntil != null;
+  const yFinished = yAnimating && now >= state.axisAnimationUntil!;
+  const xFinished = xAnimating && now >= state.xAxisAnimationUntil!;
+  const yActive = state.axisAdjusted || yAnimating;
+  const xActive = state.xAxisAdjusted || xAnimating;
+
+  // Read both panels completely before moving either axis. This also makes a
+  // simultaneous top/side-menu animation share one renderer update per frame.
+  const yInset = !state.open && (!yAnimating || yFinished) ? null
+    : yFinished ? MENU_HEIGHT_PX : yActive ? currentMenuInset(state) : null;
+  const xInset = !state.sideMenuOpen && !state.objectListOpen && (!xAnimating || xFinished) ? null
+    : xFinished ? targetRightPanelInset(state) : xActive ? currentSideMenuInset(state) : null;
+  const changes = [
+    yActive ? prepareMenuAxisChange(state, 'y', yInset) : null,
+    xActive ? prepareMenuAxisChange(state, 'x', xInset) : null
+  ];
+  if (yFinished) state.axisAnimationUntil = undefined;
+  if (xFinished) state.xAxisAnimationUntil = undefined;
+  applyMenuAxisChanges(state, changes);
+  if (state.axisAnimationUntil != null || state.xAxisAnimationUntil != null) scheduleAxisSync(state);
+}
+
+function scheduleAxisSync(state: DgsState): void {
+  if (state.axisSyncRAF || (!state.axisAdjusted && !state.xAxisAdjusted &&
+      state.axisAnimationUntil == null && state.xAxisAnimationUntil == null)) return;
+  state.axisSyncRAF = requestAnimationFrame((now) => {
+    state.axisSyncRAF = 0;
+    syncMenuAxes(state, now);
+  });
 }
 
 function scheduleXAxisSync(state: DgsState): void {
-  if (!state.xAxisAdjusted || state.xAxisAnimationRAF || state.xAxisSyncRAF) return;
-  state.xAxisSyncRAF = requestAnimationFrame(() => {
-    state.xAxisSyncRAF = 0;
-    if (state.xAxisAdjusted) applyXAxisInset(state, currentSideMenuInset(state));
-  });
+  scheduleAxisSync(state);
+}
+
+function trackAxisWithMenu(state: DgsState): void {
+  if (!state.yAxis || !state.axisOriginalPoint2) return;
+  state.axisAnimationUntil = performance.now() + MENU_TRANSITION_MS + 80;
+  scheduleAxisSync(state);
 }
 
 function trackXAxisWithSideMenu(state: DgsState): void {
   if (!state.xAxis || !state.xAxisOriginalPoint2) return;
-  if (state.xAxisAnimationRAF) cancelAnimationFrame(state.xAxisAnimationRAF);
-  if (state.xAxisSyncRAF) {
-    cancelAnimationFrame(state.xAxisSyncRAF);
-    state.xAxisSyncRAF = 0;
-  }
-
-  if ((state.sideMenuOpen || state.objectListOpen) && !state.xAxisAdjusted) {
-    applyXAxisInset(state, currentSideMenuInset(state));
-  }
-
-  const startedAt = performance.now();
-  const frame = (now: number) => {
-    state.xAxisAnimationRAF = 0;
-    if (state.xAxisAdjusted) applyXAxisInset(state, currentSideMenuInset(state));
-
-    if (now - startedAt < MENU_TRANSITION_MS + 80) {
-      state.xAxisAnimationRAF = requestAnimationFrame(frame);
-      return;
-    }
-
-    if (state.sideMenuOpen || state.objectListOpen) {
-      applyXAxisInset(state, targetRightPanelInset(state));
-    }
-    else restoreXAxis(state);
-  };
-  state.xAxisAnimationRAF = requestAnimationFrame(frame);
+  state.xAxisAnimationUntil = performance.now() + MENU_TRANSITION_MS + 80;
+  scheduleAxisSync(state);
 }
 
 function setColorPopupOpen(state: DgsState, open: boolean): void {
@@ -14867,10 +14864,10 @@ function disposeDgsState(existing: DgsState): void {
   persistDgsSetSquarePose(existing);
   cancelDgsSetSquareInteraction(existing);
   setActiveTool(existing, '', false);
-  if (existing.axisAnimationRAF) cancelAnimationFrame(existing.axisAnimationRAF);
   if (existing.axisSyncRAF) cancelAnimationFrame(existing.axisSyncRAF);
-  if (existing.xAxisAnimationRAF) cancelAnimationFrame(existing.xAxisAnimationRAF);
-  if (existing.xAxisSyncRAF) cancelAnimationFrame(existing.xAxisSyncRAF);
+  existing.axisAnimationUntil = undefined;
+  existing.xAxisAnimationUntil = undefined;
+  existing.axisSyncRAF = 0;
   if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
   if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
   if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);

@@ -13,6 +13,7 @@ import {
 import { initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getBoardObjects } from '../shared/boardObjects';
+import { trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { formatNumber } from '../shared/format';
 
 interface SliderConfig {
@@ -421,6 +422,7 @@ export function init(): void {
       slider.__liaMacroSlider = true;
       slider.__liaMacroSliderName = cfg.name;
       slider.__liaDgsSlider = true;
+      trackDgsUpdateObject(board, slider);
       slider.__liaDgsSliderName = cfg.name;
       slider.__liaDgsSliderMinimum = cfg.minimum;
       slider.__liaDgsSliderMaximum = cfg.maximum;

@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Dynamic pan and zoom profile</title>
+  <style>
+    body { margin: 16px; font-family: Arial; background: white; color: #222; }
+    .dynFlex { display: flex; width: 900px; }
+    .flex-child { flex: 1; min-width: 0; }
+    .jxgbox { position: relative; overflow: hidden; }
+    #fixture { width: 900px; }
+  </style>
+</head>
+<body>
+<main id="fixture" class="dynFlex">
+  <section class="flex-child">
+    <lia-coordinate-board data-lia-coordinate-key="profile"
+      data-spec="xmin=-10;xmax=10;ymin=-10;ymax=10;width=700;id=A1"></lia-coordinate-board>
+    <span id="axis-title-spec-profile" data-spec="id=A1;xlabel=$x$;ylabel=$y$" style="display:none"></span>
+  </section>
+</main>
+<script>
+  window.profileErrors = [];
+  window.addEventListener('error', event => profileErrors.push(String(event.error?.stack || event.message)));
+  window.addEventListener('unhandledrejection', event => profileErrors.push(String(event.reason)));
+  const params = new URLSearchParams(location.search);
+  const integration = params.get('integration') === '1';
+  for (const [i, spec] of [
+    'A;-5;-3;fix', 'B;4;-2;fix', 'D;-3;6;fix', 'C;-3;-8.5', 'M;-2;-8.5',
+    'E;-3;-1;fix', 'G;-7;-1;fix', 'F;-4;-8.5', 'P;1;-6;fix'
+  ].entries()) {
+    const marker = document.createElement('span');
+    marker.id = 'point-spec-' + i;
+    marker.dataset.spec = 'A1;' + spec;
+    marker.style.display = 'none';
+    document.querySelector('.flex-child').append(marker);
+  }
+  if (params.get('dgs') === '1') {
+    const marker = document.createElement('div');
+    marker.id = 'dgs-ui-profile';
+    marker.dataset.spec = 'A1';
+    marker.dataset.language = 'de';
+    document.querySelector('.flex-child').append(marker);
+  }
+  if (params.get('instrument') === '1') {
+    const marker = document.createElement('div');
+    marker.id = 'dgs-instrument-ui-profile';
+    marker.dataset.spec = 'A1';
+    marker.dataset.instrument = 'set-square';
+    marker.dataset.language = 'de';
+    document.querySelector('.flex-child').append(marker);
+  }
+  if (integration) {
+    const quiz = document.createElement('div');
+    quiz.className = 'lia-quiz';
+    quiz.innerHTML = '<span data-solution-timer="90s"></span>' +
+      '<input value="test"><button>Check</button><button id="timer-solution">Solution</button>';
+    document.querySelector('.flex-child').append(quiz);
+    for (const name of ['dynflex', 'timer', 'freeze']) {
+      document.write('<script src="/assets/' + name + '.js"><\/script>');
+    }
+  }
+</script>
+<script>window.MathJax = { chtml: { fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2" } };</script>
+<script src="/assets/mathjax.js"></script>
+<script src="/assets/jsxgraph-template.js"></script>
+<script src="/bundle.js"></script>
+<script>
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+  const check = (condition, message) => { if (!condition) throw Error(message); };
+  const copy = value => JSON.parse(JSON.stringify(value));
+  window.profileReady = async () => {
+    for (let i = 0; i < 150; i++) {
+      if (window.__boards?.A1 && Object.keys(window.__points?.A1 || {}).length >= 9) return;
+      await wait(50);
+    }
+    throw Error('Board initialization timeout: ' + JSON.stringify(profileErrors));
+  };
+
+  window.runProfile = async function(options = {}) {
+    await profileReady();
+    const board = __boards.A1;
+    if (options.menu) board.containerObj.querySelector('.lia-dgs-menu-button')?.click();
+    if (options.square) board.containerObj.querySelector('.lia-dgs-set-square-button')?.click();
+    await wait(700);
+    const menuOpen = board.containerObj.querySelector('.lia-dgs-menu-button')?.getAttribute('aria-expanded') === 'true';
+    const squareVisible = board.containerObj.querySelector('.lia-dgs-set-square-overlay')?.classList.contains('is-visible') || false;
+    check(menuOpen === !!options.menu && squareVisible === !!options.square, 'Scenario state mismatch');
+    if (options.integration) {
+      check(window.__liaSolTimerV001?.items.size === 1, 'Real timer did not arm');
+      check(!!window.__LIA_DYNFLEX_V1_0__, 'Real DynFlex did not initialize');
+      check(!!window.__liaFreezeV2LifecycleV1__, 'Real Freeze did not initialize');
+    }
+    const counts = { update: 0, fullUpdate: 0, suspendUpdate: 0, unsuspendUpdate: 0,
+      boundingbox: 0, mutations: 0, childList: 0, attributes: 0, characterData: 0, overlayMutations: 0 };
+    const original = {};
+    for (const name of ['update', 'fullUpdate', 'suspendUpdate', 'unsuspendUpdate']) {
+      original[name] = board[name];
+      board[name] = function(...args) { counts[name]++; return original[name].apply(this, args); };
+    }
+    const bboxListener = () => counts.boundingbox++;
+    board.on('boundingbox', bboxListener);
+    // JSXGraph is inside a shadow root: observing document would miss every board mutation.
+    const observer = new MutationObserver(records => {
+      for (const record of records) {
+        counts.mutations++;
+        counts[record.type]++;
+        const element = record.target.nodeType === 1 ? record.target : record.target.parentElement;
+        if (element?.closest('.lia-dgs-set-square-overlay')) counts.overlayMutations++;
+      }
+    });
+    observer.observe(board.containerObj, { subtree: true, childList: true, attributes: true, characterData: true });
+    const longTasks = [];
+    const taskObserver = new PerformanceObserver(list => longTasks.push(...list.getEntries()
+      .map(entry => ({ start: entry.startTime, duration: entry.duration }))));
+    taskObserver.observe({ type: 'longtask', buffered: false });
+    const frames = [], actionTimes = [];
+    let previous;
+    const start = performance.now();
+    const initial = board.getBoundingBox().slice();
+    // Keep this exact sequence identical for baseline and candidate: 60 pan,
+    // 60 zoom-in, 60 combined return steps, once per browser animation frame.
+    for (let i = 0; i < 180; i++) {
+      await new Promise(resolve => requestAnimationFrame(time => {
+        if (previous !== undefined) frames.push(time - previous);
+        previous = time;
+        const actionStart = performance.now();
+        const pan = i < 60 ? (i / 59) * 3 : i < 120 ? 3 : 3 - (i - 120) / 59 * 3;
+        const scale = i < 60 ? 1 : i < 120 ? 1 - (i - 60) / 59 * 0.35 : 0.65 + (i - 120) / 59 * 0.35;
+        const cx = (initial[0] + initial[2]) / 2 + pan;
+        const cy = (initial[1] + initial[3]) / 2 + pan / 2;
+        const width = (initial[2] - initial[0]) * scale / 2;
+        const height = (initial[1] - initial[3]) * scale / 2;
+        board.setBoundingBox([cx - width, cy + height, cx + width, cy - height], true);
+        board.update();
+        if (options.moving && i % 3 === 0) {
+          __points.A1.C.setPosition(JXG.COORDS_BY_USER, [-3 + Math.sin(i / 12), -8.5 + Math.cos(i / 12)]);
+          board.update();
+        }
+        actionTimes.push(performance.now() - actionStart);
+        resolve();
+      }));
+    }
+    await frame();
+    await frame();
+    observer.disconnect();
+    taskObserver.disconnect();
+    board.off('boundingbox', bboxListener);
+    for (const [name, fn] of Object.entries(original)) board[name] = fn;
+    const quantile = (values, q) => values.slice().sort((a, b) => a - b)[Math.floor((values.length - 1) * q)] || 0;
+    const summary = values => ({ count: values.length, mean: values.reduce((sum, value) => sum + value, 0) / values.length,
+      p50: quantile(values, .5), p95: quantile(values, .95), max: Math.max(...values) });
+    return { options, menuOpen, squareVisible, jsxgraphVersion: JXG.version, counts,
+      frames: summary(frames), frameOver25ms: frames.filter(time => time > 25).length,
+      actionTimes: summary(actionTimes), longTasks, longTaskCount: longTasks.length,
+      duration: performance.now() - start, pointCount: Object.keys(__points.A1).length,
+      points: Object.fromEntries(Object.entries(__points.A1).map(([name, point]) => [name, [point.X(), point.Y()]])),
+      bbox: board.getBoundingBox(), errors: profileErrors.slice() };
+  };
+
+  window.interactionState = () => {
+    const board = __boards.A1;
+    const rect = board.containerObj.getBoundingClientRect();
+    const point = __points.A1.C;
+    return { bbox: board.getBoundingBox(), empty: [rect.left + rect.width * .78, rect.top + rect.height * .36],
+      pointC: [rect.left + point.coords.scrCoords[1], rect.top + point.coords.scrCoords[2]],
+      coordinatesC: [point.X(), point.Y()], coordinatesA: [__points.A1.A.X(), __points.A1.A.Y()] };
+  };
+
+  window.checkStateRestore = async () => {
+    const adapter = integration ? await import('/assets/freeze-coordinate-state.js') : null;
+    let board = __boards.A1;
+    const timer = integration ? Array.from(__liaSolTimerV001.items.values())[0] : null;
+    const timerEndAt = timer?.endAt;
+    const menu = () => board.containerObj.querySelector('.lia-dgs-menu-button');
+    const squareButton = () => board.containerObj.querySelector('.lia-dgs-set-square-button');
+    const overlay = () => board.containerObj.querySelector('.lia-dgs-set-square-overlay');
+    menu()?.click();
+    if (!overlay().classList.contains('is-visible')) squareButton().click();
+    await wait(200);
+    check(overlay().classList.contains('is-visible'), 'Set square must show');
+    squareButton().click();
+    const mutations = [];
+    const observer = new MutationObserver(records => mutations.push(...records));
+    observer.observe(overlay(), { subtree: true, attributes: true, childList: true, characterData: true });
+    const bbox = board.getBoundingBox();
+    board.setBoundingBox([bbox[0] + 1, bbox[1] - 1, bbox[2] + 1, bbox[3] - 1], true);
+    board.zoomIn();
+    board.update();
+    await wait(200);
+    const hiddenMutations = mutations.length;
+    observer.disconnect();
+    // A real DynFlex host size change invokes the ResizeObserver board lifecycle.
+    const container = document.querySelector('.flex-child');
+    const initialWidth = board.canvasWidth;
+    const flexItem = container.closest('.dynFlexItem');
+    if (flexItem) flexItem.style.setProperty('--w', '65%');
+    else container.style.flex = '0 0 620px';
+    await wait(250);
+    check(board.canvasWidth < initialWidth, 'Board must follow DynFlex width');
+    squareButton().click();
+    await wait(250);
+    check(overlay().classList.contains('is-visible'), 'Set square must show after hidden viewport/resize');
+    const expectedPoint = [__points.A1.C.X(), __points.A1.C.Y()];
+    const expectedBBox = board.getBoundingBox().slice();
+    const expectedSquare = copy(__coordBoardStates.A1.dgsSetSquare);
+    check(expectedSquare && expectedSquare.visible, 'Visible square state must persist');
+    const captured = adapter ? copy(adapter.captureCoordinateStates([window])) : null;
+    const expectedTransform = overlay().style.transform;
+    // Remount the same public macro host; Freeze seeds the saved snapshot before
+    // the replacement board appears, exactly as on a slide revisit/late mount.
+    const host = document.querySelector('lia-coordinate-board');
+    const hostParent = host.parentNode;
+    const hostNext = host.nextSibling;
+    host.remove();
+    if (adapter) adapter.restoreCoordinateStates([window], captured);
+    const replacementHost = host.cloneNode(false);
+    hostParent.insertBefore(replacementHost, hostNext);
+    await profileReady();
+    board = __boards.A1;
+    if (adapter) adapter.restoreCoordinateStates([window], captured);
+    await wait(600);
+    if (!__points.A1.C && params.get('dgs') === '1') {
+      return { status: 'full-dgs-restore-failure', capturedPointCount: Object.keys(captured.p.A1).length,
+        restoredPointCount: Object.keys(__points.A1).length, capturedDgsRecords: captured.d.A1.records.length,
+        detail: 'Macro points disappear after Freeze restores full DGS history', errors: profileErrors.slice() };
+    }
+    check(!!__points.A1.C, 'Standalone restore lost point C');
+    const close = (a, b) => Math.abs(a - b) < 1e-5;
+    const adapterPointCoordinates = [__points.A1.C.X(), __points.A1.C.Y()];
+    const adapterPointHydrated = expectedPoint.every((value, i) => close(value, adapterPointCoordinates[i]));
+    if (!adapterPointHydrated) {
+      check(typeof window.restorePointFromSpec === 'function', 'Missing public point restore hook');
+      window.restorePointFromSpec('A1;C');
+      await wait(100);
+    }
+    check(expectedPoint.every((value, i) => close(value, [__points.A1.C.X(), __points.A1.C.Y()][i])),
+      'Public point restore hook failed');
+    check(expectedBBox.every((v, i) => close(v, board.getBoundingBox()[i])), 'Viewport state lost on restore');
+    const restoredSquare = copy(__coordBoardStates.A1.dgsSetSquare);
+    const squareRestoreMismatches = ['visible', 'angle', 'scale', 'pivotXRatio', 'pivotYRatio'].filter(key =>
+      typeof expectedSquare[key] === 'number' ? !close(expectedSquare[key], restoredSquare[key]) : expectedSquare[key] !== restoredSquare[key]);
+    check(overlay()?.classList.contains('is-visible'), 'Restored set square must be visible');
+    if (timer) check(Array.from(__liaSolTimerV001.items.values())[0]?.endAt === timerEndAt, 'Timer restarted during resize/remount');
+    const squareTransformPreserved = overlay().style.transform === expectedTransform;
+    return { status: 'passed-with-adapter-limitation', integration, hiddenMutations,
+      adapterPointHydrated, adapterPointCoordinates, expectedPoint, publicPointRestore: true, dynFlexResize: true, freezeAdapterCaptureRestore: !!adapter,
+      pointPreserved: true, bboxPreserved: true, squarePreserved: squareRestoreMismatches.length === 0,
+      squareRestoreMismatches, squareTransformPreserved,
+      timerDeadlinePreserved: !!timer, expectedSquare, restoredSquare,
+      expectedTransform, restoredTransform: overlay()?.style.transform, errors: profileErrors.slice() };
+  };
+</script>
+</body>
+</html>

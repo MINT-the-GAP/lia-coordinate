@@ -631,18 +631,6 @@ export function applyAxisColors(board: any): void {
 // Adaptive ticks
 // ---------------------------------------------------------------------------
 
-function pxPerUnitX(board: any): number {
-  const bb = board.getBoundingBox();
-  const w  = board.containerObj ? board.containerObj.clientWidth : 800;
-  return w / Math.max(1e-9, (bb[2] - bb[0]));
-}
-
-function pxPerUnitY(board: any): number {
-  const bb = board.getBoundingBox();
-  const h  = board.containerObj ? board.containerObj.clientHeight : 600;
-  return h / Math.max(1e-9, (bb[1] - bb[3]));
-}
-
 function chooseDecadeStep(raw: number): number {
   if (!isFinite(raw) || raw <= 0) return 1;
   const exp  = Math.floor(Math.log10(raw));
@@ -686,97 +674,116 @@ export function getAdaptiveTickMetric(
   };
 }
 
-// Per-board last-sig cache to avoid redundant setAttribute calls.
-const adaptiveSigCache = new WeakMap<object, {
-  signature: string;
-  xAxis: any;
-  yAxis: any;
-}>();
+// Cache each axis and its current tick object independently. Replacing ticks
+// must invalidate the cache even if the viewport and axis object are unchanged.
+const adaptiveSigCache = new WeakMap<object, { signature: string; ticks: any }>();
+const stickyTickPositionCache = new WeakMap<object, { signature: string; ticks: any }>();
+
+type AxisAttributeChange = () => void;
+
+function prepareAdaptiveTickChanges(board: any): AxisAttributeChange[] {
+  if (!board || !board.defaultAxes) return [];
+  let bb: number[];
+  try { bb = board.getBoundingBox(); } catch (e) { return []; }
+  if (!isValidBBox(bb)) return [];
+
+  const width = board.containerObj ? board.containerObj.clientWidth : 800;
+  const height = board.containerObj ? board.containerObj.clientHeight : 600;
+  const xMetric = getAdaptiveTickMetric(width / Math.max(1e-9, bb[2] - bb[0]));
+  const yMetric = getAdaptiveTickMetric(height / Math.max(1e-9, bb[1] - bb[3]));
+  const pixelsPerMajor = Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor);
+  const font = pixelsPerMajor < 55 ? 14 : pixelsPerMajor < 90 ? 16 : 18;
+  const changes: AxisAttributeChange[] = [];
+
+  (['x', 'y'] as const).forEach((key) => {
+    const axis = board.defaultAxes[key];
+    if (!axis || typeof axis.setAttribute !== 'function') return;
+    const metric = key === 'x' ? xMetric : yMetric;
+    const signature = [metric.majorStep, metric.minorTicks, font].join('|');
+    const cached = adaptiveSigCache.get(axis);
+    if (cached && cached.signature === signature && cached.ticks === axis.defaultTicks) return;
+    changes.push(() => {
+      const ticks = {
+        ticksDistance: metric.majorStep,
+        minorTicks: metric.minorTicks,
+        label: { fontSize: font }
+      };
+      axis.setAttribute({ ticks: { insertTicks: false, ...ticks } });
+      if (axis.defaultTicks) axis.defaultTicks.setAttribute(ticks);
+      adaptiveSigCache.set(axis, { signature, ticks: axis.defaultTicks });
+    });
+  });
+  return changes;
+}
+
+function prepareStickyTickLabelChanges(board: any): AxisAttributeChange[] {
+  if (!board || !board.defaultAxes) return [];
+  let bb: number[];
+  try { bb = board.getBoundingBox(); } catch (e) { return []; }
+  if (!isValidBBox(bb)) return [];
+
+  const changes: AxisAttributeChange[] = [];
+  (['x', 'y'] as const).forEach((key) => {
+    const axis = board.defaultAxes[key];
+    if (!axis || typeof axis.setAttribute !== 'function') return;
+    const positive = key === 'x' ? bb[3] > 0 : bb[0] > 0;
+    const signature = positive ? 'positive' : 'negative';
+    const cached = stickyTickPositionCache.get(axis);
+    if (cached && cached.signature === signature && cached.ticks === axis.defaultTicks) return;
+    const label = key === 'x'
+      ? { anchorX: 'middle', anchorY: positive ? 'bottom' : 'top', offset: [0, positive ? 5 : -5] }
+      : { anchorX: positive ? 'left' : 'right', anchorY: 'middle', offset: [positive ? 10 : -10, 0] };
+    changes.push(() => {
+      axis.setAttribute({ ticks: { label } });
+      if (axis.defaultTicks) axis.defaultTicks.setAttribute({ label });
+      stickyTickPositionCache.set(axis, { signature, ticks: axis.defaultTicks });
+    });
+  });
+  return changes;
+}
+
+function applyAxisAttributeChanges(board: any, changes: AxisAttributeChange[]): void {
+  // JSXGraph's unsuspendUpdate always performs a fullUpdate. In particular,
+  // never open an update batch for a viewport change that hit both caches.
+  if (!changes.length) return;
+  const wasSuspended = !!board.isSuspendedUpdate;
+  let suspendedHere = false;
+  if (!wasSuspended && typeof board.suspendUpdate === 'function' &&
+      typeof board.unsuspendUpdate === 'function') {
+    try { board.suspendUpdate(); } catch (e) {}
+    suspendedHere = board.isSuspendedUpdate === true;
+  }
+  try {
+    changes.forEach((change) => {
+      // Leave failed changes uncached so a later refresh can retry them.
+      try { change(); } catch (e) {}
+    });
+  } finally {
+    if (suspendedHere) {
+      try { board.unsuspendUpdate(); } catch (e) {}
+    } else if (!wasSuspended) {
+      try {
+        if (typeof board.fullUpdate === 'function') board.fullUpdate();
+        else board.update();
+      } catch (e) {}
+    }
+  }
+}
 
 export function applyAdaptiveTicks(board: any): void {
-  if (!board || !board.defaultAxes) return;
-
-  const xMetric = getAdaptiveTickMetric(pxPerUnitX(board));
-  const yMetric = getAdaptiveTickMetric(pxPerUnitY(board));
-  const majorStepX = xMetric.majorStep;
-  const majorStepY = yMetric.majorStep;
-  const minorX = xMetric.minorTicks;
-  const minorY = yMetric.minorTicks;
-
-  let font = 18;
-  if (Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor) < 90) font = 16;
-  if (Math.min(xMetric.pixelsPerMajor, yMetric.pixelsPerMajor) < 55) font = 14;
-
-  const sig = [majorStepX, majorStepY, minorX, minorY, font].join('|');
-  const cachedTicks = adaptiveSigCache.get(board);
-  if (
-    cachedTicks &&
-    cachedTicks.signature === sig &&
-    cachedTicks.xAxis === board.defaultAxes.x &&
-    cachedTicks.yAxis === board.defaultAxes.y
-  ) return;
-
-  try {
-    board.defaultAxes.x.setAttribute({ ticks: { insertTicks: false, ticksDistance: majorStepX, minorTicks: minorX, label: { fontSize: font } } });
-    board.defaultAxes.y.setAttribute({ ticks: { insertTicks: false, ticksDistance: majorStepY, minorTicks: minorY, label: { fontSize: font } } });
-  } catch (e) {}
-
-  try {
-    if (board.defaultAxes.x.defaultTicks) board.defaultAxes.x.defaultTicks.setAttribute({ ticksDistance: majorStepX, minorTicks: minorX, label: { fontSize: font } });
-    if (board.defaultAxes.y.defaultTicks) board.defaultAxes.y.defaultTicks.setAttribute({ ticksDistance: majorStepY, minorTicks: minorY, label: { fontSize: font } });
-  } catch (e) {}
-
-  try {
-    if (typeof board.fullUpdate === 'function') board.fullUpdate();
-    else board.update();
-  } catch (e) {}
-  adaptiveSigCache.set(board, {
-    signature: sig,
-    xAxis: board.defaultAxes.x,
-    yAxis: board.defaultAxes.y
-  });
+  applyAxisAttributeChanges(board, prepareAdaptiveTickChanges(board));
 }
 
 export function updateStickyTickLabelPositions(board: any): void {
-  if (!board || !board.defaultAxes) return;
-
-  let bb: number[];
-  try { bb = board.getBoundingBox(); } catch (e) { return; }
-  if (!isValidBBox(bb)) return;
-
-  const [xmin, ymax, xmax, ymin] = bb;
-  const xAxis = board.defaultAxes.x;
-  const yAxis = board.defaultAxes.y;
-  const signature = (0 < ymin ? 'below' : 'above') + '|' + (0 < xmin ? 'right' : 'left');
-  const cachedPosition = stickyTickPositionCache.get(board);
-  if (
-    cachedPosition &&
-    cachedPosition.signature === signature &&
-    cachedPosition.xAxis === xAxis &&
-    cachedPosition.yAxis === yAxis
-  ) return;
-
-  const xLabel = (0 < ymin)
-    ? { anchorX: 'middle', anchorY: 'bottom', offset: [0, 5] }
-    : { anchorX: 'middle', anchorY: 'top',    offset: [0, -5] };
-
-  const yLabel = (0 < xmin)
-    ? { anchorX: 'left',  anchorY: 'middle', offset: [10, 0] }
-    : { anchorX: 'right', anchorY: 'middle', offset: [-10, 0] };
-
-  try { xAxis.setAttribute({ ticks: { label: xLabel } }); } catch (e) {}
-  try { yAxis.setAttribute({ ticks: { label: yLabel } }); } catch (e) {}
-  try { if (xAxis.defaultTicks) xAxis.defaultTicks.setAttribute({ label: xLabel }); } catch (e) {}
-  try { if (yAxis.defaultTicks) yAxis.defaultTicks.setAttribute({ label: yLabel }); } catch (e) {}
-  try { board.update(); } catch (e) {}
-  stickyTickPositionCache.set(board, { signature, xAxis, yAxis });
+  applyAxisAttributeChanges(board, prepareStickyTickLabelChanges(board));
 }
 
-const stickyTickPositionCache = new WeakMap<object, {
-  signature: string;
-  xAxis: any;
-  yAxis: any;
-}>();
+export function updateViewportAxes(board: any): void {
+  // Complete layout reads and cache checks before the first attribute write.
+  const changes = prepareAdaptiveTickChanges(board);
+  changes.push(...prepareStickyTickLabelChanges(board));
+  applyAxisAttributeChanges(board, changes);
+}
 
 // ---------------------------------------------------------------------------
 // Resize handle
@@ -1205,8 +1212,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     if (cfg.grid) applyGridColor(board, getAccentColor());
     if (cfg.axes) {
       applyAxisColors(board);
-      applyAdaptiveTicks(board);
-      updateStickyTickLabelPositions(board);
+      updateViewportAxes(board);
     }
     if (cfg.border) {
       ensureResizeHandle(board, initialBBox, cfg.id, applyAppearance);
@@ -1357,25 +1363,10 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
       }
       scheduleBoardStateSave();
 
-      // Suspend all internal updates during pan/zoom for massive performance boost
       try {
-        if (typeof board.suspendUpdate === 'function') board.suspendUpdate();
-      } catch (e) {}
-
-      try {
-        if (cfg.axes) {
-          applyAdaptiveTicks(board);
-          updateStickyTickLabelPositions(board);
-        }
-
-        // Keep pan/zoom lightweight: avoid full DOM bootstrap scans on each move.
-        // Axis titles need positional refresh on bounding-box changes.
+        if (cfg.axes) updateViewportAxes(board);
+        // Axis titles perform their own change checks and need no board batch.
         if (window.__refreshAxisTitlesForBoard) window.__refreshAxisTitlesForBoard(cfg.id);
-      } catch (e) {}
-
-      // Resume updates at the very end
-      try {
-        if (typeof board.unsuspendUpdate === 'function') board.unsuspendUpdate();
       } catch (e) {}
     });
   });

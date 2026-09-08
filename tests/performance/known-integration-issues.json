@@ -1,0 +1,130 @@
+{
+  "scope": "Real external bundles and isolated Freeze coordinate-state adapter; no LiaScript Elm viewer.",
+  "steps": [
+    "Load nine-point fixture, MathJax, JSXGraph and timer/DynFlex/Freeze bundles.",
+    "Pan by CDP pointer drag; send legacy mousewheel event; drag point C.",
+    "Show/hide set square, pan and zoom while hidden, shrink DynFlex column, show it.",
+    "Capture with Freeze captureCoordinateStates([window]).",
+    "Remove board host, seed capture with restoreCoordinateStates, insert new host, repeat restore after board mounts.",
+    "Read point registries, viewport, stored square ratios and actual overlay transform.",
+    "For standalone only, additionally call lia-coordinate restorePointFromSpec(\"A1;C\") to test the public hook independently."
+  ],
+  "before": {
+    "bundleSha256": "e31ced523ea6a947b13d5e985dc331fa33f7f83a217295e81c3f869f3a69c2a7",
+    "actualPointerPan": true,
+    "cdpWheelZoom": false,
+    "legacyWheelZoom": true,
+    "movablePointDrag": true,
+    "fixedPointPreserved": true,
+    "status": "passed-with-adapter-limitation",
+    "integration": true,
+    "hiddenMutations": 17,
+    "adapterPointHydrated": false,
+    "adapterPointCoordinates": [
+      -3,
+      -8.5
+    ],
+    "expectedPoint": [
+      -2.080459770114942,
+      -7.781609195402298
+    ],
+    "publicPointRestore": true,
+    "dynFlexResize": true,
+    "freezeAdapterCaptureRestore": true,
+    "pointPreserved": true,
+    "bboxPreserved": true,
+    "squarePreserved": false,
+    "squareRestoreMismatches": [
+      "pivotXRatio",
+      "pivotYRatio"
+    ],
+    "squareTransformPreserved": false,
+    "timerDeadlinePreserved": true,
+    "expectedSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4392142857142857,
+      "pivotYRatio": 0.11392857142857145,
+      "angle": 0,
+      "scale": 1
+    },
+    "restoredSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4360200000000001,
+      "pivotYRatio": 0.11310000000000005,
+      "angle": 0,
+      "scale": 1
+    },
+    "expectedTransform": "translate3d(-20.189px, 32.7383px, 0px) rotate(0deg)",
+    "restoredTransform": "translate3d(-21.9331px, 32.2859px, 0px) rotate(0deg)",
+    "errors": [],
+    "fullDgsRestore": {
+      "status": "full-dgs-restore-failure",
+      "capturedPointCount": 9,
+      "restoredPointCount": 0,
+      "capturedDgsRecords": 9,
+      "detail": "Macro points disappear after Freeze restores full DGS history",
+      "errors": []
+    }
+  },
+  "after": {
+    "bundleSha256": "54d68e39e54d7ce6236f55e8f0305ae6e620058f0252aa8a23283f06eadf57c0",
+    "actualPointerPan": true,
+    "cdpWheelZoom": false,
+    "legacyWheelZoom": true,
+    "movablePointDrag": true,
+    "fixedPointPreserved": true,
+    "status": "passed-with-adapter-limitation",
+    "integration": true,
+    "hiddenMutations": 0,
+    "adapterPointHydrated": false,
+    "adapterPointCoordinates": [
+      -3,
+      -8.5
+    ],
+    "expectedPoint": [
+      -2.080459770114942,
+      -7.781609195402298
+    ],
+    "publicPointRestore": true,
+    "dynFlexResize": true,
+    "freezeAdapterCaptureRestore": true,
+    "pointPreserved": true,
+    "bboxPreserved": true,
+    "squarePreserved": false,
+    "squareRestoreMismatches": [
+      "pivotXRatio",
+      "pivotYRatio"
+    ],
+    "squareTransformPreserved": false,
+    "timerDeadlinePreserved": true,
+    "expectedSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4392142857142857,
+      "pivotYRatio": 0.11392857142857145,
+      "angle": 0,
+      "scale": 1
+    },
+    "restoredSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4360200000000001,
+      "pivotYRatio": 0.11310000000000005,
+      "angle": 0,
+      "scale": 1
+    },
+    "expectedTransform": "translate3d(-20.189px, 32.7383px, 0px) rotate(0deg)",
+    "restoredTransform": "translate3d(-21.9331px, 32.2859px, 0px) rotate(0deg)",
+    "errors": [],
+    "fullDgsRestore": {
+      "status": "full-dgs-restore-failure",
+      "capturedPointCount": 9,
+      "restoredPointCount": 0,
+      "capturedDgsRecords": 9,
+      "detail": "Macro points disappear after Freeze restores full DGS history",
+      "errors": []
+    }
+  }
+}

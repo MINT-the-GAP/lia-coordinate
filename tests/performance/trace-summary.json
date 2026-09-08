@@ -1,0 +1,338 @@
+{
+  "scope": "Complete CDP trace window including runProfile setup/700ms settling and 180 viewport steps. Main renderer thread only. Event families are inclusive and overlap; do not add their durations together.",
+  "unit": "ms",
+  "scenarios": [
+    {
+      "name": "exact-nine-points",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 362,
+          "totalMs": 628.704
+        },
+        "FunctionCall": {
+          "count": 29657,
+          "totalMs": 771.931
+        },
+        "TimerFire": {
+          "count": 28928,
+          "totalMs": 248.77
+        },
+        "Layout": {
+          "count": 532,
+          "totalMs": 85.636
+        },
+        "UpdateLayoutTree": {
+          "count": 532,
+          "totalMs": 81.433
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 362,
+          "totalMs": 423.349
+        },
+        "FunctionCall": {
+          "count": 15312,
+          "totalMs": 498.302
+        },
+        "TimerFire": {
+          "count": 14598,
+          "totalMs": 135.812
+        },
+        "Layout": {
+          "count": 352,
+          "totalMs": 81.073
+        },
+        "UpdateLayoutTree": {
+          "count": 352,
+          "totalMs": 58.697
+        }
+      }
+    },
+    {
+      "name": "menu-closed-square-hidden",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 735,
+          "totalMs": 813.207
+        },
+        "FunctionCall": {
+          "count": 31158,
+          "totalMs": 953.223
+        },
+        "TimerFire": {
+          "count": 29876,
+          "totalMs": 247.991
+        },
+        "Layout": {
+          "count": 733,
+          "totalMs": 101.723
+        },
+        "UpdateLayoutTree": {
+          "count": 915,
+          "totalMs": 98.523
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 554,
+          "totalMs": 572.614
+        },
+        "FunctionCall": {
+          "count": 16501,
+          "totalMs": 656.249
+        },
+        "TimerFire": {
+          "count": 15595,
+          "totalMs": 146.819
+        },
+        "Layout": {
+          "count": 556,
+          "totalMs": 94.686
+        },
+        "UpdateLayoutTree": {
+          "count": 561,
+          "totalMs": 70.411
+        }
+      }
+    },
+    {
+      "name": "menu-open-square-hidden",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 958,
+          "totalMs": 963.324
+        },
+        "FunctionCall": {
+          "count": 46920,
+          "totalMs": 1192.616
+        },
+        "TimerFire": {
+          "count": 45233,
+          "totalMs": 381.241
+        },
+        "Layout": {
+          "count": 962,
+          "totalMs": 92.474
+        },
+        "UpdateLayoutTree": {
+          "count": 1144,
+          "totalMs": 114.127
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 774,
+          "totalMs": 883.329
+        },
+        "FunctionCall": {
+          "count": 31831,
+          "totalMs": 1040.703
+        },
+        "TimerFire": {
+          "count": 30527,
+          "totalMs": 268.251
+        },
+        "Layout": {
+          "count": 936,
+          "totalMs": 112.29
+        },
+        "UpdateLayoutTree": {
+          "count": 943,
+          "totalMs": 115.929
+        }
+      }
+    },
+    {
+      "name": "menu-open-square-visible",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 956,
+          "totalMs": 1108.32
+        },
+        "FunctionCall": {
+          "count": 46837,
+          "totalMs": 1330.19
+        },
+        "TimerFire": {
+          "count": 45148,
+          "totalMs": 372.112
+        },
+        "Layout": {
+          "count": 1080,
+          "totalMs": 131.099
+        },
+        "UpdateLayoutTree": {
+          "count": 1146,
+          "totalMs": 145.498
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 752,
+          "totalMs": 877.237
+        },
+        "FunctionCall": {
+          "count": 31718,
+          "totalMs": 1039.724
+        },
+        "TimerFire": {
+          "count": 30257,
+          "totalMs": 265.914
+        },
+        "Layout": {
+          "count": 886,
+          "totalMs": 126.075
+        },
+        "UpdateLayoutTree": {
+          "count": 947,
+          "totalMs": 111.435
+        }
+      }
+    },
+    {
+      "name": "moving-point",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 734,
+          "totalMs": 820.126
+        },
+        "FunctionCall": {
+          "count": 31195,
+          "totalMs": 975.439
+        },
+        "TimerFire": {
+          "count": 29913,
+          "totalMs": 270.633
+        },
+        "Layout": {
+          "count": 797,
+          "totalMs": 100.87
+        },
+        "UpdateLayoutTree": {
+          "count": 980,
+          "totalMs": 97.386
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 574,
+          "totalMs": 603.893
+        },
+        "FunctionCall": {
+          "count": 16827,
+          "totalMs": 710.48
+        },
+        "TimerFire": {
+          "count": 15901,
+          "totalMs": 178.184
+        },
+        "Layout": {
+          "count": 783,
+          "totalMs": 96.742
+        },
+        "UpdateLayoutTree": {
+          "count": 792,
+          "totalMs": 78.261
+        }
+      }
+    },
+    {
+      "name": "integration-hidden",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 783,
+          "totalMs": 915.364
+        },
+        "FunctionCall": {
+          "count": 31999,
+          "totalMs": 1146.428
+        },
+        "TimerFire": {
+          "count": 29657,
+          "totalMs": 347.847
+        },
+        "Layout": {
+          "count": 975,
+          "totalMs": 118.223
+        },
+        "UpdateLayoutTree": {
+          "count": 1176,
+          "totalMs": 112.389
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 601,
+          "totalMs": 638.243
+        },
+        "FunctionCall": {
+          "count": 16985,
+          "totalMs": 822.894
+        },
+        "TimerFire": {
+          "count": 15314,
+          "totalMs": 256.994
+        },
+        "Layout": {
+          "count": 811,
+          "totalMs": 115.503
+        },
+        "UpdateLayoutTree": {
+          "count": 839,
+          "totalMs": 85.346
+        }
+      }
+    },
+    {
+      "name": "integration-visible",
+      "before": {
+        "FireAnimationFrame": {
+          "count": 1005,
+          "totalMs": 1298.529
+        },
+        "FunctionCall": {
+          "count": 47978,
+          "totalMs": 1608.081
+        },
+        "TimerFire": {
+          "count": 45010,
+          "totalMs": 464.847
+        },
+        "Layout": {
+          "count": 1320,
+          "totalMs": 150.44
+        },
+        "UpdateLayoutTree": {
+          "count": 1406,
+          "totalMs": 169.978
+        }
+      },
+      "after": {
+        "FireAnimationFrame": {
+          "count": 802,
+          "totalMs": 1099.074
+        },
+        "FunctionCall": {
+          "count": 32413,
+          "totalMs": 1382.933
+        },
+        "TimerFire": {
+          "count": 29975,
+          "totalMs": 412.217
+        },
+        "Layout": {
+          "count": 1135,
+          "totalMs": 159.253
+        },
+        "UpdateLayoutTree": {
+          "count": 1219,
+          "totalMs": 148.554
+        }
+      }
+    }
+  ],
+  "fixtureSha256": "86b22983bec207df1e399ddce74bae2013431f8665f5b5aea216e4fef785b358",
+  "beforeBundleSha256": "e31ced523ea6a947b13d5e985dc331fa33f7f83a217295e81c3f869f3a69c2a7",
+  "afterBundleSha256": "54d68e39e54d7ce6236f55e8f0305ae6e620058f0252aa8a23283f06eadf57c0"
+}

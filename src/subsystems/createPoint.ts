@@ -4,6 +4,7 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 
 /** Build the visual attributes that a static @Point needs on its first paint. */
@@ -360,6 +361,7 @@ export function init(): void {
       delete pt.__liaDgsCoordinateCompiled;
       delete pt.__liaDgsCoordinateParameter;
     }
+    trackDgsUpdateObject(pt.board, pt);
 
     try {
       pt.setAttribute({

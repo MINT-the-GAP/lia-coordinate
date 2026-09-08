@@ -1,0 +1,39 @@
+{
+  "baseline": {
+    "gitRef": "5b58cf461940d0e6e6240effa43cc4f800aee271",
+    "sha256": "e31ced523ea6a947b13d5e985dc331fa33f7f83a217295e81c3f869f3a69c2a7"
+  },
+  "assets": [
+    {
+      "file": "jsxgraph-template.js",
+      "url": "https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb/dist/index.js",
+      "sha256": "e753abd735baa6c6a778db6e28785b94cb83ee620f7da85a0de1adae30d097fd"
+    },
+    {
+      "file": "mathjax.js",
+      "url": "https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js",
+      "sha256": "0a6ded5abbce13331658dd239f34382abd06492c74b71b61e8caa8112ec55fa5"
+    },
+    {
+      "file": "timer.js",
+      "url": "https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-timer@924ec0108780ea43e39519cabcaf4f3de8b7dee6/dist/index.js",
+      "sha256": "90af1847188404d256867c24ff4e5fd24ed8e756ea56f6fe2eacaa7633c5474a"
+    },
+    {
+      "file": "dynflex.js",
+      "url": "https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-DynFlex@c291e9b7a6efbaa2aafb6b137b29ea42fcbfdd1f/dist/index.js",
+      "sha256": "f1e2622cb0b6cd69823af58e375002a096ce669666eb800573405c51cca99599"
+    },
+    {
+      "file": "freeze.js",
+      "url": "https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-freeze-v2@92c42dbf83d4ec0cc5780074a8b17120505faee0/dist/index.js",
+      "sha256": "0a0ab034e0288d0bca8cef9345503f2b04def7fd189bcfe6998037f20850e75b"
+    },
+    {
+      "file": "freeze-coordinate-state.ts",
+      "lineEndings": "crlf",
+      "url": "https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-freeze-v2@92c42dbf83d4ec0cc5780074a8b17120505faee0/src/coordinate-state.ts",
+      "sha256": "76bed59915b48ce8beaa618f27aee72f7d6014127cdd734868b71424f2caf7da"
+    }
+  ]
+}
