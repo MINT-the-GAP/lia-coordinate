@@ -422,26 +422,81 @@ test('static plot parser compiles self-contained expressions and rejects binding
   assert.equal(parseStaticPlotFunctionSpec('board;f;;#000'), null);
 });
 
-test('first-quadrant axis ticks and numbers stay inside the SVG viewport', () => {
+test('static axes use readable number and title sizes at the configured width', () => {
   const browser = installFakeBrowser();
   try {
-    const host = appendHost(browser.document);
-    const config = parseCoordSpec(
-      'xmin=0;xmax=4;ymin=0;ymax=4;width=400;id=edge-axes;achsen=1;grid=0;border=0;static=1'
-    );
-    const svg = renderStaticSvg(host, config);
-    const axes = svg.querySelector('g[data-lia-static-decoration=axes]');
-    const xNumbers = axes.querySelectorAll('text[data-lia-static-axis-number=x]');
-    const yNumbers = axes.querySelectorAll('text[data-lia-static-axis-number=y]');
-    assert.ok(xNumbers.length > 1 && yNumbers.length > 1);
-    assert.ok(xNumbers.every(label => Number(label.getAttribute('y')) < 4));
-    assert.ok(yNumbers.every(label => Number(label.getAttribute('x')) > 0));
-    axes.querySelectorAll('line[data-lia-static-axis-tick]').forEach(tick => {
-      ['x1', 'x2', 'y1', 'y2'].forEach(attribute => {
-        const value = Number(tick.getAttribute(attribute));
-        assert.ok(value >= 0 && value <= 4, `${attribute}=${value} is inside the viewBox`);
+    appendSpecMarker(browser.document, 'axis-title-spec-fonts', 'id=fonts;xlabel=x;ylabel=y');
+    appendSpecMarker(browser.document, 'point-spec-fonts', 'fonts;P;-2;1;#ff00ff;1;fix');
+    for (const width of [400, 600]) {
+      const config = parseCoordSpec(
+        `xmin=-3;xmax=4;ymin=-3;ymax=3;width=${width};id=fonts;achsen=1;static=1`
+      );
+      const svg = renderStaticSvg(appendHost(browser.document), config);
+      const pixelsPerUnit = width / 7;
+      for (const [selector, expected] of [
+        ['text[data-lia-static-axis-number]', 18],
+        ['g[data-lia-static-kind=axis-label] text', 20],
+        ['g[data-lia-static-kind=point] text', 24]
+      ]) {
+        // Query the group separately because this DOM fixture implements only
+        // simple selectors.
+        const parts = selector.split(' ');
+        const labels = parts.length === 1 ? svg.querySelectorAll(selector)
+          : svg.querySelector(parts[0]).querySelectorAll(parts[1]);
+        assert.ok(labels.length > 0);
+        labels.forEach(label => assert.ok(
+          Math.abs(Number(label.getAttribute('font-size')) * pixelsPerUnit - expected) < 1e-9
+        ));
+      }
+    }
+  } finally {
+    browser.restore();
+  }
+});
+
+test('axis numbers keep inward anchors and vertical clearance at every viewport edge', () => {
+  const browser = installFakeBrowser();
+  try {
+    for (const [xmin, xmax, ymin, ymax] of [
+      [-3, 4, -3, 3], [0, 4, 0, 4], [-4, 0, -4, 0],
+      [-300, 400, -300, 300], [-0.003, 0.004, -0.003, 0.003]
+    ]) {
+      const config = parseCoordSpec(
+        `xmin=${xmin};xmax=${xmax};ymin=${ymin};ymax=${ymax};width=600;id=edge-axes;achsen=1;grid=0;border=0;static=1`
+      );
+      const svg = renderStaticSvg(appendHost(browser.document), config);
+      const axes = svg.querySelector('g[data-lia-static-decoration=axes]');
+      const xNumbers = axes.querySelectorAll('text[data-lia-static-axis-number=x]');
+      const yNumbers = axes.querySelectorAll('text[data-lia-static-axis-number=y]');
+      assert.ok(xNumbers.length > 1 && yNumbers.length > 1);
+      const width = xmax - xmin;
+      const height = ymax - ymin;
+      const unit = width / 600;
+      assert.equal(xNumbers[0].getAttribute('text-anchor'), 'start');
+      assert.equal(xNumbers.at(-1).getAttribute('text-anchor'), 'end');
+      for (const label of [...xNumbers, ...yNumbers]) {
+        const x = Number(label.getAttribute('x'));
+        const y = Number(label.getAttribute('y'));
+        assert.ok(x > 0 && x < width);
+        assert.ok(y > 12 * unit && y < height - 12 * unit,
+          `${label.textContent} has room for the full 18px glyph height`);
+      }
+      yNumbers.forEach(label => {
+        const x = Number(label.getAttribute('x'));
+        assert.equal(label.getAttribute('text-anchor'), xmin === 0 ? 'start' : 'end');
+        assert.ok(Math.abs(x + xmin) >= 8 * unit, 'y numbers clear the axis and its ticks');
       });
-    });
+      const origin = xNumbers.find(label => label.textContent === '0');
+      assert.notEqual(Number(origin.getAttribute('x')), -xmin, 'the y-axis does not cross zero');
+      axes.querySelectorAll('line[data-lia-static-axis-tick]').forEach(tick => {
+        ['x1', 'x2', 'y1', 'y2'].forEach(attribute => {
+          const value = Number(tick.getAttribute(attribute));
+          const maximum = attribute.startsWith('x') ? width : height;
+          assert.ok(value >= -1e-12 && value <= maximum + 1e-12,
+            `${attribute}=${value} is inside the viewBox`);
+        });
+      });
+    }
   } finally {
     browser.restore();
   }

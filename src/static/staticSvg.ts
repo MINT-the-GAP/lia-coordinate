@@ -49,6 +49,8 @@ import type {
 } from './staticSpecs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const AXIS_NUMBER_FONT_SIZE = 18;
+const AXIS_TITLE_FONT_SIZE = 20;
 export const STATIC_CLAIM_ATTRIBUTE = 'data-lia-static-claimed';
 export const STATIC_CONTAINER_SELECTOR = '[data-lia-static-coordinate]';
 export const STATIC_DECLARATIVE_HOST_ATTRIBUTE = 'data-lia-static-coordinate-host';
@@ -890,6 +892,17 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
     const step = niceGridStep(Math.max(width, height));
     const unit = logicalUnitsPerPixel(config);
     const tickHalf = 4 * unit;
+    const numberPadding = 4 * unit;
+    const numberHalfHeight = 0.6 * AXIS_NUMBER_FONT_SIZE * unit;
+    // Conservative digit width avoids layout reads and keeps signed/decimal
+    // labels inside the responsive viewBox at its authored design scale.
+    const numberWidth = function(content: string): number {
+      return content.length * 0.65 * AXIS_NUMBER_FONT_SIZE * unit;
+    };
+    const numberY = function(y: number): number {
+      return Math.max(numberPadding + numberHalfHeight,
+        Math.min(height - numberPadding - numberHalfHeight, y));
+    };
     const edgeTolerance = Math.max(width, height) * 1e-12;
     if (config.ymin <= 0 && config.ymax >= 0) {
       const xAxis = svgElement(doc, 'line');
@@ -906,10 +919,28 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
       axes.appendChild(xAxis);
       for (let x = Math.ceil(config.xmin / step) * step; x <= config.xmax + step * 1e-9; x += step) {
         const normalizedX = Math.abs(x) <= step * 1e-9 ? 0 : x;
-        const xNumberOffset = Math.abs(normalizedX - config.xmin) <= edgeTolerance
-          ? 8
-          : Math.abs(normalizedX - config.xmax) <= edgeTolerance ? -8 : 0;
         const projected = projectStaticPoint({ x: normalizedX, y: 0 }, config);
+        const content = formatStaticNumber(normalizedX, 'en');
+        const labelWidth = numberWidth(content);
+        let labelX = projected.x;
+        let anchor = 'middle';
+        // The origin also needs horizontal clearance from the y-axis stroke.
+        if (normalizedX === 0) {
+          const fitsLeft = projected.x >= labelWidth + 9 * unit + numberPadding;
+          labelX += (fitsLeft ? -9 : 9) * unit;
+          anchor = fitsLeft ? 'end' : 'start';
+        }
+        const left = labelX - (anchor === 'end' ? labelWidth : anchor === 'middle' ? labelWidth / 2 : 0);
+        const right = labelX + (anchor === 'start' ? labelWidth : anchor === 'middle' ? labelWidth / 2 : 0);
+        if (left < numberPadding) {
+          labelX = numberPadding;
+          anchor = 'start';
+        } else if (right > width - numberPadding) {
+          labelX = width - numberPadding;
+          anchor = 'end';
+        }
+        const offsetY = (atBottomEdge || atTopEdge ? 24 : 20) * unit;
+        const fitsBelow = projected.y + offsetY + numberHalfHeight + numberPadding <= height;
         const tick = svgElement(doc, 'line');
         tick.setAttribute('data-lia-static-axis-tick', 'x');
         tick.setAttribute('x1', String(projected.x));
@@ -927,18 +958,14 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
         const label = appendCenteredText(
           axes,
           doc,
-          projectedLabelPoint(
-            { x: normalizedX, y: 0 },
-            config,
-            xNumberOffset,
-            atBottomEdge ? -14 : 14
-          ),
-          formatStaticNumber(normalizedX, 'en'),
+          { x: labelX, y: numberY(projected.y + (fitsBelow ? offsetY : -offsetY)) },
+          content,
           color,
           config
         );
         label.setAttribute('data-lia-static-axis-number', 'x');
-        label.setAttribute('font-size', String(13 * unit));
+        label.setAttribute('font-size', String(AXIS_NUMBER_FONT_SIZE * unit));
+        label.setAttribute('text-anchor', anchor);
       }
     }
     if (config.xmin <= 0 && config.xmax >= 0) {
@@ -957,10 +984,11 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
       for (let y = Math.ceil(config.ymin / step) * step; y <= config.ymax + step * 1e-9; y += step) {
         const normalizedY = Math.abs(y) <= step * 1e-9 ? 0 : y;
         if (normalizedY === 0 && config.ymin <= 0 && config.ymax >= 0) continue;
-        const yNumberOffset = Math.abs(normalizedY - config.ymin) <= edgeTolerance
-          ? -8
-          : Math.abs(normalizedY - config.ymax) <= edgeTolerance ? 8 : 0;
         const projected = projectStaticPoint({ x: 0, y: normalizedY }, config);
+        const content = formatStaticNumber(normalizedY, 'en');
+        const labelWidth = numberWidth(content);
+        const axisGap = (atLeftEdge || atRightEdge ? 12 : 9) * unit;
+        const fitsLeft = projected.x >= labelWidth + axisGap + numberPadding;
         const tick = svgElement(doc, 'line');
         tick.setAttribute('data-lia-static-axis-tick', 'y');
         tick.setAttribute('x1', String(
@@ -978,18 +1006,17 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
         const label = appendCenteredText(
           axes,
           doc,
-          projectedLabelPoint(
-            { x: 0, y: normalizedY },
-            config,
-            atLeftEdge ? 14 : -14,
-            yNumberOffset
-          ),
-          formatStaticNumber(normalizedY, 'en'),
+          {
+            x: projected.x + (fitsLeft ? -axisGap : axisGap),
+            y: numberY(projected.y)
+          },
+          content,
           color,
           config
         );
         label.setAttribute('data-lia-static-axis-number', 'y');
-        label.setAttribute('font-size', String(13 * unit));
+        label.setAttribute('font-size', String(AXIS_NUMBER_FONT_SIZE * unit));
+        label.setAttribute('text-anchor', fitsLeft ? 'end' : 'start');
       }
     }
     svg.appendChild(axes);
@@ -1566,35 +1593,45 @@ function appendGeometry(
   } else if (entry.geometry.kind === 'axis-label') {
     const xAxisY = Math.max(config.ymin, Math.min(config.ymax, 0));
     const yAxisX = Math.max(config.xmin, Math.min(config.xmax, 0));
+    const xAxisAtEdge = xAxisY === config.ymin || xAxisY === config.ymax;
+    const yAxisAtEdge = yAxisX === config.xmin || yAxisX === config.xmax;
+    const xTitleOffset = config.axes && xAxisAtEdge ? 48 : 20;
+    const maxYNumberWidth = Math.max(
+      formatStaticNumber(config.ymin, 'en').length,
+      formatStaticNumber(config.ymax, 'en').length
+    ) * 0.65 * AXIS_NUMBER_FONT_SIZE;
+    const yTitleOffset = config.axes && yAxisAtEdge ? maxYNumberWidth + 28 : 18;
     if (entry.geometry.xLabel.trim()) {
-      appendCenteredText(
+      const label = appendCenteredText(
         group,
         doc,
         projectedLabelPoint(
           { x: config.xmax, y: xAxisY },
           config,
-          -16,
-          xAxisY === config.ymax ? 16 : -16
+          -20,
+          xAxisY === config.ymax ? xTitleOffset : -xTitleOffset
         ),
         decodeLegacyParentheses(entry.geometry.xLabel),
         getNeutralColor(),
         config
       );
+      label.setAttribute('font-size', String(AXIS_TITLE_FONT_SIZE * logicalUnitsPerPixel(config)));
     }
     if (entry.geometry.yLabel.trim()) {
-      appendCenteredText(
+      const label = appendCenteredText(
         group,
         doc,
         projectedLabelPoint(
           { x: yAxisX, y: config.ymax },
           config,
-          yAxisX === config.xmax ? -16 : 16,
-          16
+          yAxisX === config.xmax ? -yTitleOffset : yTitleOffset,
+          20
         ),
         decodeLegacyParentheses(entry.geometry.yLabel),
         getNeutralColor(),
         config
       );
+      label.setAttribute('font-size', String(AXIS_TITLE_FONT_SIZE * logicalUnitsPerPixel(config)));
     }
   } else if (entry.geometry.kind === 'point') {
     appendPointGlyph(
