@@ -100,13 +100,16 @@ function ensureScharCss(board: any): void {
 
   const st = document.createElement('style');
   st.id = '__lia_schar_css_v6';
-  st.textContent = `
+  // Preserve the original appearance: document styles applied in light DOM,
+  // while JSXGraph shadow roots used the panel's inline and browser styles.
+  // Only interaction rules need to apply in both roots.
+  st.textContent = (root.nodeType === 9 ? `
     .lia-schar-panel{
       position:absolute;
       left:10px;
+      top:10px;
       z-index:52;
-      min-width:0;
-      width:240px;
+      min-width:190px;
       max-width:none;
       padding:8px 10px;
       border-radius:10px;
@@ -124,7 +127,7 @@ function ensureScharCss(board: any): void {
       gap:8px;
       margin-bottom:6px;
       margin-top:6px;
-      font-size:14px;
+      font-size:10px;
       font-weight:600;
       line-height:1.2;
     }
@@ -146,8 +149,8 @@ function ensureScharCss(board: any): void {
       border:none;
       background:transparent;
       color: var(--lia-schar-accent, #0b5fff);
-      width:28px;
-      height:28px;
+      width:24px;
+      height:24px;
       cursor:pointer;
       font-size:25px;
       font-weight:900 !important;
@@ -176,14 +179,12 @@ function ensureScharCss(board: any): void {
 
     .lia-schar-slider{
       width:100%;
-      min-width:0;
       flex:1;
       margin:0;
       margin-left:12px !important;
       margin-right:10px !important;
       position:relative;
-      top:0;
-      touch-action:none;
+      top:8px;
       transform:none !important;
       -webkit-appearance:none !important;
       -moz-appearance:none !important;
@@ -194,20 +195,16 @@ function ensureScharCss(board: any): void {
         var(--lia-schar-accent, #0b5fff) 0 var(--lia-schar-fill, 50%),
         rgba(128,128,128,.65) var(--lia-schar-fill, 50%) 100%
       ) !important;
-      height:32px;
-      min-height:32px;
+      height:12px;
+      min-height:12px;
       border-radius:999px !important;
       padding:0 !important;
       border:0 !important;
+      outline:none !important;
       box-shadow:none !important;
       background-size:100% 5px !important;
       background-repeat:no-repeat !important;
       background-position:center !important;
-    }
-
-    .lia-schar-panel :is(input, button, [tabindex]):focus-visible{
-      outline:2px solid var(--lia-schar-accent, #0b5fff);
-      outline-offset:2px;
     }
 
     .lia-schar-term-toggle-row{
@@ -227,9 +224,9 @@ function ensureScharCss(board: any): void {
     }
 
     .lia-schar-slider::-webkit-slider-thumb{
-      width:24px;
-      height:24px;
-      margin-top:-9.5px;
+      width:4px;
+      height:4px;
+      margin-top:0;
       -webkit-appearance:none !important;
       appearance:none !important;
       border:none !important;
@@ -247,8 +244,8 @@ function ensureScharCss(board: any): void {
     }
 
     .lia-schar-slider::-moz-range-thumb{
-      width:24px;
-      height:24px;
+      width:4px;
+      height:4px;
       border:none !important;
       border-radius:50%;
       background: currentColor !important;
@@ -286,7 +283,7 @@ function ensureScharCss(board: any): void {
       display:inline-block;
       white-space:nowrap;
       line-height:1.2;
-      font-size:14px !important;
+      font-size:10px !important;
       margin-right:6px;
     }
 
@@ -364,6 +361,8 @@ function ensureScharCss(board: any): void {
       touch-action:none;
       background:transparent;
     }
+  ` : '') + `
+    .lia-schar-slider { touch-action:none; }
   `;
 
   (root.nodeType === 9 ? (root as Document).head || (root as Document).documentElement : root).appendChild(st);
@@ -1028,7 +1027,7 @@ function restoreScharEntryState(entry: ScharEntry): void {
 
   const scale = Number(raw.panelScale);
   if (Number.isFinite(scale)) {
-    entry.panelScale = Math.max(1, Math.min(1.45, scale));
+    entry.panelScale = Math.max(0.55, Math.min(1.45, scale));
   }
 
   entry.panelMinimized = !!raw.panelMinimized;
@@ -1623,7 +1622,7 @@ function bindGraphDrag(entry: ScharEntry): void {
 }
 
 function applyPanelScale(entry: ScharEntry): void {
-  const scale = Math.max(1, Math.min(1.45, Number(entry.panelScale || 1)));
+  const scale = Math.max(0.55, Math.min(1.45, Number(entry.panelScale || 0.55)));
   entry.panelScale = scale;
   entry.panel.style.transformOrigin = 'top left';
   entry.panel.style.transform = 'scale(' + scale + ')';
@@ -1656,15 +1655,14 @@ function applyPanelMinimized(entry: ScharEntry): void {
   const panelShadow = entry.panel.dataset.baseShadow || entry.panel.style.boxShadow || '';
 
     entry.panel.classList.toggle('is-minimized', entry.panelMinimized);
-    // Keep the entire first thumb clear of the minimize button, including at its maximum.
-    entry.panel.style.padding = entry.panelMinimized ? '4px 6px' : '24px 10px 8px 10px';
+    entry.panel.style.padding = entry.panelMinimized ? '4px 6px' : '14px 10px 8px 10px';
     entry.panel.style.display = entry.panelMinimized ? 'inline-flex' : 'block';
     entry.panel.style.alignItems = entry.panelMinimized ? 'center' : '';
     entry.panel.style.justifyContent = entry.panelMinimized ? 'center' : '';
-    entry.panel.style.width = entry.panelMinimized ? '44px' : '240px';
-    entry.panel.style.minWidth = entry.panelMinimized ? '44px' : '0';
-    entry.panel.style.height = entry.panelMinimized ? '32px' : '';
-    entry.panel.style.minHeight = entry.panelMinimized ? '32px' : '';
+    entry.panel.style.width = entry.panelMinimized ? '38px' : '';
+    entry.panel.style.minWidth = entry.panelMinimized ? '38px' : '190px';
+    entry.panel.style.height = entry.panelMinimized ? '16px' : '';
+    entry.panel.style.minHeight = entry.panelMinimized ? '16px' : '';
     entry.panel.style.background = panelBg;
     entry.panel.style.border = panelBorder;
     entry.panel.style.boxShadow = panelShadow;
@@ -1714,6 +1712,22 @@ function bindPanelResizeHandle(entry: ScharEntry): void {
   const handle = document.createElement('div');
   handle.className = 'lia-schar-resize-handle';
   entry.panel.appendChild(handle);
+  handle.style.position = 'absolute';
+  handle.style.right = '0';
+  handle.style.bottom = '0';
+  handle.style.width = '15px';
+  handle.style.height = '15px';
+  handle.style.cursor = 'nwse-resize';
+  handle.style.borderRight = '2px solid ' + entry.cfg.color;
+  handle.style.borderBottom = '2px solid ' + entry.cfg.color;
+  handle.style.borderBottomRightRadius = '8px';
+  handle.style.boxSizing = 'border-box';
+  handle.style.zIndex = '10';
+  handle.style.display = entry.panelMinimized ? 'none' : 'block';
+  handle.style.pointerEvents = 'auto';
+  handle.style.userSelect = 'none';
+  handle.style.touchAction = 'none';
+  handle.style.background = 'transparent';
   let stopGesture: (() => void) | null = null;
   const onDown = (evt: PointerEvent) => {
     if (evt.button !== 0 || evt.isPrimary === false) return;
@@ -1728,7 +1742,7 @@ function bindPanelResizeHandle(entry: ScharEntry): void {
       if (move.pointerId !== pointerId) return;
       move.preventDefault();
       const distance = Math.hypot(move.clientX - rect.left, move.clientY - rect.top);
-      entry.panelScale = Math.max(1, Math.min(1.45, startScale * distance / startDistance));
+      entry.panelScale = Math.max(0.55, Math.min(1.45, startScale * distance / startDistance));
       applyPanelScale(entry);
       relayoutPanelsForBoard(entry.boardId, entry.board);
     };
@@ -1771,8 +1785,7 @@ function createPanel(entry: ScharEntry): HTMLElement {
   panel.style.left = '10px';
   panel.style.top = boardPanelsStartTop(entry.board.containerObj) + 'px';
   panel.style.zIndex = '52';
-  panel.style.minWidth = '0';
-  panel.style.width = '240px';
+  panel.style.minWidth = '190px';
   panel.style.padding = '8px 10px';
   panel.style.borderRadius = '10px';
   panel.style.background = bg;
@@ -1867,8 +1880,8 @@ function createPanel(entry: ScharEntry): HTMLElement {
     slider.style.setProperty('background-repeat', 'no-repeat', 'important');
     slider.style.setProperty('background-position', 'center', 'important');
     slider.style.setProperty('border-radius', '999px', 'important');
-    slider.style.setProperty('height', '32px', 'important');
-    slider.style.setProperty('min-height', '32px', 'important');
+    slider.style.setProperty('height', '12px', 'important');
+    slider.style.setProperty('min-height', '12px', 'important');
 
     entry.slidersByParam[name] = slider;
     ensureSliderRangeForValue(slider, Number(entry.values[name]));
@@ -2068,7 +2081,7 @@ export function init(): void {
       shiftCD: null,
       polyCoeffDrag: null,
       stopDrag: null,
-      panelScale: 1,
+      panelScale: 0.55,
       panelMinimized: false,
       fn,
       params,

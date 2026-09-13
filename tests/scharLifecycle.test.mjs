@@ -113,14 +113,14 @@ test('repeated bootstrap preserves input, graph, values, scale and listeners on 
   }
 });
 
-test('saved values and usable panel scale survive restoration, legacy tiny scale is upgraded', () => {
+test('saved values and panel scale survive restoration, including the original compact scale', () => {
   window.__liaScharStateStore = { 'one::board': { values: { a: .5, b: 1, c: -2 }, panelScale: 1.2, panelMinimized: true, termVisible: true } };
   const entry = { uid: 'one', boardId: 'board', params: ['a', 'b', 'c'], values: {}, panelScale: 1 };
   restoreScharEntryState(entry);
   assert.deepEqual(entry.values, { a: .5, b: 1, c: -2 });
   assert.equal(entry.panelScale, 1.2); assert.equal(entry.panelMinimized, true); assert.equal(entry.termVisible, true);
   window.__liaScharStateStore['one::board'].panelScale = .55;
-  restoreScharEntryState(entry); assert.equal(entry.panelScale, 1);
+  restoreScharEntryState(entry); assert.equal(entry.panelScale, .55);
 });
 
 function languageUi() {

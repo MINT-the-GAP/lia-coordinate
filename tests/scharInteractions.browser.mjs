@@ -160,7 +160,7 @@ try {
         assert.equal(mutated.trace.removed, false);
         assert.ok(mutated.trace.input.length >= 5);
         assert.equal(initial.styleCount, 1, 'Install CSS in actual ShadowRoot');
-        assert.ok(initial.rangeHeight >= 24, 'Visible native range target must be usable');
+        assert.ok(Math.abs(initial.rangeHeight / initial.panelScale - 12) < .1, 'Native range retains the original 12px design before panel scaling');
     }
     if (before) {
         await evaluate('scharFixture.entry().slidersByParam.a.focus()');
