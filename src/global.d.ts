@@ -108,7 +108,7 @@ interface Window {
   getPointFromSpec: ((spec: string) => any) | undefined;
   ensurePointFromSpec: ((spec: string) => boolean) | undefined;
   finalizePointFromSpec: ((spec: string) => boolean) | undefined;
-  renderCreatePointFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderCreatePointFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
   __checkPointFromSpec: ((spec: string) => boolean) | undefined;
   __checkCreatePointQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
@@ -161,7 +161,7 @@ interface Window {
   __bootstrapPlotInputs: (() => void) | undefined;
   __bootstrapPlotInputsRAF: number | undefined;
   __scheduleBootstrapPlotInputs: (() => void) | undefined;
-  renderPlotInputFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderPlotInputFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
 
   // PointOnGraph subsystem (@PointOnGraph)
   __pointOnGraphReady: boolean | undefined;
@@ -181,7 +181,7 @@ interface Window {
   checkPointGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
   showGraphFromPointGraphSpec: ((spec: string) => void) | undefined;
   restorePointGraphVisualState: ((uid: string) => void) | undefined;
-  renderPointOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderPointOnGraphFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
 
   // PointsOnGraph subsystem (@PointsOnGraph)
   __pointsOnGraphReady: boolean | undefined;
@@ -199,7 +199,7 @@ interface Window {
   restorePointsOnGraphFromSpec: ((spec: string) => any) | undefined;
   restorePointsOnGraphVisualState: ((uid: string) => void) | undefined;
   showGraphFromPointsOnGraphSpec: ((spec: string) => void) | undefined;
-  renderPointsOnGraphFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderPointsOnGraphFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
 
   // Segment subsystem (@Strecke / @distance)
   __distanceReady: boolean | undefined;
@@ -289,7 +289,7 @@ interface Window {
   __scharEntries: Record<string, any>;
   __liaScharStateStore: Record<string, any>;
   __bootstrapScharen: (() => void) | undefined;
-  renderScharFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderScharFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
 
   // Rekonstruktion subsystem (@Rekonstruktion)
   __rekonstruktionReady: boolean | undefined;
@@ -377,7 +377,7 @@ interface Window {
   __bootstrapTables: (() => void) | undefined;
   __bootstrapTablesRAF: number | undefined;
   __scheduleBootstrapTables: (() => void) | undefined;
-  renderTableFromSpec: ((uid: string, spec: string, force?: boolean) => boolean) | undefined;
+  renderTableFromSpec: ((uid: string, spec: string, force?: boolean, languageCode?: string) => boolean) | undefined;
   getTableValues: ((uid: string) => any) | undefined;
   getTableData: ((uid: string) => any) | undefined;
   setTableValues: ((uid: string, values: any) => boolean) | undefined;

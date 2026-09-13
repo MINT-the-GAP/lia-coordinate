@@ -4,12 +4,32 @@
 import { parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
+import { setAttributeIfChanged } from '../shared/domUpdates';
+import { boardPanelsStartTop, relayoutBoardPanels, observeBoardPanelLayout } from '../shared/boardPanelLayout';
 import {
   applyLineStyle,
   lineStyleAttributes,
   parseLineStyleOptions,
   type LineStyle
 } from '../shared/lineStyle';
+
+type ScharLanguage = 'de' | 'en';
+
+const SCHAR_TEXT = {
+  de: {
+    showTerm: 'Term anzeigen',
+    minimize: 'Parameterregler minimieren',
+    restore: 'Parameterregler wiederherstellen',
+    resize: 'Größe der Parameterregler ändern'
+  },
+  en: {
+    showTerm: 'Show term',
+    minimize: 'Minimize parameter controls',
+    restore: 'Restore parameter controls',
+    resize: 'Resize parameter controls'
+  }
+} as const;
 
 type ScharCfg = {
   name: string;
@@ -24,6 +44,11 @@ type ScharCfg = {
 
 type ScharEntry = {
   uid: string;
+  language: ScharLanguage;
+  spec: string;
+  marker: HTMLElement | null;
+  stopLayout: (() => void) | null;
+  stopResize: (() => void) | null;
   boardId: string;
   board: any;
   cfg: ScharCfg;
@@ -41,8 +66,8 @@ type ScharEntry = {
   termToggleEl: HTMLInputElement;
   termVisible: boolean;
   linearMN: { m: string; n: string } | null;
-  shiftBC: { b: string; c: string } | null;
-  shiftCD: { c: string; d: string } | null;
+  shiftBC: { b: string; c: string; innerSign: number; outerSign: number } | null;
+  shiftCD: { c: string; d: string; innerSign: number; outerSign: number } | null;
   polyCoeffDrag: { degreeToParam: Record<number, string>; maxDegree: number } | null;
   stopDrag: (() => void) | null;
   panelScale: number;
@@ -65,21 +90,23 @@ const RESERVED = new Set([
   'floor', 'ceil', 'round', 'min', 'max', 'pow'
 ]);
 
-function ensureScharCss(): void {
+function ensureScharCss(board: any): void {
+  const root = board.containerObj.getRootNode() as Document | ShadowRoot;
+  if (root.querySelector('#__lia_schar_css_v6')) return;
   ['__lia_schar_css_v3', '__lia_schar_css_v4', '__lia_schar_css_v5'].forEach((id) => {
-    const old = document.getElementById(id);
+    const old = root.querySelector('#' + id);
     if (old && old.parentNode) old.parentNode.removeChild(old);
   });
 
   const st = document.createElement('style');
-  st.id = '__lia_schar_css_v5';
+  st.id = '__lia_schar_css_v6';
   st.textContent = `
     .lia-schar-panel{
       position:absolute;
       left:10px;
-      top:10px;
       z-index:52;
-      min-width:190px;
+      min-width:0;
+      width:240px;
       max-width:none;
       padding:8px 10px;
       border-radius:10px;
@@ -97,7 +124,7 @@ function ensureScharCss(): void {
       gap:8px;
       margin-bottom:6px;
       margin-top:6px;
-      font-size:10px;
+      font-size:14px;
       font-weight:600;
       line-height:1.2;
     }
@@ -119,8 +146,8 @@ function ensureScharCss(): void {
       border:none;
       background:transparent;
       color: var(--lia-schar-accent, #0b5fff);
-      width:24px;
-      height:24px;
+      width:28px;
+      height:28px;
       cursor:pointer;
       font-size:25px;
       font-weight:900 !important;
@@ -149,12 +176,14 @@ function ensureScharCss(): void {
 
     .lia-schar-slider{
       width:100%;
+      min-width:0;
       flex:1;
       margin:0;
       margin-left:12px !important;
       margin-right:10px !important;
       position:relative;
-      top:8px;
+      top:0;
+      touch-action:none;
       transform:none !important;
       -webkit-appearance:none !important;
       -moz-appearance:none !important;
@@ -165,16 +194,20 @@ function ensureScharCss(): void {
         var(--lia-schar-accent, #0b5fff) 0 var(--lia-schar-fill, 50%),
         rgba(128,128,128,.65) var(--lia-schar-fill, 50%) 100%
       ) !important;
-      height:12px;
-      min-height:12px;
+      height:32px;
+      min-height:32px;
       border-radius:999px !important;
       padding:0 !important;
       border:0 !important;
-      outline:none !important;
       box-shadow:none !important;
       background-size:100% 5px !important;
       background-repeat:no-repeat !important;
       background-position:center !important;
+    }
+
+    .lia-schar-panel :is(input, button, [tabindex]):focus-visible{
+      outline:2px solid var(--lia-schar-accent, #0b5fff);
+      outline-offset:2px;
     }
 
     .lia-schar-term-toggle-row{
@@ -194,9 +227,9 @@ function ensureScharCss(): void {
     }
 
     .lia-schar-slider::-webkit-slider-thumb{
-      width:4px;
-      height:4px;
-      margin-top:0;
+      width:24px;
+      height:24px;
+      margin-top:-9.5px;
       -webkit-appearance:none !important;
       appearance:none !important;
       border:none !important;
@@ -214,8 +247,8 @@ function ensureScharCss(): void {
     }
 
     .lia-schar-slider::-moz-range-thumb{
-      width:4px;
-      height:4px;
+      width:24px;
+      height:24px;
       border:none !important;
       border-radius:50%;
       background: currentColor !important;
@@ -253,7 +286,7 @@ function ensureScharCss(): void {
       display:inline-block;
       white-space:nowrap;
       line-height:1.2;
-      font-size:10px !important;
+      font-size:14px !important;
       margin-right:6px;
     }
 
@@ -333,7 +366,7 @@ function ensureScharCss(): void {
     }
   `;
 
-  (document.head || document.documentElement).appendChild(st);
+  (root.nodeType === 9 ? (root as Document).head || (root as Document).documentElement : root).appendChild(st);
 }
 
 function decodeExprPlaceholders(s: string): string {
@@ -698,7 +731,6 @@ function toTexExpr(expr: string): string {
   out = replaceDivWithDfrac(out);
   out = out.replace(/\^\s*([A-Za-z]+|\d+(?:[.,]\d+)?)/g, '^{$1}');
   out = out.replace(/\*/g, ' \\cdot ');
-  out = out.replace(/(^|[^\w])(-?\d+)\.(\d+)/g, '$1$2,$3');
 
   // Hide neutral zero terms in rendered expressions (e.g., +0, -0).
   out = out.replace(/^0(?:[.,]0+)?\s*\+\s*/g, '');
@@ -996,7 +1028,7 @@ function restoreScharEntryState(entry: ScharEntry): void {
 
   const scale = Number(raw.panelScale);
   if (Number.isFinite(scale)) {
-    entry.panelScale = Math.max(0.55, Math.min(1.45, scale));
+    entry.panelScale = Math.max(1, Math.min(1.45, scale));
   }
 
   entry.panelMinimized = !!raw.panelMinimized;
@@ -1005,15 +1037,20 @@ function restoreScharEntryState(entry: ScharEntry): void {
   }
 }
 
-function eventToUser(board: any, evt: PointerEvent): { x: number; y: number } {
-  const rect = board.containerObj.getBoundingClientRect();
-  const lx = evt.clientX - rect.left;
-  const ly = evt.clientY - rect.top;
-
-  return {
-    x: (lx - board.origin.scrCoords[1]) / board.unitX,
-    y: (board.origin.scrCoords[2] - ly) / board.unitY
-  };
+function eventToUser(board: any, evt: PointerEvent): { x: number; y: number } | null {
+  const container = board && board.containerObj;
+  if (!container || !board.origin || !board.origin.scrCoords) return null;
+  const rect = container.getBoundingClientRect();
+  // Client coordinates and the DOM rect share the viewport origin, including
+  // page scroll. JSXGraph screen coordinates use unscaled content pixels.
+  const width = Number(container.offsetWidth) || rect.width;
+  const height = Number(container.offsetHeight) || rect.height;
+  if (!(rect.width > 0 && rect.height > 0)) return null;
+  const lx = (evt.clientX - rect.left) * width / rect.width - Number(container.clientLeft || 0);
+  const ly = (evt.clientY - rect.top) * height / rect.height - Number(container.clientTop || 0);
+  const x = (lx - board.origin.scrCoords[1]) / board.unitX;
+  const y = (board.origin.scrCoords[2] - ly) / board.unitY;
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
 function detectLinearMN(cfg: ScharCfg, params: string[]): { m: string; n: string } | null {
@@ -1039,33 +1076,40 @@ function detectLinearMN(cfg: ScharCfg, params: string[]): { m: string; n: string
   return null;
 }
 
-// Detect a shifted family of the form ...(x+<inner>)...[+-]<outer>$, where the
-// inner param drives a horizontal shift and the outer param a vertical offset.
-function detectShiftPair(cfg: ScharCfg, params: string[], inner: string, outer: string): { inner: string; outer: string } | null {
+// Detect a shifted family ...(x +/- inner)... +/- outer, retaining both
+// signs: parameter deltas are -innerSign * dx and outerSign * dy.
+function detectShiftPair(
+  cfg: ScharCfg, params: string[], inner: string, outer: string
+): { inner: string; outer: string; innerSign: number; outerSign: number } | null {
   const innerParam = params.find((p) => String(p).toLowerCase() === inner);
   const outerParam = params.find((p) => String(p).toLowerCase() === outer);
   if (!innerParam || !outerParam) return null;
 
-  const rawExpr = String(cfg.expr || '').replace(/\s+/g, '').toLowerCase();
-  const varLower = String(cfg.variableName || 'x').trim().toLowerCase();
+  const rawExpr = toJsExpr(decodeExprPlaceholders(cfg.expr), cfg.variableName, params).replace(/\s+/g, '').toLowerCase();
+  const variable = escapeRegExp(String(cfg.variableName || 'x').trim().toLowerCase());
+  const innerPattern = new RegExp('\\(' + variable + '([+\\-])' + escapeRegExp(inner) + '\\)', 'g');
+  const innerMatches = Array.from(rawExpr.matchAll(innerPattern));
+  const outerMatch = rawExpr.match(new RegExp('([+\\-])' + escapeRegExp(outer) + '$'));
+  if (!innerMatches.length || !outerMatch) return null;
+  const innerSign = innerMatches[0][1] === '+' ? 1 : -1;
+  if (innerMatches.some((match) => (match[1] === '+' ? 1 : -1) !== innerSign)) return null;
 
-  if (rawExpr.includes('(' + varLower + '+' + inner + ')') && new RegExp('[+\\-]' + outer + '$').test(rawExpr)) {
-    return { inner: innerParam, outer: outerParam };
-  }
-
-  return null;
+  // Other occurrences of x or either shift parameter would also change the
+  // shape, rather than translating the graph as this interaction promises.
+  const remainder = rawExpr.slice(0, outerMatch.index).replace(innerPattern, '0');
+  const remainingShiftToken = new RegExp('\\b(?:' + variable + '|' + escapeRegExp(inner) + '|' + escapeRegExp(outer) + ')\\b');
+  if (remainingShiftToken.test(remainder)) return null;
+  return { inner: innerParam, outer: outerParam, innerSign, outerSign: outerMatch[1] === '+' ? 1 : -1 };
 }
 
-// Enable direct 2D dragging for legacy shifted families like d(x+b)^2+c.
-function detectShiftBC(cfg: ScharCfg, params: string[]): { b: string; c: string } | null {
+function detectShiftBC(cfg: ScharCfg, params: string[]): ScharEntry['shiftBC'] {
   const hit = detectShiftPair(cfg, params, 'b', 'c');
-  return hit ? { b: hit.inner, c: hit.outer } : null;
+  return hit ? { b: hit.inner, c: hit.outer, innerSign: hit.innerSign, outerSign: hit.outerSign } : null;
 }
 
-// Families 3/4: inner horizontal shift by c and outer vertical offset by d.
-function detectShiftCD(cfg: ScharCfg, params: string[]): { c: string; d: string } | null {
+function detectShiftCD(cfg: ScharCfg, params: string[]): ScharEntry['shiftCD'] {
   const hit = detectShiftPair(cfg, params, 'c', 'd');
-  return hit ? { c: hit.inner, d: hit.outer } : null;
+  return hit ? { c: hit.inner, d: hit.outer, innerSign: hit.innerSign, outerSign: hit.outerSign } : null;
 }
 
 function detectPolyCoeffDrag(cfg: ScharCfg, params: string[]): { degreeToParam: Record<number, string>; maxDegree: number } | null {
@@ -1118,26 +1162,15 @@ function removeExisting(uid: string): void {
   const prev = window.__scharEntries[key];
   if (!prev) return;
 
+  persistScharEntryState(prev);
+  prev.stopLayout?.();
+  prev.stopResize?.();
+  prev.pendingTermMarkup = null;
+  clearTypesetMathNode(prev.termEl);
+
   if (typeof prev.stopDrag === 'function') {
     try { prev.stopDrag(); } catch (e) {}
     prev.stopDrag = null;
-  }
-
-  const resizeState = (window as any).__liaScharPanelResize;
-  if (resizeState) {
-    const drag = resizeState.drag;
-    if (drag && drag.entry === prev) {
-      if (drag.rafId) {
-        try { window.cancelAnimationFrame(drag.rafId); } catch (e) {}
-      }
-      resizeState.drag = null;
-      try { document.body.style.userSelect = ''; } catch (e) {}
-    }
-    if (Array.isArray(resizeState.handles)) {
-      resizeState.handles = resizeState.handles.filter(function(record) {
-        return record && record.entry !== prev && record.handle && record.handle.isConnected;
-      });
-    }
   }
 
   try {
@@ -1198,24 +1231,7 @@ function getPanelHost(entry: ScharEntry): HTMLElement | null {
 }
 
 function relayoutPanelsForBoard(boardId: string, board: any): void {
-  try {
-    const entries = Object.keys(window.__scharEntries || {})
-      .map((key) => window.__scharEntries[key])
-      .filter((item) => {
-        if (!item || !item.panel || !item.panel.parentNode) return false;
-        if (board && item.board !== board) return false;
-        return item.boardId === boardId;
-      })
-      .sort((a, b) => String(a.uid || '').localeCompare(String(b.uid || '')));
-
-    let top = 10;
-    entries.forEach((item) => {
-      item.panel.style.left = '10px';
-      item.panel.style.top = top + 'px';
-      const panelH = Math.ceil((item.panel.getBoundingClientRect && item.panel.getBoundingClientRect().height) || item.panel.offsetHeight || 56);
-      top += panelH + 8;
-    });
-  } catch (e) {}
+  if (board?.containerObj) relayoutBoardPanels(board.containerObj);
 }
 
 function syncSliderUiFromValues(entry: ScharEntry): void {
@@ -1255,9 +1271,12 @@ export function buildScharTermMarkup(entry: ScharEntry): string {
     texRhs = getExpandedTexForEntry(entry);
   }
 
+  // Localize only the rendered TeX; compiled expressions and native range values stay numeric.
+  const localize = (tex: string) => entry.language === 'de' ? tex.replace(/(\d)\.(\d)/g, '$1{,}$2') : tex;
+  texRhs = localize(texRhs);
   if (entry.polyCoeffDrag) {
-    const shiftedTex = buildShiftedPolyTex(entry) || texRhs;
-    const expandedTex = buildExpandedShiftedPolyTex(entry) || texRhs;
+    const shiftedTex = localize(buildShiftedPolyTex(entry) || texRhs);
+    const expandedTex = localize(buildExpandedShiftedPolyTex(entry) || texRhs);
     return '<div class="lia-schar-term-line">\\(' + texLhs + shiftedTex + '\\)</div>' +
       '<br>' +
       '<div class="lia-schar-term-line">\\(' + texLhs + expandedTex + '\\)</div>';
@@ -1441,18 +1460,34 @@ export function refreshScharCurveGeometry(entry: any): void {
   try { if (entry && entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
 }
 
+function canDragScharGraph(entry: ScharEntry): boolean {
+  const container = entry.board && entry.board.containerObj;
+  if (!container || container.isConnected === false || entry.board.__coordBorderEnabled === false) return false;
+  if (window.__boards && window.__boards[entry.boardId] !== entry.board) return false;
+  if (container.classList && container.classList.contains('lia-dgs-construction-mode')) return false;
+  const regressionStates = window.__liaRegressionStates || {};
+  return !Object.keys(regressionStates).some((uid) => {
+    const state = regressionStates[uid];
+    return state && state.board === entry.board && !!state.activeTool;
+  });
+}
+
 function bindGraphDrag(entry: ScharEntry): void {
   if (!entry || (!entry.linearMN && !entry.shiftBC && !entry.shiftCD && !entry.polyCoeffDrag) || (!entry.graph && !entry.dragGraph)) return;
 
-  const targets = [
+  const targets = Array.from(new Set([
     entry.graph && entry.graph.rendNode,
     entry.graph && entry.graph.rendNodeStroke,
     entry.dragGraph && entry.dragGraph.rendNode,
     entry.dragGraph && entry.dragGraph.rendNodeStroke
-  ].filter(Boolean);
+  ].filter(Boolean)));
   if (!targets.length) return;
+  let cancelActiveDrag: (() => void) | null = null;
 
   const onPointerDown = (evt: PointerEvent) => {
+    if (evt.button !== 0 || evt.isPrimary === false || cancelActiveDrag || !canDragScharGraph(entry)) return;
+    const start = eventToUser(entry.board, evt);
+    if (!start) return;
     evt.preventDefault();
     evt.stopPropagation();
 
@@ -1461,7 +1496,7 @@ function bindGraphDrag(entry: ScharEntry): void {
     });
 
     const pointerId = evt.pointerId;
-    const start = eventToUser(entry.board, evt);
+    const captureTarget = evt.currentTarget as Element | null;
     const startN = entry.linearMN ? Number(entry.values[entry.linearMN.n] ?? 0) : 0;
     const startM = entry.linearMN ? Number(entry.values[entry.linearMN.m] ?? 1) : 1;
     const startB = entry.shiftBC ? Number(entry.values[entry.shiftBC.b] ?? 0) : 0;
@@ -1471,6 +1506,7 @@ function bindGraphDrag(entry: ScharEntry): void {
     const startShiftX = Number(entry.dragShiftX || 0);
     const startShiftY = Number(entry.dragShiftY || 0);
     let moveRaf = 0;
+    let finished = false;
     const startPolyParams: Record<string, number> = {};
     if (entry.polyCoeffDrag) {
       Object.keys(entry.polyCoeffDrag.degreeToParam).forEach((degKey) => {
@@ -1479,66 +1515,24 @@ function bindGraphDrag(entry: ScharEntry): void {
       });
     }
 
-    const onMove = (moveEvt: PointerEvent) => {
-      if (moveEvt.pointerId !== pointerId) return;
-      moveEvt.preventDefault();
-      moveEvt.stopPropagation();
-
-      const now = eventToUser(entry.board, moveEvt);
-      const dx = now.x - start.x;
-      const dy = now.y - start.y;
-
-      if (entry.linearMN) {
-        // Translate line by drag delta while preserving slope m:
-        // y = m*x + n  => n' = n + dy - m*dx
-        entry.values[entry.linearMN.n] = startN + dy - (startM * dx);
-      }
-
-      if (entry.shiftBC) {
-        // g(x)=d*(x+b)^2+c; dragging by (dx,dy) maps to b' = b - dx and c' = c + dy.
-        entry.values[entry.shiftBC.b] = startB - dx;
-        entry.values[entry.shiftBC.c] = startC + dy;
-      }
-
-      if (entry.shiftCD) {
-        // Families like A*F(b*(x+c))+d and reciprocal variants:
-        // horizontal drag modifies c inversely, vertical drag modifies d directly.
-        entry.values[entry.shiftCD.c] = startShiftC - dx;
-        entry.values[entry.shiftCD.d] = startShiftD + dy;
-      }
-
-      if (entry.polyCoeffDrag) {
-        // Legacy semantics: horizontal drag uses x -> (x - s), vertical drag adds +d.
-        entry.dragShiftX = startShiftX + dx;
-        entry.dragShiftY = startShiftY + dy;
-
-        // Keep polynomial prefactors as parameter values from drag start.
-        Object.keys(startPolyParams).forEach((pname) => {
-          entry.values[pname] = Number(startPolyParams[pname]);
-        });
-
-        // Only vertical constant shifts by dy.
-        const verticalParam = entry.polyCoeffDrag.degreeToParam[0];
-        if (verticalParam) {
-          const startVertical = Number(startPolyParams[verticalParam] ?? entry.values[verticalParam] ?? 0);
-          entry.values[verticalParam] = startVertical + dy;
-        }
-      }
-
-      if (!moveRaf) {
-        moveRaf = window.requestAnimationFrame(() => {
-          moveRaf = 0;
-          syncSliderUiFromValues(entry);
-          refreshScharCurveGeometry(entry);
-          refreshScharTerm(entry);
-        });
-      }
+    const paint = () => {
+      syncSliderUiFromValues(entry);
+      refreshScharCurveGeometry(entry);
+      refreshScharTerm(entry);
     };
 
-    const onUp = (upEvt: PointerEvent) => {
-      if (upEvt.pointerId !== pointerId) return;
-      upEvt.preventDefault();
-      upEvt.stopPropagation();
+    const finish = (paintFinal: boolean) => {
+      if (finished) return;
+      finished = true;
+      cancelActiveDrag = null;
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('blur', onBlur);
+      captureTarget?.removeEventListener('lostpointercapture', onUp as EventListener);
+      try {
+        if (captureTarget?.hasPointerCapture(pointerId)) captureTarget.releasePointerCapture(pointerId);
+      } catch (e) {}
       targets.forEach((target) => {
         try { target.style.cursor = 'grab'; } catch (e) {}
       });
@@ -1546,16 +1540,70 @@ function bindGraphDrag(entry: ScharEntry): void {
         try { window.cancelAnimationFrame(moveRaf); } catch (e) {}
         moveRaf = 0;
       }
-      refreshEntry(entry);
+      if (paintFinal) paint();
       persistScharEntryState(entry);
-      try { window.removeEventListener('pointermove', onMove, true); } catch (e) {}
-      try { window.removeEventListener('pointerup', onUp, true); } catch (e) {}
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (e) {}
     };
 
-    window.addEventListener('pointermove', onMove, true);
+    const onMove = (moveEvt: PointerEvent) => {
+      if (moveEvt.pointerId !== pointerId) return;
+      if (!canDragScharGraph(entry)) {
+        finish(true);
+        return;
+      }
+      const now = eventToUser(entry.board, moveEvt);
+      if (!now) return;
+      moveEvt.preventDefault();
+      moveEvt.stopPropagation();
+      const dx = now.x - start.x;
+      const dy = now.y - start.y;
+
+      if (entry.linearMN) {
+        // Translate a line while preserving slope m: n' = n + dy - m*dx.
+        entry.values[entry.linearMN.n] = startN + dy - (startM * dx);
+      }
+      if (entry.shiftBC) {
+        entry.values[entry.shiftBC.b] = startB - entry.shiftBC.innerSign * dx;
+        entry.values[entry.shiftBC.c] = startC + entry.shiftBC.outerSign * dy;
+      }
+      if (entry.shiftCD) {
+        entry.values[entry.shiftCD.c] = startShiftC - entry.shiftCD.innerSign * dx;
+        entry.values[entry.shiftCD.d] = startShiftD + entry.shiftCD.outerSign * dy;
+      }
+      if (entry.polyCoeffDrag) {
+        // Legacy semantics: horizontal drag uses x -> (x - s), vertical drag adds +d.
+        entry.dragShiftX = startShiftX + dx;
+        entry.dragShiftY = startShiftY + dy;
+        Object.keys(startPolyParams).forEach((pname) => {
+          entry.values[pname] = Number(startPolyParams[pname]);
+        });
+        const verticalParam = entry.polyCoeffDrag.degreeToParam[0];
+        if (verticalParam) {
+          const startVertical = Number(startPolyParams[verticalParam] ?? entry.values[verticalParam] ?? 0);
+          entry.values[verticalParam] = startVertical + dy;
+        }
+      }
+      if (!moveRaf) {
+        moveRaf = window.requestAnimationFrame(() => {
+          moveRaf = 0;
+          paint();
+        });
+      }
+    };
+
+    const onUp = (upEvt: PointerEvent) => {
+      if (upEvt.pointerId !== pointerId) return;
+      if (upEvt.cancelable) upEvt.preventDefault();
+      upEvt.stopPropagation();
+      finish(true);
+    };
+    const onBlur = () => finish(true);
+    cancelActiveDrag = () => finish(false);
+    window.addEventListener('pointermove', onMove, { capture: true, passive: false });
     window.addEventListener('pointerup', onUp, true);
     window.addEventListener('pointercancel', onUp, true);
+    window.addEventListener('blur', onBlur);
+    captureTarget?.addEventListener('lostpointercapture', onUp as EventListener);
+    try { captureTarget?.setPointerCapture(pointerId); } catch (e) {}
   };
 
   targets.forEach((target) => {
@@ -1567,6 +1615,7 @@ function bindGraphDrag(entry: ScharEntry): void {
   });
 
   entry.stopDrag = () => {
+    if (cancelActiveDrag) cancelActiveDrag();
     targets.forEach((target) => {
       try { target.removeEventListener('pointerdown', onPointerDown, true); } catch (e) {}
     });
@@ -1574,10 +1623,31 @@ function bindGraphDrag(entry: ScharEntry): void {
 }
 
 function applyPanelScale(entry: ScharEntry): void {
-  const scale = Math.max(0.55, Math.min(1.45, Number(entry.panelScale || 1)));
+  const scale = Math.max(1, Math.min(1.45, Number(entry.panelScale || 1)));
   entry.panelScale = scale;
   entry.panel.style.transformOrigin = 'top left';
   entry.panel.style.transform = 'scale(' + scale + ')';
+}
+
+/** Update labels in place so changing the course language cannot interrupt a range gesture. */
+function applyScharLanguage(entry: ScharEntry, language: ScharLanguage): void {
+  entry.language = language;
+  const text = SCHAR_TEXT[language];
+  setAttributeIfChanged(entry.panel, 'lang', language);
+  const label = entry.termToggleWrapEl.querySelector('.lia-schar-term-toggle-label');
+  if (label && label.textContent !== text.showTerm) label.textContent = text.showTerm;
+  const controls: Array<[HTMLElement, string]> = [
+    [entry.minBtnEl, entry.panelMinimized ? text.restore : text.minimize],
+    [entry.miniWrapEl, text.restore],
+    [entry.termToggleEl, text.showTerm]
+  ];
+  const resizeHandle = entry.panel.querySelector<HTMLElement>('.lia-schar-resize-handle');
+  if (resizeHandle) controls.push([resizeHandle, text.resize]);
+  controls.forEach(([control, title]) => {
+    setAttributeIfChanged(control, 'title', title);
+    setAttributeIfChanged(control, 'aria-label', title);
+  });
+  setAttributeIfChanged(entry.termToggleWrapEl, 'title', text.showTerm);
 }
 
 function applyPanelMinimized(entry: ScharEntry): void {
@@ -1586,14 +1656,15 @@ function applyPanelMinimized(entry: ScharEntry): void {
   const panelShadow = entry.panel.dataset.baseShadow || entry.panel.style.boxShadow || '';
 
     entry.panel.classList.toggle('is-minimized', entry.panelMinimized);
-    entry.panel.style.padding = entry.panelMinimized ? '4px 6px' : '14px 10px 8px 10px';
+    // Keep the entire first thumb clear of the minimize button, including at its maximum.
+    entry.panel.style.padding = entry.panelMinimized ? '4px 6px' : '24px 10px 8px 10px';
     entry.panel.style.display = entry.panelMinimized ? 'inline-flex' : 'block';
     entry.panel.style.alignItems = entry.panelMinimized ? 'center' : '';
     entry.panel.style.justifyContent = entry.panelMinimized ? 'center' : '';
-    entry.panel.style.width = entry.panelMinimized ? '38px' : '';
-    entry.panel.style.minWidth = entry.panelMinimized ? '38px' : '190px';
-    entry.panel.style.height = entry.panelMinimized ? '16px' : '';
-    entry.panel.style.minHeight = entry.panelMinimized ? '16px' : '';
+    entry.panel.style.width = entry.panelMinimized ? '44px' : '240px';
+    entry.panel.style.minWidth = entry.panelMinimized ? '44px' : '0';
+    entry.panel.style.height = entry.panelMinimized ? '32px' : '';
+    entry.panel.style.minHeight = entry.panelMinimized ? '32px' : '';
     entry.panel.style.background = panelBg;
     entry.panel.style.border = panelBorder;
     entry.panel.style.boxShadow = panelShadow;
@@ -1611,7 +1682,7 @@ function applyPanelMinimized(entry: ScharEntry): void {
     entry.miniStripEl.style.borderRadius = entry.panelMinimized ? '99px' : '';
     entry.miniStripEl.style.opacity = entry.panelMinimized ? '1' : '';
 
-  entry.minBtnEl.title = entry.panelMinimized ? 'Overlay wiederherstellen' : 'Overlay minimieren';
+  applyScharLanguage(entry, entry.language);
   entry.minBtnEl.style.position = 'absolute';
   entry.minBtnEl.style.setProperty('top', '2px', 'important');
   entry.minBtnEl.style.setProperty('right', '2px', 'important');
@@ -1640,198 +1711,55 @@ function applyPanelMinimized(entry: ScharEntry): void {
 }
 
 function bindPanelResizeHandle(entry: ScharEntry): void {
-  if (!entry || !entry.panel) return;
-  const panel = entry.panel;
-  let handle = panel.querySelector('.lia-schar-resize-handle') as HTMLElement | null;
-  if (!handle) {
-    handle = document.createElement('div');
-    handle.className = 'lia-schar-resize-handle';
-    panel.appendChild(handle);
-  }
-
-  handle.style.position = 'absolute';
-  handle.style.right = '0';
-  handle.style.bottom = '0';
-  handle.style.width = '15px';
-  handle.style.height = '15px';
-  handle.style.cursor = 'nwse-resize';
-  handle.style.borderRight = '2px solid ' + entry.cfg.color;
-  handle.style.borderBottom = '2px solid ' + entry.cfg.color;
-  handle.style.borderBottomRightRadius = '8px';
-  handle.style.boxSizing = 'border-box';
-  handle.style.zIndex = '10';
-  handle.style.display = entry.panelMinimized ? 'none' : 'block';
-  handle.style.pointerEvents = 'auto';
-  handle.style.userSelect = 'none';
-  handle.style.touchAction = 'none';
-  handle.style.background = 'transparent';
-
-  if ((handle as any).__liaScharResizeBound) return;
-  (handle as any).__liaScharResizeBound = true;
-
-  type ResizeDrag = {
-    entry: ScharEntry;
-    pointerId: number | null;
-    mode: 'pointer' | 'mouse';
-    startX: number;
-    startY: number;
-    anchorX: number;
-    anchorY: number;
-    startDist: number;
-    startScale: number;
-    pendingScale: number;
-    rafId: number;
-  };
-
-  const resizeState = (window as any).__liaScharPanelResize || {
-    drag: null as ResizeDrag | null,
-    installed: false,
-    handles: [] as Array<{ handle: HTMLElement; entry: ScharEntry }>
-  };
-  (window as any).__liaScharPanelResize = resizeState;
-  (handle as any).__liaScharEntry = entry;
-  if (!(handle as any).__liaScharHandleRegistered) {
-    (handle as any).__liaScharHandleRegistered = true;
-    resizeState.handles.push({ handle, entry });
-  }
-
-  const scheduleApply = () => {
-    const d = resizeState.drag as ResizeDrag | null;
-    if (!d || d.rafId) return;
-
-    try {
-      d.rafId = window.requestAnimationFrame(() => {
-        const cur = resizeState.drag as ResizeDrag | null;
-        if (!cur) return;
-        cur.rafId = 0;
-        cur.entry.panelScale = cur.pendingScale;
-        applyPanelScale(cur.entry);
-      });
-    } catch (e) {
-      d.rafId = 0;
-      d.entry.panelScale = d.pendingScale;
-      applyPanelScale(d.entry);
-    }
-  };
-
-  const startDrag = (dragEntry: ScharEntry, x: number, y: number, mode: 'pointer' | 'mouse', pointerId: number | null) => {
-    const prev = resizeState.drag as ResizeDrag | null;
-    if (prev && prev.rafId) {
-      try { window.cancelAnimationFrame(prev.rafId); } catch (e) {}
-    }
-
-    resizeState.drag = {
-      entry: dragEntry,
-      pointerId,
-      mode,
-      startX: x,
-      startY: y,
-      anchorX: dragEntry.panel.getBoundingClientRect().left,
-      anchorY: dragEntry.panel.getBoundingClientRect().top,
-      startDist: 0,
-      startScale: dragEntry.panelScale,
-      pendingScale: dragEntry.panelScale,
-      rafId: 0
-    } as ResizeDrag;
-
-    const dx0 = x - resizeState.drag.anchorX;
-    const dy0 = y - resizeState.drag.anchorY;
-    resizeState.drag.startDist = Math.max(8, Math.hypot(dx0, dy0));
-
-    try { document.body.style.userSelect = 'none'; } catch (e) {}
-  };
-
-  const updateDrag = (x: number, y: number, mode: 'pointer' | 'mouse', pointerId: number | null) => {
-    const d = resizeState.drag as ResizeDrag | null;
-    if (!d || d.mode !== mode) return;
-    if (d.mode === 'pointer' && d.pointerId !== pointerId) return;
-
-    const dx = x - d.anchorX;
-    const dy = y - d.anchorY;
-    const dist = Math.max(8, Math.hypot(dx, dy));
-    const nextScale = Math.max(0.55, Math.min(1.45, d.startScale * (dist / d.startDist)));
-    if (Math.abs(nextScale - d.pendingScale) < 0.0015) return;
-    d.pendingScale = nextScale;
-    scheduleApply();
-  };
-
-  const stopDrag = (mode: 'pointer' | 'mouse', pointerId: number | null) => {
-    const d = resizeState.drag as ResizeDrag | null;
-    if (!d || d.mode !== mode) return;
-    if (d.mode === 'pointer' && d.pointerId !== pointerId) return;
-
-    if (d.rafId) {
-      try { window.cancelAnimationFrame(d.rafId); } catch (e) {}
-      d.rafId = 0;
-    }
-
-    d.entry.panelScale = Math.max(0.55, Math.min(1.45, d.pendingScale));
-    applyPanelScale(d.entry);
-    persistScharEntryState(d.entry);
-    relayoutPanelsForBoard(d.entry.boardId, d.entry.board);
-    resizeState.drag = null;
-    try { document.body.style.userSelect = ''; } catch (e) {}
-  };
-
-  handle.addEventListener('pointerdown', (evt: PointerEvent) => {
+  const handle = document.createElement('div');
+  handle.className = 'lia-schar-resize-handle';
+  entry.panel.appendChild(handle);
+  let stopGesture: (() => void) | null = null;
+  const onDown = (evt: PointerEvent) => {
+    if (evt.button !== 0 || evt.isPrimary === false) return;
     evt.preventDefault();
     evt.stopPropagation();
-    startDrag(entry, evt.clientX, evt.clientY, 'pointer', evt.pointerId);
-    try { handle!.setPointerCapture(evt.pointerId); } catch (e) {}
-  }, { passive: false });
-
-  handle.addEventListener('mousedown', (evt: MouseEvent) => {
-    evt.preventDefault();
-    evt.stopPropagation();
-    startDrag(entry, evt.clientX, evt.clientY, 'mouse', null);
-  }, { passive: false });
-
-  if (!resizeState.installed) {
-    resizeState.installed = true;
-
-    document.addEventListener('mousedown', (evt: MouseEvent) => {
-      const handles = Array.isArray(resizeState.handles) ? resizeState.handles : [];
-      for (let i = handles.length - 1; i >= 0; i--) {
-        const rec = handles[i];
-        if (!rec || !rec.handle || !rec.entry || !rec.entry.panel || !rec.handle.isConnected) continue;
-        if (rec.entry.panelMinimized || rec.handle.style.display === 'none') continue;
-
-        const rect = rec.handle.getBoundingClientRect();
-        if (evt.clientX < rect.left || evt.clientX > rect.right || evt.clientY < rect.top || evt.clientY > rect.bottom) {
-          continue;
-        }
-
-        evt.preventDefault();
-        evt.stopPropagation();
-        startDrag(rec.entry, evt.clientX, evt.clientY, 'mouse', null);
-        return;
-      }
-    }, true);
-
-    window.addEventListener('pointermove', (evt: PointerEvent) => {
-      updateDrag(evt.clientX, evt.clientY, 'pointer', evt.pointerId);
-    }, true);
-
-    window.addEventListener('pointerup', (evt: PointerEvent) => {
-      stopDrag('pointer', evt.pointerId);
-    }, true);
-
-    window.addEventListener('pointercancel', (evt: PointerEvent) => {
-      stopDrag('pointer', evt.pointerId);
-    }, true);
-
-    window.addEventListener('mousemove', (evt: MouseEvent) => {
-      updateDrag(evt.clientX, evt.clientY, 'mouse', null);
-    }, true);
-
-    window.addEventListener('mouseup', () => {
-      stopDrag('mouse', null);
-    }, true);
-  }
+    stopGesture?.();
+    const pointerId = evt.pointerId;
+    const rect = entry.panel.getBoundingClientRect();
+    const startDistance = Math.max(8, Math.hypot(evt.clientX - rect.left, evt.clientY - rect.top));
+    const startScale = entry.panelScale;
+    const onMove = (move: PointerEvent) => {
+      if (move.pointerId !== pointerId) return;
+      move.preventDefault();
+      const distance = Math.hypot(move.clientX - rect.left, move.clientY - rect.top);
+      entry.panelScale = Math.max(1, Math.min(1.45, startScale * distance / startDistance));
+      applyPanelScale(entry);
+      relayoutPanelsForBoard(entry.boardId, entry.board);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('blur', stop);
+      handle.removeEventListener('lostpointercapture', onUp);
+      stopGesture = null;
+      try { if (handle.hasPointerCapture(pointerId)) handle.releasePointerCapture(pointerId); } catch (e) {}
+      persistScharEntryState(entry);
+    };
+    const onUp = (up: PointerEvent) => { if (up.pointerId === pointerId) stop(); };
+    stopGesture = stop;
+    window.addEventListener('pointermove', onMove, { capture: true, passive: false });
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+    window.addEventListener('blur', stop);
+    handle.addEventListener('lostpointercapture', onUp);
+    try { handle.setPointerCapture(pointerId); } catch (e) {}
+  };
+  handle.addEventListener('pointerdown', onDown);
+  entry.stopResize = () => {
+    stopGesture?.();
+    handle.removeEventListener('pointerdown', onDown);
+  };
 }
 
 function createPanel(entry: ScharEntry): HTMLElement {
-  ensureScharCss();
+  ensureScharCss(entry.board);
 
   const panel = document.createElement('div');
   panel.className = 'lia-schar-panel';
@@ -1841,9 +1769,10 @@ function createPanel(entry: ScharEntry): HTMLElement {
 
   panel.style.position = 'absolute';
   panel.style.left = '10px';
-  panel.style.top = '10px';
+  panel.style.top = boardPanelsStartTop(entry.board.containerObj) + 'px';
   panel.style.zIndex = '52';
-  panel.style.minWidth = '190px';
+  panel.style.minWidth = '0';
+  panel.style.width = '240px';
   panel.style.padding = '8px 10px';
   panel.style.borderRadius = '10px';
   panel.style.background = bg;
@@ -1870,6 +1799,8 @@ function createPanel(entry: ScharEntry): HTMLElement {
   panel.appendChild(minBtn);
 
   const miniWrap = document.createElement('div');
+  miniWrap.tabIndex = 0;
+  miniWrap.setAttribute('role', 'button');
   miniWrap.className = 'lia-schar-mini-wrap';
   const miniName = document.createElement('span');
   miniName.className = 'lia-schar-mini-name';
@@ -1889,8 +1820,9 @@ function createPanel(entry: ScharEntry): HTMLElement {
   const content = document.createElement('div');
   content.className = 'lia-schar-content';
 
-  ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'wheel', 'touchstart', 'touchmove', 'touchend'].forEach((evtName) => {
-    panel.addEventListener(evtName, (evt) => evt.stopPropagation(), { capture: true });
+  ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'mousedown', 'mousemove', 'mouseup', 'click', 'dblclick', 'wheel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'keydown', 'keyup'].forEach((evtName) => {
+    // Bubble shielding preserves native range actions and child handlers.
+    panel.addEventListener(evtName, (evt) => evt.stopPropagation());
   });
 
   const visibleParams = entry.linearMN
@@ -1909,6 +1841,7 @@ function createPanel(entry: ScharEntry): HTMLElement {
     const slider = document.createElement('input');
     slider.className = 'lia-schar-slider';
     slider.type = 'range';
+    slider.setAttribute('aria-label', name);
     const baseVal = Number(entry.values[name]);
     const safeBase = Number.isFinite(baseVal) ? baseVal : 0;
     slider.min = String(safeBase - 5);
@@ -1934,8 +1867,8 @@ function createPanel(entry: ScharEntry): HTMLElement {
     slider.style.setProperty('background-repeat', 'no-repeat', 'important');
     slider.style.setProperty('background-position', 'center', 'important');
     slider.style.setProperty('border-radius', '999px', 'important');
-    slider.style.setProperty('height', '12px', 'important');
-    slider.style.setProperty('min-height', '12px', 'important');
+    slider.style.setProperty('height', '32px', 'important');
+    slider.style.setProperty('min-height', '32px', 'important');
 
     entry.slidersByParam[name] = slider;
     ensureSliderRangeForValue(slider, Number(entry.values[name]));
@@ -1969,7 +1902,7 @@ function createPanel(entry: ScharEntry): HTMLElement {
   termToggleWrap.style.display = 'inline-flex';
   termToggleWrap.style.alignItems = 'center';
   termToggleWrap.style.userSelect = 'none';
-  termToggleWrap.innerHTML = '<span class="lia-schar-term-toggle-row"><input class="lia-schar-term-toggle" type="checkbox" /><span>Term anzeigen</span></span>';
+  termToggleWrap.innerHTML = '<span class="lia-schar-term-toggle-row"><input class="lia-schar-term-toggle" type="checkbox" /><span class="lia-schar-term-toggle-label"></span></span>';
   const termToggle = termToggleWrap.querySelector('input') as HTMLInputElement;
   termToggle.checked = !!entry.termVisible;
   termToggle.addEventListener('input', () => {
@@ -1995,6 +1928,9 @@ function createPanel(entry: ScharEntry): HTMLElement {
     applyPanelMinimized(entry);
     persistScharEntryState(entry);
   };
+  miniWrap.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Enter' || evt.key === ' ') restoreFromMini(evt);
+  });
   miniStrip.addEventListener('click', restoreFromMini, true);
   miniName.addEventListener('click', restoreFromMini, true);
   miniWrap.addEventListener('click', restoreFromMini, true);
@@ -2023,6 +1959,31 @@ function createPanel(entry: ScharEntry): HTMLElement {
   return panel;
 }
 
+const SCHAR_MARKER_SELECTOR = '[id^="schar-spec-"]';
+
+function containsScharMarker(node: Node): boolean {
+  if (node.nodeType !== 1) return false;
+  const element = node as Element;
+  return element.matches(SCHAR_MARKER_SELECTOR) || !!element.querySelector(SCHAR_MARKER_SELECTOR);
+}
+
+function scharMutationIsRelevant(record: MutationRecord): boolean {
+  if (record.type === 'attributes') {
+    const target = record.target as Element;
+    return target.matches(SCHAR_MARKER_SELECTOR) ||
+      (record.attributeName === 'id' && String(record.oldValue || '').startsWith('schar-spec-'));
+  }
+  if (record.type !== 'childList') return false;
+  if (Array.from(record.addedNodes).some(containsScharMarker) ||
+      Array.from(record.removedNodes).some(containsScharMarker)) return true;
+  // A board can be removed separately from its still-mounted marker.
+  return Array.from(record.removedNodes).some((node) =>
+    Object.values(window.__scharEntries || {}).some((entry) =>
+      node === entry.board.containerObj || node.contains(entry.board.containerObj) ||
+      node === entry.board.containerObj.getRootNode().host ||
+      (entry.board.containerObj.getRootNode().host && node.contains(entry.board.containerObj.getRootNode().host))));
+}
+
 export function init(): void {
   if (window.__scharReady) {
     try {
@@ -2034,13 +1995,32 @@ export function init(): void {
   window.__scharReady = true;
   window.__scharEntries = window.__scharEntries || {};
 
-  window.renderScharFromSpec = function (uid: string, spec: string): boolean {
+  window.renderScharFromSpec = function (uid: string, spec: string, languageCode?: string): boolean {
     const cfg = parseScharSpec(spec);
-    if (!cfg.boardId || !cfg.expr) return false;
-
     const board = window.__boards && window.__boards[cfg.boardId];
-    if (!board || !board.containerObj) return false;
-
+    const marker = document.getElementById('schar-spec-' + uid);
+    if (marker && languageCode && marker.dataset.language !== languageCode) {
+      marker.dataset.language = languageCode;
+    }
+    const language = resolveUiLanguage(marker, languageCode);
+    const previous = window.__scharEntries['schar-' + uid] as ScharEntry | undefined;
+    if (!cfg.boardId || !cfg.expr || !board?.containerObj?.isConnected ||
+        marker?.hasAttribute('data-lia-static-claimed')) {
+      removeExisting(uid);
+      return false;
+    }
+    if (previous && previous.spec === spec && previous.marker === marker &&
+        previous.board === board && previous.panel.isConnected &&
+        board.containerObj.contains(previous.panel) && previous.graph &&
+        (!board.objects || board.objects[previous.graph.id] === previous.graph)) {
+      ensureScharCss(board);
+      if (previous.language !== language) {
+        applyScharLanguage(previous, language);
+        refreshScharTerm(previous);
+        scheduleScharRelayout(previous);
+      }
+      return true;
+    }
     removeExisting(uid);
 
     const params = extractParams(cfg.expr, cfg.variableName);
@@ -2062,6 +2042,11 @@ export function init(): void {
 
     const entry: ScharEntry = {
       uid,
+      language,
+      spec,
+      marker,
+      stopLayout: null,
+      stopResize: null,
       boardId: cfg.boardId,
       board,
       cfg,
@@ -2105,9 +2090,6 @@ export function init(): void {
 
     restoreScharEntryState(entry);
 
-    // Always start overlays at minimum scale when (re)loading.
-    entry.panelScale = 0.55;
-
     entry.panel = createPanel(entry);
     const host = getPanelHost(entry);
     if (!host) return false;
@@ -2117,6 +2099,7 @@ export function init(): void {
     persistScharEntryState(entry);
 
     window.__scharEntries['schar-' + uid] = entry;
+    entry.stopLayout = observeBoardPanelLayout(board.containerObj);
     relayoutPanelsForBoard(entry.boardId, entry.board);
     return true;
   };
@@ -2135,7 +2118,7 @@ export function init(): void {
         return;
       }
       activeUids.add(uid);
-      if (window.renderScharFromSpec) window.renderScharFromSpec(uid, spec);
+      if (window.renderScharFromSpec) window.renderScharFromSpec(uid, spec, node.dataset.language);
     });
     Object.keys(window.__scharEntries || {}).forEach(function(key) {
       const entry = window.__scharEntries[key];
@@ -2145,14 +2128,20 @@ export function init(): void {
     });
   };
 
+  onCourseLanguageChange(() => {
+    // Reuse the identity-preserving path; an explicit marker language still wins.
+    if (window.__bootstrapScharen) window.__bootstrapScharen();
+  });
+
   try {
-    const obs = new MutationObserver(function () {
+    const obs = new MutationObserver(function (records) {
+      if (!records.some(scharMutationIsRelevant)) return;
       try {
         if (window.__bootstrapScharen) window.__bootstrapScharen();
       } catch (e) {}
     });
     const root = document.body || document.documentElement;
-    if (root) obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-spec'] });
+    if (root) obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-spec', 'id', 'data-lia-static-claimed', 'data-language'], attributeOldValue: true });
   } catch (e) {}
 
   scheduleBootstrap(function () {

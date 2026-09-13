@@ -4,6 +4,7 @@
 import { splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { resolveUiLanguage, onCourseLanguageChange } from '../shared/language';
 
 export function init(): void {
 if (window.__tableReady) {
@@ -301,7 +302,16 @@ function updatePointButtonState(uid, colIndex, btn) {
 
   btn.disabled = !ready;
   btn.style.opacity = ready ? '' : '0.55';
-  btn.title = ready ? '' : 'Bitte zuerst numerische Werte fuer x und f(x) eintragen.';
+  const language = resolveUiLanguage(getRoot(uid));
+  btn.title = ready ? '' : language === 'de'
+    ? 'Bitte zuerst numerische Werte für x und f(x) eintragen.'
+    : 'Enter numeric values for x and f(x) first.';
+  const prefix = btn.querySelector('.lia-dyn-table-point-prefix');
+  const suffix = btn.querySelector('.lia-dyn-table-point-suffix');
+  const prefixText = language === 'de' ? 'Punkt\u00a0' : 'Set point\u00a0';
+  const suffixText = language === 'de' ? '\u00a0setzen' : '';
+  if (prefix && prefix.textContent !== prefixText) prefix.textContent = prefixText;
+  if (suffix && suffix.textContent !== suffixText) suffix.textContent = suffixText;
 }
 
 function refreshPointButtons(uid) {
@@ -324,7 +334,17 @@ function buildPointButton(uid, colIndex, state) {
   btn.dataset.colIndex = String(colIndex);
 
   const pointName = getPointName(state.pointPrefix, colIndex);
-  btn.innerHTML = 'Punkt&nbsp;' + normalizeLabelMath(pointName, false) + '&nbsp;setzen';
+  // Keep the typeset point name intact when the course language changes.
+  const prefix = document.createElement('span');
+  prefix.className = 'lia-dyn-table-point-prefix';
+  const name = document.createElement('span');
+  name.className = 'lia-dyn-table-point-name';
+  name.innerHTML = normalizeLabelMath(pointName, false);
+  const suffix = document.createElement('span');
+  suffix.className = 'lia-dyn-table-point-suffix';
+  btn.appendChild(prefix);
+  btn.appendChild(name);
+  btn.appendChild(suffix);
 
   btn.addEventListener('click', function() {
     const st = window.__tableStates[uid];
@@ -1483,12 +1503,14 @@ if (hasPointRow && tr3) {
   return true;
 }
 
-  window.renderTableFromSpec = function(uid, spec, force) {
+  window.renderTableFromSpec = function(uid, spec, force, languageCode?: string) {
     const root = getRoot(uid);
     if (!root) return false;
 
+    if (languageCode && root.dataset.language !== languageCode) root.dataset.language = languageCode;
     if (!force && root.__liaTableMounted && root.__liaTableLastSpec === spec) {
       applyThemeToRoot(root);
+      refreshPointButtons(uid);
       return true;
     }
 
@@ -1554,7 +1576,7 @@ window.getTableData = function(uid) {
         return;
       }
 
-      window.renderTableFromSpec(uid, spec, false);
+      window.renderTableFromSpec(uid, spec, false, node.dataset.language);
       applyThemeToRoot(node);
     });
 
@@ -1624,7 +1646,7 @@ window.getTableData = function(uid) {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ['data-spec']
+        attributeFilter: ['data-spec', 'data-language']
       });
     }
   } catch (e) {}
@@ -1651,6 +1673,10 @@ window.getTableData = function(uid) {
 
   initThemeSync();
   window.__registerLiaThemeListener(refreshAllTableThemes);
+
+  onCourseLanguageChange(() => {
+    Object.keys(window.__tableStates || {}).forEach((uid) => refreshPointButtons(uid));
+  });
 
   scheduleBootstrap(function() {
     if (window.__scheduleBootstrapTables) window.__scheduleBootstrapTables();

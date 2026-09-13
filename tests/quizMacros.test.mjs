@@ -177,3 +177,29 @@ test('the full DynFlex fixture covers every quiz, hint, solution, and timer laye
   assert.equal((fixture.match(/^\*{17}$/gm) || []).length, 14);
   assert.equal((fixture.match(/\)\r?\n\[\[\?\]\]/g) || []).length, 7);
 });
+
+
+test('interactive controls use the runtime course language without unresolved macro placeholders', () => {
+  const families = [
+    ['CreatePoint_', 'point-ui-', ['CreatePoint', 'ErzeugePunkt']],
+    ['PointOnGraph_', 'graph-ui-', ['PointOnGraph', 'PunktGraph', 'PointOnGraphWithOptions', 'PunktGraphMitOptionen']],
+    ['PointsOnGraph_', 'multi-graph-ui-', ['PointsOnGraph', 'PunkteAufGraph', 'PointsOnGraphWithOptions', 'PunkteAufGraphMitOptionen']],
+    ['Schar_', 'schar-spec-', ['Schar']],
+    ['Table_', 'lia-table-', ['Table', 'Tabelle']],
+    ['PlotInput_', 'lia-plot-input-', ['PlotInput', 'PlotEingabeLatex']]
+  ];
+  for (const [macro, prefix, aliases] of families) {
+    const bodies = macroBodies(macro);
+    assert.equal(bodies.length, 2, macro);
+    assert.equal(bodies[0], bodies[1], macro);
+    for (const body of bodies) {
+      assert.ok(body.includes(`id="${prefix}@0" data-spec="@1"`), macro);
+      assert.doesNotMatch(body, /data-language=|@language/, macro);
+    }
+    for (const alias of aliases) {
+      const definitions = readme.split(/\r?\n/).filter(line => line.startsWith('@' + alias + ':'));
+      assert.equal(definitions.length, 2, alias);
+      assert.ok(definitions.every(line => !line.includes('@language')), alias);
+    }
+  }
+});

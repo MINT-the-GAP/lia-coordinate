@@ -4,6 +4,7 @@
 import { unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { resolveUiLanguage, onCourseLanguageChange } from '../shared/language';
 import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 import { applyLineStyle, lineStyleAttributes, parseLineStyleOptions } from '../shared/lineStyle';
 
@@ -1016,6 +1017,16 @@ export function init(): void {
     return inner;
   }
 
+  function updateButtonLanguage(uid: string, languageCode?: string): boolean {
+    const uiRoot = document.getElementById('multi-graph-ui-' + uid);
+    const btn = document.getElementById('multi-graph-btn-' + uid);
+    if (!uiRoot || !btn) return false;
+    const label = resolveUiLanguage(uiRoot, languageCode) === 'de' ? 'Punkte setzen' : 'Set points';
+    const inner = ensureInnerSpan(btn);
+    if (inner.textContent !== label) inner.textContent = label;
+    return true;
+  }
+
   function applyLockedStateToButton(uid, btn) {
     const locked = isLocked(uid);
 
@@ -1128,7 +1139,7 @@ export function init(): void {
     return true;
   }
 
-  window.renderPointsOnGraphFromSpec = function(uid, spec) {
+  window.renderPointsOnGraphFromSpec = function(uid, spec, languageCode?: string) {
     const uiRoot = document.getElementById('multi-graph-ui-' + uid);
     const taskRoot = document.getElementById('multi-graph-task-' + uid);
     const checkRoot = getCoordinateQuizRoot(document.getElementById('multi-graph-check-' + uid));
@@ -1139,6 +1150,9 @@ export function init(): void {
     inst.taskRoot = taskRoot;
     inst.checkRoot = checkRoot;
     inst.spec = spec;
+    if (languageCode && uiRoot.dataset.language !== languageCode) {
+      uiRoot.dataset.language = languageCode;
+    }
 
     uiRoot.dataset.spec = spec;
     registerSourceLayerEntry(uid, spec);
@@ -1149,9 +1163,10 @@ export function init(): void {
       btn.id = 'multi-graph-btn-' + uid;
       btn.className = 'lia-btn';
       btn.type = 'button';
-      btn.textContent = 'Punkte setzen';
       taskRoot.appendChild(btn);
     }
+
+    updateButtonLanguage(uid, languageCode);
 
     if (!btn.__liaMultiGraphEnsureBound) {
       btn.__liaMultiGraphEnsureBound = true;
@@ -1245,7 +1260,7 @@ export function init(): void {
         return;
       }
 
-      window.renderPointsOnGraphFromSpec(uid, spec);
+      window.renderPointsOnGraphFromSpec(uid, spec, node.dataset.language);
     });
 
     const staleUids = new Set<string>([
@@ -1282,6 +1297,14 @@ export function init(): void {
 
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
+        if (m.type === 'attributes' && m.attributeName === 'data-language') {
+          const marker = m.target as HTMLElement;
+          if (marker.id && marker.id.startsWith('multi-graph-ui-')) {
+            // Language-only changes must not restore or recreate learner points.
+            if (!updateButtonLanguage(marker.id.slice(15))) needsBootstrap = true;
+          }
+          continue;
+        }
         if (m.type !== 'childList') continue;
 
         const added = Array.from(m.addedNodes || []);
@@ -1310,7 +1333,9 @@ export function init(): void {
     if (root) {
       mo.observe(root, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-language']
       });
     }
   } catch (e) {}
@@ -1336,6 +1361,10 @@ export function init(): void {
   } catch (e) {}
 
   window.__registerLiaThemeListener(refreshAllPointLabels);
+
+  onCourseLanguageChange(() => {
+    Object.keys(window.__pointsOnGraphInstances || {}).forEach((uid) => updateButtonLanguage(uid));
+  });
 
   scheduleBootstrap(function() {
     if (window.__scheduleBootstrapPointsOnGraph) window.__scheduleBootstrapPointsOnGraph();

@@ -1,0 +1,3800 @@
+{
+  "before": false,
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.83",
+    "revision": "@79460ebecaa5625e57a5fb679a735659e73dc687",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "bundleSha256": "583d1e7716d85ce8d2c21e1d5ccdd3fe05e6502b7658e7793a77beea619f78a6",
+  "scenarios": [
+    {
+      "name": "baseline-native-and-mutation",
+      "initial": {
+        "values": {
+          "a": 1,
+          "b": 0,
+          "c": 0
+        },
+        "bbox": [
+          -4.007104290991759,
+          6.003623188405797,
+          7.007104290991759,
+          -3.0036231884057973
+        ],
+        "graphY": [
+          1,
+          9
+        ],
+        "shift": {
+          "b": "b",
+          "c": "c",
+          "innerSign": -1,
+          "outerSign": 1
+        },
+        "dragGraph": true,
+        "graphFixed": true,
+        "eligibility": {
+          "border": true,
+          "construction": "jxgbox lia-dgs-fullscreen-host",
+          "modes": [
+            ""
+          ],
+          "graphNode": "_jxgBoard6364379G31",
+          "dragNode": "_jxgBoard6364379G32"
+        },
+        "shadow": true,
+        "hostName": "jsx-graph",
+        "panelCount": 1,
+        "panel": {
+          "left": 32,
+          "top": 219.875,
+          "right": 272,
+          "bottom": 391.875,
+          "width": 240,
+          "height": 172
+        },
+        "board": {
+          "left": 20,
+          "top": 79.875,
+          "right": 710,
+          "bottom": 644.875,
+          "width": 690,
+          "height": 565
+        },
+        "buttons": [
+          {
+            "class": "lia-schar-min-btn",
+            "title": "Minimize parameter controls",
+            "rect": {
+              "left": 241,
+              "top": 222.875,
+              "right": 269,
+              "bottom": 250.875,
+              "width": 28,
+              "height": 28
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-undo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 131.875,
+              "right": 67,
+              "bottom": 166.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-redo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 174.875,
+              "right": 67,
+              "bottom": 209.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-dgs-menu-button",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 89.375,
+              "right": 67,
+              "bottom": 124.375,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "styleCount": 1,
+        "rangeHeight": 32,
+        "rangeRect": {
+          "left": 87,
+          "top": 250.875,
+          "right": 251,
+          "bottom": 282.875,
+          "width": 164,
+          "height": 32
+        },
+        "minButton": {
+          "left": 241,
+          "top": 222.875,
+          "right": 269,
+          "bottom": 250.875,
+          "width": 28,
+          "height": 28
+        },
+        "panelScale": 1,
+        "panelMinimized": false,
+        "activeSame": false,
+        "native": {
+          "disabled": false,
+          "readOnly": false,
+          "min": "-4",
+          "max": "6",
+          "active": false,
+          "focused": true,
+          "visibility": "visible"
+        },
+        "term": "",
+        "reconstruction": false,
+        "errors": []
+      },
+      "native": {
+        "values": {
+          "a": 3,
+          "b": 0,
+          "c": 0
+        },
+        "bbox": [
+          -4.007104290991759,
+          6.003623188405797,
+          7.007104290991759,
+          -3.0036231884057973
+        ],
+        "graphY": [
+          3,
+          27
+        ],
+        "shift": {
+          "b": "b",
+          "c": "c",
+          "innerSign": -1,
+          "outerSign": 1
+        },
+        "dragGraph": true,
+        "graphFixed": true,
+        "eligibility": {
+          "border": true,
+          "construction": "jxgbox lia-dgs-fullscreen-host",
+          "modes": [
+            ""
+          ],
+          "graphNode": "_jxgBoard6364379G31",
+          "dragNode": "_jxgBoard6364379G32"
+        },
+        "shadow": true,
+        "hostName": "jsx-graph",
+        "panelCount": 1,
+        "panel": {
+          "left": 32,
+          "top": 219.875,
+          "right": 272,
+          "bottom": 391.875,
+          "width": 240,
+          "height": 172
+        },
+        "board": {
+          "left": 20,
+          "top": 79.875,
+          "right": 710,
+          "bottom": 644.875,
+          "width": 690,
+          "height": 565
+        },
+        "buttons": [
+          {
+            "class": "lia-schar-min-btn",
+            "title": "Minimize parameter controls",
+            "rect": {
+              "left": 241,
+              "top": 222.875,
+              "right": 269,
+              "bottom": 250.875,
+              "width": 28,
+              "height": 28
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-undo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 131.875,
+              "right": 67,
+              "bottom": 166.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-redo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 174.875,
+              "right": 67,
+              "bottom": 209.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-dgs-menu-button",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 89.375,
+              "right": 67,
+              "bottom": 124.375,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "styleCount": 1,
+        "rangeHeight": 32,
+        "rangeRect": {
+          "left": 87,
+          "top": 250.875,
+          "right": 251,
+          "bottom": 282.875,
+          "width": 164,
+          "height": 32
+        },
+        "minButton": {
+          "left": 241,
+          "top": 222.875,
+          "right": 269,
+          "bottom": 250.875,
+          "width": 28,
+          "height": 28
+        },
+        "panelScale": 1,
+        "panelMinimized": false,
+        "activeConnected": true,
+        "activeSame": true,
+        "trace": {
+          "input": [
+            {
+              "value": 1.2,
+              "connected": true,
+              "graph": 4.8,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 1.3,
+              "connected": true,
+              "graph": 5.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 1.5,
+              "connected": true,
+              "graph": 6,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 1.7,
+              "connected": true,
+              "graph": 6.8,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 1.8,
+              "connected": true,
+              "graph": 7.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2,
+              "connected": true,
+              "graph": 8,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2.2,
+              "connected": true,
+              "graph": 8.8,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2.3,
+              "connected": true,
+              "graph": 9.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2.5,
+              "connected": true,
+              "graph": 10,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2.7,
+              "connected": true,
+              "graph": 10.8,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 2.8,
+              "connected": true,
+              "graph": 11.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3,
+              "connected": true,
+              "graph": 12,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "pointermove",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 169,
+              "y": 266.875,
+              "buttons": 0,
+              "button": -1,
+              "trusted": true,
+              "value": "1",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mousemove",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 169,
+              "y": 266,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "1",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "pointerdown",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 169,
+              "y": 266.875,
+              "buttons": 1,
+              "button": 0,
+              "trusted": true,
+              "value": "1",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mousedown",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 169,
+              "y": 266,
+              "buttons": 1,
+              "button": 0,
+              "trusted": true,
+              "value": "1",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "gotpointercapture",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 171.3333282470703,
+              "y": 266.875,
+              "buttons": 1,
+              "button": -1,
+              "trusted": true,
+              "value": "1",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "pointerup",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 197,
+              "y": 266.875,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mouseup",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 197,
+              "y": 266,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "lostpointercapture",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 197,
+              "y": 266.875,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            }
+          ],
+          "capture": [
+            {
+              "target": "jsx-graph",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "finalDefaultPrevented": false
+            }
+          ],
+          "removed": false,
+          "eventCounts": {
+            "pointermove": 13,
+            "mousemove": 13,
+            "pointerdown": 1,
+            "mousedown": 1,
+            "gotpointercapture": 1,
+            "pointerup": 1,
+            "mouseup": 1,
+            "lostpointercapture": 1
+          }
+        },
+        "native": {
+          "disabled": false,
+          "readOnly": false,
+          "min": "-4",
+          "max": "6",
+          "active": true,
+          "focused": true,
+          "visibility": "visible"
+        },
+        "term": "",
+        "reconstruction": false,
+        "errors": []
+      },
+      "mutated": {
+        "values": {
+          "a": 4.5,
+          "b": 0,
+          "c": 0
+        },
+        "bbox": [
+          -4.007104290991759,
+          6.003623188405797,
+          7.007104290991759,
+          -3.0036231884057973
+        ],
+        "graphY": [
+          4.5,
+          40.5
+        ],
+        "shift": {
+          "b": "b",
+          "c": "c",
+          "innerSign": -1,
+          "outerSign": 1
+        },
+        "dragGraph": true,
+        "graphFixed": true,
+        "eligibility": {
+          "border": true,
+          "construction": "jxgbox lia-dgs-fullscreen-host",
+          "modes": [
+            ""
+          ],
+          "graphNode": "_jxgBoard6364379G31",
+          "dragNode": "_jxgBoard6364379G32"
+        },
+        "shadow": true,
+        "hostName": "jsx-graph",
+        "panelCount": 1,
+        "panel": {
+          "left": 32,
+          "top": 219.875,
+          "right": 272,
+          "bottom": 391.875,
+          "width": 240,
+          "height": 172
+        },
+        "board": {
+          "left": 20,
+          "top": 79.875,
+          "right": 710,
+          "bottom": 644.875,
+          "width": 690,
+          "height": 565
+        },
+        "buttons": [
+          {
+            "class": "lia-schar-min-btn",
+            "title": "Minimize parameter controls",
+            "rect": {
+              "left": 241,
+              "top": 222.875,
+              "right": 269,
+              "bottom": 250.875,
+              "width": 28,
+              "height": 28
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-undo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 131.875,
+              "right": 67,
+              "bottom": 166.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-plot-draw-toggle lia-plot-redo-btn is-disabled",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 174.875,
+              "right": 67,
+              "bottom": 209.875,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "class": "lia-dgs-menu-button",
+            "title": "",
+            "rect": {
+              "left": 32,
+              "top": 89.375,
+              "right": 67,
+              "bottom": 124.375,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "styleCount": 1,
+        "rangeHeight": 32,
+        "rangeRect": {
+          "left": 87,
+          "top": 250.875,
+          "right": 251,
+          "bottom": 282.875,
+          "width": 164,
+          "height": 32
+        },
+        "minButton": {
+          "left": 241,
+          "top": 222.875,
+          "right": 269,
+          "bottom": 250.875,
+          "width": 28,
+          "height": 28
+        },
+        "panelScale": 1,
+        "panelMinimized": false,
+        "activeConnected": true,
+        "activeSame": true,
+        "trace": {
+          "input": [
+            {
+              "value": 3.1,
+              "connected": true,
+              "graph": 12.4,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.3,
+              "connected": true,
+              "graph": 13.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.4,
+              "connected": true,
+              "graph": 13.6,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.5,
+              "connected": true,
+              "graph": 14,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.6,
+              "connected": true,
+              "graph": 14.4,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.8,
+              "connected": true,
+              "graph": 15.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 3.9,
+              "connected": true,
+              "graph": 15.6,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 4,
+              "connected": true,
+              "graph": 16,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 4.1,
+              "connected": true,
+              "graph": 16.4,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 4.3,
+              "connected": true,
+              "graph": 17.2,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 4.4,
+              "connected": true,
+              "graph": 17.6,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            },
+            {
+              "value": 4.5,
+              "connected": true,
+              "graph": 18,
+              "bbox": [
+                -4.007104290991759,
+                6.003623188405797,
+                7.007104290991759,
+                -3.0036231884057973
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "pointermove",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 197,
+              "y": 266.875,
+              "buttons": 0,
+              "button": -1,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mousemove",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 197,
+              "y": 266,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "pointerdown",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 197,
+              "y": 266.875,
+              "buttons": 1,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mousedown",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 197,
+              "y": 266,
+              "buttons": 1,
+              "button": 0,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "gotpointercapture",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 198.75,
+              "y": 266.875,
+              "buttons": 1,
+              "button": -1,
+              "trusted": true,
+              "value": "3",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "pointerup",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 218,
+              "y": 266.875,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "4.5",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "mouseup",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "x": 218,
+              "y": 266,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "4.5",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            },
+            {
+              "type": "lostpointercapture",
+              "target": "input.lia-schar-slider",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "pointerType": "mouse",
+              "x": 218,
+              "y": 266.875,
+              "buttons": 0,
+              "button": 0,
+              "trusted": true,
+              "value": "4.5",
+              "pointerCapture": false,
+              "rect": {
+                "x": 87,
+                "y": 250.875,
+                "width": 164,
+                "height": 32,
+                "top": 250.875,
+                "right": 251,
+                "bottom": 282.875,
+                "left": 87
+              },
+              "connected": true,
+              "finalDefaultPrevented": false
+            }
+          ],
+          "capture": [
+            {
+              "target": "jsx-graph",
+              "path": [
+                "input.lia-schar-slider",
+                "div.lia-schar-head",
+                "div.lia-schar-content",
+                "div.lia-schar-panel",
+                "div.lia-schar-overlay-host",
+                "div.jxgbox.lia-dgs-fullscreen-host",
+                "ShadowRoot",
+                "jsx-graph",
+                "lia-coordinate-board",
+                "div.flex-child",
+                "section.dynFlex",
+                "main",
+                "body",
+                "html",
+                "HTMLDocument",
+                "Window"
+              ],
+              "defaultPrevented": false,
+              "finalDefaultPrevented": false
+            }
+          ],
+          "removed": false,
+          "eventCounts": {
+            "pointermove": 13,
+            "mousemove": 13,
+            "pointerdown": 1,
+            "mousedown": 1,
+            "gotpointercapture": 1,
+            "pointerup": 1,
+            "mouseup": 1,
+            "lostpointercapture": 1
+          }
+        },
+        "native": {
+          "disabled": false,
+          "readOnly": false,
+          "min": "-4",
+          "max": "6",
+          "active": true,
+          "focused": true,
+          "visibility": "visible"
+        },
+        "term": "",
+        "reconstruction": false,
+        "errors": []
+      },
+      "geometry": {
+        "canvas": [
+          686,
+          561
+        ],
+        "client": [
+          686,
+          561
+        ],
+        "offset": [
+          690,
+          565
+        ],
+        "border": [
+          2,
+          2
+        ],
+        "svg": {
+          "x": 22,
+          "y": 81.875,
+          "width": 690,
+          "height": 565,
+          "top": 81.875,
+          "right": 712,
+          "bottom": 646.875,
+          "left": 22
+        }
+      }
+    },
+    {
+      "label": "initial",
+      "panel": {
+        "left": 32,
+        "top": 219.875,
+        "right": 272,
+        "bottom": 391.875,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 209.875
+    },
+    {
+      "label": "native a",
+      "inputs": 12,
+      "events": [
+        {
+          "type": "pointermove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 266.875,
+          "buttons": 0,
+          "button": -1,
+          "trusted": true,
+          "value": "1",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousemove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 266,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "1",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerdown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 266.875,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "1",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousedown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 266,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "1",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "gotpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 170.75,
+          "y": 266.875,
+          "buttons": 1,
+          "button": -1,
+          "trusted": true,
+          "value": "1",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 190,
+          "y": 266.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mouseup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 190,
+          "y": 266,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "lostpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 190,
+          "y": 266.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 250.875,
+            "width": 164,
+            "height": 32,
+            "top": 250.875,
+            "right": 251,
+            "bottom": 282.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        }
+      ]
+    },
+    {
+      "label": "native b",
+      "inputs": 12,
+      "events": [
+        {
+          "type": "pointermove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 304.875,
+          "buttons": 0,
+          "button": -1,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousemove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 304,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerdown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 304.875,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousedown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 304,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "gotpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 171.9166717529297,
+          "y": 304.875,
+          "buttons": 1,
+          "button": -1,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 204,
+          "y": 304.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mouseup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 204,
+          "y": 304,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "lostpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 204,
+          "y": 304.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 288.875,
+            "width": 164,
+            "height": 32,
+            "top": 288.875,
+            "right": 251,
+            "bottom": 320.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        }
+      ]
+    },
+    {
+      "label": "native c",
+      "inputs": 12,
+      "events": [
+        {
+          "type": "pointermove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 342.875,
+          "buttons": 0,
+          "button": -1,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousemove",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 342,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerdown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 169,
+          "y": 342.875,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mousedown",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 169,
+          "y": 342,
+          "buttons": 1,
+          "button": 0,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "gotpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 171.9166717529297,
+          "y": 342.875,
+          "buttons": 1,
+          "button": -1,
+          "trusted": true,
+          "value": "0",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "pointerup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 204,
+          "y": 342.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "mouseup",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "x": 204,
+          "y": 342,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        },
+        {
+          "type": "lostpointercapture",
+          "target": "input.lia-schar-slider",
+          "path": [
+            "input.lia-schar-slider",
+            "div.lia-schar-head",
+            "div.lia-schar-content",
+            "div.lia-schar-panel",
+            "div.lia-schar-overlay-host",
+            "div.jxgbox.lia-dgs-fullscreen-host",
+            "ShadowRoot",
+            "jsx-graph",
+            "lia-coordinate-board",
+            "div.flex-child",
+            "section.dynFlex",
+            "main",
+            "body",
+            "html",
+            "HTMLDocument",
+            "Window"
+          ],
+          "defaultPrevented": false,
+          "pointerType": "mouse",
+          "x": 204,
+          "y": 342.875,
+          "buttons": 0,
+          "button": 0,
+          "trusted": true,
+          "value": "2.5",
+          "pointerCapture": false,
+          "rect": {
+            "x": 87,
+            "y": 326.875,
+            "width": 164,
+            "height": 32,
+            "top": 326.875,
+            "right": 251,
+            "bottom": 358.875,
+            "left": 87
+          },
+          "connected": true,
+          "finalDefaultPrevented": false
+        }
+      ]
+    },
+    {
+      "label": "exact lecture parabola",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": "g(x)=0.5⋅(x−1)2−2"
+    },
+    {
+      "label": "return from .lia-plot-draw-btn",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": "g(x)=0.5⋅(x−1)2−2"
+    },
+    {
+      "label": "return from .lia-plot-erase-toggle",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": "g(x)=0.5⋅(x−1)2−2"
+    },
+    {
+      "label": "return from .lia-plot-regression-toggle",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": "g(x)=0.5⋅(x−1)2−2"
+    },
+    {
+      "label": "pointercancel",
+      "values": {
+        "a": 0.5,
+        "b": 0.240835464620631,
+        "c": -0.24083546462063143
+      }
+    },
+    {
+      "label": "release outside board",
+      "values": {
+        "a": 0.5,
+        "b": 5.323671571298498,
+        "c": -0.642227905655016
+      }
+    },
+    {
+      "label": "a*(x-b)^2+c",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "a*(x+b)^2+c",
+      "values": {
+        "a": 0.5,
+        "b": -0.9999999999999999,
+        "c": -2.0000006200644616
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "a*(x-b)^2-c",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": 1.9999996899677686
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "a*(x+b)^2-c",
+      "values": {
+        "a": 0.5,
+        "b": -0.9999999999999999,
+        "c": 1.9999999999999991
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "emulated touch range",
+      "trace": {
+        "input": [
+          {
+            "value": 2.2,
+            "connected": true,
+            "graph": 8.8,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 2.3,
+            "connected": true,
+            "graph": 9.2,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 2.5,
+            "connected": true,
+            "graph": 10,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 2.7,
+            "connected": true,
+            "graph": 10.8,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 2.8,
+            "connected": true,
+            "graph": 11.2,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 3,
+            "connected": true,
+            "graph": 12,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          }
+        ],
+        "events": [
+          {
+            "type": "pointerdown",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "touch",
+            "x": 169,
+            "y": 266.875,
+            "buttons": 1,
+            "button": 0,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "touchstart",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "gotpointercapture",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "touch",
+            "x": 171.3333282470703,
+            "y": 266.875,
+            "buttons": 1,
+            "button": -1,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "pointermove",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "touch",
+            "x": 171.3333282470703,
+            "y": 266.875,
+            "buttons": 1,
+            "button": -1,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "pointerup",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "touch",
+            "x": 197,
+            "y": 266.875,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "3",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "lostpointercapture",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "touch",
+            "x": 197,
+            "y": 266.875,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "3",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "touchend",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "trusted": true,
+            "value": "3",
+            "pointerCapture": false,
+            "rect": {
+              "x": 87,
+              "y": 250.875,
+              "width": 164,
+              "height": 32,
+              "top": 250.875,
+              "right": 251,
+              "bottom": 282.875,
+              "left": 87
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          }
+        ],
+        "capture": [
+          {
+            "target": "jsx-graph",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child",
+              "section.dynFlex",
+              "main",
+              "body",
+              "html",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "finalDefaultPrevented": false
+          }
+        ],
+        "removed": false,
+        "eventCounts": {
+          "pointerdown": 1,
+          "touchstart": 1,
+          "gotpointercapture": 1,
+          "pointermove": 12,
+          "pointerup": 1,
+          "lostpointercapture": 1,
+          "touchend": 1
+        }
+      }
+    },
+    {
+      "label": "emulated pen graph",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999997875303599,
+        "c": -2.0000003100322306
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "restore minimized",
+      "panel": {
+        "left": 32,
+        "top": 219.875,
+        "right": 272,
+        "bottom": 391.875,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 209.875
+    },
+    {
+      "label": "DynFlex width change",
+      "panel": {
+        "left": 46.59375,
+        "top": 230.265625,
+        "right": 286.59375,
+        "bottom": 402.265625,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 220.265625
+    },
+    {
+      "label": "scaled board",
+      "panel": {
+        "left": 41.275001525878906,
+        "top": 188.5,
+        "right": 233.2750015258789,
+        "bottom": 326.1000061035156,
+        "width": 192,
+        "height": 137.60000610351562
+      },
+      "controlsBottom": 180.5
+    },
+    {
+      "label": "scaled graph",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999992734669996,
+        "c": -2.0000003062435874
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "scrolled scaled graph",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999992734669996,
+        "c": -1.999998878685787
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "browser CSS zoom",
+      "panel": {
+        "left": 51,
+        "top": 884.234375,
+        "right": 291,
+        "bottom": 1056.234375,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 874.234375
+    },
+    {
+      "label": "zoomed graph",
+      "values": {
+        "a": 0.5,
+        "b": 1,
+        "c": -2
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "fullscreen",
+      "panel": {
+        "left": 12,
+        "top": 219.875,
+        "right": 252,
+        "bottom": 391.875,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 209.875
+    },
+    {
+      "label": "fullscreen graph",
+      "values": {
+        "a": 0.5,
+        "b": 1,
+        "c": -2
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "fullscreen exit",
+      "panel": {
+        "left": 32,
+        "top": 219.875,
+        "right": 272,
+        "bottom": 391.875,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 209.875
+    },
+    {
+      "label": "board replacement",
+      "newBoard": true,
+      "oldPanelRemoved": true,
+      "oldCapture": false,
+      "values": {
+        "a": 0.5,
+        "b": 1,
+        "c": -2
+      }
+    },
+    {
+      "label": "marker removal and reattach"
+    },
+    {
+      "label": "lecture imports",
+      "values": {
+        "a": 0.5,
+        "b": 0.9999998094293461,
+        "c": -2.000000135221089
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "lecture imports",
+      "panel": {
+        "left": 46.59375,
+        "top": 250.265625,
+        "right": 286.59375,
+        "bottom": 422.265625,
+        "width": 240,
+        "height": 172
+      },
+      "controlsBottom": 240.265625
+    },
+    {
+      "label": "real LiaScript native range",
+      "trace": {
+        "input": [
+          {
+            "value": 1.1,
+            "connected": true,
+            "graph": 4.4,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.3,
+            "connected": true,
+            "graph": 5.2,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.4,
+            "connected": true,
+            "graph": 5.6,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.5,
+            "connected": true,
+            "graph": 6,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.6,
+            "connected": true,
+            "graph": 6.4,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.8,
+            "connected": true,
+            "graph": 7.2,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 1.9,
+            "connected": true,
+            "graph": 7.6,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 2,
+            "connected": true,
+            "graph": 8,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 2.1,
+            "connected": true,
+            "graph": 8.4,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 2.3,
+            "connected": true,
+            "graph": 9.2,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 2.4,
+            "connected": true,
+            "graph": 9.6,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          },
+          {
+            "value": 2.5,
+            "connected": true,
+            "graph": 10,
+            "bbox": [
+              -4.01015713124,
+              6.002061855670103,
+              7.010157131239999,
+              -3.0020618556701035
+            ]
+          }
+        ],
+        "events": [
+          {
+            "type": "pointermove",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "mouse",
+            "x": 518.5,
+            "y": 375.09375,
+            "buttons": 0,
+            "button": -1,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "mousemove",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "x": 518,
+            "y": 375,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "pointerdown",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "mouse",
+            "x": 518.5,
+            "y": 375.09375,
+            "buttons": 1,
+            "button": 0,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "mousedown",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "x": 518,
+            "y": 375,
+            "buttons": 1,
+            "button": 0,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "gotpointercapture",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "mouse",
+            "x": 518.5,
+            "y": 375.09375,
+            "buttons": 1,
+            "button": -1,
+            "trusted": true,
+            "value": "1",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "pointerup",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "mouse",
+            "x": 539.5,
+            "y": 375.09375,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "2.5",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "mouseup",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "x": 539,
+            "y": 375,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "2.5",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          },
+          {
+            "type": "lostpointercapture",
+            "target": "input.lia-schar-slider",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "pointerType": "mouse",
+            "x": 539.5,
+            "y": 375.09375,
+            "buttons": 0,
+            "button": 0,
+            "trusted": true,
+            "value": "2.5",
+            "pointerCapture": false,
+            "rect": {
+              "x": 436.5,
+              "y": 359.09375,
+              "width": 164,
+              "height": 32,
+              "top": 359.09375,
+              "right": 600.5,
+              "bottom": 391.09375,
+              "left": 436.5
+            },
+            "connected": true,
+            "finalDefaultPrevented": false
+          }
+        ],
+        "capture": [
+          {
+            "target": "jsx-graph",
+            "path": [
+              "input.lia-schar-slider",
+              "div.lia-schar-head",
+              "div.lia-schar-content",
+              "div.lia-schar-panel",
+              "div.lia-schar-overlay-host",
+              "div.jxgbox.lia-dgs-fullscreen-host",
+              "ShadowRoot",
+              "jsx-graph",
+              "lia-coordinate-board",
+              "div.flex-child.dynFlexItem",
+              "section.dynFlex",
+              "main.lia-slide__content.lia-annot-host",
+              "div.lia-slide__container",
+              "div.pane-first-view",
+              "div.pane-container",
+              "div.lia-slide__container",
+              "div.lia-slide",
+              "div.lia-canvas.lia-toc--visible.lia-support--hidden.lia-mode--presentation",
+              "body",
+              "html.lia-theme-default.lia-variant-light.lia-font-scale-1.lia-tff-voice-collapsed",
+              "HTMLDocument",
+              "Window"
+            ],
+            "defaultPrevented": false,
+            "finalDefaultPrevented": false
+          }
+        ],
+        "removed": false,
+        "eventCounts": {
+          "pointermove": 13,
+          "mousemove": 13,
+          "pointerdown": 1,
+          "mousedown": 1,
+          "gotpointercapture": 1,
+          "pointerup": 1,
+          "mouseup": 1,
+          "lostpointercapture": 1
+        }
+      }
+    },
+    {
+      "label": "real LiaScript presentation",
+      "values": {
+        "a": 0.5,
+        "b": 0.999998896992663,
+        "c": -1.9999999673377618
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "native LiaScript reconstruction check",
+      "correct": true
+    },
+    {
+      "label": "real LiaScript slide revisit",
+      "values": {
+        "a": 0.5,
+        "b": 0.999997793985326,
+        "c": -1.9999999346755237
+      },
+      "reconstruction": true,
+      "term": ""
+    },
+    {
+      "label": "real LiaScript presentation",
+      "panel": {
+        "left": 381.5,
+        "top": 328.09375,
+        "right": 621.5,
+        "bottom": 508.546875,
+        "width": 240,
+        "height": 180.453125
+      },
+      "controlsBottom": 318.09375
+    }
+  ]
+}

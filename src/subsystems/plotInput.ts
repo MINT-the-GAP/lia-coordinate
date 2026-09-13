@@ -4,6 +4,7 @@
 import { parseMacroName, splitTopLevel as sharedSplitTopLevel } from '../shared/parser';
 import { getNeutralColor, themeDoc, themeWin, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { compileFunctionExpression } from '../shared/functionExpression';
 import {
   applyLineStyle,
@@ -11,6 +12,41 @@ import {
   lineStyleAttributes,
   parseLineStyleOptions
 } from '../shared/lineStyle';
+
+function plotInputText(language: string) {
+  return language === 'de' ? {
+    plot: 'Zeichnen', clear: 'Löschen', input: 'Funktionsterm',
+    example: 'z. B. \\frac{1}{2}x^2 - 1',
+    empty: 'Bitte einen Funktionsterm eingeben.',
+    missingBoard: 'Koordinatensystem nicht gefunden:',
+    success: 'Graph gezeichnet.', error: 'Der Term konnte nicht gezeichnet werden.'
+  } : {
+    plot: 'Plot', clear: 'Clear', input: 'Function expression',
+    example: 'e.g. \\frac{1}{2}x^2 - 1',
+    empty: 'Please enter a function expression.',
+    missingBoard: 'Coordinate system not found:',
+    success: 'Graph plotted.', error: 'The expression could not be plotted.'
+  };
+}
+
+function plotInputError(language: string, detail: string): string {
+  if (language !== 'de') return detail || plotInputText(language).error;
+  const messages: Array<[RegExp, string]> = [
+    [/^Expected (.*)$/, 'Erwartet: $1'],
+    [/^Unclosed bracket: (.*)$/, 'Nicht geschlossene Klammer: $1'],
+    [/^Numerator after \\frac missing\.$/, 'Zähler nach \\frac fehlt.'],
+    [/^Denominator after \\frac missing\.$/, 'Nenner nach \\frac fehlt.'],
+    [/^Argument after \\sqrt missing\.$/, 'Argument nach \\sqrt fehlt.'],
+    [/^Exponent after \^ missing\.$/, 'Exponent nach ^ fehlt.'],
+    [/^Unknown (?:character|symbol) in expression: (.*)$/, 'Unbekanntes Zeichen im Term: $1'],
+    [/^Unknown variable or function: (.*)$/, 'Unbekannte Variable oder Funktion: $1'],
+    [/^The expression could not be compiled\.$/, 'Der Funktionsterm konnte nicht verarbeitet werden.']
+  ];
+  for (const [pattern, translated] of messages) {
+    if (pattern.test(detail)) return detail.replace(pattern, translated);
+  }
+  return plotInputText(language).error;
+}
 
 export function init(): void {
   if (window.__plotInputReady) {
@@ -21,6 +57,12 @@ export function init(): void {
     return;
   }
   window.__plotInputReady = true;
+  onCourseLanguageChange(() => {
+    Object.keys(window.__plotInputInstances || {}).forEach(uid => {
+      const root = document.getElementById('lia-plot-input-' + uid);
+      if (root) updatePlotInputLanguage(uid, root);
+    });
+  });
 
   const H: Record<string, any> = {};
   window.__plotInput = H;
@@ -40,7 +82,7 @@ export function init(): void {
     return Number.isFinite(v) ? v : fallback;
   };
 
-  H.parseInputSpec = function(spec){
+  H.parseInputSpec = function(spec, languageCode?: string){
     const rawParts = sharedSplitTopLevel(String(spec || '').trim(), ';');
     const parts = rawParts.filter(function(part) { return !isLineStyleOption(part); });
     const name = parseMacroName(parts[1] || 'f', 'f');
@@ -50,7 +92,7 @@ export function init(): void {
       name: name.name,
       showName: name.showName,
       color: parts[2] || '#b41f65',
-      placeholder: parts[3] || 'e.g. \\frac{1}{2}x^2 - 1',
+      placeholder: parts[3] || plotInputText(languageCode).example,
       dx: H.numOr(parts, 4, 0.18),
       dy: H.numOr(parts, 5, 0.18),
       strokeWidth: H.numOr(parts, 6, 3),
@@ -727,18 +769,42 @@ export function init(): void {
     if (window.__plotInputInstances) delete window.__plotInputInstances[uid];
   }
 
-  window.renderPlotInputFromSpec = function(uid, spec) {
+  function updatePlotInputLanguage(uid, root, languageCode?: string) {
+    const state = window.__plotInputStates[uid];
+    const inst = window.__plotInputInstances[uid];
+    if (!state || !inst?.input) return false;
+    state.language = resolveUiLanguage(root, languageCode);
+    const text = plotInputText(state.language);
+    for (const [button, label] of [[inst.btnPlot, text.plot], [inst.btnClear, text.clear]]) {
+      const inner = button.querySelector('.lia-btn-inner') || button;
+      if (inner.textContent !== label) inner.textContent = label;
+    }
+    state.placeholder = H.parseInputSpec(root.dataset.spec || '', state.language).placeholder;
+    inst.input.placeholder = state.placeholder;
+    inst.input.setAttribute('aria-label', text.input);
+    if (inst.messageKey && inst.setFeedback) {
+      inst.setFeedback(inst.messageKey, inst.messageIsError, inst.messageDetail);
+    }
+    return true;
+  }
+
+  window.renderPlotInputFromSpec = function(uid, spec, languageCode?: string) {
     const root = document.getElementById('lia-plot-input-' + uid);
     if (!root) return false;
 
     if ((root.dataset.spec || '') !== String(spec || '')) {
       root.dataset.spec = spec;
     }
+    if (languageCode && root.dataset.language !== languageCode) {
+      root.dataset.language = languageCode;
+    }
 
-    const cfg = H.parseInputSpec(spec);
+    const language = resolveUiLanguage(root, languageCode);
+    const cfg = H.parseInputSpec(spec, language);
     const state = window.__plotInputStates[uid] || (window.__plotInputStates[uid] = {});
     const inst = window.__plotInputInstances[uid] || (window.__plotInputInstances[uid] = {});
     state.root = root;
+    state.language = language;
     inst.root = root;
     const labelConfigChanged = state.name !== cfg.name ||
       state.showName !== cfg.showName ||
@@ -836,11 +902,9 @@ export function init(): void {
 
       btnPlot.className = 'lia-btn';
       btnPlot.type = 'button';
-      btnPlot.textContent = 'Plot';
 
       btnClear.className = 'lia-btn';
       btnClear.type = 'button';
-      btnClear.textContent = 'Clear';
 
       ui.appendChild(field);
       field.appendChild(input);
@@ -873,26 +937,37 @@ export function init(): void {
         msg.style.color = text ? (isError ? '#b00020' : '#1d6f42') : '';
       }
 
+      function setFeedback(key, isError, detail = '') {
+        inst.messageKey = key;
+        inst.messageIsError = isError;
+        inst.messageDetail = detail;
+        const text = plotInputText(state.language);
+        const message = key === 'error' ? plotInputError(state.language, detail)
+          : key === 'missingBoard' ? text.missingBoard + ' ' + detail
+          : key ? text[key] : '';
+        setMsg(message, isError);
+      }
+
       function doPlot(){
         const raw = String(input.value || '').trim();
         state.raw = raw;
 
         if (!raw) {
-          setMsg('Please enter a function expression.', true);
+          setFeedback('empty', true);
           return;
         }
 
         const board = getBoard();
         if (!board) {
-          setMsg('Board "' + state.boardId + '" not found.', true);
+          setFeedback('missingBoard', true, state.boardId);
           return;
         }
 
         try {
           H.plotIntoBoard(board, state, raw);
-          setMsg('Graph plotted.', false);
+          setFeedback('success', false);
         } catch (err) {
-          setMsg((err && err.message) ? err.message : 'The expression could not be plotted.', true);
+          setFeedback('error', true, String(err?.message || ''));
         }
       }
 
@@ -906,7 +981,7 @@ export function init(): void {
           board.update();
         }
 
-        setMsg('', false);
+        setFeedback('', false);
       }
 
       btnPlot.addEventListener('click', doPlot);
@@ -924,11 +999,12 @@ export function init(): void {
       });
 
       inst.setMsg = setMsg;
+      inst.setFeedback = setFeedback;
     } else {
       mountInstance();
     }
 
-    inst.input.placeholder = state.placeholder;
+    updatePlotInputLanguage(uid, root, languageCode);
     inst.input.value = (typeof state.raw === 'string') ? state.raw : '';
 
     function ensureBtnInner(btn) {
@@ -1100,7 +1176,7 @@ export function init(): void {
         return;
       }
 
-      window.renderPlotInputFromSpec(uid, spec);
+      window.renderPlotInputFromSpec(uid, spec, node.dataset.language);
     });
 
     const staleUids = new Set<string>([
@@ -1135,6 +1211,13 @@ export function init(): void {
 
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
+        if (m.type === 'attributes') {
+          const target = m.target as HTMLElement;
+          if (target.matches?.('[id^="lia-plot-input-"][data-spec]')) {
+            const uid = target.id.replace(/^lia-plot-input-/, '');
+            if (!updatePlotInputLanguage(uid, target)) needsBootstrap = true;
+          }
+        }
         if (m.type !== 'childList') continue;
 
         const added = Array.from(m.addedNodes || []);
@@ -1163,7 +1246,9 @@ export function init(): void {
     if (root) {
       mo.observe(root, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-language']
       });
     }
   } catch (e) {}

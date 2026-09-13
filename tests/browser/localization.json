@@ -1,0 +1,894 @@
+{
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.83",
+    "revision": "@79460ebecaa5625e57a5fb679a735659e73dc687",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "runtime": "LiaScript 0.16.10",
+  "checks": [
+    "Six UI families follow actual English and German courses",
+    "Native point, table, plot, clear, Schar key/toggle/minimize/restore actions",
+    "Root language mutations translate existing errors and success status",
+    "In-place updates preserve graph, point, input and panel identities",
+    "Explicit data-language overrides win; removing them restores course inheritance"
+  ],
+  "bundleSha256": "583d1e7716d85ce8d2c21e1d5ccdd3fe05e6502b7658e7793a77beea619f78a6",
+  "scenarios": [
+    {
+      "language": "en",
+      "initial": {
+        "courseLanguage": "en",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Set point",
+          "Set point",
+          "Set points"
+        ],
+        "table": {
+          "inputs": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Set point T1",
+              "title": "Enter numeric values for x and f(x) first.",
+              "disabled": true
+            },
+            {
+              "label": "Set point T2",
+              "title": "Enter numeric values for x and f(x) first.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Plot",
+            "Clear"
+          ],
+          "inputAria": "Function expression",
+          "placeholder": "e.g. \\frac{1}{2}x^2 - 1",
+          "input": "",
+          "message": "",
+          "hasGraph": false
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Show term",
+        "termText": "",
+        "termAria": "Show term",
+        "minTitle": "Minimize parameter controls",
+        "minAria": "Minimize parameter controls",
+        "restoreTitle": "Restore parameter controls",
+        "restoreAria": "Restore parameter controls",
+        "resizeTitle": "Resize parameter controls",
+        "resizeAria": "Resize parameter controls",
+        "values": {
+          "a": 1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": false,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 0,
+        "coordinates": {},
+        "identity": null
+      },
+      "placed": {
+        "A": [
+          0.47910612764618055,
+          0.3074498517193591
+        ],
+        "Q": [
+          0.382095481385487,
+          0.5555100712520215
+        ],
+        "R_1": [
+          0.897051548524557,
+          0.13329029799641445
+        ],
+        "R_2": [
+          0.22209914507813566,
+          0.1488384515234683
+        ],
+        "T_1": [
+          2,
+          3
+        ]
+      },
+      "emptyMessage": "Please enter a function expression.",
+      "translatedEmpty": "Bitte einen Funktionsterm eingeben.",
+      "languageUpdate": {
+        "courseLanguage": "de",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Punkt setzen",
+          "Punkt setzen",
+          "Punkte setzen"
+        ],
+        "table": {
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Punkt T1 setzen",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Punkt T2 setzen",
+              "title": "Bitte zuerst numerische Werte für x und f(x) eintragen.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Zeichnen",
+            "Löschen"
+          ],
+          "inputAria": "Funktionsterm",
+          "placeholder": "z. B. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph gezeichnet.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Term anzeigen",
+        "termText": "g(x)=1,1⋅x2",
+        "termAria": "Term anzeigen",
+        "minTitle": "Parameterregler wiederherstellen",
+        "minAria": "Parameterregler wiederherstellen",
+        "restoreTitle": "Parameterregler wiederherstellen",
+        "restoreAria": "Parameterregler wiederherstellen",
+        "resizeTitle": "Größe der Parameterregler ändern",
+        "resizeAria": "Größe der Parameterregler ändern",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": true,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.47910612764618055,
+            0.3074498517193591
+          ],
+          "Q": [
+            0.382095481385487,
+            0.5555100712520215
+          ],
+          "R_1": [
+            0.897051548524557,
+            0.13329029799641445
+          ],
+          "R_2": [
+            0.22209914507813566,
+            0.1488384515234683
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "restored": {
+        "courseLanguage": "de",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Punkt setzen",
+          "Punkt setzen",
+          "Punkte setzen"
+        ],
+        "table": {
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Punkt T1 setzen",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Punkt T2 setzen",
+              "title": "Bitte zuerst numerische Werte für x und f(x) eintragen.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Zeichnen",
+            "Löschen"
+          ],
+          "inputAria": "Funktionsterm",
+          "placeholder": "z. B. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph gezeichnet.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Term anzeigen",
+        "termText": "g(x)=1,1⋅x2",
+        "termAria": "Term anzeigen",
+        "minTitle": "Parameterregler minimieren",
+        "minAria": "Parameterregler minimieren",
+        "restoreTitle": "Parameterregler wiederherstellen",
+        "restoreAria": "Parameterregler wiederherstellen",
+        "resizeTitle": "Größe der Parameterregler ändern",
+        "resizeAria": "Größe der Parameterregler ändern",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.47910612764618055,
+            0.3074498517193591
+          ],
+          "Q": [
+            0.382095481385487,
+            0.5555100712520215
+          ],
+          "R_1": [
+            0.897051548524557,
+            0.13329029799641445
+          ],
+          "R_2": [
+            0.22209914507813566,
+            0.1488384515234683
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "overridden": {
+        "courseLanguage": "de",
+        "language": "en",
+        "pointLanguages": [
+          "en",
+          "en",
+          "en"
+        ],
+        "pointLabels": [
+          "Set point",
+          "Set point",
+          "Set points"
+        ],
+        "table": {
+          "language": "en",
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Set point T1",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Set point T2",
+              "title": "Enter numeric values for x and f(x) first.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "language": "en",
+          "labels": [
+            "Plot",
+            "Clear"
+          ],
+          "inputAria": "Function expression",
+          "placeholder": "e.g. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph plotted.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Show term",
+        "termText": "g(x)=1.1⋅x2",
+        "termAria": "Show term",
+        "minTitle": "Minimize parameter controls",
+        "minAria": "Minimize parameter controls",
+        "restoreTitle": "Restore parameter controls",
+        "restoreAria": "Restore parameter controls",
+        "resizeTitle": "Resize parameter controls",
+        "resizeAria": "Resize parameter controls",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.47910612764618055,
+            0.3074498517193591
+          ],
+          "Q": [
+            0.382095481385487,
+            0.5555100712520215
+          ],
+          "R_1": [
+            0.897051548524557,
+            0.13329029799641445
+          ],
+          "R_2": [
+            0.22209914507813566,
+            0.1488384515234683
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "cleared": {
+        "labels": [
+          "Plot",
+          "Clear"
+        ],
+        "inputAria": "Function expression",
+        "placeholder": "e.g. \\frac{1}{2}x^2 - 1",
+        "input": "",
+        "message": "",
+        "hasGraph": false
+      }
+    },
+    {
+      "language": "de",
+      "initial": {
+        "courseLanguage": "de",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Punkt setzen",
+          "Punkt setzen",
+          "Punkte setzen"
+        ],
+        "table": {
+          "inputs": [
+            "",
+            "",
+            "",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Punkt T1 setzen",
+              "title": "Bitte zuerst numerische Werte für x und f(x) eintragen.",
+              "disabled": true
+            },
+            {
+              "label": "Punkt T2 setzen",
+              "title": "Bitte zuerst numerische Werte für x und f(x) eintragen.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Zeichnen",
+            "Löschen"
+          ],
+          "inputAria": "Funktionsterm",
+          "placeholder": "z. B. \\frac{1}{2}x^2 - 1",
+          "input": "",
+          "message": "",
+          "hasGraph": false
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Term anzeigen",
+        "termText": "",
+        "termAria": "Term anzeigen",
+        "minTitle": "Parameterregler minimieren",
+        "minAria": "Parameterregler minimieren",
+        "restoreTitle": "Parameterregler wiederherstellen",
+        "restoreAria": "Parameterregler wiederherstellen",
+        "resizeTitle": "Größe der Parameterregler ändern",
+        "resizeAria": "Größe der Parameterregler ändern",
+        "values": {
+          "a": 1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": false,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 0,
+        "coordinates": {},
+        "identity": null
+      },
+      "placed": {
+        "A": [
+          0.6115307015424589,
+          0.2557768716143075
+        ],
+        "Q": [
+          0.8246660424649527,
+          0.038920362458691904
+        ],
+        "R_1": [
+          0.00626376963083064,
+          0.3192131905711222
+        ],
+        "R_2": [
+          0.14431817115664225,
+          0.0243445930792906
+        ],
+        "T_1": [
+          2,
+          3
+        ]
+      },
+      "emptyMessage": "Bitte einen Funktionsterm eingeben.",
+      "translatedEmpty": "Please enter a function expression.",
+      "languageUpdate": {
+        "courseLanguage": "en",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Set point",
+          "Set point",
+          "Set points"
+        ],
+        "table": {
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Set point T1",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Set point T2",
+              "title": "Enter numeric values for x and f(x) first.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Plot",
+            "Clear"
+          ],
+          "inputAria": "Function expression",
+          "placeholder": "e.g. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph plotted.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Show term",
+        "termText": "g(x)=1.1⋅x2",
+        "termAria": "Show term",
+        "minTitle": "Restore parameter controls",
+        "minAria": "Restore parameter controls",
+        "restoreTitle": "Restore parameter controls",
+        "restoreAria": "Restore parameter controls",
+        "resizeTitle": "Resize parameter controls",
+        "resizeAria": "Resize parameter controls",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": true,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.6115307015424589,
+            0.2557768716143075
+          ],
+          "Q": [
+            0.8246660424649527,
+            0.038920362458691904
+          ],
+          "R_1": [
+            0.00626376963083064,
+            0.3192131905711222
+          ],
+          "R_2": [
+            0.14431817115664225,
+            0.0243445930792906
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "restored": {
+        "courseLanguage": "en",
+        "pointLanguages": [
+          null,
+          null,
+          null
+        ],
+        "pointLabels": [
+          "Set point",
+          "Set point",
+          "Set points"
+        ],
+        "table": {
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Set point T1",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Set point T2",
+              "title": "Enter numeric values for x and f(x) first.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "labels": [
+            "Plot",
+            "Clear"
+          ],
+          "inputAria": "Function expression",
+          "placeholder": "e.g. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph plotted.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Show term",
+        "termText": "g(x)=1.1⋅x2",
+        "termAria": "Show term",
+        "minTitle": "Minimize parameter controls",
+        "minAria": "Minimize parameter controls",
+        "restoreTitle": "Restore parameter controls",
+        "restoreAria": "Restore parameter controls",
+        "resizeTitle": "Resize parameter controls",
+        "resizeAria": "Resize parameter controls",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.6115307015424589,
+            0.2557768716143075
+          ],
+          "Q": [
+            0.8246660424649527,
+            0.038920362458691904
+          ],
+          "R_1": [
+            0.00626376963083064,
+            0.3192131905711222
+          ],
+          "R_2": [
+            0.14431817115664225,
+            0.0243445930792906
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "overridden": {
+        "courseLanguage": "en",
+        "language": "de",
+        "pointLanguages": [
+          "de",
+          "de",
+          "de"
+        ],
+        "pointLabels": [
+          "Punkt setzen",
+          "Punkt setzen",
+          "Punkte setzen"
+        ],
+        "table": {
+          "language": "de",
+          "inputs": [
+            "2",
+            "",
+            "3",
+            ""
+          ],
+          "buttons": [
+            {
+              "label": "Punkt T1 setzen",
+              "title": "",
+              "disabled": false
+            },
+            {
+              "label": "Punkt T2 setzen",
+              "title": "Bitte zuerst numerische Werte für x und f(x) eintragen.",
+              "disabled": true
+            }
+          ]
+        },
+        "plot": {
+          "language": "de",
+          "labels": [
+            "Zeichnen",
+            "Löschen"
+          ],
+          "inputAria": "Funktionsterm",
+          "placeholder": "z. B. \\frac{1}{2}x^2 - 1",
+          "input": "x^2",
+          "message": "Graph gezeichnet.",
+          "hasGraph": true,
+          "graphAtTwo": 4
+        },
+        "pointAria": [
+          null,
+          null,
+          null
+        ],
+        "termLabel": "Term anzeigen",
+        "termText": "g(x)=1,1⋅x2",
+        "termAria": "Term anzeigen",
+        "minTitle": "Parameterregler minimieren",
+        "minAria": "Parameterregler minimieren",
+        "restoreTitle": "Parameterregler wiederherstellen",
+        "restoreAria": "Parameterregler wiederherstellen",
+        "resizeTitle": "Größe der Parameterregler ändern",
+        "resizeAria": "Größe der Parameterregler ändern",
+        "values": {
+          "a": 1.1,
+          "b": 0,
+          "c": 0
+        },
+        "minimized": false,
+        "termVisible": true,
+        "panelScale": 1,
+        "bbox": [
+          -4.009344958640733,
+          6.004761904761905,
+          7.0093449586407335,
+          -3.004761904761904
+        ],
+        "pointCount": 5,
+        "coordinates": {
+          "A": [
+            0.6115307015424589,
+            0.2557768716143075
+          ],
+          "Q": [
+            0.8246660424649527,
+            0.038920362458691904
+          ],
+          "R_1": [
+            0.00626376963083064,
+            0.3192131905711222
+          ],
+          "R_2": [
+            0.14431817115664225,
+            0.0243445930792906
+          ],
+          "T_1": [
+            2,
+            3
+          ]
+        },
+        "identity": {
+          "entry": true,
+          "board": true,
+          "panel": true,
+          "input": true,
+          "buttons": true,
+          "points": true,
+          "tableInputs": true,
+          "plotInput": true,
+          "plotGraph": true
+        }
+      },
+      "cleared": {
+        "labels": [
+          "Zeichnen",
+          "Löschen"
+        ],
+        "inputAria": "Funktionsterm",
+        "placeholder": "z. B. \\frac{1}{2}x^2 - 1",
+        "input": "",
+        "message": "",
+        "hasGraph": false
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 // Adds a menu button and a sliding top menu bar to a coordinate board.
 
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { eventTargetsBoardUi } from '../shared/boardUiEvents';
 import { setAttributeIfChanged, setStyleIfChanged } from '../shared/domUpdates';
 import { getDgsUpdateTargets, trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { getAdaptiveTickMetric } from '../coord/boardHelpers';
@@ -4116,33 +4117,6 @@ function getNextSegmentName(state: DgsState): string {
     const name = letter + "'".repeat(Math.floor(index / 26));
     if (!used.has(name)) return name;
   }
-}
-
-function eventTargetsBoardUi(evt: Event): boolean {
-  const selector = [
-    'button',
-    'input',
-    'select',
-    'textarea',
-    'a',
-    '[role="button"]',
-    '.lia-dgs-set-square-overlay',
-    '.lia-dgs-menu-clip',
-    '.lia-dgs-side-menu-clip',
-    '.lia-dgs-color-popup',
-    '.lia-dgs-angle-dialog',
-    '.lia-plot-analyze-panel',
-    '.lia-plot-color-menu',
-    '.lia-schar-panel',
-    '.lia-jxg-resize-handle',
-    '.JXG_navigation'
-  ].join(',');
-  const path = typeof evt.composedPath === 'function' ? evt.composedPath() : [evt.target];
-
-  return path.some((node) => {
-    const element = node as Element;
-    return !!element && typeof element.matches === 'function' && element.matches(selector);
-  });
 }
 
 function eventToUserCoordinates(state: DgsState, evt: PointerEvent): { x: number; y: number } | null {

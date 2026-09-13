@@ -1,0 +1,2462 @@
+{
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/152.0.7977.83",
+    "revision": "@79460ebecaa5625e57a5fb679a735659e73dc687",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+    "jsVersion": "15.2.124.21"
+  },
+  "runtime": "LiaScript 0.16.10",
+  "checks": [
+    "All seven native LiaScript quiz families plus area and perimeter variants",
+    "Native incorrect Check, Hint, correct Check and Resolve",
+    "Native point creation buttons; JSXGraph point/polygon and Schar parameter geometry prepared explicitly",
+    "Point lock and unchanged hint geometry assertions"
+  ],
+  "bundleSha256": "583d1e7716d85ce8d2c21e1d5ccdd3fe05e6502b7658e7793a77beea619f78a6",
+  "scenarios": [
+    {
+      "id": "q_create",
+      "passed": true,
+      "initial": {
+        "id": "q_create",
+        "kind": "create-point",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_create",
+        "kind": "create-point",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_create",
+        "kind": "create-point",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Ziehe den Punkt nach left parenthesis, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nZiehe den Punkt nach .",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_create",
+        "kind": "create-point",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Ziehe den Punkt nach left parenthesis, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nZiehe den Punkt nach .",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": false
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_create",
+        "kind": "create-point",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Ziehe den Punkt nach left parenthesis, 1, vertical bar, 1, right parenthesis.",
+        "solution": "Der Zielpunkt ist A, left parenthesis, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nZiehe den Punkt nach .\n\nDer Zielpunkt ist .",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": true
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_create",
+          "kind": "create-point",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Ziehe den Punkt nach left parenthesis, 1, vertical bar, 1, right parenthesis.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nZiehe den Punkt nach .",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_create",
+          "kind": "create-point",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Ziehe den Punkt nach left parenthesis, 1, vertical bar, 1, right parenthesis.",
+          "solution": "Der Zielpunkt ist A, left parenthesis, 1, vertical bar, 1, right parenthesis.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nZiehe den Punkt nach .\n\nDer Zielpunkt ist .",
+          "points": [
+            {
+              "name": "A",
+              "x": 1,
+              "y": 1,
+              "fixed": true
+            }
+          ],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_metric",
+      "passed": true,
+      "initial": {
+        "id": "q_metric",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_metric",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard1207189Py27",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_metric",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Addiere die drei Seitenlängen.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nAddiere die drei Seitenlängen.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard1207189Py27",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_metric",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Addiere die drei Seitenlängen.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nAddiere die drei Seitenlängen.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard1207189Py27",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                1.5,
+                2.598076211353316
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_metric",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Addiere die drei Seitenlängen.",
+        "solution": "Eine mögliche Lösung ist ein gleichseitiges Dreieck mit Seitenlänge 3.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nAddiere die drei Seitenlängen.\n\nEine mögliche Lösung ist ein gleichseitiges Dreieck mit Seitenlänge .",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard1207189Py27",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                1.5,
+                2.598076211353316
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_metric",
+          "kind": "polygon-metric",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Addiere die drei Seitenlängen.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nAddiere die drei Seitenlängen.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_metric",
+          "kind": "polygon-metric",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Addiere die drei Seitenlängen.",
+          "solution": "Eine mögliche Lösung ist ein gleichseitiges Dreieck mit Seitenlänge 3.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nAddiere die drei Seitenlängen.\n\nEine mögliche Lösung ist ein gleichseitiges Dreieck mit Seitenlänge .",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_construction",
+      "passed": true,
+      "initial": {
+        "id": "q_construction",
+        "kind": "construction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_construction",
+        "kind": "construction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8634470Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_construction",
+        "kind": "construction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "165, degrees liegt nahe an einem gestreckten Winkel.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\n liegt nahe an einem gestreckten Winkel.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8634470Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_construction",
+        "kind": "construction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "165, degrees liegt nahe an einem gestreckten Winkel.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\n liegt nahe an einem gestreckten Winkel.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8634470Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                -2.897777478867205,
+                0.7764571353075622
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_construction",
+        "kind": "construction",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "165, degrees liegt nahe an einem gestreckten Winkel.",
+        "solution": "Markiere am Scheitelpunkt 165, degrees und schließe das Dreieck.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\n liegt nahe an einem gestreckten Winkel.\n\nMarkiere am Scheitelpunkt  und schließe das Dreieck.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8634470Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                -2.897777478867205,
+                0.7764571353075622
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_construction",
+          "kind": "construction",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "165, degrees liegt nahe an einem gestreckten Winkel.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\n liegt nahe an einem gestreckten Winkel.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_construction",
+          "kind": "construction",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "165, degrees liegt nahe an einem gestreckten Winkel.",
+          "solution": "Markiere am Scheitelpunkt 165, degrees und schließe das Dreieck.",
+          "text": "Prüfen 2\nAufgelöste Antwort\n liegt nahe an einem gestreckten Winkel.\n\nMarkiere am Scheitelpunkt  und schließe das Dreieck.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_combined",
+      "passed": true,
+      "initial": {
+        "id": "q_combined",
+        "kind": "combined",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_combined",
+        "kind": "combined",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard9019241Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_combined",
+        "kind": "combined",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Suche ein Rechteck mit Seitenlängen 2 und 3.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nSuche ein Rechteck mit Seitenlängen  und .",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard9019241Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_combined",
+        "kind": "combined",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Suche ein Rechteck mit Seitenlängen 2 und 3.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nSuche ein Rechteck mit Seitenlängen  und .",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard9019241Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_combined",
+        "kind": "combined",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Suche ein Rechteck mit Seitenlängen 2 und 3.",
+        "solution": "Ein Rechteck der Seitenlängen 2 und 3 erfüllt alle Bedingungen.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nSuche ein Rechteck mit Seitenlängen  und .\n\nEin Rechteck der Seitenlängen  und  erfüllt alle Bedingungen.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard9019241Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_combined",
+          "kind": "combined",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Suche ein Rechteck mit Seitenlängen 2 und 3.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nSuche ein Rechteck mit Seitenlängen  und .",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_combined",
+          "kind": "combined",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Suche ein Rechteck mit Seitenlängen 2 und 3.",
+          "solution": "Ein Rechteck der Seitenlängen 2 und 3 erfüllt alle Bedingungen.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nSuche ein Rechteck mit Seitenlängen  und .\n\nEin Rechteck der Seitenlängen  und  erfüllt alle Bedingungen.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_graph",
+      "passed": true,
+      "initial": {
+        "id": "q_graph",
+        "kind": "point-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_graph",
+        "kind": "point-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_graph",
+        "kind": "point-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Für jeden Punkt gilt y, equals, 2, x, minus, 1.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nFür jeden Punkt gilt .",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_graph",
+        "kind": "point-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Für jeden Punkt gilt y, equals, 2, x, minus, 1.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nFür jeden Punkt gilt .",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": false
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_graph",
+        "kind": "point-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Für jeden Punkt gilt y, equals, 2, x, minus, 1.",
+        "solution": "Zum Beispiel liegt left parenthesis, 1, vertical bar, 1, right parenthesis auf dem Graphen.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nFür jeden Punkt gilt .\n\nZum Beispiel liegt  auf dem Graphen.",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": true
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_graph",
+          "kind": "point-on-graph",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Für jeden Punkt gilt y, equals, 2, x, minus, 1.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nFür jeden Punkt gilt .",
+          "points": [
+            {
+              "name": "A",
+              "x": 0.8921584619912442,
+              "y": 0.01893510216917693,
+              "fixed": false
+            }
+          ],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_graph",
+          "kind": "point-on-graph",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Für jeden Punkt gilt y, equals, 2, x, minus, 1.",
+          "solution": "Zum Beispiel liegt left parenthesis, 1, vertical bar, 1, right parenthesis auf dem Graphen.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nFür jeden Punkt gilt .\n\nZum Beispiel liegt  auf dem Graphen.",
+          "points": [
+            {
+              "name": "A",
+              "x": 0.8921584619912442,
+              "y": 0.01893510216917693,
+              "fixed": true
+            }
+          ],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_multi_graph",
+      "passed": true,
+      "initial": {
+        "id": "q_multi_graph",
+        "kind": "points-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_multi_graph",
+        "kind": "points-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_multi_graph",
+        "kind": "points-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Alle Punkte müssen y, equals, x, minus, 1 erfüllen.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nAlle Punkte müssen  erfüllen.",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_multi_graph",
+        "kind": "points-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Alle Punkte müssen y, equals, x, minus, 1 erfüllen.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nAlle Punkte müssen  erfüllen.",
+        "points": [
+          {
+            "name": "A_1",
+            "x": -1,
+            "y": -2,
+            "fixed": false
+          },
+          {
+            "name": "A_2",
+            "x": 0,
+            "y": -1,
+            "fixed": false
+          },
+          {
+            "name": "A_3",
+            "x": 1,
+            "y": 0,
+            "fixed": false
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_multi_graph",
+        "kind": "points-on-graph",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Alle Punkte müssen y, equals, x, minus, 1 erfüllen.",
+        "solution": "Mögliche Punkte sind left parenthesis, 0, vertical bar, minus, 1, right parenthesis, left parenthesis, 1, vertical bar, 0, right parenthesis und left parenthesis, 2, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nAlle Punkte müssen  erfüllen.\n\nMögliche Punkte sind ,  und .",
+        "points": [
+          {
+            "name": "A_1",
+            "x": -1,
+            "y": -2,
+            "fixed": true
+          },
+          {
+            "name": "A_2",
+            "x": 0,
+            "y": -1,
+            "fixed": true
+          },
+          {
+            "name": "A_3",
+            "x": 1,
+            "y": 0,
+            "fixed": true
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_multi_graph",
+          "kind": "points-on-graph",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Alle Punkte müssen y, equals, x, minus, 1 erfüllen.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nAlle Punkte müssen  erfüllen.",
+          "points": [
+            {
+              "name": "A_1",
+              "x": 0,
+              "y": 2,
+              "fixed": false
+            },
+            {
+              "name": "A_2",
+              "x": 1,
+              "y": 2,
+              "fixed": false
+            },
+            {
+              "name": "A_3",
+              "x": 2,
+              "y": 2,
+              "fixed": false
+            }
+          ],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_multi_graph",
+          "kind": "points-on-graph",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Alle Punkte müssen y, equals, x, minus, 1 erfüllen.",
+          "solution": "Mögliche Punkte sind left parenthesis, 0, vertical bar, minus, 1, right parenthesis, left parenthesis, 1, vertical bar, 0, right parenthesis und left parenthesis, 2, vertical bar, 1, right parenthesis.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nAlle Punkte müssen  erfüllen.\n\nMögliche Punkte sind ,  und .",
+          "points": [
+            {
+              "name": "A_1",
+              "x": 0,
+              "y": 2,
+              "fixed": true
+            },
+            {
+              "name": "A_2",
+              "x": 1,
+              "y": 2,
+              "fixed": true
+            },
+            {
+              "name": "A_3",
+              "x": 2,
+              "y": 2,
+              "fixed": true
+            }
+          ],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
+      "id": "q_reconstruction",
+      "passed": true,
+      "initial": {
+        "id": "q_reconstruction",
+        "kind": "reconstruction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": [
+          {
+            "values": {
+              "m": 1,
+              "n": 0
+            },
+            "disabled": [
+              false
+            ]
+          }
+        ]
+      },
+      "wrong": {
+        "id": "q_reconstruction",
+        "kind": "reconstruction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [],
+        "schars": [
+          {
+            "values": {
+              "m": 1,
+              "n": 0
+            },
+            "disabled": [
+              false
+            ]
+          }
+        ]
+      },
+      "hinted": {
+        "id": "q_reconstruction",
+        "kind": "reconstruction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Bestimme Steigung und Achsenabschnitt.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nBestimme Steigung und Achsenabschnitt.",
+        "points": [],
+        "polygons": [],
+        "schars": [
+          {
+            "values": {
+              "m": 1,
+              "n": 0
+            },
+            "disabled": [
+              false
+            ]
+          }
+        ]
+      },
+      "attempted": {
+        "id": "q_reconstruction",
+        "kind": "reconstruction",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Bestimme Steigung und Achsenabschnitt.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nBestimme Steigung und Achsenabschnitt.",
+        "points": [],
+        "polygons": [],
+        "schars": [
+          {
+            "values": {
+              "m": 2,
+              "n": -1
+            },
+            "disabled": [
+              false
+            ]
+          }
+        ]
+      },
+      "correct": {
+        "id": "q_reconstruction",
+        "kind": "reconstruction",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Bestimme Steigung und Achsenabschnitt.",
+        "solution": "Setze m, equals, 2 und n, equals, minus, 1.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nBestimme Steigung und Achsenabschnitt.\n\nSetze  und .",
+        "points": [],
+        "polygons": [],
+        "schars": [
+          {
+            "values": {
+              "m": 2,
+              "n": -1
+            },
+            "disabled": [
+              false
+            ]
+          }
+        ]
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_reconstruction",
+          "kind": "reconstruction",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Bestimme Steigung und Achsenabschnitt.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nBestimme Steigung und Achsenabschnitt.",
+          "points": [],
+          "polygons": [],
+          "schars": [
+            {
+              "values": {
+                "m": 1,
+                "n": 0
+              },
+              "disabled": [
+                false
+              ]
+            }
+          ]
+        },
+        "resolved": {
+          "id": "q_reconstruction",
+          "kind": "reconstruction",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Bestimme Steigung und Achsenabschnitt.",
+          "solution": "Setze m, equals, 2 und n, equals, minus, 1.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nBestimme Steigung und Achsenabschnitt.\n\nSetze  und .",
+          "points": [],
+          "polygons": [],
+          "schars": [
+            {
+              "values": {
+                "m": 1,
+                "n": 0
+              },
+              "disabled": [
+                false
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "q_area",
+      "passed": true,
+      "initial": {
+        "id": "q_area",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_area",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8673265Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_area",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Use a rectangle with side lengths 2 and 3.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nUse a rectangle with side lengths 2 and 3.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8673265Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_area",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Use a rectangle with side lengths 2 and 3.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nUse a rectangle with side lengths 2 and 3.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8673265Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_area",
+        "kind": "polygon-metric",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          }
+        ],
+        "hints": "Use a rectangle with side lengths 2 and 3.",
+        "solution": "A rectangle of width 3 and height 2 has area 6.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nUse a rectangle with side lengths 2 and 3.\n\nA rectangle of width 3 and height 2 has area 6.",
+        "points": [],
+        "polygons": [
+          {
+            "id": "jxgBoard8673265Py30",
+            "vertices": [
+              [
+                0,
+                0
+              ],
+              [
+                3,
+                0
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_area",
+          "kind": "polygon-metric",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Use a rectangle with side lengths 2 and 3.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nUse a rectangle with side lengths 2 and 3.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_area",
+          "kind": "polygon-metric",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            }
+          ],
+          "hints": "Use a rectangle with side lengths 2 and 3.",
+          "solution": "A rectangle of width 3 and height 2 has area 6.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nUse a rectangle with side lengths 2 and 3.\n\nA rectangle of width 3 and height 2 has area 6.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    }
+  ]
+}

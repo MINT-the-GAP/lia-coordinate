@@ -3,6 +3,8 @@
 
 import { unquote } from '../shared/parser';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { observeBoardPanelLayout, relayoutBoardPanels } from '../shared/boardPanelLayout';
+import { eventTargetsBoardUi } from '../shared/boardUiEvents';
 
 type DrawPoint = { x: number; y: number };
 type DrawStroke = { color: string; width: number; points: DrawPoint[] };
@@ -140,6 +142,7 @@ type RegressionState = {
   onDocPointerDown?: (evt: PointerEvent) => void;
   onWindowResize?: () => void;
   resizeObserver?: ResizeObserver;
+  releasePanelLayout?: () => void;
   resizeLayoutFrame?: number | null;
   overlayScaleCarry?: number;
   overlayScaleCarryUntil?: number;
@@ -3774,27 +3777,7 @@ function removeAllSqrtAnalysisOverlays(state: RegressionState): void { removeAll
 function removeAllHyperbolaAnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbolaAnalysisEntries'); }
 function removeAllHyperbola2AnalysisOverlays(state: RegressionState): void { removeAllFromList(state, 'hyperbola2AnalysisEntries'); }
 
-function analysisPanelsStartTop(state: RegressionState): number {
-  const dgsMenu = state.boardContainer.querySelector<HTMLElement>('.lia-dgs-top-menu');
-  if (!dgsMenu) return 8;
-
-  const fallbackTop = 120;
-  try {
-    const boardRect = state.boardContainer.getBoundingClientRect();
-    const controlsBottom = Math.max(
-      state.undoButton.getBoundingClientRect().bottom,
-      state.redoButton.getBoundingClientRect().bottom
-    );
-    const anchoredTop = Math.ceil(controlsBottom - boardRect.top) + 8;
-    return Number.isFinite(anchoredTop) ? Math.max(fallbackTop, anchoredTop) : fallbackTop;
-  } catch (e) {
-    return fallbackTop;
-  }
-}
-
 function relayoutAnalysisPanels(state: RegressionState): void {
-  let nextTop = analysisPanelsStartTop(state);
-
   const allEntries: AnyAnalysisEntry[] = ([] as AnyAnalysisEntry[])
     .concat(state.analysisEntries)
     .concat(state.quadraticAnalysisEntries)
@@ -3819,13 +3802,8 @@ function relayoutAnalysisPanels(state: RegressionState): void {
 
     const isMinimized = miniWrapIsVisible(panel);
     if (!isMinimized) setAnalysisOverlayPanelWidth(panel, state.boardContainer);
-    panel.style.left = '10px';
-    panel.style.top = nextTop + 'px';
-
-    const rect = panel.getBoundingClientRect();
-    const gap = isMinimized ? 6 : 10;
-    nextTop += Math.max(16, Math.round(rect.height || 0)) + gap;
   }
+  relayoutBoardPanels(state.boardContainer);
 }
 
 function miniWrapIsVisible(panel: HTMLElement): boolean {
@@ -7888,6 +7866,7 @@ function disposeRegressionState(state: RegressionState): void {
   if (state.resizeObserver) {
     state.resizeObserver.disconnect();
   }
+  state.releasePanelLayout?.();
   if (state.resizeLayoutFrame !== null && state.resizeLayoutFrame !== undefined) {
     try { window.cancelAnimationFrame(state.resizeLayoutFrame); } catch (e) {}
     state.resizeLayoutFrame = null;
@@ -8335,7 +8314,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
   };
 
   state.onBoardPointerDown = (evt: PointerEvent) => {
-    if (state.activeTool !== 'regression' || state.regressionMode !== 'select-points') return;
+    if (state.activeTool !== 'regression' || state.regressionMode !== 'select-points' || eventTargetsBoardUi(evt)) return;
 
     const point = getContainerPos(state.boardContainer, evt);
     const hitPoint = findNearestSelectableBoardPoint(state, point, 14);
@@ -8383,6 +8362,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.resizeObserver = ro;
   }
 
+  state.releasePanelLayout = observeBoardPanelLayout(boardContainer);
   states[uid] = state;
   window.__liaRegressionStates = window.__liaRegressionStates || {};
   window.__liaRegressionStates[uid] = state;

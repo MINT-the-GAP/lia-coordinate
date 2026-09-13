@@ -4,6 +4,7 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 
@@ -44,6 +45,12 @@ export function init(): void {
     return;
   }
   window.__createPointReady = true;
+  onCourseLanguageChange(() => {
+    Object.keys(window.__createPointInstances || {}).forEach(uid => {
+      const root = document.getElementById('point-ui-' + uid);
+      if (root) updateCreatePointLanguage(uid, root);
+    });
+  });
 
   try {
     if (window.JXG && JXG.Options && JXG.Options.text) {
@@ -908,6 +915,18 @@ export function init(): void {
     return inner;
   }
 
+  function updateCreatePointLanguage(uid, uiRoot, languageCode?: string) {
+    const btn = document.getElementById('btn-' + uid);
+    if (!btn) return false;
+    const language = resolveUiLanguage(uiRoot, languageCode);
+    const inst = window.__createPointInstances[uid];
+    if (inst) inst.language = language;
+    const label = language === 'de' ? 'Punkt setzen' : 'Set point';
+    const inner = ensureInnerSpan(btn);
+    if (inner.textContent !== label) inner.textContent = label;
+    return true;
+  }
+
   function applyCreatePointUi(uid) {
     const uiRoot = document.getElementById('point-ui-' + uid);
     const taskRoot = document.getElementById('point-task-' + uid);
@@ -1019,7 +1038,7 @@ export function init(): void {
     return true;
   }
 
-  window.renderCreatePointFromSpec = function(uid, spec) {
+  window.renderCreatePointFromSpec = function(uid, spec, languageCode?: string) {
     const uiRoot = document.getElementById('point-ui-' + uid);
     const taskRoot = document.getElementById('point-task-' + uid);
     const checkRoot = getCoordinateQuizRoot(document.getElementById('point-check-' + uid));
@@ -1031,6 +1050,9 @@ export function init(): void {
     inst.taskRoot = taskRoot;
     inst.checkRoot = checkRoot;
     inst.spec = spec;
+    if (languageCode && uiRoot.dataset.language !== languageCode) {
+      uiRoot.dataset.language = languageCode;
+    }
 
     if ((uiRoot.dataset.spec || '') !== String(spec || '')) {
       uiRoot.dataset.spec = spec;
@@ -1042,7 +1064,6 @@ export function init(): void {
       btn.id = 'btn-' + uid;
       btn.className = 'lia-btn';
       btn.type = 'button';
-      btn.textContent = 'Punkt setzen';
       taskRoot.appendChild(btn);
     }
 
@@ -1057,6 +1078,7 @@ export function init(): void {
       });
     }
 
+    updateCreatePointLanguage(uid, uiRoot, languageCode);
     applyCreatePointUi(uid);
     assignPointMacroIdentity(uid, spec);
 
@@ -1150,7 +1172,7 @@ export function init(): void {
         return;
       }
 
-      window.renderCreatePointFromSpec(uid, spec);
+      window.renderCreatePointFromSpec(uid, spec, node.dataset.language);
     });
 
     Object.keys(window.__createPointInstances || {}).forEach(function(uid) {
@@ -1182,6 +1204,13 @@ export function init(): void {
 
       for (let i = 0; i < mutations.length; i++) {
         const m = mutations[i];
+        if (m.type === 'attributes') {
+          const target = m.target as HTMLElement;
+          if (target.matches?.('[id^="point-ui-"][data-spec]')) {
+            const uid = target.id.replace(/^point-ui-/, '');
+            if (!updateCreatePointLanguage(uid, target)) needsBootstrap = true;
+          }
+        }
         if (m.type !== 'childList') continue;
 
         const added = Array.from(m.addedNodes || []);
@@ -1210,7 +1239,9 @@ export function init(): void {
     if (root) {
       mo.observe(root, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-language']
       });
     }
   } catch (e) {}

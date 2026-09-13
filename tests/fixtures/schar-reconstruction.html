@@ -1,0 +1,26 @@
+﻿<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reconstruction: adjust the graph</title>
+<style>body{margin:20px;font-family:Arial;background:white;color:#222} #fixture{width:100%;max-width:1400px}.dynFlex{display:flex;gap:20px}.flex-child{flex:1;min-width:0}</style></head>
+<body><main id="fixture"><h1>Reconstruction: adjust the graph</h1>
+<section class="dynFlex" data-basis="49%">
+<div class="flex-child" id="board-column">
+<lia-coordinate-board data-lia-coordinate-key="reconstruction" data-spec="xmin=-4;xmax=7;ymin=-3;ymax=6;width=;id=koordRekonstruktion;achsen=1;grid=1;border=1"></lia-coordinate-board>
+<span id="schar-spec-parabola" data-spec="g;x;a*(x-b)^2+c;koordRekonstruktion;term=1;#b41f65" style="display:none"></span>
+<span id="point-spec-S" data-spec="koordRekonstruktion;S;1;-2;#ff00ff;1;fix" style="display:none"></span>
+<span id="point-spec-P" data-spec="koordRekonstruktion;P;3;0;#ff00ff;1;fix" style="display:none"></span>
+</div><div class="flex-child">
+<p><strong>Adjust</strong> the parabola to have vertex \(S(1,-2)\) and pass through \(P(3,0)\).</p>
+<span id="rek-spec-reconstruction" data-spec="koordRekonstruktion;0.5*(x-1)^2-2;0.1" style="display:none"></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+<div class="lia-quiz" data-hint-button="1" data-solution-button="3"><span id="rek-check-reconstruction" data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="reconstruction" data-lia-coordinate-quiz-uid="reconstruction" style="display:none"></span><input value="lia-coordinate-check"><button>Check</button></div>
+</div></section></main>
+<script>
+window.fixtureErrors=[];addEventListener('error',e=>fixtureErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>fixtureErrors.push(String(e.reason)));
+const parameters=new URLSearchParams(location.search);
+if(parameters.get('border')==='0'){const h=document.querySelector('lia-coordinate-board');h.dataset.spec=h.dataset.spec.replace('border=1','border=0')}
+if(parameters.get('dgs')==='1'){const d=document.createElement('div');d.id='dgs-ui-fixture';d.dataset.spec='koordRekonstruktion';d.dataset.language='en';document.querySelector('#board-column').append(d)}
+if(parameters.get('integration')==='1')document.write('<script src="/assets/dynflex.js"><\/script>');
+if(parameters.get('lecture')==='1')for(const name of ['board-mode','annotation','freeze'])document.write('<script src="/assets/'+name+'.js"><\/script>');
+</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script><script src="/fixture-api.js"></script></body></html>

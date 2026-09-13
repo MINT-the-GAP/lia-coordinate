@@ -1119,6 +1119,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     }
   } catch (e) {}
   window.__boards[cfg.id] = board;
+  board.__coordBorderEnabled = cfg.border;
   const storedBoardState = loadStoredBoardState(cfg.id);
   board.__manualWidth = null;
   board.__manualHeight = null;

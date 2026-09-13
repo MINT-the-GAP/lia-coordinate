@@ -628,7 +628,11 @@ Parameters: `id=<boardId>;xlabel=<label>;ylabel=<label>`
 
           --{{0}}--
 Creates a draggable point exercise. The student drags a point to a target coordinate and checks their answer.
-A "Create point" button appears — clicking it places the draggable point. The check button validates position within a tolerance of 0.05 units.
+A "Set point" button appears — clicking it places the draggable point. The check button validates position within a tolerance of 0.05 units.
+
+The action buttons in `@CreatePoint`, `@PointOnGraph`, `@PointsOnGraph`,
+`@Table`, and `@PlotInput` follow the course's `language: en` or `language: de`,
+including their German aliases. Tooltips and input feedback use the same language.
 
 Parameters: `<boardId>;<pointName>;<targetX>;<targetY>`
 
@@ -1993,6 +1997,8 @@ Reconstruct or draw the function $f(x) = 2x -1$.
 
           --{{0}}--
 Creates an adjustable function family with sliders directly on the board.
+The term toggle, tooltips, accessible control labels, and decimal separator
+follow the course's `language: en` or `language: de`.
 
 Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>[;linestyle=<style>]`
 
