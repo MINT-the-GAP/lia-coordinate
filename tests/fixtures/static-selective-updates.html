@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Statische Superposition: drei Diagramme, 16 Vektoren, 20 TeX-Beschriftungen</title>
+  <style>
+    body { margin: 16px; background: rgb(255, 255, 255); color: #111; font-family: system-ui, sans-serif; }
+    html[data-theme="dark"] body { background: rgb(20, 20, 20); color: #eee; }
+    .lia-btn { background: rgb(36, 96, 180); border: 0; padding: 6px 12px; color: white; }
+    html[data-theme="dark"] .lia-btn { background: rgb(255, 190, 80); }
+    main { max-width: 720px; }
+    .slide { padding: 12px 0 32px; }
+    .spacer { height: 700px; }
+  </style>
+</head>
+<body>
+  <button class="lia-btn" id="theme">Theme wechseln</button>
+  <h1>Superposition</h1>
+  <p>Drei statische SVG-Diagramme mit 16 Vektoren und 20 TeX-Beschriftungen einschließlich Achsentiteln.</p>
+  <main id="fixture"></main>
+  <div class="spacer"></div>
+  <script type="module">
+    const { boards } = await (await fetch('./static-superposition.json')).json();
+    const fixture = document.getElementById('fixture');
+    const metrics = { markerSearches: 0, svgInsertions: 0, bboxReads: 0, clientRectsReads: 0, textLengthReads: 0 };
+    const errors = [];
+    const nativeQuery = Document.prototype.querySelectorAll;
+    Document.prototype.querySelectorAll = function (selector) {
+      if (selector.includes('[id^=')) metrics.markerSearches++;
+      return nativeQuery.call(this, selector);
+    };
+    for (const [prototype, method, counter] of [
+      [SVGGraphicsElement.prototype, 'getBBox', 'bboxReads'],
+      [Element.prototype, 'getClientRects', 'clientRectsReads'],
+      [SVGTextContentElement.prototype, 'getComputedTextLength', 'textLengthReads']
+    ]) {
+      const original = prototype[method];
+      prototype[method] = function (...args) { metrics[counter]++; return original.apply(this, args); };
+    }
+    const outputObserver = new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.matches('svg[data-lia-static-svg]')) metrics.svgInsertions++;
+        metrics.svgInsertions += node.querySelectorAll('svg[data-lia-static-svg]').length;
+      }
+    });
+    outputObserver.observe(fixture, { childList: true, subtree: true });
+    window.addEventListener('error', event => errors.push(String(event.message)));
+    window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
+    const appendMarker = (slide, id, spec, kind) => {
+      const marker = document.createElement('span');
+      marker.id = id;
+      marker.dataset.spec = spec;
+      if (kind) marker.dataset.kind = kind;
+      marker.hidden = true;
+      slide.append(marker);
+    };
+    function makeSlide(boardIndex) {
+      const slide = document.createElement('section');
+      slide.className = 'slide';
+      slide.id = 'slide-' + boardIndex;
+      const host = document.createElement('lia-coordinate-board');
+      host.id = 'host-' + boardIndex;
+      host.dataset.liaStaticCoordinateHost = '';
+      const specs = boards[boardIndex];
+      host.dataset.spec = specs.board;
+      slide.append(host);
+      specs.vectors.forEach((spec, index) => appendMarker(slide,
+        'linear-spec-vector-' + boardIndex + '-' + index, spec, 'vector'));
+      specs.texts.forEach((spec, index) => appendMarker(slide,
+        'coord-text-spec-label-' + boardIndex + '-' + index, spec));
+      if (specs.axis) appendMarker(slide, 'axis-title-spec-axis-' + boardIndex, specs.axis);
+      return slide;
+    }
+    for (let index = 0; index < 3; index++) fixture.append(makeSlide(index));
+    const state = () => Array.from(fixture.querySelectorAll('svg[data-lia-static-svg]'), svg => ({
+      svg, geometry: Array.from(svg.querySelectorAll('[data-lia-static-kind]')),
+      labels: Array.from(svg.querySelectorAll('[data-lia-static-tex="ready"]'))
+    }));
+    let saved = [];
+    window.staticUpdatesFixture = {
+      metrics, errors,
+      ready: () => fixture.querySelectorAll('[data-lia-static-tex="ready"]').length === 20,
+      save() { saved = state(); for (const key of Object.keys(metrics)) metrics[key] = 0; },
+      snapshot() {
+        const current = state();
+        return {
+          ...metrics, errors: [...errors], svgCount: current.length,
+          vectorCount: fixture.querySelectorAll('[data-lia-static-kind="vector"]').length,
+          readyCount: fixture.querySelectorAll('[data-lia-static-tex="ready"]').length,
+          pendingCount: fixture.querySelectorAll('[data-lia-static-tex="pending"]').length,
+          svgSame: current.map((value, i) => value.svg === saved[i]?.svg),
+          geometrySame: current.map((value, i) => value.geometry.every((node, j) => node === saved[i]?.geometry[j])),
+          labelsSame: current.map((value, i) => value.labels.every((node, j) => node === saved[i]?.labels[j])),
+          vectorStrokes: current.map(value => value.svg.querySelector('[data-lia-static-kind="vector"] line')?.getAttribute('stroke')),
+          vectorEndpoints: current.map(value => {
+            const line = value.svg.querySelector('[data-lia-static-kind="vector"] line');
+            return [line?.getAttribute('x2'), line?.getAttribute('y2')];
+          }),
+          labelContent: current.map(value => value.labels.map(node => node.getAttribute('aria-label'))),
+          viewBoxes: current.map(value => value.svg.getAttribute('viewBox')),
+          axisStrokes: current.map(value => value.svg.querySelector('[data-lia-static-axis]')?.getAttribute('stroke')),
+          labelBounds: current.map(value => value.labels.map(node => {
+            const rect = node.getBoundingClientRect();
+            return { width: rect.width, height: rect.height };
+          })),
+          jsxBoardCount: window.__boards ? Object.keys(window.__boards).length : 0,
+          scrollY, viewportScale: visualViewport?.scale || 1
+        };
+      },
+      unrelated(index) {
+        document.documentElement.style.setProperty('--foreign-scroll-progress', String(index));
+        document.documentElement.classList.toggle('foreign-course-state', index % 2 === 0);
+        document.body.dataset.theme = 'unrelated-' + index;
+      },
+      sameStyle() { document.documentElement.style.setProperty('--foreign-scroll-progress', 'same'); },
+      editVector() {
+        const marker = document.getElementById('linear-spec-vector-1-0');
+        marker.dataset.spec = marker.dataset.spec.replace('[5;0]', '[6;0]');
+      },
+      editText() {
+        const marker = document.getElementById('coord-text-spec-label-1-0');
+        marker.dataset.spec = marker.dataset.spec.replace('\\vec{a}', '\\vec{b}');
+      },
+      editBoard() { document.getElementById('host-1').dataset.spec += ';xmax=9'; },
+      theme() { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; },
+      hide(index = 1) { document.getElementById('slide-' + index).style.display = 'none'; },
+      reveal(index = 1) { document.getElementById('slide-' + index).style.display = ''; },
+      remount(index = 1) { document.getElementById('slide-' + index).replaceWith(makeSlide(index)); },
+      addHidden() {
+        const slide = makeSlide(1);
+        slide.style.display = 'none';
+        document.getElementById('slide-1').replaceWith(slide);
+      }
+    };
+    document.getElementById('theme').onclick = () => staticUpdatesFixture.theme();
+    const bundle = document.createElement('script'); bundle.src = '../../dist/' + (new URL(location.href).searchParams.get('bundle') === 'index' ? 'index' : 'static') + '.js'; document.head.append(bundle);
+  </script>
+</body>
+</html>

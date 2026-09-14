@@ -3,7 +3,7 @@
 // DOM observer for all static boards and macro markers.
 
 import type { BoardConfig } from '../shared/coordSpec';
-import { splitStaticText, typesetStaticText } from './staticTex';
+import { retryStaticText, splitStaticText, typesetStaticText } from './staticTex';
 import { parseCoordSpec } from '../shared/coordSpec';
 import {
   isHiddenNameOption,
@@ -14,7 +14,7 @@ import {
 } from '../shared/parser';
 import type { CoordinatePair } from '../shared/parser';
 import { isLineStyleOption, parseLineStyleOptions, type LineStyle } from '../shared/lineStyle';
-import { getAccentColor, getNeutralColor, themeDoc } from '../shared/theme';
+import { getAccentColor as readAccentColor, getNeutralColor as readNeutralColor, themeDoc } from '../shared/theme';
 import {
   clipLineToBounds,
   clipRayToBounds,
@@ -292,6 +292,64 @@ let bootstrapTimeout = 0;
 let bootstrapRunning = false;
 let staticObserver: MutationObserver | null = null;
 let markerSerial = 0;
+let retryTexErrors = false;
+const ownHostStyles = new WeakMap<HTMLElement, string | null>();
+
+interface StaticTheme { neutral: string; accent: string }
+interface StaticRenderState {
+  config: BoardConfig;
+  input: string;
+  svg: SVGSVGElement;
+  neutral?: string;
+  accent?: string;
+}
+interface StaticMarkerIndex {
+  document: Document;
+  nodes: HTMLElement[];
+  boards: Map<string, HTMLElement[]>;
+}
+const renderedBoards = new WeakMap<HTMLElement, StaticRenderState>();
+let batchMarkers: StaticMarkerIndex | null = null;
+let batchTheme: StaticTheme | null = null;
+let rendering: StaticRenderState | null = null;
+
+// Read effective colors before writing to the DOM. Unrelated custom properties,
+// classes and viewport scale are not rendering inputs: the SVG viewBox and CSS
+// handle responsive sizing without geometry reconstruction or JS layout reads.
+function readStaticTheme(): StaticTheme {
+  return { neutral: readNeutralColor(), accent: readAccentColor() };
+}
+
+function getNeutralColor(): string {
+  const color = batchTheme ? batchTheme.neutral : readNeutralColor();
+  if (rendering) rendering.neutral = color;
+  return color;
+}
+
+function getAccentColor(): string {
+  const color = batchTheme ? batchTheme.accent : readAccentColor();
+  if (rendering) rendering.accent = color;
+  return color;
+}
+
+function indexMarkers(doc: Document): StaticMarkerIndex {
+  const nodes = Array.from(doc.querySelectorAll<HTMLElement>(MARKER_SELECTOR))
+    .filter(node => !isStaticOutput(node));
+  const boards = new Map<string, HTMLElement[]>();
+  nodes.forEach(node => {
+    const info = markerInfo(node);
+    if (!info) return;
+    const id = markerBoardId(node, info);
+    let markers = boards.get(id);
+    if (!markers) boards.set(id, markers = []);
+    markers.push(node);
+  });
+  return { document: doc, nodes, boards };
+}
+
+function markersFor(doc: Document): StaticMarkerIndex {
+  return batchMarkers?.document === doc ? batchMarkers : indexMarkers(doc);
+}
 
 function registry(): Record<string, StaticBoardHandle> {
   if (typeof window === 'undefined') return fallbackRegistry;
@@ -2111,10 +2169,8 @@ function resolvedPlotGeometry(spec: string, config: BoardConfig): StaticPlotGeom
   };
 }
 
-function collectGeometry(config: BoardConfig, doc: Document): StaticGeometryEntry[] {
+function collectGeometry(config: BoardConfig, nodes: HTMLElement[]): StaticGeometryEntry[] {
   const result: StaticGeometryEntry[] = [];
-  let nodes: HTMLElement[] = [];
-  try { nodes = Array.from(doc.querySelectorAll<HTMLElement>(MARKER_SELECTOR)); } catch (e) {}
   const resolvePoint = pointResolver(createStaticPointRegistry(config, nodes));
   nodes.forEach(function(node) {
     const info = markerInfo(node);
@@ -2183,11 +2239,46 @@ function clearContainer(container: HTMLElement): void {
   }
 }
 
-/** Render one complete static board synchronously as exactly one root SVG. */
+/** Keep the existing SVG (including asynchronous TeX) while its inputs agree. */
 export function renderStaticSvg(container: HTMLElement, config: BoardConfig): SVGSVGElement {
   const doc = documentFor(container);
   if (!doc) throw new Error('Static SVG rendering requires a document.');
-  container.style.aspectRatio = 'auto';
+  const nodes = markersFor(doc).boards.get(config.id) || [];
+  const input = JSON.stringify([
+    config.id, config.xmin, config.xmax, config.ymin, config.ymax,
+    config.width, config.axes, config.grid, config.border, config.staticMode,
+    nodes.map(node => [
+    node.id, node.getAttribute('data-spec'), node.getAttribute('data-kind'),
+    node.getAttribute('data-language')
+  ])]);
+  const theme = batchTheme || readStaticTheme();
+  const previous = renderedBoards.get(container);
+  if (previous && previous.svg.parentNode === container && previous.input === input &&
+      (previous.neutral === undefined || previous.neutral === theme.neutral) &&
+      (previous.accent === undefined || previous.accent === theme.accent)) {
+    return previous.svg;
+  }
+  const previousTheme = batchTheme;
+  const previousRendering = rendering;
+  batchTheme = theme;
+  const state: StaticRenderState = { config: { ...config }, input, svg: null! };
+  rendering = state;
+  try {
+    const svg = buildStaticSvg(container, config, doc, nodes);
+    state.svg = svg;
+    renderedBoards.set(container, state);
+    return svg;
+  } finally {
+    batchTheme = previousTheme;
+    rendering = previousRendering;
+  }
+}
+
+/** Build only diagrams whose authored layout, markers or used colors changed. */
+function buildStaticSvg(
+  container: HTMLElement, config: BoardConfig, doc: Document, nodes: HTMLElement[]
+): SVGSVGElement {
+  if (container.style.aspectRatio !== 'auto') container.style.aspectRatio = 'auto';
   const width = config.xmax - config.xmin;
   const height = config.ymax - config.ymin;
   const svg = svgElement(doc, 'svg');
@@ -2213,11 +2304,12 @@ export function renderStaticSvg(container: HTMLElement, config: BoardConfig): SV
   }
 
   appendDecorations(svg, config, doc);
-  collectGeometry(config, doc).forEach(function(entry) {
+  collectGeometry(config, nodes).forEach(function(entry) {
     appendGeometry(svg, entry, config, doc);
   });
   clearContainer(container);
   container.appendChild(svg);
+  ownHostStyles.set(container, container.getAttribute('style'));
   return svg;
 }
 
@@ -2294,9 +2386,7 @@ function syncMarkerClaims(doc: Document): void {
     const entry = registry()[id];
     if (entry && entry.container && entry.container.isConnected !== false) activeIds.add(id);
   });
-  let nodes: HTMLElement[] = [];
-  try { nodes = Array.from(doc.querySelectorAll<HTMLElement>(MARKER_SELECTOR)); } catch (e) {}
-  nodes.forEach(function(node) {
+  markersFor(doc).nodes.forEach(function(node) {
     const info = markerInfo(node);
     if (!info) return;
     const boardId = markerBoardId(node, info);
@@ -2320,9 +2410,7 @@ function syncMarkerClaims(doc: Document): void {
 }
 
 function ensureDynamicRuntimeForUnclaimedMarkers(doc: Document): void {
-  let nodes: HTMLElement[] = [];
-  try { nodes = Array.from(doc.querySelectorAll<HTMLElement>(MARKER_SELECTOR)); } catch (e) {}
-  if (!nodes.some(function(node) { return !node.hasAttribute(STATIC_CLAIM_ATTRIBUTE); })) return;
+  if (!markersFor(doc).nodes.some(function(node) { return !node.hasAttribute(STATIC_CLAIM_ATTRIBUTE); })) return;
   try {
     if (window.__ensureCoordinateDynamicRuntime) window.__ensureCoordinateDynamicRuntime();
   } catch (e) {}
@@ -2343,8 +2431,9 @@ export function disposeStaticCoordinateBoard(id: string, expectedContainer?: HTM
   try { entry.container.querySelectorAll(STATIC_SVG_SELECTOR).forEach(function(svg) { svg.remove(); }); } catch (e) {}
   try { entry.container.removeAttribute('data-lia-static-coordinate'); } catch (e) {}
   delete entries[key];
+  renderedBoards.delete(entry.container);
   const doc = documentFor(entry.container);
-  if (doc) syncMarkerClaims(doc);
+  if (doc && !bootstrapRunning) syncMarkerClaims(doc);
 }
 
 /** Dispose every static registry entry owned by this host or a child host. */
@@ -2394,7 +2483,10 @@ export function initializeStaticCoordinateBoard(
     current.config.grid === config.grid &&
     current.config.border === config.border &&
     current.config.staticMode === config.staticMode;
-  if (sameConfiguration) return current;
+  if (sameConfiguration) {
+    if (!bootstrapRunning) scheduleStaticBootstrap();
+    return current;
+  }
 
   cleanupInteractiveBoard(config.id);
   const handle = entries[config.id] && entries[config.id].container === container
@@ -2412,8 +2504,9 @@ export function initializeStaticCoordinateBoard(
   container.style.marginLeft = '0';
   container.style.marginRight = 'auto';
   container.style.boxSizing = 'border-box';
+  ownHostStyles.set(container, container.getAttribute('style'));
   const doc = documentFor(container);
-  if (doc) syncMarkerClaims(doc);
+  if (doc && !bootstrapRunning) syncMarkerClaims(doc);
   if (!bootstrapRunning) scheduleStaticBootstrap();
   return handle;
 }
@@ -2441,8 +2534,7 @@ function cleanupDisconnectedBoards(): void {
   Object.keys(entries).forEach(function(id) {
     const entry = entries[id];
     if (!entry || !entry.container || entry.container.isConnected === false) {
-      if (entry) disposeStaticCoordinateBoard(id, entry.container);
-      else delete entries[id];
+      delete entries[id];
     }
   });
 }
@@ -2451,9 +2543,24 @@ function cleanupDisconnectedBoards(): void {
 export function bootstrapStaticCoordinateBoards(): void {
   const doc = documentFor();
   if (!doc) return;
+  if (bootstrapRunning) return;
   bootstrapRunning = true;
+  const retryErrors = retryTexErrors;
+  retryTexErrors = false;
   try {
+    // One ordered marker search feeds claims, runtime handoff and every board.
+    batchTheme = readStaticTheme();
+    batchMarkers = indexMarkers(doc);
     cleanupDisconnectedBoards();
+    // Reclaim preserved slides before applying possible id/mode edits.
+    doc.querySelectorAll<HTMLElement>(STATIC_CONTAINER_SELECTOR).forEach(host => {
+      const saved = renderedBoards.get(host);
+      if (saved && !registry()[saved.config.id]) {
+        registry()[saved.config.id] = {
+          id: saved.config.id, container: host, config: saved.config, svg: saved.svg
+        };
+      }
+    });
     initializeDeclarativeHosts(doc);
     syncMarkerClaims(doc);
     ensureDynamicRuntimeForUnclaimedMarkers(doc);
@@ -2461,8 +2568,11 @@ export function bootstrapStaticCoordinateBoards(): void {
       const entry = registry()[id];
       if (!entry || !entry.container || entry.container.isConnected === false) return;
       entry.svg = renderStaticSvg(entry.container, entry.config);
+      retryStaticText(entry.svg, retryErrors);
     });
   } finally {
+    batchMarkers = null;
+    batchTheme = null;
     bootstrapRunning = false;
   }
 }
@@ -2499,9 +2609,22 @@ export function scheduleStaticBootstrap(): void {
   if (!bootstrapFrame && !bootstrapTimeout) run();
 }
 
+// Ignore our complete output tree, including async TeX replacement and hidden
+// measurement roots. Do not disconnect/takeRecords: that could discard real
+// macro mutations caused by other synchronous runtime callbacks.
+function isStaticOutput(node: Node): boolean {
+  let element = node.nodeType === 1 ? node as Element : node.parentElement;
+  while (element) {
+    if (element.hasAttribute('data-lia-static-svg') ||
+        element.hasAttribute('data-lia-static-tex-measurement')) return true;
+    element = element.parentElement;
+  }
+  return false;
+}
+
 function elementContainsStaticInput(node: Node): boolean {
   const element = node as Element;
-  if (!element || element.nodeType !== 1) return false;
+  if (!element || element.nodeType !== 1 || isStaticOutput(node)) return false;
   try {
     if (
       element.matches(STATIC_CONTAINER_SELECTOR) ||
@@ -2533,19 +2656,39 @@ export function initStaticRenderer(): void {
   const root = document.documentElement || document.body;
   if (root && typeof MutationObserver === 'function') {
     staticObserver = new MutationObserver(function(mutations) {
-      const relevant = mutations.some(function(mutation) {
+      let relevant = false;
+      mutations.forEach(function(mutation) {
+        if (isStaticOutput(mutation.target)) return;
         if (mutation.type === 'attributes') {
-          if (
-            mutation.attributeName === 'class' ||
-            mutation.attributeName === 'style' ||
-            mutation.attributeName === 'data-theme'
-          ) return isThemeMutationTarget(mutation.target);
-          return elementContainsStaticInput(mutation.target);
+          const target = mutation.target as HTMLElement;
+          const attribute = mutation.attributeName;
+          if (attribute === 'class' || attribute === 'style' ||
+              attribute === 'data-theme' || attribute === 'hidden') {
+            // Identical CSS writes need not emit records in every browser.
+            // If they do, our own settled host style is still never an input.
+            if (attribute === 'style' && ownHostStyles.has(target) &&
+                target.getAttribute('style') === ownHostStyles.get(target)) return;
+            if (isThemeMutationTarget(target)) {
+              relevant = true;
+            } else if (elementContainsStaticInput(target)) {
+              relevant = true;
+              retryTexErrors = true; // an ancestor/slide may have become visible
+            }
+            return;
+          }
+          if (attribute === 'id' && mutation.oldValue &&
+              STATIC_MARKER_PREFIXES.some(definition =>
+                mutation.oldValue!.startsWith(definition.prefix))) relevant = true;
+          if (markerInfo(target) || elementContainsStaticInput(target)) relevant = true;
+          return;
         }
-        if (mutation.type !== 'childList') return false;
-        return Array.from(mutation.addedNodes || [])
+        if (mutation.type !== 'childList') return;
+        if (Array.from(mutation.addedNodes || [])
           .concat(Array.from(mutation.removedNodes || []))
-          .some(elementContainsStaticInput);
+          .some(elementContainsStaticInput)) {
+          relevant = true;
+          retryTexErrors = true;
+        }
       });
       if (relevant) scheduleStaticBootstrap();
     });
@@ -2554,7 +2697,10 @@ export function initStaticRenderer(): void {
         childList: true,
         subtree: true,
         attributes: true,
+        attributeOldValue: true,
         attributeFilter: [
+          'id',
+          'hidden',
           'data-spec',
           'data-language',
           'data-kind',
@@ -2586,9 +2732,35 @@ export function initStaticRenderer(): void {
     }
   } catch (e) {}
 
+  const resume = function() {
+    retryTexErrors = true;
+    scheduleStaticBootstrap();
+  };
+  try {
+    window.addEventListener('pageshow', resume);
+    window.addEventListener('hashchange', resume);
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) resume();
+    });
+    const resources = function(event: Event) {
+      const target = event.target as HTMLElement;
+      if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) resume();
+    };
+    document.addEventListener('load', resources, true);
+    const themedDocument = themeDoc();
+    if (themedDocument !== document) themedDocument.addEventListener('load', resources, true);
+  } catch (e) {}
+
   // Register declarative lightweight hosts and claim already mounted markers
   // synchronously, but defer all SVG construction to the shared scheduled batch.
-  initializeDeclarativeHosts(document);
-  syncMarkerClaims(document);
+  bootstrapRunning = true;
+  batchMarkers = indexMarkers(document);
+  try {
+    initializeDeclarativeHosts(document);
+    syncMarkerClaims(document);
+  } finally {
+    batchMarkers = null;
+    bootstrapRunning = false;
+  }
   scheduleStaticBootstrap();
 }

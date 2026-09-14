@@ -9,7 +9,7 @@ registerHooks({
   }
 });
 
-const { splitStaticText, typesetStaticText } = await import('../src/static/staticTex.ts');
+const { splitStaticText, typesetStaticText, retryStaticText } = await import('../src/static/staticTex.ts');
 const { parseStaticCoordTextSpec } = await import('../src/static/staticSvg.ts');
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const mathRun = (text, display = false) => ({ text, math: true, display });
@@ -41,6 +41,11 @@ class Element {
   set id(value) { this.setAttribute('id', value); }
   get isConnected() {
     return this === this.ownerDocument.documentElement || !!this.parentNode?.isConnected;
+  }
+  get ownerSVGElement() {
+    let parent = this.parentNode;
+    while (parent && parent.localName !== 'svg') parent = parent.parentNode;
+    return parent || null;
   }
   get viewBox() {
     const [x, y, width, height] = (this.getAttribute('viewBox') || '0 0 0 0').split(/\s+/).map(Number);
@@ -522,3 +527,174 @@ test('an even number of backslashes does not escape the following math delimiter
   assert.deepEqual(splitStaticText(String.raw`$a\\$`), [mathRun(String.raw`a\\`)]);
   assert.deepEqual(splitStaticText(String.raw`\\$v_0$`), [textRun(String.raw`\\`), mathRun('v_0')]);
 });
+
+
+test('resource retries update existing fallback nodes and preserve ready labels', async () => {
+  const env = browser();
+  let attempts = 0;
+  const math = makeMathJax(env, { load: () => ++attempts === 1
+    ? Promise.reject(new Error('offline')) : Promise.resolve() });
+  const oldWarn = console.warn;
+  console.warn = () => {};
+  try {
+    const node = label(env, 'v_0');
+    typesetStaticText(node, '$v_0$');
+    await finish();
+    assert.equal(node.getAttribute('data-lia-static-tex'), 'error');
+    retryStaticText(env.root);
+    await finish();
+    assert.equal(math.calls.loads.length, 1, 'routine checks do not repeatedly retry failed resources');
+    assert.equal(node.isConnected, true);
+    retryStaticText(env.root, true);
+    retryStaticText(env.root, true);
+    await finish();
+    const group = ready(env)[0];
+    assert.ok(group);
+    assert.equal(group.getAttribute('aria-label'), '$v_0$', 'retry retains original delimited source');
+    assert.equal(node.isConnected, false);
+    assert.equal(math.calls.loads.length, 2, 'duplicate requests share one retry');
+    const formula = group.querySelector('svg');
+    group.getBBox = () => assert.fail('ready labels must not be measured again');
+    retryStaticText(env.root, true);
+    await finish();
+    assert.equal(ready(env)[0], group);
+    assert.equal(group.querySelector('svg'), formula);
+    assert.equal(math.calls.conversions.length, 1);
+  } finally { console.warn = oldWarn; }
+});
+
+test('pending labels detached before conversion resume on slide reattachment', async () => {
+  const env = browser();
+  const math = makeMathJax(env);
+  const node = label(env);
+  typesetStaticText(node, '$x$');
+  env.root.remove();
+  await finish();
+  assert.equal(node.getAttribute('data-lia-static-tex'), 'pending');
+  assert.equal(math.calls.loads.length, 0);
+  env.document.body.appendChild(env.root);
+  retryStaticText(env.root);
+  await finish();
+  assert.equal(ready(env).length, 1);
+  assert.equal(math.calls.loads.length, 1);
+});
+
+test('a batch shares hidden-board visibility checks and measurement SVGs', async () => {
+  const env = browser();
+  makeMathJax(env);
+  env.root.setAttribute('viewBox', '0 0 640 320');
+  env.root.setAttribute('width', '640');
+  let visibilityReads = 0;
+  env.root.getClientRects = () => { visibilityReads++; return []; };
+  const measurements = [];
+  env.document.onAppend = node => {
+    if (node.getAttribute('data-lia-static-tex-measurement') !== null) measurements.push(node);
+  };
+  for (let i = 0; i < 20; i++) {
+    const source = 'Vektor $v_' + i + '$';
+    const node = label(env, source);
+    node.getClientRects = () => assert.fail('visibility must be checked once per board');
+    typesetStaticText(node, source);
+  }
+  await finish();
+  assert.equal(ready(env).length, 20);
+  assert.equal(visibilityReads, 1);
+  assert.equal(measurements.length, 1);
+  assert.equal(measurements[0].isConnected, false, 'temporary measurement output is removed');
+  assert.equal(measurements[0].getAttribute('viewBox'), '0 0 640 320');
+  assert.match(measurements[0].style.cssText, /width:640px;height:320px/);
+  assert.equal(env.document.body.children.length, 1);
+});
+
+test('label layout batches text width and bounding-box reads across diagrams', async () => {
+  const env = browser();
+  makeMathJax(env);
+  const events = [];
+  const createElementNS = env.document.createElementNS;
+  env.document.createElementNS = function(namespace, name) {
+    const node = createElementNS.call(this, namespace, name);
+    const setAttributeNS = node.setAttributeNS;
+    node.setAttributeNS = function(...args) {
+      if (this.isConnected) events.push('write');
+      return setAttributeNS.apply(this, args);
+    };
+    if (name === 'text') {
+      const getComputedTextLength = node.getComputedTextLength;
+      node.getComputedTextLength = function() {
+        events.push('width');
+        return getComputedTextLength.call(this);
+      };
+    }
+    if (name === 'g') {
+      const getBBox = node.getBBox;
+      node.getBBox = function() {
+        events.push('bounds');
+        return getBBox.call(this);
+      };
+    }
+    return node;
+  };
+  for (let i = 0; i < 3; i++) {
+    const board = env.document.body.appendChild(createElementNS.call(env.document, SVG_NS, 'svg'));
+    const source = 'Vor $v_' + i + '$ nach';
+    const node = label({ ...env, root: board }, source);
+    typesetStaticText(node, source);
+  }
+  await finish();
+  const firstWidth = events.indexOf('width');
+  const firstBounds = events.indexOf('bounds');
+  const lastBounds = events.lastIndexOf('bounds');
+  const initialReads = events.slice(firstWidth, firstBounds);
+  assert.equal(initialReads.filter(event => event === 'width').length, 6);
+  assert.ok(!initialReads.slice(0, 6).includes('write'), 'all native widths are read before positioning writes');
+  assert.ok(!events.slice(firstBounds, lastBounds).includes('write'), 'all label bounds are read before final transforms');
+  assert.equal(events.filter(event => event === 'bounds').length, 3);
+});
+for (const phase of ['startup', 'output/svg']) {
+  test('late MathJax ' + phase + ' success retries timed-out fallback without a DOM event', async () => {
+    const env = browser();
+    const resource = deferred();
+    const timers = new Map();
+    let serial = 0;
+    env.view.setTimeout = callback => {
+      const id = ++serial;
+      timers.set(id, callback);
+      return id;
+    };
+    env.view.clearTimeout = id => timers.delete(id);
+    const math = makeMathJax(env, phase === 'startup'
+      ? { startup: resource.promise } : { load: () => resource.promise });
+    const oldWarn = console.warn;
+    console.warn = () => {};
+    try {
+      const node = label(env, 'v_0');
+      typesetStaticText(node, '$v_0$');
+      await finish();
+      assert.equal(timers.size, 1);
+      for (const [id, callback] of timers) {
+        timers.delete(id);
+        callback();
+      }
+      await finish();
+      assert.equal(node.getAttribute('data-lia-static-tex'), 'error');
+      assert.equal(node.isConnected, true);
+      assert.equal(node.textContent, 'v_0');
+      assert.equal(timers.size, 0, 'timeout does not start a retry timer');
+      const loadsBeforeSuccess = math.calls.loads.length;
+      await finish();
+      assert.equal(math.calls.loads.length, loadsBeforeSuccess, 'failure does not poll resources');
+      resource.resolve();
+      await finish();
+      assert.equal(node.isConnected, false, 'late promise success replaces the existing fallback');
+      const group = ready(env)[0];
+      assert.ok(group);
+      assert.equal(group.getAttribute('aria-label'), '$v_0$');
+      assert.equal(math.calls.conversions.length, 1);
+      assert.equal(math.calls.loads.length, loadsBeforeSuccess + 1);
+      assert.equal(timers.size, 0);
+      await finish();
+      assert.equal(ready(env)[0], group);
+      assert.equal(math.calls.conversions.length, 1, 'late success triggers no repeated conversion');
+    } finally { console.warn = oldWarn; }
+  });
+}

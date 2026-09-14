@@ -203,6 +203,20 @@ class FakeElement {
     return String(selector).split(',').some(part => simpleSelectorMatches(this, part));
   }
 
+  contains(candidate) {
+    for (let current = candidate; current; current = current.parentNode) {
+      if (current === this) return true;
+    }
+    return false;
+  }
+
+  closest(selector) {
+    for (let current = this; current; current = current.parentElement) {
+      if (current.matches(selector)) return current;
+    }
+    return null;
+  }
+
   querySelectorAll(selector) {
     const source = String(selector || '').trim();
     const directOnly = /^:scope\s*>/.test(source);
@@ -289,6 +303,12 @@ function installFakeBrowser() {
   const mutationObservers = [];
   const resizeObserverCalls = [];
   const mediaListeners = [];
+  const documentQueries = [];
+  const querySelectorAll = document.querySelectorAll.bind(document);
+  document.querySelectorAll = selector => {
+    documentQueries.push(String(selector));
+    return querySelectorAll(selector);
+  };
   const theme = {
     backgroundColor: 'rgb(255, 255, 255)',
     color: 'rgb(0, 0, 0)',
@@ -393,7 +413,11 @@ function installFakeBrowser() {
     mutationObserverCalls,
     mutationObservers,
     resizeObserverCalls,
+    documentQueries,
     window,
+    pendingAnimationFrames() {
+      return animationFrames.length;
+    },
     setTheme(values) {
       Object.assign(theme, values);
     },
@@ -436,6 +460,21 @@ function appendSpecMarker(document, id, spec, language = 'de') {
   marker.dataset.language = language;
   document.body.appendChild(marker);
   return marker;
+}
+
+function appendTestVectorBoard(browser, boardId, color = '#123456') {
+  const host = appendHost(browser.document);
+  const marker = appendSpecMarker(
+    browser.document,
+    'linear-spec-' + boardId,
+    `${boardId};[[0;0];[2;1]];${color};u=0`
+  );
+  marker.dataset.kind = 'vector';
+  const config = parseCoordSpec(
+    `xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=${boardId};achsen=0;grid=0;border=0;static=1`
+  );
+  initializeStaticCoordinateBoard(host, config);
+  return { host, marker, config, svg: () => host.querySelector('svg[data-lia-static-svg]') };
 }
 
 function geometryChildren(svg) {
@@ -1526,6 +1565,329 @@ test('border=0 without static=1 retains the existing JSXGraph path', () => {
     assert.equal(browser.window.__boards[boardId], board);
     assert.equal(host.querySelectorAll('svg[data-lia-static-svg]').length, 0);
   } finally {
+    browser.restore();
+  }
+});
+
+
+test('unrelated root CSS variables and classes preserve static SVG, geometry, and labels', () => {
+  const browser = installFakeBrowser();
+  const ids = ['stable-root-a', 'stable-root-b', 'stable-root-c'];
+  try {
+    const boards = ids.map(id => appendTestVectorBoard(browser, id));
+    boards.forEach(({ config }) => {
+      const text = appendSpecMarker(
+        browser.document, 'coord-text-spec-' + config.id, `${config.id};[1;1];$x$;#123456;1`
+      );
+      text.className = 'lia-coord-text-spec';
+    });
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const originals = boards.map(board => ({
+      svg: board.svg(),
+      geometry: board.svg().querySelector('line'),
+      label: board.svg().querySelector('text')
+    }));
+    originals.forEach(original => assert.ok(original.label));
+
+    for (let pass = 0; pass < 6; pass += 1) {
+      browser.document.documentElement.style.setProperty('--unrelated-scroll-position', pass);
+      browser.document.documentElement.className = 'external-scroll-state-' + pass;
+      ['style', 'class'].forEach(attributeName => browser.triggerMutation({
+        type: 'attributes', target: browser.document.documentElement, attributeName
+      }));
+      browser.document.body.setAttribute('data-theme', 'unrelated-value-' + pass);
+      browser.triggerMutation({
+        type: 'attributes', target: browser.document.body, attributeName: 'data-theme'
+      });
+      browser.flushAnimationFrames();
+      boards.forEach((board, index) => {
+        assert.equal(board.svg(), originals[index].svg, 'unchanged effective styles retain the root SVG');
+        assert.equal(board.svg().querySelector('line'), originals[index].geometry);
+        assert.equal(board.svg().querySelector('text'), originals[index].label);
+      });
+    }
+    boards.forEach(board => initializeStaticCoordinateBoard(board.host, { ...board.config }));
+    bootstrapStaticCoordinateBoards();
+    browser.flushAnimationFrames();
+    boards.forEach((board, index) => {
+      assert.equal(board.svg(), originals[index].svg, 'same macro configuration is idempotent');
+      assert.equal(renderStaticSvg(board.host, board.config), originals[index].svg);
+    });
+    assert.equal(browser.pendingAnimationFrames(), 0, 'the fake event queue is settled, with no retry cycle');
+    assert.equal(browser.intervalCalls.length, 0);
+  } finally {
+    ids.forEach(id => disposeStaticCoordinateBoard(id));
+    browser.restore();
+  }
+});
+
+test('marker and coordinate macro edits update only the corresponding static diagram', () => {
+  const browser = installFakeBrowser();
+  const ids = ['selective-edit-a', 'selective-edit-b', 'selective-edit-c'];
+  try {
+    const boards = ids.map(id => appendTestVectorBoard(browser, id));
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const initial = boards.map(board => board.svg());
+
+    boards[0].marker.dataset.spec = `${ids[0]};[[0;0];[3;2]];#123456;u=0`;
+    browser.triggerMutation({ type: 'attributes', target: boards[0].marker, attributeName: 'data-spec' });
+    browser.flushAnimationFrames();
+    assert.notEqual(boards[0].svg(), initial[0]);
+    assert.notDeepEqual(
+      ['x1', 'y1', 'x2', 'y2'].map(name => boards[0].svg().querySelector('line').getAttribute(name)),
+      ['x1', 'y1', 'x2', 'y2'].map(name => initial[0].querySelector('line').getAttribute(name)),
+      'the changed vector has new geometry'
+    );
+    assert.equal(boards[1].svg(), initial[1]);
+    assert.equal(boards[2].svg(), initial[2]);
+
+    const afterMarkerEdit = boards.map(board => board.svg());
+    const changedConfig = { ...boards[1].config, xmax: 8 };
+    initializeStaticCoordinateBoard(boards[1].host, changedConfig);
+    browser.flushAnimationFrames();
+    assert.equal(boards[0].svg(), afterMarkerEdit[0]);
+    assert.notEqual(boards[1].svg(), afterMarkerEdit[1]);
+    assert.equal(boards[1].svg().getAttribute('viewBox'), '0 0 8 2');
+    assert.equal(boards[2].svg(), afterMarkerEdit[2]);
+  } finally {
+    ids.forEach(id => disposeStaticCoordinateBoard(id));
+    browser.restore();
+  }
+});
+
+test('marker reordering, retargeting, renaming, and removal reconcile only affected boards', () => {
+  const browser = installFakeBrowser();
+  const ids = ['selective-input-a', 'selective-input-b', 'selective-input-c'];
+  try {
+    const boards = ids.map(id => appendTestVectorBoard(browser, id));
+    const extra = appendSpecMarker(
+      browser.document, 'linear-spec-selective-input-extra', `${ids[0]};[[0;0];[1;2]];#654321;v=0`
+    );
+    extra.dataset.kind = 'vector';
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const groupIds = board => board.svg().querySelectorAll('g[data-lia-static-kind]')
+      .map(group => group.getAttribute('data-lia-static-uid'));
+    assert.deepEqual(groupIds(boards[0]), [ids[0], 'selective-input-extra']);
+    let originals = boards.map(board => board.svg());
+
+    browser.document.body.appendChild(boards[0].marker);
+    browser.triggerMutation({
+      type: 'childList', target: browser.document.body,
+      addedNodes: [boards[0].marker], removedNodes: [boards[0].marker]
+    });
+    browser.flushAnimationFrames();
+    assert.deepEqual(groupIds(boards[0]), ['selective-input-extra', ids[0]]);
+    assert.notEqual(boards[0].svg(), originals[0]);
+    assert.equal(boards[1].svg(), originals[1]);
+    assert.equal(boards[2].svg(), originals[2]);
+    originals = boards.map(board => board.svg());
+
+    extra.dataset.spec = `${ids[1]};[[0;0];[1;2]];#654321;v=0`;
+    browser.triggerMutation({ type: 'attributes', target: extra, attributeName: 'data-spec' });
+    browser.flushAnimationFrames();
+    assert.deepEqual(groupIds(boards[0]), [ids[0]]);
+    assert.deepEqual(groupIds(boards[1]), [ids[1], 'selective-input-extra']);
+    assert.equal(extra.dataset.liaStaticClaimed, ids[1]);
+    assert.notEqual(boards[0].svg(), originals[0]);
+    assert.notEqual(boards[1].svg(), originals[1]);
+    assert.equal(boards[2].svg(), originals[2]);
+    originals = boards.map(board => board.svg());
+
+    extra.id = 'linear-spec-selective-input-renamed';
+    browser.triggerMutation({ type: 'attributes', target: extra, attributeName: 'id' });
+    browser.flushAnimationFrames();
+    assert.deepEqual(groupIds(boards[1]), [ids[1], 'selective-input-renamed']);
+    assert.equal(boards[0].svg(), originals[0]);
+    assert.notEqual(boards[1].svg(), originals[1]);
+    assert.equal(boards[2].svg(), originals[2]);
+    originals = boards.map(board => board.svg());
+
+    extra.remove();
+    browser.triggerMutation({ type: 'childList', target: browser.document.body, addedNodes: [], removedNodes: [extra] });
+    browser.flushAnimationFrames();
+    assert.deepEqual(groupIds(boards[1]), [ids[1]]);
+    assert.equal(boards[0].svg(), originals[0]);
+    assert.notEqual(boards[1].svg(), originals[1]);
+    assert.equal(boards[2].svg(), originals[2]);
+  } finally {
+    ids.forEach(id => disposeStaticCoordinateBoard(id));
+    browser.restore();
+  }
+});
+
+test('effective accent changes retain diagrams using only explicit colors', () => {
+  const browser = installFakeBrowser();
+  const ids = ['selective-theme-default', 'selective-theme-explicit'];
+  try {
+    const accent = browser.document.createElement('button');
+    accent.className = 'lia-btn';
+    browser.document.body.appendChild(accent);
+    const boards = [appendTestVectorBoard(browser, ids[0], ''), appendTestVectorBoard(browser, ids[1])];
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const originals = boards.map(board => board.svg());
+    const explicitGeometry = originals[1].querySelector('line');
+
+    browser.setTheme({ accentColor: 'rgb(140, 80, 200)' });
+    browser.triggerMutation({ type: 'attributes', target: browser.document.body, attributeName: 'class' });
+    browser.flushAnimationFrames();
+    assert.notEqual(boards[0].svg(), originals[0]);
+    assert.equal(boards[0].svg().querySelector('line').getAttribute('stroke'), 'rgb(140, 80, 200)');
+    assert.equal(boards[1].svg(), originals[1]);
+    assert.equal(boards[1].svg().querySelector('line'), explicitGeometry);
+    assert.equal(explicitGeometry.getAttribute('stroke'), '#123456');
+
+    const themedSvg = boards[0].svg();
+    browser.triggerMediaChange();
+    browser.flushAnimationFrames();
+    assert.equal(boards[0].svg(), themedSvg, 'same effective colors after a media event retain the SVG');
+    assert.equal(boards[1].svg(), originals[1]);
+  } finally {
+    ids.forEach(id => disposeStaticCoordinateBoard(id));
+    browser.restore();
+  }
+});
+
+test('one bootstrap shares one document-wide marker search across three declarative diagrams', () => {
+  const browser = installFakeBrowser();
+  const ids = ['batched-search-a', 'batched-search-b', 'batched-search-c'];
+  try {
+    const hosts = ids.map(id => {
+      const host = appendHost(browser.document);
+      host.dataset.liaStaticCoordinateHost = '';
+      host.dataset.spec = `xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=${id};achsen=0;grid=0;border=0;static=1`;
+      const marker = appendSpecMarker(browser.document, 'linear-spec-' + id, `${id};[[0;0];[2;1]];#123456;u=0`);
+      marker.dataset.kind = 'vector';
+      return host;
+    });
+    const markerSearches = () => browser.documentQueries.filter(query => query.includes('[id^="area-spec-"][data-spec]'));
+    browser.documentQueries.length = 0;
+    bootstrapStaticCoordinateBoards();
+    assert.equal(markerSearches().length, 1, 'initial host registration, claims, and geometry share the marker index');
+    const originals = hosts.map(host => host.querySelector('svg[data-lia-static-svg]'));
+    originals.forEach(svg => assert.ok(svg));
+
+    browser.documentQueries.length = 0;
+    bootstrapStaticCoordinateBoards();
+    assert.equal(markerSearches().length, 1, 'subsequent reconciliation scans the document once');
+    hosts.forEach((host, index) => assert.equal(host.querySelector('svg[data-lia-static-svg]'), originals[index]));
+  } finally {
+    ids.forEach(id => disposeStaticCoordinateBoard(id));
+    browser.restore();
+  }
+});
+
+test('observer ignores owned SVG and TeX output mutations without scheduling feedback', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-output-feedback';
+  try {
+    const board = appendTestVectorBoard(browser, boardId);
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const svg = board.svg();
+    const output = browser.document.createElementNS(SVG_NAMESPACE, 'g');
+    // TeX output may use arbitrary ids and attributes, including marker-looking ones.
+    output.id = 'linear-spec-generated-output';
+    output.dataset.spec = `${boardId};[[0;0];[4;2]];#000000;u=0`;
+    svg.appendChild(output);
+    [
+      { type: 'childList', target: board.host, addedNodes: [svg], removedNodes: [] },
+      { type: 'childList', target: svg, addedNodes: [output], removedNodes: [] },
+      { type: 'attributes', target: output, attributeName: 'data-spec' },
+      { type: 'attributes', target: svg, attributeName: 'style' }
+    ].forEach(mutation => browser.triggerMutation(mutation));
+    assert.equal(browser.pendingAnimationFrames(), 0, 'owned output must not enqueue another bootstrap');
+    browser.flushAnimationFrames();
+    assert.equal(board.svg(), svg);
+    bootstrapStaticCoordinateBoards();
+    assert.equal(board.svg(), svg, 'later input searches also exclude owned output');
+  } finally {
+    disposeStaticCoordinateBoard(boardId);
+    browser.restore();
+  }
+});
+
+test('hidden slides and unchanged detached slide revisits retain their SVG identity', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-slide-revisit';
+  try {
+    const slide = browser.document.createElement('section');
+    browser.document.body.appendChild(slide);
+    const board = appendTestVectorBoard(browser, boardId);
+    slide.appendChild(board.host);
+    slide.appendChild(board.marker);
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    const svg = board.svg();
+
+    slide.style.display = 'none';
+    browser.triggerMutation({ type: 'attributes', target: slide, attributeName: 'style' });
+    browser.flushAnimationFrames();
+    slide.style.display = 'block';
+    browser.triggerMutation({ type: 'attributes', target: slide, attributeName: 'style' });
+    browser.flushAnimationFrames();
+    assert.equal(board.svg(), svg, 'showing an unchanged slide preserves all SVG output');
+
+    slide.remove();
+    browser.triggerMutation({ type: 'childList', target: browser.document.body, addedNodes: [], removedNodes: [slide] });
+    browser.flushAnimationFrames();
+    assert.equal(isStaticCoordinateBoard(boardId), false);
+    browser.document.body.appendChild(slide);
+    browser.triggerMutation({ type: 'childList', target: browser.document.body, addedNodes: [slide], removedNodes: [] });
+    browser.flushAnimationFrames();
+    assert.equal(isStaticCoordinateBoard(boardId), true);
+    assert.equal(board.svg(), svg, 'returning with the same DOM and configuration reuses the previous SVG');
+    assert.equal(board.marker.dataset.liaStaticClaimed, boardId);
+  } finally {
+    disposeStaticCoordinateBoard(boardId);
+    browser.restore();
+  }
+});
+
+
+test('a detached declarative slide can switch to dynamic mode before returning', () => {
+  const browser = installFakeBrowser();
+  const boardId = 'static-slide-mode-change';
+  let dynamicRuntimeCalls = 0;
+  browser.window.__ensureCoordinateDynamicRuntime = () => { dynamicRuntimeCalls += 1; };
+  try {
+    const slide = browser.document.createElement('section');
+    browser.document.body.appendChild(slide);
+    const host = browser.document.createElement('div');
+    host.dataset.liaStaticCoordinateHost = '';
+    const spec = `xmin=0;xmax=4;ymin=0;ymax=2;width=240;id=${boardId};achsen=0;grid=0;border=0;static=`;
+    host.dataset.spec = spec + '1';
+    slide.appendChild(host);
+    const marker = appendSpecMarker(
+      browser.document, 'linear-spec-' + boardId, `${boardId};[[0;0];[2;1]];#123456;u=0`
+    );
+    marker.dataset.kind = 'vector';
+    slide.appendChild(marker);
+    initStaticRenderer();
+    browser.flushAnimationFrames();
+    assert.equal(marker.dataset.liaStaticClaimed, boardId);
+    assert.ok(host.querySelector('svg[data-lia-static-svg]'));
+
+    slide.remove();
+    browser.triggerMutation({ type: 'childList', target: browser.document.body, addedNodes: [], removedNodes: [slide] });
+    browser.flushAnimationFrames();
+    assert.equal(isStaticCoordinateBoard(boardId), false);
+    host.dataset.spec = spec + '0';
+    browser.document.body.appendChild(slide);
+    browser.triggerMutation({ type: 'childList', target: browser.document.body, addedNodes: [slide], removedNodes: [] });
+    browser.flushAnimationFrames();
+
+    assert.equal(isStaticCoordinateBoard(boardId), false);
+    assert.equal(host.querySelector('svg[data-lia-static-svg]'), null, 'cached static output is disposed on mode change');
+    assert.equal(host.hasAttribute('data-lia-static-coordinate'), false);
+    assert.equal(host.hasAttribute('data-lia-static-coordinate-host'), true);
+    assert.equal(marker.hasAttribute('data-lia-static-claimed'), false);
+    assert.equal(dynamicRuntimeCalls, 1);
+  } finally {
+    disposeStaticCoordinateBoard(boardId);
     browser.restore();
   }
 });

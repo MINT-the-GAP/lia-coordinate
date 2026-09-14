@@ -36,29 +36,52 @@ export function splitStaticText(content: string): StaticTextRun[] {
 }
 
 interface TexRenderer { engine: any; document: any }
+interface TexLabel {
+  text: SVGTextElement;
+  content: string;
+  runs: StaticTextRun[];
+  math?: SVGSVGElement[];
+}
 interface TexState {
   renderer?: Promise<TexRenderer>;
   queue: Promise<unknown>;
   cache: Map<string, SVGSVGElement>;
   serial: number;
   warned: boolean;
+  pending: TexLabel[];
+  scheduled: boolean;
+  active: WeakSet<SVGTextElement>;
+  sources: WeakMap<SVGTextElement, string>;
 }
 
 // Share loading, conversion queue, and bounded cache across bundle instances.
 function stateFor(view: Window): TexState {
   const runtime = view as Window & { __liaStaticTex?: TexState };
   return runtime.__liaStaticTex || (runtime.__liaStaticTex = {
-    queue: Promise.resolve(), cache: new Map(), serial: 0, warned: false
+    queue: Promise.resolve(), cache: new Map(), serial: 0, warned: false,
+    pending: [], scheduled: false, active: new WeakSet(), sources: new WeakMap()
   });
 }
 
-function bounded<T>(view: Window, promise: Promise<T>): Promise<T> {
+function bounded<T>(view: Window, promise: Promise<T>, onLateSuccess?: () => void): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = view.setTimeout(() => reject(new Error('MathJax loading timed out')), 20000);
-    promise.then(resolve, reject).finally(() => view.clearTimeout(timer));
+    let timedOut = false;
+    const timer = view.setTimeout(() => {
+      timedOut = true;
+      reject(new Error('MathJax loading timed out'));
+    }, 20000);
+    promise.then(value => {
+      resolve(value);
+      if (timedOut) onLateSuccess?.();
+    }, reject).finally(() => view.clearTimeout(timer));
   });
 }
 
+function retryAfterLateResource(view: Window): void {
+  // A startup/component promise can resolve after our timeout without another
+  // DOM load event. Retry once on that success, after failed jobs leave the queue.
+  stateFor(view).queue.then(() => retryStaticText(view.document.documentElement, true));
+}
 async function loadMathJax(view: Window): Promise<any> {
   const doc = view.document;
   let engine = (view as any).MathJax;
@@ -110,7 +133,7 @@ async function loadMathJax(view: Window): Promise<any> {
   if (!engine?.startup?.promise || !engine?.loader?.load) {
     throw new Error('Static TeX labels require MathJax 3 with its component loader');
   }
-  await bounded(view, engine.startup.promise);
+  await bounded(view, engine.startup.promise, () => retryAfterLateResource(view));
   return engine;
 }
 
@@ -118,7 +141,7 @@ function rendererFor(view: Window, state: TexState): Promise<TexRenderer> {
   if (!state.renderer) {
     state.renderer = (async () => {
       const engine = await loadMathJax(view);
-      await bounded(view, engine.loader.load('output/svg'));
+      await bounded(view, engine.loader.load('output/svg'), () => retryAfterLateResource(view));
       // The loaded options include the glyph tables and accent metrics.
       // Never change useOutput(), startup.document, or the global TeX state.
       const output = new engine.startup.constructors.svg({
@@ -179,87 +202,184 @@ function uniqueIds(svg: SVGSVGElement, serial: number): void {
   }));
 }
 
-function placeLabel(text: SVGTextElement, content: string, runs: StaticTextRun[], math: SVGSVGElement[], state: TexState): void {
-  if (!text.isConnected || !text.parentNode) return;
-  const doc = text.ownerDocument;
-  const group = doc.createElementNS(SVG_NS, 'g');
-  // Read after async conversion: callers may override the default font size.
-  const fontSize = Number(text.getAttribute('font-size'));
-  const color = text.getAttribute('fill') || 'currentColor';
-  group.setAttribute('data-lia-static-tex', 'ready');
-  group.setAttribute('aria-label', content);
-  group.setAttribute('role', 'img');
-  group.setAttribute('font-size', String(fontSize));
-  group.setAttribute('font-family', text.getAttribute('font-family') || 'system-ui, sans-serif');
-  group.setAttribute('fill', color);
-  group.style.color = color;
-  group.setAttribute('opacity', text.getAttribute('fill-opacity') || '1');
-  group.setAttribute('pointer-events', 'none');
-  group.setAttribute('visibility', 'hidden');
-  // Connected slides can still have display:none. Measure outside that hidden
-  // subtree, at the board's design scale, so native text runs keep their widths.
-  let measurement: SVGSVGElement | null = null;
-  if (typeof text.getClientRects === 'function' && !text.getClientRects().length) {
-    measurement = doc.createElementNS(SVG_NS, 'svg');
-    const board = text.ownerSVGElement;
-    const viewBox = board?.getAttribute('viewBox') || '0 0 1 1';
-    const bounds = viewBox.split(/\s+/).map(Number);
-    const width = Number(board?.getAttribute('width')) || 640;
-    measurement.setAttribute('viewBox', viewBox);
-    measurement.setAttribute('aria-hidden', 'true');
-    measurement.style.cssText = 'position:absolute;left:-100000px;top:0;' +
-      'display:block;visibility:hidden;overflow:hidden;pointer-events:none;' +
-      'width:' + width + 'px;height:' + width * bounds[3] / bounds[2] + 'px;';
-    (doc.body || doc.documentElement).appendChild(measurement);
-    measurement.appendChild(group);
-  } else {
-    text.parentNode.insertBefore(group, text);
+interface PreparedLabel {
+  label: TexLabel;
+  group: SVGGElement;
+  pieces: { node: SVGTextElement | SVGSVGElement; width?: number }[];
+  bounds?: DOMRect;
+  failed?: boolean;
+}
+
+function failedLabel(label: TexLabel, state: TexState, error: unknown): void {
+  if (!label.text.isConnected) return;
+  label.text.setAttribute('data-lia-static-tex', 'error');
+  if (!state.warned) {
+    state.warned = true;
+    console.warn('[lia-coordinate] Static TeX could not be rendered; keeping text fallback.', error);
   }
+}
+
+/** Keep writes, text-width reads, positioning, and bounding-box reads in batches. */
+function placeLabels(labels: TexLabel[], state: TexState): void {
+  const mounted = labels.filter(label => label.text.isConnected && label.text.parentNode);
+  // One visibility read per board, before inserting any of our label output.
+  const boards = new Map<SVGSVGElement | SVGTextElement, boolean>();
+  mounted.forEach(({ text }) => {
+    const board = text.ownerSVGElement || text;
+    if (!boards.has(board)) boards.set(board,
+      typeof board.getClientRects === 'function' && !board.getClientRects().length);
+  });
+  const measurements = new Map<SVGSVGElement | SVGTextElement, SVGSVGElement>();
+  const prepared: PreparedLabel[] = [];
+  const fail = (item: PreparedLabel, error: unknown) => {
+    item.failed = true;
+    item.group.remove();
+    failedLabel(item.label, state, error);
+  };
   try {
-    let cursor = 0;
-    let index = 0;
-    runs.forEach(run => {
-      if (run.math) {
-        const svg = math[index++];
-        uniqueIds(svg, ++state.serial);
-        const box = svg.viewBox.baseVal;
-        const scale = fontSize / 1000;
-        const width = box.width * scale;
-        const height = box.height * scale;
-        svg.setAttribute('x', String(cursor));
-        svg.setAttribute('y', String(box.y * scale));
-        svg.setAttribute('width', String(width));
-        svg.setAttribute('height', String(height));
-        svg.removeAttribute('style');
-        svg.style.overflow = 'visible';
-        svg.setAttribute('aria-hidden', 'true');
-        svg.setAttribute('focusable', 'false');
-        group.appendChild(svg);
-        cursor += width;
-      } else {
-        const plain = doc.createElementNS(SVG_NS, 'text');
-        plain.setAttribute('x', String(cursor));
-        plain.setAttribute('y', '0');
-        plain.setAttribute('xml:space', 'preserve');
-        plain.style.whiteSpace = 'pre';
-        plain.textContent = run.text;
-        group.appendChild(plain);
-        cursor += plain.getComputedTextLength();
-      }
+    mounted.forEach(label => {
+      const { text, content, runs, math } = label;
+      const doc = text.ownerDocument;
+      const group = doc.createElementNS(SVG_NS, 'g');
+      const item: PreparedLabel = { label, group, pieces: [] };
+      prepared.push(item);
+      try {
+        // Read after async conversion: callers may override the default font size.
+        const fontSize = Number(text.getAttribute('font-size'));
+        const color = text.getAttribute('fill') || 'currentColor';
+        group.setAttribute('data-lia-static-tex', 'ready');
+        group.setAttribute('aria-label', content);
+        group.setAttribute('role', 'img');
+        group.setAttribute('font-size', String(fontSize));
+        group.setAttribute('font-family', text.getAttribute('font-family') || 'system-ui, sans-serif');
+        group.setAttribute('fill', color);
+        group.style.color = color;
+        group.setAttribute('opacity', text.getAttribute('fill-opacity') || '1');
+        group.setAttribute('pointer-events', 'none');
+        group.setAttribute('visibility', 'hidden');
+        let index = 0;
+        runs.forEach(run => {
+          if (run.math) {
+            const svg = math[index++];
+            uniqueIds(svg, ++state.serial);
+            const box = svg.viewBox.baseVal;
+            const scale = fontSize / 1000;
+            const width = box.width * scale;
+            svg.setAttribute('x', '0');
+            svg.setAttribute('y', String(box.y * scale));
+            svg.setAttribute('width', String(width));
+            svg.setAttribute('height', String(box.height * scale));
+            svg.removeAttribute('style');
+            svg.style.overflow = 'visible';
+            svg.setAttribute('aria-hidden', 'true');
+            svg.setAttribute('focusable', 'false');
+            group.appendChild(svg);
+            item.pieces.push({ node: svg, width });
+          } else {
+            const plain = doc.createElementNS(SVG_NS, 'text');
+            plain.setAttribute('x', '0');
+            plain.setAttribute('y', '0');
+            plain.setAttribute('xml:space', 'preserve');
+            plain.style.whiteSpace = 'pre';
+            plain.textContent = run.text;
+            group.appendChild(plain);
+            item.pieces.push({ node: plain });
+          }
+        });
+        const board = text.ownerSVGElement || text;
+        if (boards.get(board)) {
+          let measurement = measurements.get(board);
+          if (!measurement) {
+            // Hidden slides need native text metrics outside display:none.
+            // All their labels share one temporary SVG at the design scale.
+            measurement = doc.createElementNS(SVG_NS, 'svg');
+            const viewBox = board.getAttribute('viewBox') || '0 0 1 1';
+            const bounds = viewBox.split(/\s+/).map(Number);
+            const width = Number(board.getAttribute('width')) || 640;
+            measurement.setAttribute('viewBox', viewBox);
+            measurement.setAttribute('aria-hidden', 'true');
+            measurement.setAttribute('data-lia-static-tex-measurement', '');
+            measurement.style.cssText = 'position:absolute;left:-100000px;top:0;' +
+              'display:block;visibility:hidden;overflow:hidden;pointer-events:none;' +
+              'width:' + width + 'px;height:' + width * bounds[3] / bounds[2] + 'px;';
+            (doc.body || doc.documentElement).appendChild(measurement);
+            measurements.set(board, measurement);
+          }
+          measurement.appendChild(group);
+        } else {
+          text.parentNode.insertBefore(group, text);
+        }
+      } catch (error) { fail(item, error); }
     });
-    const bounds = group.getBBox();
-    const x = Number(text.getAttribute('x')) - bounds.x - bounds.width / 2;
-    const y = Number(text.getAttribute('y')) - bounds.y - bounds.height / 2;
-    group.setAttribute('transform', 'translate(' + x + ' ' + y + ')');
-    group.removeAttribute('visibility');
-    if (measurement) text.parentNode.insertBefore(group, text);
-    text.remove();
-  } catch (error) {
-    group.remove();
-    throw error;
+    prepared.forEach(item => {
+      if (item.failed) return;
+      try {
+        item.pieces.forEach(piece => {
+          if (piece.width === undefined) piece.width = (piece.node as SVGTextElement).getComputedTextLength();
+        });
+      } catch (error) { fail(item, error); }
+    });
+    prepared.forEach(item => {
+      if (item.failed) return;
+      let cursor = 0;
+      item.pieces.forEach(piece => {
+        piece.node.setAttribute('x', String(cursor));
+        cursor += piece.width;
+      });
+    });
+    prepared.forEach(item => {
+      if (item.failed) return;
+      try { item.bounds = item.group.getBBox(); }
+      catch (error) { fail(item, error); }
+    });
+    prepared.forEach(item => {
+      if (item.failed) return;
+      const { text } = item.label;
+      const { group, bounds } = item;
+      const x = Number(text.getAttribute('x')) - bounds.x - bounds.width / 2;
+      const y = Number(text.getAttribute('y')) - bounds.y - bounds.height / 2;
+      group.setAttribute('transform', 'translate(' + x + ' ' + y + ')');
+      group.removeAttribute('visibility');
+      if (group.parentNode !== text.parentNode) text.parentNode.insertBefore(group, text);
+      text.remove();
+    });
   } finally {
-    measurement?.remove();
+    measurements.forEach(measurement => measurement.remove());
   }
+}
+
+function scheduleLabels(view: Window, state: TexState): void {
+  if (state.scheduled) return;
+  state.scheduled = true;
+  // Mounting is synchronous; gather labels from all boards in this turn.
+  Promise.resolve().then(() => {
+    state.scheduled = false;
+    const labels = state.pending.splice(0);
+    const render = async () => {
+      try {
+        if (!labels.some(label => label.text.isConnected)) return;
+        const renderer = await rendererFor(view, state);
+        const converted: TexLabel[] = [];
+        for (const label of labels) {
+          if (!label.text.isConnected) continue;
+          try {
+            label.math = [];
+            for (const run of label.runs) {
+              if (!label.text.isConnected) break;
+              if (run.math) label.math.push(await mathSvg(renderer, state, run));
+            }
+            if (label.text.isConnected) converted.push(label);
+          } catch (error) { failedLabel(label, state, error); }
+        }
+        placeLabels(converted, state);
+      } catch (error) {
+        labels.forEach(label => failedLabel(label, state, error));
+      } finally {
+        labels.forEach(label => state.active.delete(label.text));
+      }
+    };
+    state.queue = state.queue.then(render, render);
+  });
 }
 
 /** Replace only the original, still-mounted node; never append to a newer render. */
@@ -269,29 +389,22 @@ export function typesetStaticText(text: SVGTextElement, content: string): void {
   const view = text.ownerDocument.defaultView;
   if (!view) return;
   const state = stateFor(view);
+  if (state.active.has(text)) return;
+  state.sources.set(text, content);
+  state.active.add(text);
   text.setAttribute('data-lia-static-tex', 'pending');
-  // Mounting is synchronous; waiting one microtask also skips discarded SVGs.
-  Promise.resolve().then(async () => {
-    if (!text.isConnected) return;
-    const renderer = await rendererFor(view, state);
-    const render = async () => {
-      if (!text.isConnected) return;
-      const math: SVGSVGElement[] = [];
-      for (const run of runs) {
-        if (!text.isConnected) return;
-        if (run.math) math.push(await mathSvg(renderer, state, run));
-      }
-      placeLabel(text, content, runs, math, state);
-    };
-    const job = state.queue.then(render);
-    state.queue = job.catch(() => {});
-    await job;
-  }).catch(error => {
-    if (!text.isConnected) return;
-    text.setAttribute('data-lia-static-tex', 'error');
-    if (!state.warned) {
-      state.warned = true;
-      console.warn('[lia-coordinate] Static TeX could not be rendered; keeping text fallback.', error);
-    }
+  state.pending.push({ text, content, runs });
+  scheduleLabels(view, state);
+}
+
+/** Retry only fallback nodes; ready labels retain their DOM and measured layout. */
+export function retryStaticText(root: ParentNode, retryErrors = false): void {
+  root.querySelectorAll<SVGTextElement>('[data-lia-static-tex]').forEach(text => {
+    const status = text.getAttribute('data-lia-static-tex');
+    if (text.localName !== 'text' || (status !== 'pending' && !(retryErrors && status === 'error'))) return;
+    const view = text.ownerDocument.defaultView;
+    if (!view) return;
+    const content = stateFor(view).sources.get(text);
+    if (content !== undefined) typesetStaticText(text, content);
   });
 }
