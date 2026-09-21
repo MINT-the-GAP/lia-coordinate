@@ -492,6 +492,34 @@ function assertClose(actual, expected, epsilon = 1e-9) {
   );
 }
 
+test('Superposition arrowheads stay small in a narrow SVG viewBox', () => {
+  const browser = installFakeBrowser();
+  try {
+    const host = appendHost(browser.document);
+    const vector = appendSpecMarker(
+      browser.document,
+      'linear-spec-superposition-safari',
+      'P10Superposition;[[0;0];[3;4]];#ff0000;c=0'
+    );
+    vector.dataset.kind = 'vector';
+    const config = parseCoordSpec(
+      'xmin=-0.6;xmax=6.6;ymin=-0.6;ymax=6.6;width=500;id=P10Superposition;achsen=1;grid=1;border=0;static=1'
+    );
+    const svg = renderStaticSvg(host, config);
+    const markers = svg.querySelectorAll('marker');
+    assert.equal(markers.length, 3, 'two axes and one vector have arrowheads');
+    markers.forEach((marker, index) => {
+      assert.equal(marker.getAttribute('markerUnits'), 'userSpaceOnUse');
+      const size = Number(marker.getAttribute('markerWidth'));
+      assertClose(size, (index < 2 ? 10 : 12) * 7.2 / 500);
+      assertClose(Number(marker.getAttribute('markerHeight')), size);
+      assert.ok(size < 1, 'an arrowhead must remain much smaller than the 7.2-unit board');
+    });
+  } finally {
+    browser.restore();
+  }
+});
+
 test('coordinate parser activates static mode only through static=1 or statisch=1', () => {
   assert.equal(parseCoordSpec('id=english;static=1').staticMode, true);
   assert.equal(parseCoordSpec('id=german;statisch=1').staticMode, true);
@@ -817,7 +845,7 @@ test('native SVG renders a complete number line in mixed source order', () => {
     const vectorArrow = svg.querySelector(`#${vectorArrowId}`);
     assert.ok(vectorArrow, 'vector arrow marker is defined in the SVG');
     assert.equal(vectorArrow.getAttribute('orient'), 'auto-start-reverse');
-    assert.equal(vectorArrow.getAttribute('markerUnits'), 'strokeWidth');
+    assert.equal(vectorArrow.getAttribute('markerUnits'), 'userSpaceOnUse');
     assert.equal(vectorGroup.querySelectorAll('text').length, 0, 'u=0 suppresses the vector name');
 
     const tick = groups[2].querySelector('polyline, line');
@@ -932,7 +960,7 @@ test('arc arrows, end caps, and caption fallbacks render natively', () => {
     const arrowMarkers = svg.querySelectorAll('marker');
     assert.equal(arrowMarkers.length, 3);
     arrowMarkers.forEach(marker => {
-      assert.equal(marker.getAttribute('markerUnits'), 'strokeWidth');
+      assert.equal(marker.getAttribute('markerUnits'), 'userSpaceOnUse');
       assert.equal(marker.getAttribute('orient'), 'auto-start-reverse');
     });
 

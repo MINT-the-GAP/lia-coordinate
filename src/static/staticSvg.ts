@@ -973,7 +973,7 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
       xAxis.setAttribute('y1', String(py));
       xAxis.setAttribute('y2', String(py));
       setStableStroke(xAxis, color, 2.5, 'solid');
-      xAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config.id) + ')');
+      xAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config, 2.5) + ')');
       axes.appendChild(xAxis);
       for (let x = Math.ceil(config.xmin / step) * step; x <= config.xmax + step * 1e-9; x += step) {
         const normalizedX = Math.abs(x) <= step * 1e-9 ? 0 : x;
@@ -1037,7 +1037,7 @@ function appendDecorations(svg: SVGSVGElement, config: BoardConfig, doc: Documen
       yAxis.setAttribute('y1', String(height));
       yAxis.setAttribute('y2', '0');
       setStableStroke(yAxis, color, 2.5, 'solid');
-      yAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config.id) + ')');
+      yAxis.setAttribute('marker-end', 'url(#' + addArrowMarker(svg, doc, color, config, 2.5) + ')');
       axes.appendChild(yAxis);
       for (let y = Math.ceil(config.ymin / step) * step; y <= config.ymax + step * 1e-9; y += step) {
         const normalizedY = Math.abs(y) <= step * 1e-9 ? 0 : y;
@@ -1085,7 +1085,8 @@ function addArrowMarker(
   svg: SVGSVGElement,
   doc: Document,
   color: string,
-  boardId: string
+  config: BoardConfig,
+  strokeWidth: number
 ): string {
   let defs = svg.querySelector('defs[data-lia-static-defs]') as SVGDefsElement | null;
   if (!defs) {
@@ -1094,16 +1095,20 @@ function addArrowMarker(
     svg.insertBefore(defs, svg.firstChild);
   }
   markerSerial += 1;
-  const safeBoardId = boardId.replace(/[^a-z0-9_-]/gi, '-') || 'board';
+  const safeBoardId = config.id.replace(/[^a-z0-9_-]/gi, '-') || 'board';
   const id = 'lia-static-arrow-' + safeBoardId + '-' + markerSerial;
+  // Stroke widths are CSS pixels because the line uses non-scaling-stroke.
+  // A strokeWidth-relative marker is scaled in viewBox units by Safari, which
+  // makes its arrowhead as large as the board. Size it explicitly in user units.
+  const markerSize = 4 * strokeWidth * logicalUnitsPerPixel(config);
   const marker = svgElement(doc, 'marker');
   marker.setAttribute('id', id);
   marker.setAttribute('viewBox', '0 0 10 10');
   marker.setAttribute('refX', '9');
   marker.setAttribute('refY', '5');
-  marker.setAttribute('markerWidth', '4');
-  marker.setAttribute('markerHeight', '4');
-  marker.setAttribute('markerUnits', 'strokeWidth');
+  marker.setAttribute('markerWidth', String(markerSize));
+  marker.setAttribute('markerHeight', String(markerSize));
+  marker.setAttribute('markerUnits', 'userSpaceOnUse');
   marker.setAttribute('orient', 'auto-start-reverse');
   const path = svgElement(doc, 'path');
   path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
@@ -1532,7 +1537,7 @@ function appendGeometry(
     polyline.setAttribute('fill', 'none');
     setStableStroke(polyline, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
     if (entry.geometry.firstArrow || entry.geometry.lastArrow) {
-      const markerId = addArrowMarker(svg, doc, entry.geometry.color, config.id);
+      const markerId = addArrowMarker(svg, doc, entry.geometry.color, config, entry.geometry.strokeWidth);
       if (entry.geometry.firstArrow) polyline.setAttribute('marker-start', 'url(#' + markerId + ')');
       if (entry.geometry.lastArrow) polyline.setAttribute('marker-end', 'url(#' + markerId + ')');
     }
@@ -1569,7 +1574,7 @@ function appendGeometry(
     line.setAttribute('y2', String(end.y));
     line.setAttribute('fill', 'none');
     setStableStroke(line, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
-    const markerId = addArrowMarker(svg, doc, entry.geometry.color, config.id);
+    const markerId = addArrowMarker(svg, doc, entry.geometry.color, config, entry.geometry.strokeWidth);
     line.setAttribute('marker-end', 'url(#' + markerId + ')');
     group.appendChild(line);
     if (entry.geometry.showName && entry.geometry.objectName) {
@@ -1621,7 +1626,7 @@ function appendGeometry(
     path.setAttribute('stroke-linecap', 'round');
     setStableStroke(path, entry.geometry.color, entry.geometry.strokeWidth, entry.geometry.lineStyle);
     if (entry.geometry.firstArrow || entry.geometry.lastArrow) {
-      const markerId = addArrowMarker(svg, doc, entry.geometry.color, config.id);
+      const markerId = addArrowMarker(svg, doc, entry.geometry.color, config, entry.geometry.strokeWidth);
       if (entry.geometry.firstArrow) path.setAttribute('marker-start', 'url(#' + markerId + ')');
       if (entry.geometry.lastArrow) path.setAttribute('marker-end', 'url(#' + markerId + ')');
     }
