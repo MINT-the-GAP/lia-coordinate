@@ -1147,12 +1147,26 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     userViewportIntentUntil = Math.max(userViewportIntentUntil, Date.now() + duration);
   };
   const handleViewportWheel = function(event: WheelEvent): void {
-    if (!isBoardUiControl(event.target)) markUserViewportIntent();
+    if (isBoardUiControl(event.target)) return;
+    if (!board.__liaDgsFullscreenActive) markUserViewportIntent();
+    // JSXGraph 1.11 listens to the legacy mousewheel event. Chrome sends a
+    // standard wheel event here, so forward it through JSXGraph's own handler
+    // to retain its cursor anchor, zoom limits and DGS axis-direction hooks.
+    if (!cfg.border || event.defaultPrevented || !Number.isFinite(event.deltaY) ||
+        event.deltaY === 0 || typeof board.mouseWheelListener !== 'function') return;
+    try {
+      Object.defineProperty(event, 'wheelDelta', {
+        configurable: true,
+        value: event.deltaY < 0 ? 120 : -120
+      });
+      board.mouseWheelListener(event);
+      event.stopPropagation();
+    } catch (e) {}
   };
   const handleViewportPointerDown = function(event: PointerEvent): void {
     if (isBoardUiControl(event.target)) return;
     userViewportPointerActive = true;
-    markUserViewportIntent(1200);
+    if (!board.__liaDgsFullscreenActive) markUserViewportIntent(1200);
   };
   const handleViewportPointerUp = function(): void {
     if (!isCurrentBoard()) {
@@ -1168,7 +1182,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     if (!isCurrentBoard()) cleanupViewportIntentListeners();
   };
   const handleViewportKeyDown = function(event: KeyboardEvent): void {
-    if (!isBoardUiControl(event.target)) markUserViewportIntent();
+    if (!board.__liaDgsFullscreenActive && !isBoardUiControl(event.target)) markUserViewportIntent();
   };
   const cleanupViewportIntentListeners = function(): void {
     try { board.containerObj.removeEventListener('wheel', handleViewportWheel, true); } catch (e) {}
@@ -1177,7 +1191,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     try { window.removeEventListener('pointerup', handleViewportPointerUp, true); } catch (e) {}
     try { window.removeEventListener('pointercancel', handleViewportPointerCancel, true); } catch (e) {}
   };
-  board.containerObj.addEventListener('wheel', handleViewportWheel, { capture: true, passive: true });
+  board.containerObj.addEventListener('wheel', handleViewportWheel, { capture: true, passive: false });
   board.containerObj.addEventListener('pointerdown', handleViewportPointerDown, true);
   window.addEventListener('pointerup', handleViewportPointerUp, true);
   window.addEventListener('pointercancel', handleViewportPointerCancel, true);
@@ -1359,7 +1373,10 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     if (bboxRAF) return;
     bboxRAF = requestAnimationFrame(function() {
       bboxRAF = 0;
-      if (userViewportPointerActive || Date.now() <= userViewportIntentUntil) {
+      if (board.__liaDgsFullscreenActive) {
+        userViewportPointerActive = false;
+        userViewportIntentUntil = 0;
+      } else if (userViewportPointerActive || Date.now() <= userViewportIntentUntil) {
         board.__coordExportBBox = getSafeBBox(board, initialBBox);
       }
       scheduleBoardStateSave();

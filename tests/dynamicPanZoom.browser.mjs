@@ -190,6 +190,57 @@ try {
 
 
     assert.ok(zoomed.bbox[2] - zoomed.bbox[0] < panned.bbox[2] - panned.bbox[0], 'Actual wheel must zoom');
+    if (mode !== 'before') assert.equal(cdpWheelZoom, true, 'Standard Chrome wheel event must zoom without a legacy fallback');
+
+    if (mode !== 'before') {
+      await evaluate('__boards.A1.containerObj.querySelector(".lia-dgs-menu-button").click()');
+      await sleep(250);
+      const embedded = await evaluate('(()=>{const b=__boards.A1,r=b.containerObj.getBoundingClientRect();return{bbox:b.getBoundingBox(),exportBBox:b.__coordExportBBox.slice(),width:r.width,height:r.height}})()');
+      async function fullscreenButtonClick() {
+        const center = await evaluate('(()=>{const r=__boards.A1.containerObj.querySelector(".lia-dgs-fullscreen-button").getBoundingClientRect();return[r.left+r.width/2,r.top+r.height/2]})()');
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: center[0], y: center[1] });
+        await send('Input.dispatchMouseEvent', { type: 'mousePressed', button: 'left', buttons: 1, x: center[0], y: center[1], clickCount: 1 });
+        await send('Input.dispatchMouseEvent', { type: 'mouseReleased', button: 'left', buttons: 0, x: center[0], y: center[1], clickCount: 1 });
+      }
+      async function waitFullscreen(active) {
+        for (let i = 0; i < 40; i++) {
+          if (await evaluate('(()=>{const b=__boards.A1.containerObj;return b.getRootNode().fullscreenElement===b || document.fullscreenElement===b})()') === active) return;
+          await sleep(50);
+        }
+        throw Error('DGS fullscreen state did not become ' + active);
+      }
+      async function checkEmbeddedView() {
+        await sleep(350);
+        const restored = await evaluate('(()=>{const b=__boards.A1,r=b.containerObj.getBoundingClientRect(),s=__coordBoardStates.A1;return{bbox:b.getBoundingBox(),exportBBox:b.__coordExportBBox.slice(),storedBBox:s.bbox,storedExportBBox:s.exportBBox,width:r.width,height:r.height}})()');
+        const close = (a, b) => Math.abs(a - b) < 1e-5;
+        assert.ok(restored.bbox.every((value, i) => close(value, embedded.bbox[i])), 'Embedded zoom must match the view before fullscreen');
+        assert.ok(restored.exportBBox.every((value, i) => close(value, embedded.exportBBox[i])), 'Responsive export viewport must be restored');
+        assert.ok(restored.storedBBox.every((value, i) => close(value, embedded.bbox[i])), 'Stored viewport must be restored');
+        assert.ok(restored.storedExportBBox.every((value, i) => close(value, embedded.exportBBox[i])), 'Stored export viewport must be restored');
+        assert.ok(close(restored.width, embedded.width) && close(restored.height, embedded.height), 'Embedded dimensions must be restored');
+      }
+      await fullscreenButtonClick();
+      await waitFullscreen(true);
+      await sleep(250);
+      const fullscreenBeforeWheel = await evaluate('__boards.A1.getBoundingBox()');
+      const fullscreenTarget = await evaluate('interactionState().empty');
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: fullscreenTarget[0], y: fullscreenTarget[1] });
+      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: fullscreenTarget[0], y: fullscreenTarget[1], deltaX: 0, deltaY: -160 });
+      await sleep(180);
+      const fullscreenAfterWheel = await evaluate('__boards.A1.getBoundingBox()');
+      assert.ok(fullscreenAfterWheel[2] - fullscreenAfterWheel[0] < fullscreenBeforeWheel[2] - fullscreenBeforeWheel[0],
+        'Mouse wheel must zoom while in fullscreen');
+      await fullscreenButtonClick();
+      await waitFullscreen(false);
+      await checkEmbeddedView();
+      await fullscreenButtonClick();
+      await waitFullscreen(true);
+      await sleep(250);
+      await evaluate('__boards.A1.setBoundingBox([-3,4,6,-5],true);document.exitFullscreen()');
+      await waitFullscreen(false);
+      await checkEmbeddedView();
+    }
+
     await evaluate('__boards.A1.setBoundingBox([-10,10,10,-10],true);__boards.A1.update();true');
     await sleep(150);
     const beforeDrag = await evaluate('interactionState()');

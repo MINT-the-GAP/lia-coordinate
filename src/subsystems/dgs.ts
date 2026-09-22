@@ -481,6 +481,7 @@ type DgsState = {
     width: number;
     height: number;
     boundingBox: number[] | null;
+    exportBBox: number[] | null;
   } | null;
   fullscreenRenderWidth: number;
   fullscreenRenderHeight: number;
@@ -901,7 +902,7 @@ function restoreDgsEmbeddedSize(state: DgsState): void {
   }
   if (state.fullscreenReleaseTimer != null) window.clearTimeout(state.fullscreenReleaseTimer);
   const container = state.boardContainer;
-  const boundingBox = readDgsBoundingBox(state) || snapshot.boundingBox;
+  const boundingBox = snapshot.boundingBox || readDgsBoundingBox(state);
   container.classList.remove('lia-dgs-fullscreen-active');
   if (snapshot.widthStyle) container.style.width = snapshot.widthStyle;
   else container.style.removeProperty('width');
@@ -919,6 +920,7 @@ function restoreDgsEmbeddedSize(state: DgsState): void {
   if (boundingBox) {
     try { state.board?.setBoundingBox?.(boundingBox.slice(), true); } catch (e) {}
   }
+  if (state.board && snapshot.exportBBox) state.board.__coordExportBBox = snapshot.exportBBox.slice();
   try { state.board?.fullUpdate?.(); } catch (e) {
     try { state.board?.update?.(); } catch (e2) {}
   }
@@ -943,7 +945,8 @@ function restoreDgsEmbeddedSize(state: DgsState): void {
       ...previousState,
       width: keepManualSize ? Math.round(manualWidth) : width,
       height: keepManualSize ? Math.round(manualHeight) : height,
-      bbox: boundingBox.slice()
+      bbox: boundingBox.slice(),
+      ...(snapshot.exportBBox ? { exportBBox: snapshot.exportBBox.slice() } : {})
     };
   }
   state.fullscreenReleaseTimer = window.setTimeout(() => {
@@ -988,7 +991,9 @@ async function toggleDgsFullscreen(state: DgsState): Promise<void> {
       heightStyle: container.style.height,
       width: Math.max(1, Math.round(rect.width || container.clientWidth || 1)),
       height: Math.max(1, Math.round(rect.height || container.clientHeight || 1)),
-      boundingBox: readDgsBoundingBox(state)
+      boundingBox: readDgsBoundingBox(state),
+      exportBBox: Array.isArray(state.board?.__coordExportBBox)
+        ? state.board.__coordExportBBox.slice() : null
     };
     state.fullscreenRenderWidth = 0;
     state.fullscreenRenderHeight = 0;

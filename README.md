@@ -1485,7 +1485,8 @@ switching back to Cartesian restores ordinary tick labels and function plotting.
 The fullscreen button directly before the object-list button toggles the complete DGS board
 between its embedded size and browser fullscreen. Entering and leaving fullscreen resizes
 JSXGraph to the available viewport; Escape or a browser-initiated exit also synchronizes the
-button state and restores the previous embedded size while retaining the current pan/zoom view.
+button state and restores the previous embedded size and pan/zoom view. Changes to the view
+made in fullscreen do not affect the embedded view.
 The final toolbar button opens an object list from the right. It contains every user-facing DGS
 object with its name, type, color, and current visibility. Right-clicking an entry opens the
 ordinary object-properties panel immediately to the left of the list, so both panels remain
