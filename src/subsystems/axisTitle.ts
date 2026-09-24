@@ -6,6 +6,21 @@ import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { setStyleIfChanged } from '../shared/domUpdates';
 
+export function isAxisVisibleForTitle(board: any, key: 'x' | 'y'): boolean {
+  const axis = board && board.defaultAxes && board.defaultAxes[key];
+  if (!axis) return false;
+
+  try {
+    if (typeof axis.evalVisProp === 'function') {
+      const evaluated = axis.evalVisProp('visible');
+      if (evaluated != null) return evaluated !== false;
+    }
+  } catch (e) {}
+  try { if (axis.visPropCalc && axis.visPropCalc.visible === false) return false; } catch (e) {}
+  try { if (axis.visProp && axis.visProp.visible === false) return false; } catch (e) {}
+  return true;
+}
+
 export function init(): void {
   if (window.__axisTitlesReady) {
     try {
@@ -178,8 +193,15 @@ export function init(): void {
     if (xEl) setStyleIfChanged(xEl, 'color', col);
     if (yEl) setStyleIfChanged(yEl, 'color', col);
 
-    const xHTML = normalizeAxisLabelMath(cfg.xlabel || '');
-    const yHTML = normalizeAxisLabelMath(cfg.ylabel || '');
+    // DGS snapshots can contain the default variables even when a board was
+    // authored without axes. Never let those overlay titles flash over an
+    // absent or deliberately invisible JSXGraph axis.
+    const xHTML = isAxisVisibleForTitle(board, 'x')
+      ? normalizeAxisLabelMath(cfg.xlabel || '')
+      : '';
+    const yHTML = isAxisVisibleForTitle(board, 'y')
+      ? normalizeAxisLabelMath(cfg.ylabel || '')
+      : '';
 
     setOverlayContent(xEl, xHTML);
     setOverlayContent(yEl, yHTML);

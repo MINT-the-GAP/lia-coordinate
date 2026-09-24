@@ -1491,8 +1491,11 @@ The final toolbar button opens an object list from the right. It contains every 
 object with its name, type, color, and current visibility. Right-clicking an entry opens the
 ordinary object-properties panel immediately to the left of the list, so both panels remain
 usable at the same time. The horizontal axis shortens by the combined visible panel width, and
-the open top menu moves both panels downward. The button at the bottom of the object list opens
-a centered export dialog. It creates a fresh eight-character board id and emits the current board
+the open top menu moves both panels downward. Course-authored macro objects remain editable and
+deletable like other DGS objects. The object-list footer provides a two-step **Restore initial state**
+action that removes learner-created objects and recreates even deleted macro-managed objects and
+axis labels from the course-authored state. The
+Export button in the same footer opens a centered export dialog. It creates a fresh eight-character board id and emits the current board
 as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
 system, axis labels, points, coordinate text, parameter sliders, function graphs, function-analysis
 points, ordinate-axis intercepts, intersections, segments, straight lines, rays, vectors, arcs,
@@ -1513,7 +1516,7 @@ are serialized independently as `restrictions=[...]`: `100` disables object prop
 board, object list, and keyboard context-menu shortcut; `200` limits object properties to colors,
 opacity, and point traces; `300` removes and locks the checkmarks for lengths, equations, areas,
 perimeters, angles, function terms, coordinates, and analysis values; and `400` hides and disables
-the Export button in the object list. Restriction `300` also suppresses values that were already
+only the Export button in the object list. The initial-state restore remains available. Restriction `300` also suppresses values that were already
 visible or would normally be shown automatically; the underlying author settings are preserved
 and reappear if the restriction is removed. The two object-property modes are mutually exclusive
 in the dialog. The complete lock (`100`) takes precedence if `100` and `200` are written by hand.

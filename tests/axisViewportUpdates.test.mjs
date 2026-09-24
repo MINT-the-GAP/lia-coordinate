@@ -28,6 +28,7 @@ const {
   updateStickyTickLabelPositions,
   updateViewportAxes
 } = await import('../src/coord/boardHelpers.ts');
+const { isAxisVisibleForTitle } = await import('../src/subsystems/axisTitle.ts');
 
 function createBoard() {
   const board = {
@@ -173,4 +174,30 @@ test('a suspend method that throws after setting the flag is still paired', () =
   assert.equal(board.isSuspendedUpdate, false);
   assert.equal(count(board, 'unsuspend'), 1);
   assert.equal(count(board, 'fullUpdate'), 1);
+});
+
+test('axis titles stay hidden when their JSXGraph axes are absent or invisible', () => {
+  assert.equal(isAxisVisibleForTitle({}, 'x'), false);
+  assert.equal(isAxisVisibleForTitle({ defaultAxes: {} }, 'y'), false);
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { x: { evalVisProp: () => false } }
+  }, 'x'), false);
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { y: { visPropCalc: { visible: false } } }
+  }, 'y'), false);
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { x: { visProp: { visible: false } } }
+  }, 'x'), false);
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { x: { evalVisProp: () => undefined, visProp: { visible: false } } }
+  }, 'x'), false);
+});
+
+test('axis titles remain available for visible axes', () => {
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { x: { evalVisProp: () => true } }
+  }, 'x'), true);
+  assert.equal(isAxisVisibleForTitle({
+    defaultAxes: { y: { visProp: { visible: true } } }
+  }, 'y'), true);
 });

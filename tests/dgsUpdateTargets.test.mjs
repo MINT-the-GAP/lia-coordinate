@@ -158,3 +158,47 @@ test('array-only boards still detect removal and a replacement board owns a sepa
   assert.deepEqual(getDgsUpdateTargets(newBoard, 'coordinates'), [newPoint]);
   for (const kind of kinds) assert.deepEqual(getDgsUpdateTargets(null, kind), []);
 });
+
+test('authored macro objects remain deletable through both DGS delete paths', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/subsystems/dgs.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /isDgsMacroObjectProtected/);
+  assert.match(source, /state\.deleteButton\.hidden = false;/);
+  assert.match(
+    source,
+    /window\.__eraseDgsAtClientPoint[\s\S]*?deleteDgsObject\(state, object, false\);/
+  );
+});
+
+test('the object list restores the authored macro state with two-click confirmation', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/subsystems/dgs.ts', import.meta.url), 'utf8');
+  assert.match(source, /restoreInitialState: 'Anfangszustand wiederherstellen'/);
+  assert.match(
+    source,
+    /function captureDgsInitialConstruction[\s\S]*?\.filter\(isDgsMacroSnapshotRecord\)/
+  );
+  assert.match(
+    source,
+    /function restoreDgsInitialConstruction[\s\S]*?clearDgsConstructionFromBoard\(state\);[\s\S]*?discardDgsMacroRegistryEntries\(state\.boardId, state\.board\);/
+  );
+  assert.match(
+    source,
+    /runExternalBootstraps\(\);[\s\S]*?dgsConstructionStates\[state\.boardId\] = cloneDgsSnapshot\(initial\);[\s\S]*?restoreDgsConstruction\(state\);/
+  );
+  assert.match(
+    source,
+    /objectListResetButton\.addEventListener\('click'[\s\S]*?if \(!state\.initialResetArmed\)[\s\S]*?restoreDgsInitialConstruction\(state\);/
+  );
+});
+
+test('export restriction leaves initial-state restore available', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/subsystems/dgs.ts', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /function applyDgsProfileRestrictions[\s\S]*?state\.objectListFooter\.hidden = false;[\s\S]*?state\.objectListExportButton\.hidden = exportLocked;/
+  );
+  assert.match(source, /objectListFooter\.appendChild\(objectListResetButton\);/);
+  assert.match(source, /state\.objectListResetButton\.tabIndex = open \? 0 : -1;/);
+});

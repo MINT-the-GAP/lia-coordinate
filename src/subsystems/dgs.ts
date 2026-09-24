@@ -5,7 +5,7 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { eventTargetsBoardUi } from '../shared/boardUiEvents';
 import { setAttributeIfChanged, setStyleIfChanged } from '../shared/domUpdates';
 import { getDgsUpdateTargets, trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
-import { getAdaptiveTickMetric } from '../coord/boardHelpers';
+import { getAdaptiveTickMetric, runExternalBootstraps } from '../coord/boardHelpers';
 import { formatMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import {
@@ -258,6 +258,7 @@ type DgsState = {
   objectListFooter: HTMLDivElement;
   objectListCloseButton: HTMLButtonElement;
   objectListExportButton: HTMLButtonElement;
+  objectListResetButton: HTMLButtonElement;
   exportDialog: HTMLDivElement;
   exportDialogTitle: HTMLDivElement;
   exportToolsStep: HTMLDivElement;
@@ -475,6 +476,7 @@ type DgsState = {
   sideMenuOpen: boolean;
   objectListOpen: boolean;
   objectListSignature: string;
+  initialResetArmed: boolean;
   fullscreenSnapshot: {
     widthStyle: string;
     heightStyle: string;
@@ -627,7 +629,7 @@ const DGS_TEXT = {
     exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
     appearance: 'Darstellung', lineStyle: 'Linienart', solid: 'Durchgezogen', dashed: 'Gestrichelt', dotted: 'Gepunktet', dashdotted: 'Strichpunktiert', design: 'Design', strokeWidth: 'Linienstärke',
     enterFullscreen: 'Vollbildmodus starten', exitFullscreen: 'Vollbildmodus beenden',
-    objectList: 'Objektliste', noObjects: 'Noch keine Objekte', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
+    objectList: 'Objektliste', noObjects: 'Noch keine Objekte', restoreInitialState: 'Anfangszustand wiederherstellen', confirmRestoreInitialState: 'Wiederherstellen best\u00e4tigen', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
     point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
     coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
     showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
@@ -657,7 +659,7 @@ const DGS_TEXT = {
     exitAngle: 'Exit angle', entryAngle: 'Entry angle',
     appearance: 'Appearance', lineStyle: 'Line style', solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted', dashdotted: 'Dash-dotted', design: 'Design', strokeWidth: 'Line width',
     enterFullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen',
-    objectList: 'Object list', noObjects: 'No objects yet', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
+    objectList: 'Object list', noObjects: 'No objects yet', restoreInitialState: 'Restore initial state', confirmRestoreInitialState: 'Confirm restore', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
     point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
     coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
     showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
@@ -1939,6 +1941,9 @@ const dgsConstructionStates: Record<string, any> =
   ((window as any).__dgsConstructionStates = (window as any).__dgsConstructionStates || {});
 const dgsConstructionBoards: Record<string, any> =
   ((window as any).__dgsConstructionBoards = (window as any).__dgsConstructionBoards || {});
+const dgsInitialConstructionStates: Record<string, any> =
+  ((window as any).__dgsInitialConstructionStates =
+    (window as any).__dgsInitialConstructionStates || {});
 let dgsPersistentIdCounter = 0;
 const dgsHistoryApplying = new Set<string>();
 const dgsPendingHistoryBefore: Record<string, any> = {};
@@ -1976,7 +1981,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-08-22-1';
+const DGS_STYLE_VERSION = '2026-09-24-1';
 
 function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   if (!board) return;
@@ -2061,6 +2066,57 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   visit('__objectAnalysisPointEntries', (entry, key) => assignList(entry.points, key + ':point', true));
 }
 
+const DGS_MACRO_ENTRY_REGISTRIES = [
+  '__plotFunctionEntries',
+  '__sliderEntries',
+  '__distanceEntries',
+  '__linearObjectEntries',
+  '__arcEntries',
+  '__relationObjectEntries',
+  '__areaEntries',
+  '__angleEntries',
+  '__coordTextEntries',
+  '__circleEntries',
+  '__tangentEntries',
+  '__sectorEntries',
+  '__functionAnalysisPointEntries',
+  '__objectAnalysisPointEntries'
+] as const;
+
+function discardDgsMacroRegistryEntries(boardId: string, board: any): void {
+  const root = window as any;
+  DGS_MACRO_ENTRY_REGISTRIES.forEach((registryName) => {
+    const entries = root[registryName];
+    if (!entries || typeof entries !== 'object') return;
+    Object.keys(entries).forEach((key) => {
+      const entry = entries[key];
+      if (!entry || String(entry.boardId || boardId) !== boardId) return;
+      const candidates = [
+        entry.board,
+        entry.graph?.board,
+        entry.slider?.board,
+        entry.object?.board,
+        entry.curve?.board,
+        entry.polygon?.board,
+        entry.angle?.board,
+        entry.text?.board,
+        entry.circle?.board,
+        entry.tangent?.board,
+        entry.sector?.board,
+        entry.contactPoint?.board,
+        entry.source?.board,
+        entry.source?.object?.board,
+        entry.points?.[0]?.board,
+        entry.ownedPoints?.[0]?.board,
+        entry.ownedObjects?.[0]?.board,
+        entry.segments?.[0]?.board
+      ].filter(Boolean);
+      if (candidates.length && !candidates.includes(board)) return;
+      delete entries[key];
+    });
+  });
+}
+
 function getExternalDgsMacroSpecSignature(boardId: string): string {
   const objectSpecId = /^(?:(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-|point-ui-)/;
   try {
@@ -2129,6 +2185,7 @@ function discardStaleMacroBackedDgsSnapshot(boardId: string, board: any): void {
   if (!hasChangedDgsMacroSpecAnchor(savedSignature, currentSignature)) return;
   delete dgsConstructionStates[boardId];
   delete dgsConstructionBoards[boardId];
+  delete dgsInitialConstructionStates[boardId];
   delete dgsPendingHistoryBefore[boardId];
   dgsHistoryApplying.delete(boardId);
 }
@@ -2421,9 +2478,12 @@ function ensureStyles(root: Document | ShadowRoot): void {
       margin-top: 8px;
       padding-top: 8px;
       border-top: 2px solid var(--lia-dgs-theme-color, currentColor);
+      display: grid;
+      gap: 6px;
     }
 
-    .lia-dgs-object-list-export {
+    .lia-dgs-object-list-export,
+    .lia-dgs-object-list-reset {
       width: 100%;
       min-height: 34px;
       box-sizing: border-box;
@@ -2441,9 +2501,17 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-object-list-export:hover,
-    .lia-dgs-object-list-export:focus-visible {
+    .lia-dgs-object-list-export:focus-visible,
+    .lia-dgs-object-list-reset:hover,
+    .lia-dgs-object-list-reset:focus-visible {
       background: color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 15%, transparent);
       outline: none;
+    }
+
+    .lia-dgs-object-list-reset[data-confirm=1] {
+      border-color: #b3261e;
+      background: rgba(179, 38, 30, .1);
+      color: #b3261e;
     }
 
     .lia-dgs-object-list-empty {
@@ -8997,6 +9065,68 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   }
 }
 
+function isDgsMacroSnapshotRecord(record: any): boolean {
+  return !!record && (
+    record.origin === 'macro' || !!record.macroKey ||
+    String(record.id || '').startsWith('macro:')
+  );
+}
+
+function dgsSnapshotRecordKey(record: any): string {
+  if (!record) return '';
+  return String(record.macroKey || record.id || '');
+}
+
+function captureDgsInitialConstruction(state: DgsState): void {
+  if (!state || state.restoring || !state.board) return;
+  const boardId = state.boardId;
+  const hadConstruction = Object.prototype.hasOwnProperty.call(dgsConstructionStates, boardId);
+  const previousConstruction = hadConstruction
+    ? dgsConstructionStates[boardId]
+    : undefined;
+  const hadPendingHistory = Object.prototype.hasOwnProperty.call(dgsPendingHistoryBefore, boardId);
+  const previousPendingHistory = hadPendingHistory
+    ? dgsPendingHistoryBefore[boardId]
+    : undefined;
+
+  persistDgsConstruction(state, false);
+  const liveSnapshot = cloneDgsSnapshot(dgsConstructionStates[boardId] || {
+    boardId,
+    language: state.language,
+    records: []
+  });
+
+  if (hadConstruction) dgsConstructionStates[boardId] = previousConstruction;
+  else delete dgsConstructionStates[boardId];
+  if (hadPendingHistory) dgsPendingHistoryBefore[boardId] = previousPendingHistory;
+  else delete dgsPendingHistoryBefore[boardId];
+
+  const macroRecords = (Array.isArray(liveSnapshot.records) ? liveSnapshot.records : [])
+    .filter(isDgsMacroSnapshotRecord);
+  const initial = dgsInitialConstructionStates[boardId];
+  if (!initial) {
+    dgsInitialConstructionStates[boardId] = {
+      ...liveSnapshot,
+      records: macroRecords
+    };
+    return;
+  }
+
+  const existingKeys = new Set(
+    (Array.isArray(initial.records) ? initial.records : [])
+      .map(dgsSnapshotRecordKey)
+      .filter(Boolean)
+  );
+  if (!Array.isArray(initial.records)) initial.records = [];
+  macroRecords.forEach((record: any) => {
+    const key = dgsSnapshotRecordKey(record);
+    if (!key || existingKeys.has(key)) return;
+    initial.records.push(record);
+    existingKeys.add(key);
+  });
+  initial.macroSpecSignature = liveSnapshot.macroSpecSignature;
+}
+
 function findDgsPointForRestore(state: DgsState, reference: any, byId: Map<string, any>): any | null {
   if (reference && reference.id && byId.has(reference.id)) return byId.get(reference.id);
   const name = String(reference && reference.name || '');
@@ -9434,6 +9564,7 @@ function restoreDgsPendingRecords(
 }
 
 function restoreDgsConstruction(state: DgsState): boolean {
+  captureDgsInitialConstruction(state);
   const saved = dgsConstructionStates[state.boardId];
   if (!saved || saved.boardId !== state.boardId || !Array.isArray(saved.records)) return false;
   dgsConstructionBoards[state.boardId] = state.board;
@@ -12556,6 +12687,56 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   persistDgsConstruction(state, recordHistory);
 }
 
+function resetDgsInitialRestoreButton(state: DgsState): void {
+  state.initialResetArmed = false;
+  state.objectListResetButton.dataset.confirm = '0';
+  state.objectListResetButton.textContent = dgsText(state.language).restoreInitialState;
+  state.objectListResetButton.title = dgsText(state.language).restoreInitialState;
+  state.objectListResetButton.setAttribute(
+    'aria-label',
+    dgsText(state.language).restoreInitialState
+  );
+}
+
+function restoreDgsInitialConstruction(state: DgsState): void {
+  if (!state || !state.board) return;
+  captureDgsInitialConstruction(state);
+  const initial = dgsInitialConstructionStates[state.boardId];
+  if (!initial || !Array.isArray(initial.records)) {
+    resetDgsInitialRestoreButton(state);
+    return;
+  }
+
+  persistDgsConstruction(state, true);
+  const before = cloneDgsSnapshot(dgsConstructionStates[state.boardId] || {
+    boardId: state.boardId,
+    language: state.language,
+    records: []
+  });
+  dgsPendingHistoryBefore[state.boardId] = cloneDgsSnapshot(before);
+
+  setActiveTool(state, '', false);
+  clearDgsConstructionFromBoard(state);
+  discardDgsMacroRegistryEntries(state.boardId, state.board);
+
+  let needsDeferredRestore = true;
+  for (let attempt = 0; attempt < 3 && needsDeferredRestore; attempt += 1) {
+    runExternalBootstraps();
+    assignDgsMacroPersistentIds(state.boardId, state.board);
+    dgsConstructionStates[state.boardId] = cloneDgsSnapshot(initial);
+    needsDeferredRestore = restoreDgsConstruction(state);
+  }
+  dgsConstructionStates[state.boardId] = before;
+  dgsHistoryApplying.add(state.boardId);
+  try {
+    persistDgsConstruction(state, true);
+  } finally {
+    dgsHistoryApplying.delete(state.boardId);
+  }
+  resetDgsInitialRestoreButton(state);
+  refreshDgsObjectList(state, true);
+}
+
 function getDgsStateForBoard(boardId: string): DgsState | null {
   const board = window.__boards && window.__boards[boardId];
   return Object.keys(states)
@@ -14183,9 +14364,13 @@ function setObjectListOpen(state: DgsState, open: boolean): void {
   state.sideMenu.dataset.objectListOpen = open ? '1' : '0';
   state.sideMenu.classList.toggle('has-object-list', open);
   state.objectListCloseButton.tabIndex = open ? 0 : -1;
+  state.objectListResetButton.tabIndex = open ? 0 : -1;
   state.objectListExportButton.tabIndex = open && !state.objectListExportButton.hidden ? 0 : -1;
   if (open) refreshDgsObjectList(state, true);
-  else state.objectListSignature = '';
+  else {
+    state.objectListSignature = '';
+    resetDgsInitialRestoreButton(state);
+  }
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (changed) trackXAxisWithSideMenu(state);
   if (changed) {
@@ -14211,7 +14396,7 @@ function applyDgsProfileRestrictions(state: DgsState): void {
     DGS_RESTRICTION_IDS.valueControlsLocked
   );
   if (state.board) state.board.__liaDgsValueDisplayLocked = valueDisplayLocked;
-  state.objectListFooter.hidden = exportLocked;
+  state.objectListFooter.hidden = false;
   state.objectListExportButton.hidden = exportLocked;
   state.objectListExportButton.disabled = exportLocked;
   state.objectListExportButton.tabIndex = state.objectListOpen && !exportLocked ? 0 : -1;
@@ -15045,6 +15230,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.objectListContent?.isConnected &&
     !!existing.objectListFooter?.isConnected &&
     !!existing.objectListCloseButton?.isConnected &&
+    !!existing.objectListResetButton?.isConnected &&
     !!existing.objectListExportButton?.isConnected &&
     !!existing.nameOption?.isConnected &&
     !!existing.objectOption?.isConnected &&
@@ -15751,6 +15937,14 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   objectListContent.className = 'lia-dgs-object-list-content';
   const objectListFooter = document.createElement('div');
   objectListFooter.className = 'lia-dgs-object-list-footer';
+  const objectListResetButton = document.createElement('button');
+  objectListResetButton.type = 'button';
+  objectListResetButton.className = 'lia-dgs-object-list-reset';
+  objectListResetButton.textContent = text.restoreInitialState;
+  objectListResetButton.title = text.restoreInitialState;
+  objectListResetButton.setAttribute('aria-label', text.restoreInitialState);
+  objectListResetButton.dataset.confirm = '0';
+  objectListResetButton.tabIndex = -1;
   const objectListExportButton = document.createElement('button');
   objectListExportButton.type = 'button';
   objectListExportButton.className = 'lia-dgs-object-list-export';
@@ -15758,6 +15952,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   objectListExportButton.title = text.exportMacrosTitle;
   objectListExportButton.setAttribute('aria-label', text.exportMacrosTitle);
   objectListExportButton.tabIndex = -1;
+  objectListFooter.appendChild(objectListResetButton);
   objectListFooter.appendChild(objectListExportButton);
   objectListPanel.appendChild(objectListHeader);
   objectListPanel.appendChild(objectListContent);
@@ -16661,6 +16856,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     objectListContent,
     objectListFooter,
     objectListCloseButton,
+    objectListResetButton,
     objectListExportButton,
     exportDialog,
     exportDialogTitle,
@@ -16889,6 +17085,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     sideMenuOpen: false,
     objectListOpen: false,
     objectListSignature: '',
+    initialResetArmed: false,
     fullscreenSnapshot: null,
     fullscreenRenderWidth: 0,
     fullscreenRenderHeight: 0,
@@ -16964,6 +17161,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   menuBar.addEventListener('scroll', () => positionOpenDgsSubmenu(state), { passive: true });
   setDgsZoomMode(state, storedZoomMode, false);
   setDgsAxisScaleMode(state, storedAxisScaleMode, false);
+  captureDgsInitialConstruction(state);
   restoreDgsConstruction(state);
   // Several legacy macros finish their own restore in a zero/120 ms timeout.
   // One settling pass therefore always runs after them; further passes happen
@@ -17427,6 +17625,20 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     setObjectListOpen(state, false);
+  });
+
+  objectListResetButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (!state.initialResetArmed) {
+      state.initialResetArmed = true;
+      objectListResetButton.dataset.confirm = '1';
+      objectListResetButton.textContent = text.confirmRestoreInitialState;
+      objectListResetButton.title = text.confirmRestoreInitialState;
+      objectListResetButton.setAttribute('aria-label', text.confirmRestoreInitialState);
+      return;
+    }
+    restoreDgsInitialConstruction(state);
   });
 
   objectListExportButton.addEventListener('click', (evt) => {
