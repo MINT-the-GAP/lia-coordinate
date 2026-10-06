@@ -1476,7 +1476,7 @@ export function initializeCoordinateBoard(jxgbox: HTMLElement, spec: string): an
     axis: false,
     grid: false,
     showNavigation: false,
-    showCopyright: false,
+    showCopyright: true,
     boundingbox: presetState ? presetState.bbox.slice() : initialBBox.slice(),
     keepaspectratio: true,
     resize: { enabled: false },
