@@ -2,12 +2,12 @@
   "before": false,
   "browser": {
     "protocolVersion": "1.3",
-    "product": "Chrome/152.0.7977.83",
-    "revision": "@79460ebecaa5625e57a5fb679a735659e73dc687",
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
-    "jsVersion": "15.2.124.21"
+    "product": "Chrome/155.0.8059.40",
+    "revision": "@cfaadc5a132d78e1828635aa8405a499f3e14864",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+    "jsVersion": "15.5.35.20"
   },
-  "bundleSha256": "583d1e7716d85ce8d2c21e1d5ccdd3fe05e6502b7658e7793a77beea619f78a6",
+  "bundleSha256": "ad1ad0c82d0ec42b9493eaa3ceca5c54e07389e0e9b718d87e290d683d5be2b0",
   "scenarios": [
     {
       "name": "baseline-native-and-mutation",
@@ -41,8 +41,8 @@
           "modes": [
             ""
           ],
-          "graphNode": "_jxgBoard6364379G31",
-          "dragNode": "_jxgBoard6364379G32"
+          "graphNode": "_jxgBoard11495838G31",
+          "dragNode": "_jxgBoard11495838G32"
         },
         "shadow": true,
         "hostName": "jsx-graph",
@@ -50,10 +50,10 @@
         "panel": {
           "left": 32,
           "top": 219.875,
-          "right": 272,
-          "bottom": 391.875,
-          "width": 240,
-          "height": 172
+          "right": 136.5,
+          "bottom": 272.67498779296875,
+          "width": 104.5,
+          "height": 52.79998779296875
         },
         "board": {
           "left": 20,
@@ -68,12 +68,12 @@
             "class": "lia-schar-min-btn",
             "title": "Minimize parameter controls",
             "rect": {
-              "left": 241,
-              "top": 222.875,
-              "right": 269,
-              "bottom": 250.875,
-              "width": 28,
-              "height": 28
+              "left": 123.96172332763672,
+              "top": 221.52499389648438,
+              "right": 134.85000610351562,
+              "bottom": 230.875,
+              "width": 10.888282775878906,
+              "height": 9.350006103515625
             }
           },
           {
@@ -114,24 +114,24 @@
           }
         ],
         "styleCount": 1,
-        "rangeHeight": 32,
+        "rangeHeight": 6.5999908447265625,
         "rangeRect": {
-          "left": 87,
-          "top": 250.875,
-          "right": 251,
-          "bottom": 282.875,
-          "width": 164,
-          "height": 32
+          "left": 52.049217224121094,
+          "top": 229.22500610351562,
+          "right": 122.99922180175781,
+          "bottom": 235.8249969482422,
+          "width": 70.95000457763672,
+          "height": 6.5999908447265625
         },
         "minButton": {
-          "left": 241,
-          "top": 222.875,
-          "right": 269,
-          "bottom": 250.875,
-          "width": 28,
-          "height": 28
+          "left": 123.96172332763672,
+          "top": 221.52499389648438,
+          "right": 134.85000610351562,
+          "bottom": 230.875,
+          "width": 10.888282775878906,
+          "height": 9.350006103515625
         },
-        "panelScale": 1,
+        "panelScale": 0.55,
         "panelMinimized": false,
         "activeSame": false,
         "native": {
@@ -177,8 +177,8 @@
           "modes": [
             ""
           ],
-          "graphNode": "_jxgBoard6364379G31",
-          "dragNode": "_jxgBoard6364379G32"
+          "graphNode": "_jxgBoard11495838G31",
+          "dragNode": "_jxgBoard11495838G32"
         },
         "shadow": true,
         "hostName": "jsx-graph",
@@ -186,10 +186,10 @@
         "panel": {
           "left": 32,
           "top": 219.875,
-          "right": 272,
-          "bottom": 391.875,
-          "width": 240,
-          "height": 172
+          "right": 136.5,
+          "bottom": 272.67498779296875,
+          "width": 104.5,
+          "height": 52.79998779296875
         },
         "board": {
           "left": 20,
@@ -204,12 +204,12 @@
             "class": "lia-schar-min-btn",
             "title": "Minimize parameter controls",
             "rect": {
-              "left": 241,
-              "top": 222.875,
-              "right": 269,
-              "bottom": 250.875,
-              "width": 28,
-              "height": 28
+              "left": 123.96172332763672,
+              "top": 221.52499389648438,
+              "right": 134.85000610351562,
+              "bottom": 230.875,
+              "width": 10.888282775878906,
+              "height": 9.350006103515625
             }
           },
           {
@@ -250,24 +250,24 @@
           }
         ],
         "styleCount": 1,
-        "rangeHeight": 32,
+        "rangeHeight": 6.5999908447265625,
         "rangeRect": {
-          "left": 87,
-          "top": 250.875,
-          "right": 251,
-          "bottom": 282.875,
-          "width": 164,
-          "height": 32
+          "left": 52.049217224121094,
+          "top": 229.22500610351562,
+          "right": 122.99922180175781,
+          "bottom": 235.8249969482422,
+          "width": 70.95000457763672,
+          "height": 6.5999908447265625
         },
         "minButton": {
-          "left": 241,
-          "top": 222.875,
-          "right": 269,
-          "bottom": 250.875,
-          "width": 28,
-          "height": 28
+          "left": 123.96172332763672,
+          "top": 221.52499389648438,
+          "right": 134.85000610351562,
+          "bottom": 230.875,
+          "width": 10.888282775878906,
+          "height": 9.350006103515625
         },
-        "panelScale": 1,
+        "panelScale": 0.55,
         "panelMinimized": false,
         "activeConnected": true,
         "activeSame": true,
@@ -430,22 +430,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 169,
-              "y": 266.875,
+              "x": 87.52421569824219,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": -1,
               "trusted": true,
               "value": "1",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -472,22 +472,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 169,
-              "y": 266,
+              "x": 87,
+              "y": 232,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "1",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -515,22 +515,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 169,
-              "y": 266.875,
+              "x": 87.52421569824219,
+              "y": 232.52499389648438,
               "buttons": 1,
               "button": 0,
               "trusted": true,
               "value": "1",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -557,22 +557,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 169,
-              "y": 266,
+              "x": 87,
+              "y": 232,
               "buttons": 1,
               "button": 0,
               "trusted": true,
               "value": "1",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -600,22 +600,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 171.3333282470703,
-              "y": 266.875,
+              "x": 88.56005096435547,
+              "y": 232.52499389648438,
               "buttons": 1,
               "button": -1,
               "trusted": true,
               "value": "1",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -643,22 +643,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 197,
-              "y": 266.875,
+              "x": 99.9542236328125,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -685,22 +685,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 197,
-              "y": 266,
+              "x": 99,
+              "y": 232,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -728,22 +728,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 197,
-              "y": 266.875,
+              "x": 99.9542236328125,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -829,8 +829,8 @@
           "modes": [
             ""
           ],
-          "graphNode": "_jxgBoard6364379G31",
-          "dragNode": "_jxgBoard6364379G32"
+          "graphNode": "_jxgBoard11495838G31",
+          "dragNode": "_jxgBoard11495838G32"
         },
         "shadow": true,
         "hostName": "jsx-graph",
@@ -838,10 +838,10 @@
         "panel": {
           "left": 32,
           "top": 219.875,
-          "right": 272,
-          "bottom": 391.875,
-          "width": 240,
-          "height": 172
+          "right": 136.5,
+          "bottom": 272.67498779296875,
+          "width": 104.5,
+          "height": 52.79998779296875
         },
         "board": {
           "left": 20,
@@ -856,12 +856,12 @@
             "class": "lia-schar-min-btn",
             "title": "Minimize parameter controls",
             "rect": {
-              "left": 241,
-              "top": 222.875,
-              "right": 269,
-              "bottom": 250.875,
-              "width": 28,
-              "height": 28
+              "left": 123.96172332763672,
+              "top": 221.52499389648438,
+              "right": 134.85000610351562,
+              "bottom": 230.875,
+              "width": 10.888282775878906,
+              "height": 9.350006103515625
             }
           },
           {
@@ -902,24 +902,24 @@
           }
         ],
         "styleCount": 1,
-        "rangeHeight": 32,
+        "rangeHeight": 6.5999908447265625,
         "rangeRect": {
-          "left": 87,
-          "top": 250.875,
-          "right": 251,
-          "bottom": 282.875,
-          "width": 164,
-          "height": 32
+          "left": 52.049217224121094,
+          "top": 229.22500610351562,
+          "right": 122.99922180175781,
+          "bottom": 235.8249969482422,
+          "width": 70.95000457763672,
+          "height": 6.5999908447265625
         },
         "minButton": {
-          "left": 241,
-          "top": 222.875,
-          "right": 269,
-          "bottom": 250.875,
-          "width": 28,
-          "height": 28
+          "left": 123.96172332763672,
+          "top": 221.52499389648438,
+          "right": 134.85000610351562,
+          "bottom": 230.875,
+          "width": 10.888282775878906,
+          "height": 9.350006103515625
         },
-        "panelScale": 1,
+        "panelScale": 0.55,
         "panelMinimized": false,
         "activeConnected": true,
         "activeSame": true,
@@ -937,9 +937,9 @@
               ]
             },
             {
-              "value": 3.3,
+              "value": 3.2,
               "connected": true,
-              "graph": 13.2,
+              "graph": 12.8,
               "bbox": [
                 -4.007104290991759,
                 6.003623188405797,
@@ -981,9 +981,9 @@
               ]
             },
             {
-              "value": 3.8,
+              "value": 3.7,
               "connected": true,
-              "graph": 15.2,
+              "graph": 14.8,
               "bbox": [
                 -4.007104290991759,
                 6.003623188405797,
@@ -1025,9 +1025,9 @@
               ]
             },
             {
-              "value": 4.3,
+              "value": 4.2,
               "connected": true,
-              "graph": 17.2,
+              "graph": 16.8,
               "bbox": [
                 -4.007104290991759,
                 6.003623188405797,
@@ -1082,22 +1082,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 197,
-              "y": 266.875,
+              "x": 99.9542236328125,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": -1,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1124,22 +1124,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 197,
-              "y": 266,
+              "x": 99,
+              "y": 232,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1167,22 +1167,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 197,
-              "y": 266.875,
+              "x": 99.9542236328125,
+              "y": 232.52499389648438,
               "buttons": 1,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1209,22 +1209,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 197,
-              "y": 266,
+              "x": 99,
+              "y": 232,
               "buttons": 1,
               "button": 0,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1252,22 +1252,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 198.75,
-              "y": 266.875,
+              "x": 100.73109436035156,
+              "y": 232.52499389648438,
               "buttons": 1,
               "button": -1,
               "trusted": true,
               "value": "3",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1295,22 +1295,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 218,
-              "y": 266.875,
+              "x": 109.27671813964844,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "4.5",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1337,22 +1337,22 @@
                 "Window"
               ],
               "defaultPrevented": false,
-              "x": 218,
-              "y": 266,
+              "x": 109,
+              "y": 232,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "4.5",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1380,22 +1380,22 @@
               ],
               "defaultPrevented": false,
               "pointerType": "mouse",
-              "x": 218,
-              "y": 266.875,
+              "x": 109.27671813964844,
+              "y": 232.52499389648438,
               "buttons": 0,
               "button": 0,
               "trusted": true,
               "value": "4.5",
               "pointerCapture": false,
               "rect": {
-                "x": 87,
-                "y": 250.875,
-                "width": 164,
-                "height": 32,
-                "top": 250.875,
-                "right": 251,
-                "bottom": 282.875,
-                "left": 87
+                "x": 52.049217224121094,
+                "y": 229.22500610351562,
+                "width": 70.95000457763672,
+                "height": 6.5999908447265625,
+                "top": 229.22500610351562,
+                "right": 122.99922180175781,
+                "bottom": 235.8249969482422,
+                "left": 52.049217224121094
               },
               "connected": true,
               "finalDefaultPrevented": false
@@ -1485,10 +1485,10 @@
       "panel": {
         "left": 32,
         "top": 219.875,
-        "right": 272,
-        "bottom": 391.875,
-        "width": 240,
-        "height": 172
+        "right": 136.5,
+        "bottom": 272.67498779296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 209.875
     },
@@ -1519,22 +1519,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 266.875,
+          "x": 87.52421569824219,
+          "y": 232.52499389648438,
           "buttons": 0,
           "button": -1,
           "trusted": true,
           "value": "1",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1561,22 +1561,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 266,
+          "x": 87,
+          "y": 232,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "1",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1604,22 +1604,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 266.875,
+          "x": 87.52421569824219,
+          "y": 232.52499389648438,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "1",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1646,22 +1646,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 266,
+          "x": 87,
+          "y": 232,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "1",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1689,22 +1689,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 170.75,
-          "y": 266.875,
+          "x": 88.30109405517578,
+          "y": 232.52499389648438,
           "buttons": 1,
           "button": -1,
           "trusted": true,
           "value": "1",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1732,22 +1732,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 190,
-          "y": 266.875,
+          "x": 96.84671783447266,
+          "y": 232.52499389648438,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1774,22 +1774,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 190,
-          "y": 266,
+          "x": 96,
+          "y": 232,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1817,22 +1817,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 190,
-          "y": 266.875,
+          "x": 96.84671783447266,
+          "y": 232.52499389648438,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 250.875,
-            "width": 164,
-            "height": 32,
-            "top": 250.875,
-            "right": 251,
-            "bottom": 282.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 229.22500610351562,
+            "width": 70.95000457763672,
+            "height": 6.5999908447265625,
+            "top": 229.22500610351562,
+            "right": 122.99922180175781,
+            "bottom": 235.8249969482422,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1866,22 +1866,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 304.875,
+          "x": 87.52421569824219,
+          "y": 242.4250030517578,
           "buttons": 0,
           "button": -1,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1908,22 +1908,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 304,
+          "x": 87,
+          "y": 242,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1951,22 +1951,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 304.875,
+          "x": 87.52421569824219,
+          "y": 242.4250030517578,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -1993,22 +1993,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 304,
+          "x": 87,
+          "y": 242,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2036,22 +2036,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 171.9166717529297,
-          "y": 304.875,
+          "x": 88.81900787353516,
+          "y": 242.4250030517578,
           "buttons": 1,
           "button": -1,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2079,22 +2079,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 204,
-          "y": 304.875,
+          "x": 103.06172180175781,
+          "y": 242.4250030517578,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2121,22 +2121,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 204,
-          "y": 304,
+          "x": 103,
+          "y": 242,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2164,22 +2164,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 204,
-          "y": 304.875,
+          "x": 103.06172180175781,
+          "y": 242.4250030517578,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 288.875,
-            "width": 164,
-            "height": 32,
-            "top": 288.875,
-            "right": 251,
-            "bottom": 320.875,
-            "left": 87
+            "x": 52.049217224121094,
+            "y": 239.125,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 239.125,
+            "right": 122.99922180175781,
+            "bottom": 245.72500610351562,
+            "left": 52.049217224121094
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2213,22 +2213,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 342.875,
+          "x": 86.42422485351562,
+          "y": 252.3249969482422,
           "buttons": 0,
           "button": -1,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2255,22 +2255,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 342,
+          "x": 86,
+          "y": 252,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2298,22 +2298,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 169,
-          "y": 342.875,
+          "x": 86.42422485351562,
+          "y": 252.3249969482422,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2340,22 +2340,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 169,
-          "y": 342,
+          "x": 86,
+          "y": 252,
           "buttons": 1,
           "button": 0,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2383,22 +2383,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 171.9166717529297,
-          "y": 342.875,
+          "x": 87.71900939941406,
+          "y": 252.3249969482422,
           "buttons": 1,
           "button": -1,
           "trusted": true,
           "value": "0",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2426,22 +2426,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 204,
-          "y": 342.875,
+          "x": 101.96172332763672,
+          "y": 252.3249969482422,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2468,22 +2468,22 @@
             "Window"
           ],
           "defaultPrevented": false,
-          "x": 204,
-          "y": 342,
+          "x": 101,
+          "y": 252,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2511,22 +2511,22 @@
           ],
           "defaultPrevented": false,
           "pointerType": "mouse",
-          "x": 204,
-          "y": 342.875,
+          "x": 101.96172332763672,
+          "y": 252.3249969482422,
           "buttons": 0,
           "button": 0,
           "trusted": true,
           "value": "2.5",
           "pointerCapture": false,
           "rect": {
-            "x": 87,
-            "y": 326.875,
-            "width": 164,
-            "height": 32,
-            "top": 326.875,
-            "right": 251,
-            "bottom": 358.875,
-            "left": 87
+            "x": 50.94921875,
+            "y": 249.02499389648438,
+            "width": 70.95000457763672,
+            "height": 6.600006103515625,
+            "top": 249.02499389648438,
+            "right": 121.89922332763672,
+            "bottom": 255.625,
+            "left": 50.94921875
           },
           "connected": true,
           "finalDefaultPrevented": false
@@ -2634,6 +2634,83 @@
       "trace": {
         "input": [
           {
+            "value": 1.1,
+            "connected": true,
+            "graph": 4.4,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 1.3,
+            "connected": true,
+            "graph": 5.2,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 1.4,
+            "connected": true,
+            "graph": 5.6,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 1.6,
+            "connected": true,
+            "graph": 6.4,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 1.7,
+            "connected": true,
+            "graph": 6.8,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 1.9,
+            "connected": true,
+            "graph": 7.6,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
+            "value": 2,
+            "connected": true,
+            "graph": 8,
+            "bbox": [
+              -4.007104290991759,
+              6.003623188405797,
+              7.007104290991759,
+              -3.0036231884057973
+            ]
+          },
+          {
             "value": 2.2,
             "connected": true,
             "graph": 8.8,
@@ -2667,9 +2744,9 @@
             ]
           },
           {
-            "value": 2.7,
+            "value": 2.6,
             "connected": true,
-            "graph": 10.8,
+            "graph": 10.4,
             "bbox": [
               -4.007104290991759,
               6.003623188405797,
@@ -2681,17 +2758,6 @@
             "value": 2.8,
             "connected": true,
             "graph": 11.2,
-            "bbox": [
-              -4.007104290991759,
-              6.003623188405797,
-              7.007104290991759,
-              -3.0036231884057973
-            ]
-          },
-          {
-            "value": 3,
-            "connected": true,
-            "graph": 12,
             "bbox": [
               -4.007104290991759,
               6.003623188405797,
@@ -2724,22 +2790,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "touch",
-            "x": 169,
-            "y": 266.875,
+            "x": 87.52421569824219,
+            "y": 232.52499389648438,
             "buttons": 1,
             "button": 0,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -2765,22 +2831,22 @@
               "HTMLDocument",
               "Window"
             ],
-            "defaultPrevented": false,
+            "defaultPrevented": true,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
-            "finalDefaultPrevented": false
+            "finalDefaultPrevented": true
           },
           {
             "type": "gotpointercapture",
@@ -2805,22 +2871,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "touch",
-            "x": 171.3333282470703,
-            "y": 266.875,
+            "x": 88.56005096435547,
+            "y": 232.52499389648438,
             "buttons": 1,
             "button": -1,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -2848,22 +2914,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "touch",
-            "x": 171.3333282470703,
-            "y": 266.875,
+            "x": 88.56005096435547,
+            "y": 232.52499389648438,
             "buttons": 1,
             "button": -1,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -2891,22 +2957,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "touch",
-            "x": 197,
-            "y": 266.875,
+            "x": 99.9542236328125,
+            "y": 232.52499389648438,
             "buttons": 0,
             "button": 0,
             "trusted": true,
-            "value": "3",
+            "value": "2.8",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -2934,22 +3000,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "touch",
-            "x": 197,
-            "y": 266.875,
+            "x": 99.9542236328125,
+            "y": 232.52499389648438,
             "buttons": 0,
             "button": 0,
             "trusted": true,
-            "value": "3",
+            "value": "2.8",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -2975,22 +3041,22 @@
               "HTMLDocument",
               "Window"
             ],
-            "defaultPrevented": false,
+            "defaultPrevented": true,
             "trusted": true,
-            "value": "3",
+            "value": "2.8",
             "pointerCapture": false,
             "rect": {
-              "x": 87,
-              "y": 250.875,
-              "width": 164,
-              "height": 32,
-              "top": 250.875,
-              "right": 251,
-              "bottom": 282.875,
-              "left": 87
+              "x": 52.049217224121094,
+              "y": 229.22500610351562,
+              "width": 70.95000457763672,
+              "height": 6.5999908447265625,
+              "top": 229.22500610351562,
+              "right": 122.99922180175781,
+              "bottom": 235.8249969482422,
+              "left": 52.049217224121094
             },
             "connected": true,
-            "finalDefaultPrevented": false
+            "finalDefaultPrevented": true
           }
         ],
         "capture": [
@@ -3045,10 +3111,10 @@
       "panel": {
         "left": 32,
         "top": 219.875,
-        "right": 272,
-        "bottom": 391.875,
-        "width": 240,
-        "height": 172
+        "right": 136.5,
+        "bottom": 272.67498779296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 209.875
     },
@@ -3057,10 +3123,10 @@
       "panel": {
         "left": 46.59375,
         "top": 230.265625,
-        "right": 286.59375,
-        "bottom": 402.265625,
-        "width": 240,
-        "height": 172
+        "right": 151.09375,
+        "bottom": 283.06561279296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 220.265625
     },
@@ -3069,10 +3135,10 @@
       "panel": {
         "left": 41.275001525878906,
         "top": 188.5,
-        "right": 233.2750015258789,
-        "bottom": 326.1000061035156,
-        "width": 192,
-        "height": 137.60000610351562
+        "right": 124.875,
+        "bottom": 230.739990234375,
+        "width": 83.5999984741211,
+        "height": 42.239990234375
       },
       "controlsBottom": 180.5
     },
@@ -3101,10 +3167,10 @@
       "panel": {
         "left": 51,
         "top": 884.234375,
-        "right": 291,
-        "bottom": 1056.234375,
-        "width": 240,
-        "height": 172
+        "right": 155.5,
+        "bottom": 937.6943969726562,
+        "width": 104.5,
+        "height": 53.46002197265625
       },
       "controlsBottom": 874.234375
     },
@@ -3123,10 +3189,10 @@
       "panel": {
         "left": 12,
         "top": 219.875,
-        "right": 252,
-        "bottom": 391.875,
-        "width": 240,
-        "height": 172
+        "right": 116.5,
+        "bottom": 272.67498779296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 209.875
     },
@@ -3145,10 +3211,10 @@
       "panel": {
         "left": 32,
         "top": 219.875,
-        "right": 272,
-        "bottom": 391.875,
-        "width": 240,
-        "height": 172
+        "right": 136.5,
+        "bottom": 272.67498779296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 209.875
     },
@@ -3181,10 +3247,10 @@
       "panel": {
         "left": 46.59375,
         "top": 250.265625,
-        "right": 286.59375,
-        "bottom": 422.265625,
-        "width": 240,
-        "height": 172
+        "right": 151.09375,
+        "bottom": 303.06561279296875,
+        "width": 104.5,
+        "height": 52.79998779296875
       },
       "controlsBottom": 240.265625
     },
@@ -3204,9 +3270,9 @@
             ]
           },
           {
-            "value": 1.3,
+            "value": 1.2,
             "connected": true,
-            "graph": 5.2,
+            "graph": 4.8,
             "bbox": [
               -4.01015713124,
               6.002061855670103,
@@ -3248,9 +3314,9 @@
             ]
           },
           {
-            "value": 1.8,
+            "value": 1.7,
             "connected": true,
-            "graph": 7.2,
+            "graph": 6.8,
             "bbox": [
               -4.01015713124,
               6.002061855670103,
@@ -3355,22 +3421,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "mouse",
-            "x": 518.5,
-            "y": 375.09375,
+            "x": 437.60858154296875,
+            "y": 343.4937744140625,
             "buttons": 0,
             "button": -1,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3403,22 +3469,22 @@
               "Window"
             ],
             "defaultPrevented": false,
-            "x": 518,
-            "y": 375,
+            "x": 437,
+            "y": 343,
             "buttons": 0,
             "button": 0,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3452,22 +3518,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "mouse",
-            "x": 518.5,
-            "y": 375.09375,
+            "x": 437.60858154296875,
+            "y": 343.4937744140625,
             "buttons": 1,
             "button": 0,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3500,22 +3566,22 @@
               "Window"
             ],
             "defaultPrevented": false,
-            "x": 518,
-            "y": 375,
+            "x": 437,
+            "y": 343,
             "buttons": 1,
             "button": 0,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3549,22 +3615,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "mouse",
-            "x": 518.5,
-            "y": 375.09375,
+            "x": 437.60858154296875,
+            "y": 343.4937744140625,
             "buttons": 1,
             "button": -1,
             "trusted": true,
             "value": "1",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3598,22 +3664,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "mouse",
-            "x": 539.5,
-            "y": 375.09375,
+            "x": 446.93109130859375,
+            "y": 343.4937744140625,
             "buttons": 0,
             "button": 0,
             "trusted": true,
             "value": "2.5",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3646,22 +3712,22 @@
               "Window"
             ],
             "defaultPrevented": false,
-            "x": 539,
-            "y": 375,
+            "x": 446,
+            "y": 343,
             "buttons": 0,
             "button": 0,
             "trusted": true,
             "value": "2.5",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3695,22 +3761,22 @@
             ],
             "defaultPrevented": false,
             "pointerType": "mouse",
-            "x": 539.5,
-            "y": 375.09375,
+            "x": 446.93109130859375,
+            "y": 343.4937744140625,
             "buttons": 0,
             "button": 0,
             "trusted": true,
             "value": "2.5",
             "pointerCapture": false,
             "rect": {
-              "x": 436.5,
-              "y": 359.09375,
-              "width": 164,
-              "height": 32,
-              "top": 359.09375,
-              "right": 600.5,
-              "bottom": 391.09375,
-              "left": 436.5
+              "x": 402.13360595703125,
+              "y": 340.1937561035156,
+              "width": 70.94998168945312,
+              "height": 6.600006103515625,
+              "top": 340.1937561035156,
+              "right": 473.0835876464844,
+              "bottom": 346.79376220703125,
+              "left": 402.13360595703125
             },
             "connected": true,
             "finalDefaultPrevented": false
@@ -3789,10 +3855,10 @@
       "panel": {
         "left": 381.5,
         "top": 328.09375,
-        "right": 621.5,
-        "bottom": 508.546875,
-        "width": 240,
-        "height": 180.453125
+        "right": 486,
+        "bottom": 399.4906311035156,
+        "width": 104.5,
+        "height": 71.39688110351562
       },
       "controlsBottom": 318.09375
     }

@@ -3,6 +3,7 @@
 // pressed. No geometry is cached between checks or across slide remounts.
 
 import { getBoardObjects } from '../shared/boardObjects';
+import { segmentConstructionCandidates, type ConstructionEdge } from '../shared/constructionSegments';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { splitTopLevel, unquote } from '../shared/parser';
 import {
@@ -11,6 +12,8 @@ import {
   analyzePolygonGeometry,
   isLearnerDgsPolygon,
   normalizePolygonCounterClockwise,
+  polygonSignedDoubleArea,
+  polygonInteriorAngle,
   readPolygonCoordinates,
   type PolygonCoordinate,
 } from '../shared/polygonGeometry';
@@ -196,27 +199,47 @@ export function parseConstructionQuizSpec(spec: string): ConstructionQuizConfig 
 }
 
 export function buildConstructionFeatures(
-  inputCoordinates: ConstructionCoordinate[]
+  inputCoordinates: ConstructionCoordinate[],
+  drawnEdges?: ConstructionEdge[]
 ): ConstructionFeature[] {
   const analysis = analyzePolygonGeometry(inputCoordinates);
   if (!analysis.valid) return [];
   const coordinates = normalizePolygonCounterClockwise(inputCoordinates);
   const count = coordinates.length;
   const angles = analysis.interiorAngles;
+  const edges = drawnEdges && polygonSignedDoubleArea(inputCoordinates) < 0
+    // Reversing the vertices starts with the penultimate edge in reverse.
+    ? inputCoordinates.map((_, index) => {
+        const edge = drawnEdges[(count - 2 - index + count) % count];
+        return { start: edge.end, end: edge.start };
+      })
+    : drawnEdges;
   const features: ConstructionFeature[] = [];
   for (let index = 0; index < count; index += 1) {
     const nextIndex = (index + 1) % count;
     features.push({
       kind: 'side',
-      value: Math.hypot(
-        coordinates[nextIndex].x - coordinates[index].x,
-        coordinates[nextIndex].y - coordinates[index].y
-      ),
+      value: edges
+        ? Math.hypot(edges[index].end.x - edges[index].start.x, edges[index].end.y - edges[index].start.y)
+        : Math.hypot(
+            coordinates[nextIndex].x - coordinates[index].x,
+            coordinates[nextIndex].y - coordinates[index].y
+          ),
       boundaryIndex: index
     });
     features.push({
       kind: 'angle',
-      value: angles[nextIndex],
+      value: edges ? polygonInteriorAngle(
+        {
+          x: edges[index].start.x - edges[index].end.x,
+          y: edges[index].start.y - edges[index].end.y,
+        },
+        { x: 0, y: 0 },
+        {
+          x: edges[nextIndex].end.x - edges[nextIndex].start.x,
+          y: edges[nextIndex].end.y - edges[nextIndex].start.y,
+        }
+      ) : angles[nextIndex],
       boundaryIndex: nextIndex
     });
   }
@@ -310,7 +333,7 @@ export function polygonMatchesConstruction(
   if (!config.valid || !isLearnerDgsPolygon(polygon, false)) return false;
   const coordinates = readPolygonCoordinates(polygon);
   if (coordinates.length !== config.corners) return false;
-  const features = buildConstructionFeatures(coordinates);
+  const features = buildConstructionFeatures(coordinates, polygon.__liaDgsConstructionEdges);
   if (features.length !== config.corners * 2) return false;
   return config.mode === 'fixed'
     ? matchesFixedConstruction(features, config)
@@ -322,10 +345,14 @@ export function checkConstructionOnBoard(
   config: ConstructionQuizConfig
 ): boolean {
   if (!board || !config.valid) return false;
-  return getBoardObjects(board).some(function(object) {
+  if (getBoardObjects(board).some(function(object) {
     if (!object || object.board !== board) return false;
     return polygonMatchesConstruction(object, config);
-  });
+  })) return true;
+  for (const candidate of segmentConstructionCandidates(board, config.corners, config.lengthTolerance)) {
+    if (polygonMatchesConstruction(candidate, config)) return true;
+  }
+  return false;
 }
 
 function readSpecNode(node: HTMLElement | null): string {

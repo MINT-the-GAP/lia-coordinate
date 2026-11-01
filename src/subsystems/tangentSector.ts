@@ -228,7 +228,7 @@ export function init(): void {
   function sourceKind(object: any): SourceKind | null {
     if (!object) return null;
     const type = String(object.elType || '').toLowerCase();
-    if (typeof object.Y === 'function' && (object.__liaDgsFunction || object.__liaPlotFunctionName || type === 'functiongraph')) return 'function';
+    if (typeof object.Y === 'function' && (object.__liaDgsFunction || object.__liaDgsAnalysisFunction || object.__liaPlotFunctionName || type === 'functiongraph')) return 'function';
     if (object.__liaDgsCircle || type === 'circle' || typeof object.Radius === 'function') return 'circle';
     if (object.point1 && object.point2) return 'linear';
     return null;
@@ -256,6 +256,15 @@ export function init(): void {
   function findNamedSource(board: any, boardId: string, sourceName: string): ResolvedSource | null {
     const wanted = normalizeName(sourceName);
     if (!board || !wanted) return null;
+
+    const scharEntries = window.__scharEntries || {};
+    for (const key of Object.keys(scharEntries)) {
+      const entry = scharEntries[key];
+      if (!entry || entry.boardId !== boardId || entry.board !== board || !entry.graph || entry.graph.board !== board) continue;
+      if (candidateSourceNames(entry.graph).some(function(name) { return namesEqual(name, wanted); })) {
+        return { object: entry.graph, kind: 'function' };
+      }
+    }
 
     const plotEntries = window.__plotFunctionEntries || {};
     for (const key of Object.keys(plotEntries)) {

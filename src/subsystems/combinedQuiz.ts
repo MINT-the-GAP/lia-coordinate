@@ -2,6 +2,7 @@
 // Every condition is evaluated against the same learner-created polygon.
 
 import { getBoardObjects } from '../shared/boardObjects';
+import { segmentConstructionCandidates } from '../shared/constructionSegments';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { splitTopLevel, unquote } from '../shared/parser';
 import {
@@ -321,10 +322,19 @@ export function evaluateCombinedQuizOnBoard(
     );
   }
 
-  const candidates = getBoardObjects(board).filter(function(object) {
-    return isLearnerDgsPolygon(object);
+  const polygons = getBoardObjects(board).filter(function(object) {
+    return object.board === board && isLearnerDgsPolygon(object);
   });
-  if (!candidates.length) {
+  const constructionTolerances = config.conditions.flatMap(condition =>
+    condition.kind === 'construction' ? [condition.config.lengthTolerance] : []
+  );
+  function* candidates(): Generator<any> {
+    yield* polygons;
+    if (constructionTolerances.length) {
+      yield* segmentConstructionCandidates(board, config.corners, Math.min(...constructionTolerances));
+    }
+  }
+  if (!polygons.length && !constructionTolerances.length) {
     return emptyEvaluation(
       'missing-polygon',
       language === 'de'
@@ -335,7 +345,7 @@ export function evaluateCombinedQuizOnBoard(
   }
 
   let best: (CombinedQuizEvaluation & { rank: number; diagnosticPriority: number }) | null = null;
-  for (const polygon of candidates) {
+  for (const polygon of candidates()) {
     const coordinates = readPolygonCoordinates(polygon);
     const cornerRank = coordinates.length === config.corners ? 20 : 0;
     const formEvaluations = config.conditions.map(function(condition) {

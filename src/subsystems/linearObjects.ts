@@ -12,6 +12,7 @@ import {
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { getLivePoint, createHiddenPoint, sameCoordinates } from '../shared/boardObjects';
+import { namesEqual } from '../shared/format';
 import { subscriptTexName as texName } from '../shared/texName';
 import {
   applyLineStyle,
@@ -230,7 +231,7 @@ export function init(): void {
   }
 
   function createLabel(board: any, object: any, points: any[], cfg: LinearObjectConfig): any {
-    if (!labelText(cfg, points)) return null;
+    if (!labelText(cfg, points) && cfg.kind !== 'line') return null;
     const label = board.create('text', [
       function() { return labelPosition(board, points).x; },
       function() { return labelPosition(board, points).y; },
@@ -246,7 +247,7 @@ export function init(): void {
       strokeColor: cfg.color,
       fillColor: cfg.color,
       fontSize: 20,
-      visible: cfg.visible
+      visible: cfg.visible && !!labelText(cfg, points)
     });
     object.label = label;
     scheduleBootstrap(function() { try { board.update(); } catch (e) {} });
@@ -314,6 +315,54 @@ export function init(): void {
     if (entry.label) object.label = entry.label;
   }
 
+  function hasImportedObjectFormat(object: any): boolean {
+    return Object.values(window.__objectFormatEntries || {}).some(
+      (entry: any) => entry?.object === object
+    );
+  }
+
+  function migrateLinearObjectReferences(previous: any, current: any, boardId: string, objectName: string): void {
+    if (!current) return;
+    Object.values(window.__points?.[boardId] || {}).forEach((point: any) => {
+      const bindingReference = String(point?.__liaDgsMacroBindingReference ||
+        point?.__liaDgsPendingBindingReference || '').trim();
+      const matchesPrevious = !!previous &&
+        (point?.slideObject === previous || point?.__liaDgsGliderSource === previous);
+      if (!point || (!matchesPrevious && (!bindingReference || !namesEqual(bindingReference, objectName)))) return;
+      try {
+        while (point.slideObject && typeof point.popSlideObject === 'function') point.popSlideObject();
+        if (typeof point.makeGlider !== 'function') return;
+        point.makeGlider(current);
+        point.__liaDgsGliderSource = current;
+        delete point.__liaDgsPendingBindingReference;
+      } catch (e) {}
+    });
+    Object.entries(window.__objectFormatEntries || {}).forEach(([uid, value]) => {
+      const entry: any = value;
+      if (!entry?.spec || entry.board !== current.board) return;
+      const reference = String(splitTopLevel(unquote(String(entry.spec)), ';')[1] || '').trim();
+      if (entry.object !== previous && (!reference || !namesEqual(reference, objectName))) return;
+      try { window.renderObjectFormatFromSpec?.(uid, entry.spec); } catch (e) {}
+    });
+  }
+
+  function scheduleLinearObjectReferenceMigration(
+    key: string,
+    previous: any,
+    current: any,
+    boardId: string,
+    objectName: string
+  ): void {
+    const migrate = function(): void {
+      if (window.__linearObjectEntries?.[key]?.object !== current || current?.board == null) return;
+      migrateLinearObjectReferences(previous, current, boardId, objectName);
+    };
+    migrate();
+    [0, 100, 300, 700].forEach(function(delay) {
+      window.setTimeout(migrate, delay);
+    });
+  }
+
   window.renderLinearObjectFromSpec = function(uid: string, spec: string, kind: string, language?: string): boolean {
     const cfg = parseLinearObjectSpec(spec, kind, language);
     const key = entryKey(uid);
@@ -346,14 +395,17 @@ export function init(): void {
       old.hasExplicitColor = cfg.hasExplicitColor;
       old.visible = cfg.visible;
       old.lineStyle = cfg.lineStyle;
-      applyObjectColor(old.object, old.label, cfg.color);
-      applyLineStyle(old.object, cfg.lineStyle);
-      applyLinearObjectVisibility(old, cfg);
-      applyDgsLinearObjectMetadata(old, cfg);
+      if (!hasImportedObjectFormat(old.object)) {
+        applyObjectColor(old.object, old.label, cfg.color);
+        applyLineStyle(old.object, cfg.lineStyle);
+        applyLinearObjectVisibility(old, cfg);
+        applyDgsLinearObjectMetadata(old, cfg);
+      }
       try { board.update(); } catch (e) {}
       return true;
     }
 
+    const previousObject = old?.object || null;
     removeEntry(uid);
     const ownedPoints: any[] = [];
     let object = null;
@@ -396,6 +448,7 @@ export function init(): void {
       window.__linearObjectEntries[key] = entry;
       applyLinearObjectVisibility(entry, cfg);
       applyDgsLinearObjectMetadata(entry, cfg);
+      scheduleLinearObjectReferenceMigration(key, previousObject, object, cfg.boardId, effectiveName);
       try { board.update(); } catch (e) {}
       try { if (window.__scheduleBootstrapRelationObjects) window.__scheduleBootstrapRelationObjects(); } catch (e) {}
       return true;
@@ -426,6 +479,12 @@ export function init(): void {
       if (!activeKeys.has(key)) removeEntryByKey(key);
     });
     hasPendingLinearObjects = pending;
+    // Points may depend on a line declared later in an exported block. Linear
+    // metadata also restores macro defaults, so bindings and exported formats
+    // must be finalized against the live line instance after this pass.
+    try { window.__scheduleBootstrapStaticPoints?.(); } catch (e) {}
+    try { window.__scheduleBootstrapCreatePoints?.(); } catch (e) {}
+    try { window.__scheduleBootstrapObjectFormats?.(); } catch (e) {}
   };
 
   window.__scheduleBootstrapLinearObjects = function(): void {

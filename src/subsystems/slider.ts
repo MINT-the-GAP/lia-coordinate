@@ -30,8 +30,15 @@ interface SliderConfig {
   showObject: boolean;
   showName: boolean;
   fontSize: number;
+  showAnimationControl: boolean;
+  animationSpeed: number;
   language: 'de' | 'en';
 }
+
+const DEFAULT_ANIMATION_SPEED = 1.5;
+const MIN_ANIMATION_SPEED = 0.25;
+const MAX_ANIMATION_SPEED = 10;
+const ANIMATION_SPEED_STEP = 0.25;
 
 const RESERVED_PARAMETER_NAMES = new Set([
   'x', 'y', 'pi', 'e', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'arcsin', 'arccos', 'arctan',
@@ -82,9 +89,16 @@ export function init(): void {
     };
   }
 
+  function normalizeAnimationSpeed(value: unknown): number {
+    const parsed = parseNumber(value);
+    if (!Number.isFinite(parsed)) return DEFAULT_ANIMATION_SPEED;
+    const clamped = Math.max(MIN_ANIMATION_SPEED, Math.min(MAX_ANIMATION_SPEED, parsed));
+    return Number((Math.round(clamped / ANIMATION_SPEED_STEP) * ANIMATION_SPEED_STEP).toFixed(2));
+  }
+
   function isOption(value: string): boolean {
     return isHiddenNameOption(value) ||
-      /^(?:lockposition|positionlocked|lock|fix|fixed|visible|show|anzeigen|fontsize|font-size|schriftgroesse|schriftgröße|position)\s*=/i.test(value) ||
+      /^(?:lockposition|positionlocked|lock|fix|fixed|visible|show|anzeigen|fontsize|font-size|schriftgroesse|schriftgröße|position|animation|animationcontrol|animationbutton|playbutton|animationschalter|animationspeed|speed|geschwindigkeit)\s*=/i.test(value) ||
       /^(?:lockposition|positionlocked|lock|fix|fixed)$/i.test(value);
   }
 
@@ -122,6 +136,8 @@ export function init(): void {
     let showObject = true;
     let showName = parsedName.showName;
     let fontSize = 18;
+    let showAnimationControl = true;
+    let animationSpeed = DEFAULT_ANIMATION_SPEED;
     parts.slice(optionStart).forEach(function(option) {
       const raw = String(option || '').trim();
       if (!raw) return;
@@ -147,6 +163,16 @@ export function init(): void {
         showObject = !/^(?:0|false|nein|no)$/i.test(String(visibleMatch[1] || '').trim());
         return;
       }
+      const animationMatch = raw.match(/^(?:animation|animationcontrol|animationbutton|playbutton|animationschalter)\s*=\s*(.+)$/i);
+      if (animationMatch) {
+        showAnimationControl = !/^(?:0|false|nein|no)$/i.test(String(animationMatch[1] || '').trim());
+        return;
+      }
+      const speedMatch = raw.match(/^(?:animationspeed|speed|geschwindigkeit)\s*=\s*(.+)$/i);
+      if (speedMatch) {
+        animationSpeed = normalizeAnimationSpeed(speedMatch[1]);
+        return;
+      }
       const fontMatch = raw.match(/^(?:fontsize|font-size|schriftgroesse|schriftgröße)\s*=\s*(.+)$/i);
       if (fontMatch) {
         const parsed = parseNumber(fontMatch[1]);
@@ -168,6 +194,8 @@ export function init(): void {
       showObject,
       showName,
       fontSize,
+      showAnimationControl,
+      animationSpeed,
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de'
     };
   }
@@ -325,6 +353,7 @@ export function init(): void {
       try { if (part && entry.board) entry.board.removeObject(part); } catch (e) {}
     });
     delete window.__sliderEntries[key];
+    try { window.__refreshDgsSliderAnimationControls?.(String(entry.boardId || '')); } catch (e) {}
     scheduleDependents(String(entry.boardId || ''), entry.board);
   }
 
@@ -379,6 +408,8 @@ export function init(): void {
         old.maximum === cfg.maximum && old.step === cfg.step && old.color === cfg.color &&
         old.lockPosition === cfg.lockPosition && old.showObject === cfg.showObject &&
         old.showName === cfg.showName &&
+        old.showAnimationControl === cfg.showAnimationControl &&
+        old.animationSpeed === cfg.animationSpeed &&
         old.fontSize === cfg.fontSize && old.language === cfg.language &&
         JSON.stringify(old.position || null) === JSON.stringify(cfg.position || null)) {
       try {
@@ -386,6 +417,9 @@ export function init(): void {
         old.slider.__liaDgsSliderValue = cfg.value;
       } catch (e) {}
       applySliderVisual(old.slider, cfg);
+      old.slider.__liaDgsShowAnimationControl = cfg.showAnimationControl;
+      old.slider.__liaDgsSliderAnimationSpeed = cfg.animationSpeed;
+      try { window.__refreshDgsSliderAnimationControls?.(cfg.boardId); } catch (e) {}
       scheduleDependents(cfg.boardId, board);
       return true;
     }
@@ -429,6 +463,9 @@ export function init(): void {
       slider.__liaDgsSliderStep = cfg.step;
       slider.__liaDgsSliderValue = cfg.value;
       slider.__liaDgsSliderPositionLocked = cfg.lockPosition;
+      slider.__liaDgsShowAnimationControl = cfg.showAnimationControl;
+      slider.__liaDgsSliderAnimationSpeed = cfg.animationSpeed;
+      slider.__liaDgsSliderAnimating = false;
       slider.__liaDgsShowName = cfg.showName;
       slider.__liaDgsShowObject = cfg.showObject;
       slider.__liaDgsOpacity = cfg.showObject ? 1 : 0;
@@ -467,11 +504,14 @@ export function init(): void {
         lockPosition: cfg.lockPosition,
         showObject: cfg.showObject,
         showName: cfg.showName,
+        showAnimationControl: cfg.showAnimationControl,
+        animationSpeed: cfg.animationSpeed,
         fontSize: cfg.fontSize,
         language: cfg.language,
         board,
         slider
       };
+      try { window.__refreshDgsSliderAnimationControls?.(cfg.boardId); } catch (e) {}
       scheduleDependents(cfg.boardId, board);
       return true;
     } catch (e) {

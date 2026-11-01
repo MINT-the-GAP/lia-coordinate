@@ -5,6 +5,15 @@ export type CompiledFunctionExpression = {
   fn: ((x: number) => number) | null;
 };
 
+export type CompiledParameterizedExpression = {
+  prepared: string;
+  ascii: string;
+  normalized: string;
+  parameters: string[];
+  fn: ((...parameters: number[]) => number) | null;
+  error?: string;
+};
+
 type Token = { type: 'number' | 'ident' | 'op' | 'open' | 'close'; value: string };
 
 const FUNCTIONS = new Set([
@@ -300,4 +309,72 @@ export function compileFunctionExpression(
     fn = (x: number) => evaluator(x, ...customValues, ...variableGetters.map((getter) => getter()));
   } catch (e) {}
   return { prepared, ascii, normalized, fn };
+}
+
+/** Compile a whitelisted mathematical expression with named parameters such as t or u,v. */
+export function compileParameterizedExpression(
+  input: unknown,
+  parameters: string[],
+  customFunctions: Record<string, (...values: number[]) => number> = {},
+  customVariables: Record<string, number | (() => number)> = {}
+): CompiledParameterizedExpression {
+  const parameterNames = parameters.map(name => String(name || '').trim().toLowerCase());
+  const invalidParameter = parameterNames.find(name =>
+    !/^[a-z][a-z0-9]*$/.test(name) || name === 'pi' || name === 'e' || FUNCTIONS.has(name));
+  const duplicateParameter = parameterNames.find((name, index) => parameterNames.indexOf(name) !== index);
+  const prepared = prepareFunctionInput(input);
+  let ascii = '';
+  let normalized = '';
+  if (invalidParameter || duplicateParameter || parameterNames.length === 0) {
+    return {
+      prepared, ascii, normalized, parameters: parameterNames, fn: null,
+      error: invalidParameter ? 'Invalid parameter: ' + invalidParameter : 'Duplicate parameter: ' + duplicateParameter
+    };
+  }
+
+  const normalizedCustomFunctions = new Map<string, (...values: number[]) => number>();
+  Object.keys(customFunctions).forEach(name => {
+    const key = String(name || '').toLowerCase();
+    if (!/^[a-z][a-z0-9]*$/.test(key) || key === 'pi' || key === 'e' ||
+        parameterNames.includes(key) || FUNCTIONS.has(key) || typeof customFunctions[name] !== 'function') return;
+    normalizedCustomFunctions.set(key, customFunctions[name]);
+  });
+  const normalizedCustomVariables = new Map<string, () => number>();
+  Object.keys(customVariables).forEach(name => {
+    const key = String(name || '').toLowerCase();
+    const value = customVariables[name];
+    if (!/^[a-z][a-z0-9]*$/.test(key) || key === 'pi' || key === 'e' ||
+        parameterNames.includes(key) || FUNCTIONS.has(key) || normalizedCustomFunctions.has(key)) return;
+    normalizedCustomVariables.set(key, typeof value === 'function'
+      ? () => Number((value as () => number)())
+      : () => Number(value));
+  });
+
+  const functionNames = Array.from(normalizedCustomFunctions.keys());
+  const functionValues = functionNames.map(name => normalizedCustomFunctions.get(name)!);
+  const variableNames = Array.from(normalizedCustomVariables.keys());
+  const variableGetters = variableNames.map(name => normalizedCustomVariables.get(name)!);
+  try {
+    ascii = transformLatex(prepared);
+    normalized = normalizeFunctionExpression(ascii, functionNames, [...parameterNames, ...variableNames]);
+    const evaluator = new Function(...parameterNames, ...functionNames, ...variableNames,
+      'const pi=Math.PI,e=Math.E;' +
+      'const sin=Math.sin,cos=Math.cos,tan=Math.tan,asin=Math.asin,acos=Math.acos,atan=Math.atan;' +
+      'const arcsin=Math.asin,arccos=Math.acos,arctan=Math.atan,sinh=Math.sinh,cosh=Math.cosh,tanh=Math.tanh;' +
+      'const exp=Math.exp,log=(Math.log10||((v)=>Math.log(v)/Math.LN10)),ln=Math.log,sqrt=Math.sqrt,abs=Math.abs;' +
+      'const floor=Math.floor,ceil=Math.ceil,round=Math.round,min=Math.min,max=Math.max,pow=Math.pow;' +
+      'return (' + normalized + ');'
+    ) as (...values: Array<number | ((...args: number[]) => number)>) => number;
+    const fn = (...values: number[]): number => {
+      if (values.length !== parameterNames.length || values.some(value => !Number.isFinite(value))) return NaN;
+      const result = Number(evaluator(...values, ...functionValues, ...variableGetters.map(getter => getter())));
+      return Number.isFinite(result) ? result : NaN;
+    };
+    return { prepared, ascii, normalized, parameters: parameterNames, fn };
+  } catch (error) {
+    return {
+      prepared, ascii, normalized, parameters: parameterNames, fn: null,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }

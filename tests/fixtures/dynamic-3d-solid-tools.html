@@ -1,0 +1,25 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Solid construction tools</title>
+<style>body{margin:12px;background:#303030;color:white;font-family:Arial,sans-serif}.flex-child{width:920px}.jxgbox{position:relative;overflow:hidden}</style></head><body>
+<section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="solid-tools" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-4;zmax=5;width=900;camera=0.8/0.4/0"></lia-coordinate-board>
+<span hidden id="point3d-spec-tools-o" data-spec="raum;O;0;0;0;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-x" data-spec="raum;X;2;0;0;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-y" data-spec="raum;Y;0;2;0;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-xy" data-spec="raum;XY;2;2;0;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-z" data-spec="raum;Z;0;0;2;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-u" data-spec="raum;U;1;0;0;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-m" data-spec="raum;M;0;0;1;#ff00ff;1"></span>
+<span hidden id="point3d-spec-tools-a" data-spec="raum;A;1;1;3;#ff00ff;1"></span>
+<span hidden id="linear3d-spec-tools-vx" data-kind="vector" data-spec="raum;vx;O;X;#00ffff"></span>
+<span hidden id="linear3d-spec-tools-vy" data-kind="vector" data-spec="raum;vy;O;Y;#00ffff"></span>
+<span hidden id="linear3d-spec-tools-vz" data-kind="vector" data-spec="raum;vz;O;Z;#00ffff"></span>
+<span hidden id="linear3d-spec-tools-diag" data-kind="vector" data-spec="raum;vd;O;XY;#00ffff"></span>
+<span hidden id="polygon3d-spec-tools-base" data-spec="raum;Base;O;X;XY;Y;linecolor=#00ffff;opacity=.2"></span>
+<div id="dgs-ui-solid-tools" data-spec="raum" data-language="de"></div></section>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script>window.MathJax={chtml:{fontURL:"https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2"}};</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<240;i++){if(window.__coordinateViews3d?.raum&&__points?.raum?.A&&[...__coordinateViews3d.raum.polygonObjects].length&&__boards.raum.containerObj.querySelector('.lia-dgs-geometry-tool'))return true;await new Promise(r=>setTimeout(r,25));}throw Error('Init timeout '+JSON.stringify(profileErrors));};
+window.toolScreen=(point)=>{const b=__boards.raum,p=__coordinateViews3d.raum.view.project3DTo2D(point),r=b.containerObj.getBoundingClientRect();return[r.left+b.origin.scrCoords[1]+p[1]*b.unitX,r.top+b.origin.scrCoords[2]-p[2]*b.unitY];};
+window.toolPointScreen=name=>{const p=__points.raum[name];return toolScreen([p.X(),p.Y(),p.Z()]);};
+</script></body></html>

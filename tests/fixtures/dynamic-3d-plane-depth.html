@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Plane depth regression</title>
+<style>body{margin:12px;background:#303030;color:white;font-family:Arial,sans-serif}.flex-child{width:920px;min-width:0}.jxgbox{position:relative;overflow:hidden}</style></head>
+<body><main><section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="plane-depth" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-5;zmax=5;width=900;projection=parallel;camera=0.8/0.4/0"></lia-coordinate-board>
+<div id="dgs-ui-plane-depth" data-spec="raum" data-language="de"></div>
+</section></main>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<240;i++){if(window.__boards?.raum&&window.__coordinateViews3d?.raum&&__boards.raum.containerObj.querySelector('.lia-dgs-point-button'))return true;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('Plane fixture init timeout: '+JSON.stringify(profileErrors));};
+window.preparePlaneScene=()=>{
+  const board=__boards.raum,azimuth=.8,elevation=.4;
+  const right=[-Math.cos(azimuth),Math.sin(azimuth),0],up=[-Math.sin(elevation)*Math.sin(azimuth),-Math.sin(elevation)*Math.cos(azimuth),Math.cos(elevation)];
+  const viewer=[Math.sin(azimuth)*Math.cos(elevation),Math.cos(azimuth)*Math.cos(elevation),Math.sin(elevation)];
+  const at=(x,y,depth)=>right.map((value,i)=>value*x+up[i]*y+viewer[i]*depth);
+  const point=(position,name,color,visible=true)=>__coord.createCoordinatePoint3D(board,position,{name,withLabel:visible,visible,fixed:true,strokeColor:color,fillColor:color,size:5,label:{strokeColor:color}});
+  const source=[point(at(-1,-1,0),'A','#ff00ff',false),point(at(1,-1,0),'B','#ff00ff',false),point(at(0,1,0),'C','#ff00ff',false)];
+  const plane=__coord.createCoordinatePlane3D(board,'three-points',source,[],{name:'E',withLabel:true,strokeColor:'#ff6600',fillColor:'#ff6600',fillOpacity:.22,highlightFillOpacity:.22});
+  const line=(name,y,depth,color)=>__coord.createCoordinateLinear3D(board,'segment',point(at(-3.2,y,depth),'',color,false),point(at(3.2,y,depth),'',color,false),{name,withLabel:true,strokeColor:color,highlightStrokeColor:color,strokeWidth:3,fixed:true,label:{strokeColor:color}});
+  const front=line('vorne',.55,2,'#ffffff'),back=line('hinten',-.55,-2,'#00ffff');
+  const frontPoint=point(at(.55,1.1,2),'V','#ffffff'),backPoint=point(at(-.55,-1.1,-2),'H','#00ffff');
+  window.planeProbe={plane,front,back,frontPoint,backPoint,source,at,right,up,viewer,point,camera:{azimuth,elevation,bank:0}};
+  board.fullUpdate();return true;
+};
+</script></body></html>

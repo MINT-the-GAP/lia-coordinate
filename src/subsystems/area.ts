@@ -1,7 +1,7 @@
 // Area subsystem (@Area / @Fläche macros).
 // Fills a polygon spanned by named points and optionally displays area/perimeter.
 
-import { parseCoordinateList, splitTopLevel, unquote } from '../shared/parser';
+import { parseCoordinateList, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import type { CoordinatePair } from '../shared/parser';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
@@ -21,6 +21,8 @@ interface AreaConfig {
   language: 'de' | 'en';
   visible: boolean;
   lineStyle: LineStyle;
+  name: string;
+  showName: boolean;
 }
 
 interface XY {
@@ -75,6 +77,11 @@ export function init(): void {
     const visible = !options.some(function(option) {
       return /^(?:visible|sichtbar)\s*=\s*0$/i.test(option);
     });
+    const rawName = options.map(function(option) {
+      const match = String(option || '').match(/^name\s*=\s*([\s\S]+)$/i);
+      return match ? String(match[1] || '').trim() : '';
+    }).find(Boolean) || '';
+    const parsedName = parseMacroName(rawName);
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -91,7 +98,9 @@ export function init(): void {
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
       visible: visible,
-      lineStyle: parseLineStyleOptions(options)
+      lineStyle: parseLineStyleOptions(options),
+      name: parsedName.name,
+      showName: !!rawName && parsedName.showName
     };
   }
 
@@ -423,17 +432,19 @@ export function init(): void {
   }
 
   function measurementText(cfg: AreaConfig, points: any[]): string {
-    if (!mayDisplayDgsValues(cfg.boardId)) return '';
+    const valuesAllowed = mayDisplayDgsValues(cfg.boardId);
+    if (!valuesAllowed && !cfg.showName) return '';
     const coordinates = pointCoordinates(points);
     if (coordinates.length < 3) return '';
 
     const lines: string[] = [];
-    if (cfg.showArea) {
+    if (cfg.showName && cfg.name) lines.push(cfg.name);
+    if (valuesAllowed && cfg.showArea) {
       const unit = cfg.language === 'de' ? 'FE' : 'AU';
       lines.push('A \\approx ' + formatValue(polygonArea(coordinates), cfg.language) +
         '\\,\\mathrm{' + unit + '}');
     }
-    if (cfg.showPerimeter) {
+    if (valuesAllowed && cfg.showPerimeter) {
       const unit = cfg.language === 'de' ? 'LE' : 'LU';
       lines.push('u \\approx ' + formatValue(polygonPerimeter(coordinates), cfg.language) +
         '\\,\\mathrm{' + unit + '}');
@@ -500,8 +511,9 @@ export function init(): void {
     vertices.forEach(function(vertex: any) {
       setElementVisibility(vertex, !!vertex && vertex.__liaDgsShowObject !== false);
     });
-    setElementVisibility(label, visible && mayDisplayDgsValues(cfg.boardId) &&
-      (cfg.showArea || cfg.showPerimeter));
+    setElementVisibility(label, visible && (
+      cfg.showName || (mayDisplayDgsValues(cfg.boardId) && (cfg.showArea || cfg.showPerimeter))
+    ));
   }
 
   function applyAreaDgsMetadata(
@@ -514,21 +526,22 @@ export function init(): void {
     const pointNames = points
       .map(function(point) { return String(point && point.__liaDgsPointName || '').trim(); })
       .filter(Boolean);
-    const polygonName = pointNames.length === points.length ? pointNames.join('') : '';
+    const automaticName = pointNames.length === points.length ? pointNames.join('') : '';
+    const polygonName = cfg.name || automaticName;
     const textColor = getNeutralColor();
     const borders = Array.isArray(polygon.borders) ? polygon.borders : [];
 
     polygon.__liaDgsMacroManaged = true;
     polygon.__liaDgsPolygon = true;
     polygon.__liaDgsPolygonName = polygonName;
-    polygon.__liaDgsPolygonAutoName = true;
+    polygon.__liaDgsPolygonAutoName = !cfg.name;
     polygon.__liaDgsPolygonBorders = borders;
     polygon.__liaDgsLanguage = cfg.language;
     polygon.__liaDgsColor = cfg.color;
     polygon.__liaDgsTextColor = textColor;
     polygon.__liaDgsLineColor = cfg.color;
     polygon.__liaDgsFillColor = cfg.color;
-    polygon.__liaDgsShowName = false;
+    polygon.__liaDgsShowName = cfg.showName;
     polygon.__liaDgsShowObject = cfg.visible;
     polygon.__liaDgsOpacity = cfg.opacity;
     polygon.__liaDgsShowArea = cfg.showArea;
@@ -605,7 +618,9 @@ export function init(): void {
       function() { return measurementText(cfg, points); }
     ], {
       fixed: true,
-      visible: cfg.visible && mayDisplayDgsValues(cfg.boardId),
+      visible: cfg.visible && (
+        cfg.showName || (mayDisplayDgsValues(cfg.boardId) && (cfg.showArea || cfg.showPerimeter))
+      ),
       highlight: false,
       parse: false,
       useMathJax: true,
@@ -673,7 +688,9 @@ export function init(): void {
       old.language === cfg.language &&
       old.showArea === cfg.showArea &&
       old.showPerimeter === cfg.showPerimeter &&
-      (!(cfg.showArea || cfg.showPerimeter) || old.label) &&
+      old.name === cfg.name &&
+      old.showName === cfg.showName &&
+      (!(cfg.showName || cfg.showArea || cfg.showPerimeter) || old.label) &&
       old.polygon
     ) {
       if (
@@ -735,7 +752,7 @@ export function init(): void {
       });
       applyPolygonStyle(polygon, cfg.color, cfg.opacity);
 
-      if (cfg.showArea || cfg.showPerimeter) {
+      if (cfg.showName || cfg.showArea || cfg.showPerimeter) {
         label = createMeasurementLabel(board, points, cfg);
       }
       applyAreaDgsMetadata(polygon, points, label, cfg);
@@ -756,6 +773,8 @@ export function init(): void {
         language: cfg.language,
         showArea: cfg.showArea,
         showPerimeter: cfg.showPerimeter,
+        name: cfg.name,
+        showName: cfg.showName,
         visible: cfg.visible,
         lineStyle: cfg.lineStyle,
         board: board,

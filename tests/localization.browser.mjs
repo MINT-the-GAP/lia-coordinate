@@ -116,7 +116,7 @@ try {
         await release(coordinates);
         await delay(150);
     };
-    const checkLabels = (snapshot, language) => {
+    const checkLabels = (snapshot, language, dgsLanguage = language) => {
         const expected = labels[language];
         assert.deepEqual(snapshot.plot.labels, language === 'en' ? ['Plot','Clear'] : ['Zeichnen','L'+String.fromCharCode(246)+'schen']);
         assert.equal(snapshot.plot.inputAria, language === 'en' ? 'Function expression' : 'Funktionsterm');
@@ -134,6 +134,14 @@ try {
         assert.equal(snapshot.restoreAria, expected.restore);
         assert.equal(snapshot.resizeTitle, expected.resize);
         assert.equal(snapshot.resizeAria, expected.resize);
+        assert.equal(snapshot.dgs.language, dgsLanguage);
+        assert.equal(snapshot.dgs.toolbarAria, dgsLanguage === 'en' ? 'DGS toolbar' : 'DGS-Menüleiste');
+        assert.equal(snapshot.dgs.objectListAria, dgsLanguage === 'en' ? 'Object list' : 'Objektliste');
+        assert.equal(snapshot.dgs.fullscreenAria, dgsLanguage === 'en' ? 'Enter fullscreen' : 'Vollbildmodus starten');
+        assert.equal(snapshot.dgs.pointAria, dgsLanguage === 'en' ? 'Place point' : 'Punkt setzen');
+        assert.equal(snapshot.dgs.lineToolsAria, dgsLanguage === 'en' ? 'Line tools' : 'Linienwerkzeuge');
+        assert.equal(snapshot.dgs.relationsAria, dgsLanguage === 'en' ? 'Line relations' : 'Lagebeziehungen');
+        assert.ok(snapshot.dgs.strings.every(value => !/[\u00c3\u00c2\u00e2]/.test(value)), JSON.stringify(snapshot.dgs.strings));
     };
     for (const language of ['en', 'de']) {
         await navigate(language);
@@ -213,7 +221,7 @@ try {
         await evaluate('localizationFixture.changeLanguage(' + JSON.stringify(language) + ')');
         await delay(350);
         const overridden = await state();
-        checkLabels(overridden, language);
+        checkLabels(overridden, language, nextLanguage);
         assert.equal(overridden.courseLanguage, nextLanguage);
         assert.deepEqual(overridden.identity, changed.identity);
         assert.deepEqual(overridden.values, beforeChange.values);
@@ -224,7 +232,7 @@ try {
         await delay(350);
         await evaluate('localizationFixture.changeCourseLanguage(' + JSON.stringify(nextLanguage) + ')');
         await delay(350);
-        checkLabels(await state(), language);
+        checkLabels(await state(), language, nextLanguage);
         await evaluate('localizationFixture.clearLanguageOverrides()');
         await delay(350);
         checkLabels(await state(), nextLanguage);

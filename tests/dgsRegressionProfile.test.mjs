@@ -13,21 +13,22 @@ registerHooks({
 });
 
 const {
+  buildImplicitAnalysisDgsSpec,
   buildImplicitRegressionDgsSpec,
   resolveRegressionDgsController
 } = await import('../src/shared/dgsRegressionProfile.ts');
 
-test('implicit Regression and Reconstruction use only the three regression tool ids', () => {
+test('implicit Regression and Reconstruction expose regression and all analysis tools', () => {
   assert.equal(
     buildImplicitRegressionDgsSpec('board-a'),
-    'board-a;tools=[910;920;930]'
+    'board-a;tools=[810;820;830;840;850;860;910;920;930]'
   );
 
   assert.deepEqual(
     resolveRegressionDgsController('board-a', 'regression-board-a', 'de'),
     {
       uid: 'regression-board-a',
-      spec: 'board-a;tools=[910;920;930]',
+      spec: 'board-a;tools=[810;820;830;840;850;860;910;920;930]',
       language: 'de',
       explicit: false
     }
@@ -77,4 +78,8 @@ test('unavailable flyout tools stay hidden after submenus move into the menu cli
     /\.lia-dgs-menu-clip \[hidden\]\s*\{\s*display:\s*none !important;/
   );
   assert.match(source, /button\.hidden = !enabled;\s*button\.disabled = !enabled;/);
+});
+
+test('implicit Schar exposes all six analysis tools', () => {
+  assert.equal(buildImplicitAnalysisDgsSpec('board-a'), 'board-a;tools=[810;820;830;840;850;860]');
 });

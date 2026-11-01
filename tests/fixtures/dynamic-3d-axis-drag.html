@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>3D object axis drag regression fixture</title>
+  <style>
+    body { margin: 12px; background: #303030; color: #fff; font-family: Arial, sans-serif; }
+    .flex-child { width: 920px; min-width: 0; }
+    .jxgbox { position: relative; overflow: hidden; }
+  </style>
+</head>
+<body>
+<main id="fixture">
+  <section class="flex-child">
+    <lia-coordinate-board data-lia-coordinate-key="axis-drag-3d"
+      data-spec="id=raum;mode=3d;xmin=-6;xmax=6;ymin=-6;ymax=6;zmin=-5;zmax=5;width=900;projection=parallel;camera=0.9/0.45/0"></lia-coordinate-board>
+    <span id="point3d-spec-a" data-spec="raum;A;-2;0;0;#ff00ff;1" hidden></span>
+    <span id="point3d-spec-b" data-spec="raum;B;-0.6;0;0;#ff00ff;1" hidden></span>
+    <span id="point3d-spec-p" data-spec="raum;P;2;1;1;#00ffff;1" hidden></span>
+    <span id="point3d-spec-q" data-spec="raum;Q;0;-3;-1;#ffff00;1" hidden></span>
+    <span id="sphere3d-spec-s" data-definition="center-point" data-language="de"
+      data-spec="raum;S;A;B;#ff00ff;opacity=0.18;objectid=axis-drag-sphere" hidden></span>
+    <div id="dgs-ui-axis-drag-3d" data-spec="raum" data-language="de"></div>
+  </section>
+</main>
+<script>
+  window.profileErrors = [];
+  window.addEventListener('error', event => profileErrors.push(String(event.error?.stack || event.message)));
+  window.addEventListener('unhandledrejection', event => profileErrors.push(String(event.reason)));
+</script>
+<script src="/assets/jsxgraph-template.js"></script>
+<script src="/bundle.js"></script>
+<script>
+  window.profileReady = async () => {
+    for (let i = 0; i < 240; i += 1) {
+      const board = window.__boards?.raum;
+      const points = window.__points?.raum;
+      const sphere = Object.values(window.__sphere3DEntries || {}).find(entry => entry.boardId === 'raum');
+      if (board && window.__coordinateViews3d?.raum && points?.A && points?.B && points?.P && points?.Q &&
+          sphere?.object && board.containerObj.querySelector('.lia-dgs-point-button')) return true;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    throw Error('Axis drag initialization timeout: ' + JSON.stringify(profileErrors));
+  };
+  window.pointScreen = name => {
+    const point = __points.raum[name];
+    const rect = __boards.raum.containerObj.getBoundingClientRect();
+    return [rect.left + point.element2D.coords.scrCoords[1], rect.top + point.element2D.coords.scrCoords[2]];
+  };
+</script>
+</body>
+</html>

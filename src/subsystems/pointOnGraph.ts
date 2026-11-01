@@ -7,6 +7,10 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { resolveUiLanguage, onCourseLanguageChange } from '../shared/language';
 import { getCoordinateQuizRoot, isQuizResolveButton } from '../shared/quizDom';
 import { applyLineStyle, lineStyleAttributes, parseLineStyleOptions } from '../shared/lineStyle';
+import {
+  keepFunctionGraphLabelOnOneLine,
+  positionFunctionGraphLabel
+} from '../shared/functionGraphLabel';
 
 export function init(): void {
   if (window.__pointOnGraphReady) {
@@ -507,83 +511,26 @@ export function init(): void {
     );
   }
 
-  function safeBBox(board) {
-    try {
-      const bb = board.getBoundingBox();
-      if (
-        Array.isArray(bb) &&
-        bb.length === 4 &&
-        bb.every(function(v) { return Number.isFinite(v); }) &&
-        bb[2] > bb[0] &&
-        bb[1] > bb[3]
-      ) {
-        return bb.slice();
-      }
-    } catch (e) {}
-
-    return [-5, 5, 5, -5];
-  }
-
-  function chooseVisibleAnchorX(board, fn) {
-    const bb = safeBBox(board);
-    const xmin = bb[0];
-    const ymax = bb[1];
-    const xmax = bb[2];
-    const ymin = bb[3];
-
-    const xspan = xmax - xmin;
-    const yspan = ymax - ymin;
-
-    const xStart = xmax - 0.10 * xspan;
-    const xEnd   = xmin + 0.18 * xspan;
-
-    const yPadTop = 0.14 * yspan;
-    const yPadBottom = 0.12 * yspan;
-
-    const steps = 120;
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = xStart - t * (xStart - xEnd);
-
-      let y;
-      try {
-        y = fn(x);
-      } catch (e) {
-        y = NaN;
-      }
-
-      if (!Number.isFinite(y)) continue;
-      if (y <= ymax - yPadTop && y >= ymin + yPadBottom) return x;
-    }
-
-    return xmin + 0.60 * xspan;
-  }
-
   function createFunctionLabel(board, fn, graphName, graphColor) {
     const labelText = texName(graphName);
     const gCol = String(graphColor || '#b41f65').trim() || '#b41f65';
+    let text = null;
+    const placement = function() {
+      return positionFunctionGraphLabel(board, fn, {
+        label: text,
+        text: labelText,
+        fontSize: 24,
+        horizontalGapUser: 0.18,
+        verticalOffsetUser: 0.18
+      });
+    };
 
     const anchor = board.create('point', [
       function() {
-        return chooseVisibleAnchorX(board, fn);
+        return placement().x;
       },
       function() {
-        const x = chooseVisibleAnchorX(board, fn);
-        let y;
-
-        try {
-          y = fn(x);
-        } catch (e) {
-          y = NaN;
-        }
-
-        if (!Number.isFinite(y)) {
-          const bb = safeBBox(board);
-          return (bb[1] + bb[3]) / 2;
-        }
-
-        return y;
+        return placement().y;
       }
     ], {
       visible: false,
@@ -592,12 +539,12 @@ export function init(): void {
       name: ''
     });
 
-    const text = board.create('text', [
+    text = board.create('text', [
       function() {
-        return anchor.X() + 0.18;
+        return anchor.X();
       },
       function() {
-        return anchor.Y() + 0.18;
+        return anchor.Y();
       },
       function() {
         return labelText;
@@ -612,8 +559,10 @@ export function init(): void {
       fillColor: gCol,
       fontSize: 24,
       anchorX: 'left',
-      anchorY: 'top'
+      anchorY: 'middle',
+      cssStyle: 'white-space:nowrap;overflow:visible;'
     });
+    keepFunctionGraphLabelOnOneLine(text);
 
     return {
       anchor: anchor,

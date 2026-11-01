@@ -1,19 +1,19 @@
 {
   "browser": {
     "protocolVersion": "1.3",
-    "product": "Chrome/152.0.7977.83",
-    "revision": "@79460ebecaa5625e57a5fb679a735659e73dc687",
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
-    "jsVersion": "15.2.124.21"
+    "product": "Chrome/155.0.8059.40",
+    "revision": "@cfaadc5a132d78e1828635aa8405a499f3e14864",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+    "jsVersion": "15.5.35.20"
   },
   "runtime": "LiaScript 0.16.10",
   "checks": [
-    "All seven native LiaScript quiz families plus area and perimeter variants",
+    "All eight native LiaScript quiz families plus area and perimeter variants",
     "Native incorrect Check, Hint, correct Check and Resolve",
     "Native point creation buttons; JSXGraph point/polygon and Schar parameter geometry prepared explicitly",
     "Point lock and unchanged hint geometry assertions"
   ],
-  "bundleSha256": "583d1e7716d85ce8d2c21e1d5ccdd3fe05e6502b7658e7793a77beea619f78a6",
+  "bundleSha256": "90754edb135b61d4848e9c4ac9933d4e8b943eca8d42e9eb077b52c3a7abbbbd",
   "scenarios": [
     {
       "id": "q_create",
@@ -330,7 +330,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard1207189Py27",
+            "id": "jxgBoard5360219Py27",
             "vertices": [
               [
                 0,
@@ -385,7 +385,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard1207189Py27",
+            "id": "jxgBoard5360219Py27",
             "vertices": [
               [
                 0,
@@ -440,7 +440,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard1207189Py27",
+            "id": "jxgBoard5360219Py27",
             "vertices": [
               [
                 0,
@@ -496,7 +496,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard1207189Py27",
+            "id": "jxgBoard5360219Py27",
             "vertices": [
               [
                 0,
@@ -651,7 +651,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8634470Py30",
+            "id": "jxgBoard6317284Py30",
             "vertices": [
               [
                 0,
@@ -706,7 +706,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8634470Py30",
+            "id": "jxgBoard6317284Py30",
             "vertices": [
               [
                 0,
@@ -761,7 +761,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8634470Py30",
+            "id": "jxgBoard6317284Py30",
             "vertices": [
               [
                 0,
@@ -817,7 +817,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8634470Py30",
+            "id": "jxgBoard6317284Py30",
             "vertices": [
               [
                 0,
@@ -972,7 +972,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard9019241Py30",
+            "id": "jxgBoard24538Py30",
             "vertices": [
               [
                 0,
@@ -1031,7 +1031,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard9019241Py30",
+            "id": "jxgBoard24538Py30",
             "vertices": [
               [
                 0,
@@ -1090,7 +1090,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard9019241Py30",
+            "id": "jxgBoard24538Py30",
             "vertices": [
               [
                 0,
@@ -1150,7 +1150,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard9019241Py30",
+            "id": "jxgBoard24538Py30",
             "vertices": [
               [
                 0,
@@ -1458,8 +1458,8 @@
           "points": [
             {
               "name": "A",
-              "x": 0.8921584619912442,
-              "y": 0.01893510216917693,
+              "x": 0.6866615533399247,
+              "y": 0.1428579250528219,
               "fixed": false
             }
           ],
@@ -1499,8 +1499,8 @@
           "points": [
             {
               "name": "A",
-              "x": 0.8921584619912442,
-              "y": 0.01893510216917693,
+              "x": 0.6866615533399247,
+              "y": 0.1428579250528219,
               "fixed": true
             }
           ],
@@ -2122,6 +2122,302 @@
       }
     },
     {
+      "id": "q_3d",
+      "passed": true,
+      "initial": {
+        "id": "q_3d",
+        "kind": "construction3d",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "Zurücksetzen",
+            "class": "lia-coordinate-quiz-reset",
+            "aria": "Zurücksetzen",
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen\nZurücksetzen",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "wrong": {
+        "id": "q_3d",
+        "kind": "construction3d",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "Zurücksetzen",
+            "class": "lia-coordinate-quiz-reset",
+            "aria": "Zurücksetzen",
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nZurücksetzen\nEin benötigtes Objekt fehlt.",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "hinted": {
+        "id": "q_3d",
+        "kind": "construction3d",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "Zurücksetzen",
+            "class": "lia-coordinate-quiz-reset",
+            "aria": "Zurücksetzen",
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "Setze den Punkt bei left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nSetze den Punkt bei .\nZurücksetzen\nEin benötigtes Objekt fehlt.",
+        "points": [],
+        "polygons": [],
+        "schars": []
+      },
+      "attempted": {
+        "id": "q_3d",
+        "kind": "construction3d",
+        "quizClass": "lia-quiz lia-quiz-multi open",
+        "buttons": [
+          {
+            "text": "Prüfen 1",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve hide",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": false,
+            "disabled": false
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "Zurücksetzen",
+            "class": "lia-coordinate-quiz-reset",
+            "aria": "Zurücksetzen",
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "Setze den Punkt bei left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 1\nDie richtige Antwort wurde noch nicht gegeben\nSetze den Punkt bei .\nZurücksetzen\nEin benötigtes Objekt fehlt.",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": false
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "correct": {
+        "id": "q_3d",
+        "kind": "construction3d",
+        "quizClass": "lia-quiz lia-quiz-multi solved",
+        "buttons": [
+          {
+            "text": "Prüfen 2",
+            "class": "lia-btn  lia-btn--outline lia-quiz__check",
+            "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+            "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "",
+            "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+            "aria": null,
+            "visible": true,
+            "disabled": true
+          },
+          {
+            "text": "Zurücksetzen",
+            "class": "lia-coordinate-quiz-reset",
+            "aria": "Zurücksetzen",
+            "visible": true,
+            "disabled": false
+          }
+        ],
+        "hints": "Setze den Punkt bei left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+        "solution": "Der Zielpunkt ist A, left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+        "text": "Prüfen 2\nHerzlichen Glückwunsch, das war die richtige Antwort\nSetze den Punkt bei .\n\nDer Zielpunkt ist .\n\nZurücksetzen\nDie Konstruktion ist vollständig richtig.",
+        "points": [
+          {
+            "name": "A",
+            "x": 1,
+            "y": 1,
+            "fixed": false
+          }
+        ],
+        "polygons": [],
+        "schars": []
+      },
+      "resolve": {
+        "passed": true,
+        "beforeResolve": {
+          "id": "q_3d",
+          "kind": "construction3d",
+          "quizClass": "lia-quiz lia-quiz-multi open",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": false
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "Zurücksetzen",
+              "class": "lia-coordinate-quiz-reset",
+              "aria": "Zurücksetzen",
+              "visible": true,
+              "disabled": false
+            }
+          ],
+          "hints": "Setze den Punkt bei left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+          "text": "Prüfen 2\nDie richtige Antwort wurde noch nicht gegeben\nSetze den Punkt bei .\nZurücksetzen\nEin benötigtes Objekt fehlt.",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        },
+        "resolved": {
+          "id": "q_3d",
+          "kind": "construction3d",
+          "quizClass": "lia-quiz lia-quiz-multi resolved",
+          "buttons": [
+            {
+              "text": "Prüfen 2",
+              "class": "lia-btn  lia-btn--outline lia-quiz__check",
+              "aria": "Überprüfe die Antwort. Die Antwort wird als richtig oder falsch markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__resolve",
+              "aria": "Zeige die Lösung. Das Quiz wird als aufgelöst markiert.",
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "",
+              "class": "lia-btn lia-btn--transparent lia-quiz__hint",
+              "aria": null,
+              "visible": true,
+              "disabled": true
+            },
+            {
+              "text": "Zurücksetzen",
+              "class": "lia-coordinate-quiz-reset",
+              "aria": "Zurücksetzen",
+              "visible": true,
+              "disabled": false
+            }
+          ],
+          "hints": "Setze den Punkt bei left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+          "solution": "Der Zielpunkt ist A, left parenthesis, 1, vertical bar, 1, vertical bar, 1, right parenthesis.",
+          "text": "Prüfen 2\nAufgelöste Antwort\nSetze den Punkt bei .\n\nDer Zielpunkt ist .\n\nZurücksetzen",
+          "points": [],
+          "polygons": [],
+          "schars": []
+        }
+      }
+    },
+    {
       "id": "q_area",
       "passed": true,
       "initial": {
@@ -2182,7 +2478,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8673265Py30",
+            "id": "jxgBoard11861236Py30",
             "vertices": [
               [
                 0,
@@ -2241,7 +2537,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8673265Py30",
+            "id": "jxgBoard11861236Py30",
             "vertices": [
               [
                 0,
@@ -2300,7 +2596,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8673265Py30",
+            "id": "jxgBoard11861236Py30",
             "vertices": [
               [
                 0,
@@ -2360,7 +2656,7 @@
         "points": [],
         "polygons": [
           {
-            "id": "jxgBoard8673265Py30",
+            "id": "jxgBoard11861236Py30",
             "vertices": [
               [
                 0,

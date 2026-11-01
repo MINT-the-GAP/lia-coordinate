@@ -1,17 +1,17 @@
 {
   "mode": "after",
-  "date": "2026-09-08T14:08:47.740Z",
+  "date": "2026-10-13T20:20:41.740Z",
   "browser": {
     "protocolVersion": "1.3",
-    "product": "Chrome/152.0.7977.82",
-    "revision": "@d04cdb24d67b081f6cf80200ffc5233f44b61109",
-    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
-    "jsVersion": "15.2.124.21"
+    "product": "Chrome/155.0.8059.40",
+    "revision": "@cfaadc5a132d78e1828635aa8405a499f3e14864",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+    "jsVersion": "15.5.35.20"
   },
-  "bundleSha256": "54d68e39e54d7ce6236f55e8f0305ae6e620058f0252aa8a23283f06eadf57c0",
+  "bundleSha256": "ad1ad0c82d0ec42b9493eaa3ceca5c54e07389e0e9b718d87e290d683d5be2b0",
   "jsxgraphSha256": "e753abd735baa6c6a778db6e28785b94cb83ee620f7da85a0de1adae30d097fd",
   "mathjaxSha256": "0a6ded5abbce13331658dd239f34382abd06492c74b71b61e8caa8112ec55fa5",
-  "fixtureSha256": "86b22983bec207df1e399ddce74bae2013431f8665f5b5aea216e4fef785b358",
+  "fixtureSha256": "f1b0becca479b0aa4f1c393470ce9f8b5d77260bf9fa6f61dd455f00c5b22e0d",
   "integrationAssets": {
     "timer.js": "90af1847188404d256867c24ff4e5fd24ed8e756ea56f6fe2eacaa7633c5474a",
     "dynflex.js": "f1e2622cb0b6cd69823af58e375002a096ce669666eb800573405c51cca99599",
@@ -40,22 +40,22 @@
       },
       "frames": {
         "count": 179,
-        "mean": 16.666480446927373,
+        "mean": 16.665921787709497,
         "p50": 16.699999999999818,
-        "p95": 16.700000000000273,
+        "p95": 16.799999999999727,
         "max": 16.800000000000182
       },
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 1.9533333248562283,
-        "p50": 1.9000000953674316,
-        "p95": 2.5,
-        "max": 3.0999999046325684
+        "mean": 1.6155555566151938,
+        "p50": 1.5999999940395355,
+        "p95": 1.9000000059604645,
+        "max": 2.300000011920929
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3007,
+      "duration": 3006.800000011921,
       "pointCount": 9,
       "points": {
         "A": [
@@ -126,7 +126,7 @@
       },
       "frames": {
         "count": 179,
-        "mean": 16.666480446927373,
+        "mean": 16.6659217877095,
         "p50": 16.699999999999818,
         "p95": 16.700000000000273,
         "max": 16.800000000000182
@@ -134,14 +134,14 @@
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.528333338101705,
-        "p50": 2.5,
-        "p95": 3,
-        "max": 3.4000000953674316
+        "mean": 2.288888887564341,
+        "p50": 2.2999999821186066,
+        "p95": 2.699999988079071,
+        "max": 2.800000011920929
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3018,
+      "duration": 3006.5999999940395,
       "pointCount": 9,
       "points": {
         "A": [
@@ -213,7 +213,7 @@
       },
       "frames": {
         "count": 179,
-        "mean": 16.665921787709497,
+        "mean": 16.66536312849162,
         "p50": 16.699999999999818,
         "p95": 16.799999999999727,
         "max": 16.800000000000182
@@ -221,14 +221,14 @@
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.343333344989353,
-        "p50": 2.200000286102295,
-        "p95": 3.200000286102295,
-        "max": 4.099999904632568
+        "mean": 1.7961111096872224,
+        "p50": 1.7999999821186066,
+        "p95": 2.300000011920929,
+        "max": 2.7000000178813934
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3010.5999999046326,
+      "duration": 3008,
       "pointCount": 9,
       "points": {
         "A": [
@@ -301,22 +301,22 @@
       },
       "frames": {
         "count": 179,
-        "mean": 16.6659217877095,
+        "mean": 16.665921787709493,
         "p50": 16.699999999999818,
-        "p95": 16.799999999999727,
+        "p95": 16.700000000000273,
         "max": 16.800000000000182
       },
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.29333332379659,
-        "p50": 2.1999998092651367,
-        "p95": 2.8000001907348633,
-        "max": 3.3999996185302734
+        "mean": 1.9383333336975839,
+        "p50": 1.9000000059604645,
+        "p95": 2.5,
+        "max": 3.300000011920929
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3015.300000190735,
+      "duration": 3017.5999999940395,
       "pointCount": 9,
       "points": {
         "A": [
@@ -388,7 +388,7 @@
       },
       "frames": {
         "count": 179,
-        "mean": 16.666480446927373,
+        "mean": 16.665921787709497,
         "p50": 16.699999999999818,
         "p95": 16.700000000000273,
         "max": 16.800000000000182
@@ -396,14 +396,14 @@
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.5577777995003594,
-        "p50": 2.5,
-        "p95": 3.200000286102295,
-        "max": 3.5999999046325684
+        "mean": 2.3822222204671966,
+        "p50": 2.300000011920929,
+        "p95": 3.0999999940395355,
+        "max": 3.5
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3012,
+      "duration": 3002.800000011921,
       "pointCount": 9,
       "points": {
         "A": [
@@ -467,30 +467,30 @@
         "suspendUpdate": 0,
         "unsuspendUpdate": 0,
         "boundingbox": 180,
-        "mutations": 56891,
+        "mutations": 57920,
         "childList": 884,
-        "attributes": 55913,
+        "attributes": 56942,
         "characterData": 94,
         "overlayMutations": 0
       },
       "frames": {
         "count": 179,
-        "mean": 16.6659217877095,
+        "mean": 16.665921787709497,
         "p50": 16.699999999999818,
         "p95": 16.700000000000273,
-        "max": 16.800000000000182
+        "max": 16.799999999999955
       },
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.5466666645473905,
-        "p50": 2.5,
-        "p95": 3.1999998092651367,
-        "max": 4.599999904632568
+        "mean": 2.4455555553237596,
+        "p50": 2.399999976158142,
+        "p95": 3.2000000178813934,
+        "max": 3.4000000059604645
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3002.800000190735,
+      "duration": 3004.300000011921,
       "pointCount": 9,
       "points": {
         "A": [
@@ -556,30 +556,30 @@
         "suspendUpdate": 177,
         "unsuspendUpdate": 177,
         "boundingbox": 180,
-        "mutations": 69619,
+        "mutations": 70648,
         "childList": 1639,
-        "attributes": 67875,
+        "attributes": 68904,
         "characterData": 105,
         "overlayMutations": 2233
       },
       "frames": {
         "count": 179,
-        "mean": 16.6659217877095,
+        "mean": 16.665921787709493,
         "p50": 16.699999999999818,
-        "p95": 16.799999999999727,
+        "p95": 16.799999999999955,
         "max": 16.800000000000182
       },
       "frameOver25ms": 0,
       "actionTimes": {
         "count": 180,
-        "mean": 2.83944448100196,
-        "p50": 2.5999999046325684,
-        "p95": 4.5,
-        "max": 6.699999809265137
+        "mean": 2.0516666672295996,
+        "p50": 2,
+        "p95": 2.899999976158142,
+        "max": 3.5999999940395355
       },
       "longTasks": [],
       "longTaskCount": 0,
-      "duration": 3013.4000000953674,
+      "duration": 3008.2999999821186,
       "pointCount": 9,
       "points": {
         "A": [
@@ -628,5 +628,100 @@
       "errors": [],
       "trace": "C:\\Users\\MaSaLo\\AppData\\Local\\Temp\\lia-coordinate-profile-assets\\after-integration-visible.trace.json"
     }
-  ]
+  ],
+  "interactionChecks": {
+    "actualPointerPan": true,
+    "cdpWheelZoom": true,
+    "legacyWheelZoom": false,
+    "movablePointDrag": true,
+    "fixedPointPreserved": true,
+    "status": "passed-with-adapter-limitation",
+    "integration": true,
+    "hiddenMutations": 0,
+    "adapterPointHydrated": false,
+    "adapterPointCoordinates": [
+      -3,
+      -8.5
+    ],
+    "expectedPoint": [
+      -2.080459770114942,
+      -7.781609195402298
+    ],
+    "publicPointRestore": true,
+    "dynFlexResize": true,
+    "freezeAdapterCaptureRestore": true,
+    "pointPreserved": true,
+    "bboxPreserved": true,
+    "squarePreserved": false,
+    "squareRestoreMismatches": [
+      "pivotXRatio",
+      "pivotYRatio"
+    ],
+    "squareTransformPreserved": false,
+    "timerDeadlinePreserved": true,
+    "expectedSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4392142857142857,
+      "pivotYRatio": 0.11392857142857145,
+      "angle": 0,
+      "scale": 1
+    },
+    "restoredSquare": {
+      "visible": true,
+      "initialized": true,
+      "pivotXRatio": 0.4360200000000001,
+      "pivotYRatio": 0.11310000000000005,
+      "angle": 0,
+      "scale": 1
+    },
+    "expectedTransform": "translate3d(-20.189px, 32.7383px, 0px) rotate(0deg)",
+    "restoredTransform": "translate3d(-21.9331px, 32.2859px, 0px) rotate(0deg)",
+    "errors": [],
+    "fullDgsRestore": {
+      "status": "passed-with-adapter-limitation",
+      "integration": true,
+      "hiddenMutations": 0,
+      "adapterPointHydrated": true,
+      "adapterPointCoordinates": [
+        -2.0804597701149423,
+        -7.781609195402298
+      ],
+      "expectedPoint": [
+        -2.0804597701149423,
+        -7.781609195402298
+      ],
+      "publicPointRestore": true,
+      "dynFlexResize": true,
+      "freezeAdapterCaptureRestore": true,
+      "pointPreserved": true,
+      "bboxPreserved": true,
+      "squarePreserved": false,
+      "squareRestoreMismatches": [
+        "pivotXRatio",
+        "pivotYRatio"
+      ],
+      "squareTransformPreserved": false,
+      "timerDeadlinePreserved": true,
+      "expectedSquare": {
+        "visible": true,
+        "initialized": true,
+        "pivotXRatio": 0.4081643672602156,
+        "pivotYRatio": 0.10267559048089436,
+        "angle": 0,
+        "scale": 1
+      },
+      "restoredSquare": {
+        "visible": true,
+        "initialized": true,
+        "pivotXRatio": 0.40519589913468684,
+        "pivotYRatio": 0.10192885891376059,
+        "angle": 0,
+        "scale": 1
+      },
+      "expectedTransform": "translate3d(-37.1423px, 26.5942px, 0px) rotate(0deg)",
+      "restoredTransform": "translate3d(-38.763px, 26.1865px, 0px) rotate(0deg)",
+      "errors": []
+    }
+  }
 }

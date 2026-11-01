@@ -417,7 +417,7 @@ export function init(): void {
     } catch (e) {}
     for (const object of candidates) {
       const type = String(object && object.elType || '').toLowerCase();
-      if (!object || typeof object.Y !== 'function' || (!object.__liaDgsFunction && type !== 'functiongraph')) continue;
+      if (!object || typeof object.Y !== 'function' || (!object.__liaDgsFunction && !object.__liaDgsAnalysisFunction && type !== 'functiongraph')) continue;
       const names = [object.__liaDgsFunctionName, object.__liaPlotFunctionName, object.name].map(normalizeFunctionName);
       if (names.includes(wanted)) return object;
     }

@@ -15,6 +15,8 @@ interface CoordTextConfig {
   color: string;
   hasExplicitColor: boolean;
   opacity: number;
+  fontSize: number;
+  fixed: boolean;
 }
 
 export function init(): void {
@@ -73,6 +75,18 @@ export function init(): void {
     const rendered = renderDollarTeX(content);
     const explicitColor = String(parts[3] || '').trim();
     const parsedOpacity = parseFloat(String(parts[4] || '').replace(',', '.'));
+    const options = parts.slice(5);
+    let fontSize = 18;
+    let fixed = true;
+    options.forEach(function(option) {
+      const fontMatch = String(option || '').match(/^(?:fontsize|schriftgroesse|schriftgröße)\s*=\s*(.+)$/i);
+      if (fontMatch) {
+        const parsed = Number(String(fontMatch[1] || '').replace(',', '.'));
+        if (Number.isFinite(parsed)) fontSize = Math.max(8, Math.min(96, parsed));
+      }
+      const fixedMatch = String(option || '').match(/^(?:fixed|fixiert)\s*=\s*(0|1|false|true)$/i);
+      if (fixedMatch) fixed = !/^(?:0|false)$/i.test(fixedMatch[1]);
+    });
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -85,7 +99,9 @@ export function init(): void {
       hasExplicitColor: !!explicitColor,
       opacity: Number.isFinite(parsedOpacity)
         ? Math.max(0, Math.min(1, parsedOpacity))
-        : 1
+        : 1,
+      fontSize: fontSize,
+      fixed: fixed
     };
   }
 
@@ -106,7 +122,7 @@ export function init(): void {
     removeEntryByKey(entryKey(uid));
   }
 
-  function applyTextStyle(text: any, color: string, opacity: number): void {
+  function applyTextStyle(text: any, color: string, opacity: number, fontSize: number, fixed: boolean): void {
     if (!text || typeof text.setAttribute !== 'function') return;
     try {
       text.setAttribute({
@@ -118,7 +134,9 @@ export function init(): void {
         highlightStrokeOpacity: opacity,
         fillOpacity: opacity,
         highlightFillOpacity: opacity,
-        cssStyle: 'opacity:' + opacity + ';'
+        cssStyle: 'opacity:' + opacity + ';',
+        fontSize: fontSize,
+        fixed: fixed
       });
     } catch (e) {}
   }
@@ -128,8 +146,8 @@ export function init(): void {
     text.__liaDgsMacroManaged = true;
     text.__liaDgsText = true;
     text.__liaDgsTextContent = cfg.content;
-    text.__liaDgsTextFontSize = 18;
-    text.__liaDgsFormatFontSize = 18;
+    text.__liaDgsTextFontSize = cfg.fontSize;
+    text.__liaDgsFormatFontSize = cfg.fontSize;
     text.__liaDgsShowName = true;
     text.__liaDgsShowObject = cfg.opacity > 0;
     text.__liaDgsOpacity = cfg.opacity;
@@ -163,12 +181,14 @@ export function init(): void {
       old.x === cfg.x &&
       old.y === cfg.y &&
       old.content === cfg.content &&
+      old.fontSize === cfg.fontSize &&
+      old.fixed === cfg.fixed &&
       old.text
     ) {
       old.color = cfg.color;
       old.opacity = cfg.opacity;
       old.hasExplicitColor = cfg.hasExplicitColor;
-      applyTextStyle(old.text, cfg.color, cfg.opacity);
+      applyTextStyle(old.text, cfg.color, cfg.opacity, cfg.fontSize, cfg.fixed);
       applyDgsTextMetadata(old.text, cfg);
       try { board.update(); } catch (e) {}
       return true;
@@ -179,7 +199,7 @@ export function init(): void {
 
     try {
       text = board.create('text', [cfg.x, cfg.y, cfg.renderedContent], {
-        fixed: true,
+        fixed: cfg.fixed,
         highlight: false,
         parse: false,
         useMathJax: cfg.useMathJax,
@@ -195,7 +215,7 @@ export function init(): void {
         fillOpacity: cfg.opacity,
         highlightFillOpacity: cfg.opacity,
         cssStyle: 'opacity:' + cfg.opacity + ';',
-        fontSize: 18
+        fontSize: cfg.fontSize
       });
       applyDgsTextMetadata(text, cfg);
 
@@ -208,6 +228,8 @@ export function init(): void {
         color: cfg.color,
         hasExplicitColor: cfg.hasExplicitColor,
         opacity: cfg.opacity,
+        fontSize: cfg.fontSize,
+        fixed: cfg.fixed,
         board: board,
         text: text
       };
@@ -299,7 +321,7 @@ export function init(): void {
       const entry = window.__coordTextEntries[key];
       if (!entry) return;
       if (!entry.hasExplicitColor) entry.color = getAccentColor();
-      applyTextStyle(entry.text, entry.color, entry.opacity);
+      applyTextStyle(entry.text, entry.color, entry.opacity, entry.fontSize, entry.fixed);
       applyDgsTextMetadata(entry.text, {
         boardId: entry.boardId,
         x: entry.x,
@@ -309,7 +331,9 @@ export function init(): void {
         useMathJax: false,
         color: entry.color,
         hasExplicitColor: entry.hasExplicitColor,
-        opacity: entry.opacity
+        opacity: entry.opacity,
+        fontSize: entry.fontSize,
+        fixed: entry.fixed
       });
       try { if (entry.board) entry.board.update(); } catch (e) {}
     });

@@ -1,10 +1,38 @@
 // Runtime globals injected by JSXGraph and MathJax CDN scripts
 declare const JXG: any;
 
+interface CoordinateView3DRegistryEntry {
+  boardId: string;
+  board: any;
+  view: any;
+  config: import('./shared/coordSpec').BoardConfig;
+  projection: import('./shared/scene3d').Projection3D;
+  camera: import('./shared/scene3d').Camera3D;
+  viewMode: import('./shared/scene3d').SceneViewMode;
+  points: Set<any>;
+  linearObjects: Set<any>;
+  planeObjects: Set<any>;
+  circleObjects: Set<any>;
+  sphereObjects: Set<any>;
+  polygonObjects: Set<any>;
+  solidObjects: Set<any>;
+  curveObjects: Set<any>;
+  surfaceObjects: Set<any>;
+  decorations: Set<any>;
+  controls?: HTMLElement;
+  controlsCleanup?: () => void;
+  cameraDragCleanup?: () => void;
+  viewportCleanup?: () => void;
+  viewportSignature?: string;
+  decorationSignature?: string;
+  spatialRanges: [[number, number], [number, number], [number, number]];
+}
+
 interface Window {
   // JSXGraph board registry
   JXG: any;
   __boards: Record<string, any>;
+  __coordinateViews3d: Record<string, CoordinateView3DRegistryEntry>;
 
   // MathJax (loaded externally)
   MathJax: any;
@@ -14,6 +42,9 @@ interface Window {
   __liaRunCoordHooks: Array<() => void> | { push(fn: () => void): void } | undefined;
   __coordBoardStates: Record<string, any>;
   __ensureCoordinateDynamicRuntime: (() => void) | undefined;
+  __bootstrapDgsSegment6Tools: (() => void) | undefined;
+  __mountDgsSegment6Tools: ((menu: HTMLElement) => void) | undefined;
+  __dgsSegment6PropertyObjects: Record<string, any> | undefined;
   __coordinateDynamicRuntimeReady: boolean | undefined;
   __disposeDGSForBoard: ((boardId: string) => void) | undefined;
   __disposeRegressionForBoard: ((boardId: string) => void) | undefined;
@@ -69,7 +100,140 @@ interface Window {
     bootstrapStaticCoordinateBoards: () => void;
     scheduleStaticBootstrap: () => void;
     initCoordinateBoardElement: () => void;
+    coordinateLinear3DEndpoint: (object: any) => [number, number, number] | null;
+    coordinateLinear3DData: (object: any) => any;
+    coordinatePlane3DData: (object: any) => any;
+    coordinateCircle3DData: (object: any) => any;
+    coordinateSphere3DData: (object: any) => any;
+    coordinatePolygon3DData: (object: any) => any;
+    coordinateSolid3DData: (object: any) => any;
+    coordinateCurve3DData: (object: any) => any;
+    coordinateSurface3DData: (object: any) => any;
+    coordinateLinear3DSourcePoints: (object: any) => [any, any] | null;
+    coordinateVector3DComponents: (object: any) => [number, number, number] | null;
+    createCoordinateFreeVector3D: (board: any, anchor: any, components: [number, number, number], attributes?: Record<string, unknown>) => any;
+    createCoordinateLinear3D: (board: any, kind: 'segment' | 'line' | 'ray' | 'vector', point1: any, point2: any, attributes?: Record<string, unknown>) => any;
+    createCoordinatePoint3D: (board: any, coordinates: [number, number, number], attributes?: Record<string, unknown>) => any;
+    createCoordinatePlane3D: (board: any, definition: 'three-points' | 'point-vectors' | 'point-normal', points: any[], vectors?: any[], attributes?: Record<string, unknown>) => any;
+    createCoordinateCircle3D: (board: any, definition: 'three-points' | 'center-normal-radius' | 'center-normal-point', points: any[], vectors?: any[], radius?: number | (() => number), attributes?: Record<string, unknown>) => any;
+    createCoordinateDependentCircle3D: (board: any, evaluator: () => any, attributes?: Record<string, unknown>) => any;
+    createCoordinateSphere3D: (board: any, definition: 'center-point' | 'center-radius' | 'four-points', points: any[], radius?: number | (() => number), attributes?: Record<string, unknown>) => any;
+    createCoordinatePolygon3D: (board: any, points: any[], attributes?: Record<string, unknown>) => any;
+    createCoordinateDependentPolygon3D: (board: any, evaluator: () => any, attributes?: Record<string, unknown>) => any;
+    createCoordinateSolid3D: (board: any, definition: import('./shared/scene3d').Solid3DDefinition, points?: any[], vectors?: any[], polygon?: any, radius?: number | (() => number), attributes?: Record<string, unknown>) => any;
+    createCoordinateDependentSolid3D: (board: any, evaluator: () => any, attributes?: Record<string, unknown>) => any;
+    createCoordinateCurve3D: (board: any, curveOrEvaluator: any, attributes?: Record<string, unknown>) => any;
+    createCoordinateSurface3D: (board: any, surfaceOrEvaluator: any, attributes?: Record<string, unknown>) => any;
+    createCoordinateTransformedObject3D: (board: any, source: any, evaluator: () => import('./shared/transform3d').SimilarityTransform3D | null, definition: import('./shared/scene3d').Transformation3DDefinition, references?: any[], value?: number | (() => number), attributes?: Record<string, unknown>) => any;
+    disposeCoordinateView3D: (boardOrId: any) => void;
+    ensureCoordinateView3D: (board: any, config?: any) => any;
+    getCoordinateView3D: (boardOrId: any) => any;
+    mountCoordinateView3DControls: (board: any, container: HTMLElement, language?: 'de' | 'en') => HTMLElement;
+    point3DCoordinates: (point: any) => [number, number, number] | null;
+    projectBoardCoordinatesToXYPlane: (board: any, x: number, y: number) => [number, number, number];
+    requestCoordinateSceneMode: (board: any, mode: '2d' | '3d') => { ok: boolean; message?: string };
+    setCoordinateCamera: (entryOrBoard: any, camera: any, emit?: boolean) => void;
+    setCoordinateFreeVector3DComponents: (object: any, components: [number, number, number]) => boolean;
+    setCoordinatePoint3D: (point: any, coordinates: [number, number, number], updateBoardAfterwards?: boolean) => boolean;
+    setCoordinateProjection: (entryOrBoard: any, projection: 'parallel' | 'central', emit?: boolean) => void;
+    setCoordinateViewMode: (entryOrBoard: any, viewMode: '2d' | '3d') => void;
   } | undefined;
+
+  // Point3D subsystem (@Point3D/@Punkt3D)
+  __point3DReady: boolean | undefined;
+  __point3DObserver: MutationObserver | undefined;
+  __bootstrapPoint3D: (() => void) | undefined;
+  __bootstrapPoint3DRAF: number | undefined;
+  __scheduleBootstrapPoint3D: (() => void) | undefined;
+  renderPoint3DFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Linear 3D subsystems (@Segment3D/@Line3D/@Ray3D/@Vector3D and German aliases)
+  __linear3DReady: boolean | undefined;
+  __linear3DObserver: MutationObserver | undefined;
+  __linear3DEntries: Record<string, any>;
+  __bootstrapLinear3D: (() => void) | undefined;
+  __bootstrapLinear3DRAF: number | undefined;
+  __scheduleBootstrapLinear3D: (() => void) | undefined;
+  renderLinear3DFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
+
+  // Plane 3D subsystem
+  __plane3DReady: boolean | undefined;
+  __intersection3DReady: boolean | undefined;
+  __intersection3DObserver: MutationObserver | undefined;
+  __intersection3DEntries: Record<string, any> | undefined;
+  __bootstrapIntersection3D: (() => void) | undefined;
+  __bootstrapIntersection3DRAF: number | undefined;
+  __scheduleBootstrapIntersection3D: (() => void) | undefined;
+  renderIntersection3DFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+  __plane3DObserver: MutationObserver | undefined;
+  __plane3DEntries: Record<string, any>;
+  __circle3DEntries: Record<string, any>;
+  __sphere3DEntries: Record<string, any>;
+  __bootstrapPlane3D: (() => void) | undefined;
+  __bootstrapPlane3DRAF: number | undefined;
+  __scheduleBootstrapPlane3D: (() => void) | undefined;
+  renderPlane3DFromSpec: ((uid: string, spec: string, definition: string, language?: string) => boolean) | undefined;
+  // Circle/Sphere 3D subsystems
+  __circle3DReady: boolean | undefined;
+  __circle3DObserver: MutationObserver | undefined;
+  __bootstrapCircle3D: (() => void) | undefined;
+  __bootstrapCircle3DRAF: number | undefined;
+  __scheduleBootstrapCircle3D: (() => void) | undefined;
+  renderCircle3DFromSpec: ((uid: string, spec: string, definition: string, language?: string) => boolean) | undefined;
+  __sphere3DReady: boolean | undefined;
+  __sphere3DObserver: MutationObserver | undefined;
+  __bootstrapSphere3D: (() => void) | undefined;
+  __bootstrapSphere3DRAF: number | undefined;
+  __scheduleBootstrapSphere3D: (() => void) | undefined;
+  renderSphere3DFromSpec: ((uid: string, spec: string, definition: string, language?: string) => boolean) | undefined;
+  // Polygon/Solid/Transformation 3D subsystems
+  __solid3DReady: boolean | undefined;
+  __solid3DObserver: MutationObserver | undefined;
+  __solid3DEntries: Record<string, any> | undefined;
+  __bootstrapSolid3D: (() => void) | undefined;
+  __bootstrapSolid3DRAF: number | undefined;
+  __scheduleBootstrapSolid3D: (() => void) | undefined;
+  renderSolid3DFromSpec: ((uid: string, spec: string, definition: string, language?: string) => boolean) | undefined;
+  __transformation3DReady: boolean | undefined;
+  __transformation3DObserver: MutationObserver | undefined;
+  __transformation3DEntries: Record<string, any> | undefined;
+  __bootstrapTransformation3D: (() => void) | undefined;
+  __bootstrapTransformation3DRAF: number | undefined;
+  __scheduleBootstrapTransformation3D: (() => void) | undefined;
+  renderTransformation3DFromSpec: ((uid: string, spec: string, definition: string, language?: string) => boolean) | undefined;
+  // Locus curve and locus surface 3D subsystems
+  __locus3DReady: boolean | undefined;
+  __locus3DObserver: MutationObserver | undefined;
+  __locus3DEntries: Record<string, any> | undefined;
+  __locusSurface3DEntries: Record<string, any> | undefined;
+  __bootstrapLocus3D: (() => void) | undefined;
+  __bootstrapLocus3DRAF: number | undefined;
+  __scheduleBootstrapLocus3D: (() => void) | undefined;
+  renderLocus3DFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderLocusSurface3DFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+
+  // Analytic geometry 3D subsystem
+  __analytic3DReady: boolean | undefined;
+  __analytic3DObserver: MutationObserver | undefined;
+  __analytic3DEntries: Record<string, any> | undefined;
+  __bootstrapAnalytic3D: (() => void) | undefined;
+  __bootstrapAnalytic3DRAF: number | undefined;
+  __scheduleBootstrapAnalytic3D: (() => void) | undefined;
+  renderAnalytic3DFromSpec: ((uid: string, spec: string, operation: string) => boolean) | undefined;
+
+  // Curve, surface and conic 3D subsystems
+  __curveSurface3DReady: boolean | undefined;
+  __lastCurveSurface3DError: string | undefined;
+  __curveSurface3DObserver: MutationObserver | undefined;
+  __curve3DEntries: Record<string, any> | undefined;
+  __surface3DEntries: Record<string, any> | undefined;
+  __conic3DEntries: Record<string, any> | undefined;
+  __bootstrapCurveSurface3D: (() => void) | undefined;
+  __bootstrapCurveSurface3DRAF: number | undefined;
+  __scheduleBootstrapCurveSurface3D: (() => void) | undefined;
+  renderCurve3DFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  renderSurface3DFromSpec: ((uid: string, spec: string, functionGraph?: boolean) => boolean) | undefined;
+  renderConic3DFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
   // Axis title subsystem
   __axisTitlesReady: boolean | undefined;
@@ -128,6 +292,7 @@ interface Window {
   __bootstrapSlidersRAF: number | undefined;
   __scheduleBootstrapSliders: (() => void) | undefined;
   __getCoordSliderBindings: ((boardId?: string, excludeObject?: any) => Record<string, () => number>) | undefined;
+  __refreshDgsSliderAnimationControls: ((boardId?: string) => void) | undefined;
   renderSliderFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
   // Function analysis point subsystem (@Zeros/@Nullstellen, @Extrema/@Extrempunkte, @InflectionPoints/@Wendepunkte)
@@ -237,7 +402,16 @@ interface Window {
   __scheduleBootstrapRelationObjects: (() => void) | undefined;
   renderRelationObjectFromSpec: ((uid: string, spec: string, kind: string, language?: string) => boolean) | undefined;
 
-  // Area subsystem (@Area / @Fläche)
+  // Dependent transformation point subsystem (@TransformPoint/@Transformationspunkt)
+  __transformedPointsReady: boolean | undefined;
+  __transformedPointEntries: Record<string, any>;
+  __transformedPointsRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapTransformedPoints: (() => void) | undefined;
+  __bootstrapTransformedPointsRAF: number | undefined;
+  __scheduleBootstrapTransformedPoints: (() => void) | undefined;
+  renderTransformedPointFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
+  // Area subsystem (@Area / @FlÃ¤che)
   __areaReady: boolean | undefined;
   __areaEntries: Record<string, any>;
   __areaRetryInterval: ReturnType<typeof setInterval> | undefined;
@@ -264,6 +438,16 @@ interface Window {
   __scheduleBootstrapCoordTexts: (() => void) | undefined;
   renderCoordTextFromSpec: ((uid: string, spec: string) => boolean) | undefined;
 
+  // Exported DGS object formatting (@ObjectFormat / @ObjektFormat)
+  __objectFormatReady: boolean | undefined;
+  __objectFormatEntries: Record<string, any>;
+  __objectFormatRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapObjectFormats: (() => void) | undefined;
+  __bootstrapObjectFormatsRAF: number | undefined;
+  __scheduleBootstrapObjectFormats: (() => void) | undefined;
+  renderObjectFormatFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  __applyDgsObjectExportFormat: ((boardId: string, object: any, config: any) => boolean) | undefined;
+
   // Circle subsystem (@Circle / @Kreis)
   __circleReady: boolean | undefined;
   __circleEntries: Record<string, any>;
@@ -272,6 +456,15 @@ interface Window {
   __bootstrapCirclesRAF: number | undefined;
   __scheduleBootstrapCircles: (() => void) | undefined;
   renderCircleFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+
+  // Compass arc subsystem (@CompassArc / @Zirkelbogen)
+  __compassArcReady: boolean | undefined;
+  __compassArcEntries: Record<string, any>;
+  __compassArcRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapCompassArcs: (() => void) | undefined;
+  __bootstrapCompassArcsRAF: number | undefined;
+  __scheduleBootstrapCompassArcs: (() => void) | undefined;
+  renderCompassArcFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
   // Tangent and circular-sector subsystem (@Tangent/@Tangente, @CircularSector/@Kreissektor/@Kreissegment)
   __tangentSectorReady: boolean | undefined;
@@ -325,6 +518,17 @@ interface Window {
   __checkConstructionQuizFromSpec: ((spec: string) => boolean) | undefined;
   __checkConstructionQuiz: ((uid: string, spec: string) => boolean) | undefined;
 
+  // 3D and combined 2D/3D construction quizzes
+  __constructionQuiz3DReady: boolean | undefined;
+  __constructionQuiz3DObserver: MutationObserver | undefined;
+  __constructionQuiz3DEntries: Record<string, any> | undefined;
+  __bootstrapConstructionQuiz3D: (() => void) | undefined;
+  __setupConstructionQuiz3D: ((uid: string, spec: string, language?: string) => void) | undefined;
+  __checkConstructionQuiz3DFromSpec: ((spec: string, language?: string) => any) | undefined;
+  __checkConstructionQuiz3D: ((uid: string, spec: string) => boolean) | undefined;
+  __getConstructionQuiz3DResult: ((uid: string) => any) | undefined;
+  __resetConstructionQuiz3D: ((uid: string) => void) | undefined;
+
   // Combined polygon quizzes (@KoordQuiz/@GeometrieQuiz and English aliases)
   __combinedQuizReady: boolean | undefined;
   __bootstrapCombinedQuizzes: (() => void) | undefined;
@@ -344,6 +548,8 @@ interface Window {
   __setDgsExternalToolActive: ((boardId: string, active: boolean) => void) | undefined;
   __refreshDgsToolAvailabilityForBoard: ((boardId: string) => void) | undefined;
   __dgsMayDisplayValuesForBoard: ((boardId: string) => boolean) | undefined;
+  __captureDgsSceneSnapshot: ((boardId: string) => any) | undefined;
+  __persistDgsSegment6: ((boardId: string) => void) | undefined;
   __liaRegressionStates: Record<string, any>;
   __checkRegressionFromSpec: ((spec: string) => boolean) | undefined;
   __checkRegressionQuiz: ((uid: string, spec: string) => boolean) | undefined;
@@ -351,6 +557,7 @@ interface Window {
   redoAction: ((boardId: string) => void) | undefined;
   __recordDgsHistory: ((boardId: string, before: any, after: any) => void) | undefined;
   __applyDgsHistory: ((boardId: string, snapshot: any) => void) | undefined;
+  __createDgsDrawnSegment: ((boardId: string, start: { x: number; y: number }, end: { x: number; y: number }, color: string, width: number) => boolean) | undefined;
   __beginDgsErase: ((boardId: string) => void) | undefined;
   __eraseDgsAtClientPoint: ((boardId: string, clientX: number, clientY: number) => boolean) | undefined;
   __finishDgsErase: ((boardId: string) => void) | undefined;
@@ -370,6 +577,13 @@ interface Window {
     kind: string,
     language?: string
   ) => void) | undefined;
+  __dgsLocusEntries: Record<string, any>;
+  __dgsLocusRetryInterval: ReturnType<typeof setInterval> | undefined;
+  __bootstrapDgsLoci: (() => void) | undefined;
+  renderDgsLocusFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
+  __dgsEllipseEntries: Record<string, any>;
+  __bootstrapDgsEllipses: (() => void) | undefined;
+  renderDgsEllipseFromSpec: ((uid: string, spec: string, language?: string) => boolean) | undefined;
 
   // Table subsystem (@Table)
   __tableReady: boolean | undefined;

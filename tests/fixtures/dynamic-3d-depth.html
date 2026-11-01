@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>3D depth and sphere tint regression</title>
+  <style>
+    body { margin: 12px; background: #303030; color: #fff; font-family: Arial, sans-serif; }
+    .flex-child { width: 920px; min-width: 0; }
+    .jxgbox { position: relative; overflow: hidden; }
+  </style>
+</head>
+<body>
+<main id="fixture"><section class="flex-child">
+  <lia-coordinate-board data-lia-coordinate-key="depth-3d"
+    data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-5;zmax=5;width=900;projection=parallel;camera=0.8/0.4/0"></lia-coordinate-board>
+  <span id="point3d-spec-depth-center" data-spec="raum;O;0;0;0;#ffffff;1" hidden></span>
+  <span id="sphere3d-spec-depth-sphere" data-definition="center-radius" data-language="de"
+    data-spec="raum;S;O;#ff0000;radius=2;opacity=0.18;objectid=depth-sphere" hidden></span>
+  <div id="dgs-ui-depth-3d" data-spec="raum" data-language="de"></div>
+</section></main>
+<script>
+  window.profileErrors = [];
+  window.addEventListener('error', event => profileErrors.push(String(event.error?.stack || event.message)));
+  window.addEventListener('unhandledrejection', event => profileErrors.push(String(event.reason)));
+</script>
+<script src="/assets/jsxgraph-template.js"></script>
+<script src="/bundle.js"></script>
+<script>
+  window.profileReady = async () => {
+    for (let i = 0; i < 240; i += 1) {
+      const board = window.__boards?.raum;
+      const sphere = window.__sphere3DEntries?.['depth-sphere']?.object;
+      if (board && window.__coordinateViews3d?.raum && sphere &&
+          board.containerObj.querySelector('.lia-dgs-point-button')) return true;
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    throw Error('Depth fixture initialization timeout: ' + JSON.stringify(profileErrors));
+  };
+  window.prepareDepthScene = () => {
+    const board = __boards.raum;
+    const azimuth = .8, elevation = .4;
+    const right = [-Math.cos(azimuth), Math.sin(azimuth), 0];
+    const up = [-Math.sin(elevation)*Math.sin(azimuth), -Math.sin(elevation)*Math.cos(azimuth), Math.cos(elevation)];
+    const viewer = [Math.sin(azimuth)*Math.cos(elevation), Math.cos(azimuth)*Math.cos(elevation), Math.sin(elevation)];
+    const at = (x, y, depth) => right.map((value, i) => value*x+up[i]*y+viewer[i]*depth);
+    const point = (position, name, color, visible=true) => __coord.createCoordinatePoint3D(board, position,
+      {name, withLabel:visible, visible, fixed:true, strokeColor:color, fillColor:color, size:5, label:{strokeColor:color}});
+    const line = (name, y, depth, color) => {
+      const first=point(at(-3.2,y,depth),'',color,false),second=point(at(3.2,y,depth),'',color,false);
+      return __coord.createCoordinateLinear3D(board,'segment',first,second,
+        {name,withLabel:true,strokeColor:color,highlightStrokeColor:color,strokeWidth:3, fixed:true,label:{strokeColor:color}});
+    };
+    const front=line('vorne',.55,3,'#ffffff'),back=line('hinten',-.55,-3,'#00ffff');
+    const frontPoint=point(at(.55,1.1,3),'V','#ffffff'),backPoint=point(at(-.55,-1.1,-3),'H','#00ffff');
+    window.depthProbe={front,back,frontPoint,backPoint,at,right,up,viewer,
+      sphere:__sphere3DEntries['depth-sphere'].object, camera:{azimuth,elevation,bank:0}};
+    board.fullUpdate();
+    return true;
+  };
+</script>
+</body>
+</html>

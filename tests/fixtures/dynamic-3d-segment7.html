@@ -1,0 +1,45 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Segment 7 3D quizzes</title><style>body{margin:10px;background:#202428;color:white}.flex-child{width:min(860px,100%)}.jxgbox{position:relative;overflow:hidden}</style></head><body><main id="fixture-segment7"><section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="segment6" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-5;zmax=5;width=820;projection=parallel;camera=0.9/0.45/0"></lia-coordinate-board>
+<span id="point3d-spec-o" data-spec="raum;O;0;0;-2;#ff00ff;1;objectid=p-o"></span>
+<span id="point3d-spec-z" data-spec="raum;Z;0;0;2;#ff00ff;1;objectid=p-z"></span>
+<span id="point3d-spec-a" data-spec="raum;A;-2;-2;0.5;#ff00ff;1;objectid=p-a"></span>
+<span id="point3d-spec-b" data-spec="raum;B;2;-2;0.5;#ff00ff;1;objectid=p-b"></span>
+<span id="point3d-spec-c" data-spec="raum;C;0;2;0.5;#ff00ff;1;objectid=p-c"></span>
+<span id="point3d-spec-x" data-spec="raum;X;1;0;-2;#ff00ff;1;objectid=p-x"></span>
+<span id="linear3d-spec-v1" data-kind="vector" data-language="de" data-spec="raum;v;O;[1;2;0];#f9a825;objectid=v-1"></span>
+<span id="linear3d-spec-v2" data-kind="vector" data-language="de" data-spec="raum;w;O;[-2;1;1];#42d66b;objectid=v-2"></span>
+<span id="plane3d-spec-e" data-definition="three-points" data-language="de" data-spec="raum;E;A;B;C;#00dfe8;0.12;objectid=plane-e"></span>
+<span id="solid3d-spec-cylinder" data-definition="cylinder" data-language="de" data-spec="raum;Zyl;O;Z;1;linecolor=#8888ff;fillcolor=#4444aa;opacity=0.12;objectid=cyl"></span>
+<span id="solid3d-spec-cone" data-definition="cone" data-language="de" data-spec="raum;Kegel;Z;O;2;linecolor=#ff8866;fillcolor=#aa4422;opacity=0.1;objectid=cone"></span>
+<span id="curve3d-spec-helix" data-spec="raum;c;t;cos(t);sin(t);t/3;-2*pi;2*pi;linecolor=#00dfe8;width=4;quality=120;objectid=curve-c"></span>
+<span id="surface3d-spec-wave" data-function-graph="false" data-spec="raum;S;u;v;u;v;sin(u)*cos(v);-3;3;-3;3;linecolor=#42d66b;fillcolor=#1b8f52;opacity=0.25;quality=22;qualityv=18;objectid=surface-s"></span>
+<span id="surface3d-spec-graph" data-function-graph="true" data-spec="raum;F;sin(u)*cos(v);-2;2;-2;2;linecolor=#ffd54f;fillcolor=#cc9900;opacity=0.2;quality=16;objectid=surface-f"></span>
+<span id="conic3d-spec-cylinder-cut" data-spec="raum;k;E;Zyl;linecolor=#ffffff;width=5;objectid=conic-k"></span>
+<span id="analytic3d-spec-sum" data-operation="vector-add" data-spec="raum;s;v;w;color=#ff44cc;objectid=sum"></span>
+<span id="analytic3d-spec-dot" data-operation="dot" data-spec="raum;d;v;w;objectid=dot"></span>
+<span id="analytic3d-spec-tangent" data-operation="curve-tangent" data-spec="raum;t_c;c;t=1;color=#ffffff;objectid=tangent"></span>
+<span id="analytic3d-spec-normal-plane" data-operation="curve-normal-plane" data-spec="raum;N_c;c;t=1;color=#9966ff;objectid=normal-plane"></span>
+<span id="analytic3d-spec-tangent-plane" data-operation="surface-tangent-plane" data-spec="raum;T_S;S;u=0.5;v=0.5;color=#ff8800;objectid=tangent-plane"></span>
+<span id="analytic3d-spec-tangent-u" data-operation="surface-tangent-u" data-spec="raum;T_u;S;u=0.5;v=0.5;color=#66ccff;objectid=tangent-u"></span>
+<span id="analytic3d-spec-tangent-v" data-operation="surface-tangent-v" data-spec="raum;T_v;S;u=0.5;v=0.5;color=#ff66cc;objectid=tangent-v"></span>
+<span id="point3d-spec-oncurve" data-spec="raum;P;0;0;0;#ffffff;1;on=c;t=1;objectid=on-curve"></span>
+<span id="point3d-spec-onsurface" data-spec="raum;Q;0;0;0;#ffffff;1;on=S;u=0.5;v=0.5;objectid=on-surface"></span>
+<span id="locus3d-spec-curve" data-spec="raum;L;P;P;quality=48;linecolor=#ff44cc;objectid=locus-curve"></span>
+<span id="locussurface3d-spec-surface" data-spec="raum;M;Q.u;Q.v;Q;quality=12;linecolor=#66ccff;fillcolor=#225588;opacity=0.18;objectid=locus-surface"></span>
+<span id="circle3d-spec-quiz-circle" data-definition="center-normal-radius" data-language="de" data-spec="raum;K;O;v;radius=1;linecolor=#44ddff;opacity=0.15;objectid=circle-quiz"></span>
+<span id="sphere3d-spec-quiz-sphere" data-definition="center-radius" data-language="de" data-spec="raum;Sph;O;radius=2;linecolor=#ff8844;opacity=0.12;objectid=sphere-quiz"></span>
+<span id="polygon3d-spec-quiz-polygon" data-language="de" data-spec="raum;Dreieck;A;B;C;linecolor=#66ffaa;fillcolor=#225544;opacity=0.12;objectid=polygon-quiz"></span>
+
+<span id='construction-quiz3d-spec-partial' data-language='de' data-spec='{"boardId":"raum","mode":"result","viewPolicy":"3d","includeAuthored":true,"expected":[{"id":"O","kind":"point3d","point":[0,0,-2]},{"id":"R","kind":"point3d","point":[4,4,4]}]}' style='display:none'></span>
+<p class="lia-paragraph"><span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction3d" data-lia-coordinate-quiz-uid="partial"></span><span data-lia-coordinate-quiz-input><input class="lia-quiz__input"></span></p>
+<div class="lia-quiz" id="quiz-partial"><button type="button" class="lia-quiz__check">Prüfen</button></div>
+
+<span id='construction-quiz3d-spec-correct' data-language='en' data-spec='{"boardId":"raum","mode":"result","viewPolicy":"free","includeAuthored":true,"expected":[{"id":"O","kind":"point3d","point":[0,0,-2]},{"id":"v","kind":"vector3d","components":[1,2,0]},{"id":"E","kind":"plane3d","point":[0,0,0.5],"normal":[0,0,1]},{"id":"K","kind":"circle3d","center":[0,0,-2],"normal":[1,2,0],"radius":1},{"id":"Sph","kind":"sphere3d","center":[0,0,-2],"radius":2},{"id":"D","kind":"polygon3d","vertices":[[-2,-2,0.5],[2,-2,0.5],[0,2,0.5]]},{"id":"Zyl","kind":"solid3d","solidKind":"cylinder","baseCenter":[0,0,-2],"topCenter":[0,0,2],"radius":1},{"id":"c","kind":"curve3d","parameterizationRelevant":true,"expressions":["cos(t)","sin(t)","t/3"],"range":[-6.283185307179586,6.283185307179586]},{"id":"F","kind":"surface3d","parameterizationRelevant":true,"expressions":["u","v","sin(u)*cos(v)"],"uRange":[-3,3],"vRange":[-3,3]},{"id":"d","kind":"scalar3d","value":0}],"conditions":[{"kind":"measurement","objects":["Sph"],"measurement":"radius","value":2}]}' style='display:none'></span>
+<p class="lia-paragraph"><span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction3d" data-lia-coordinate-quiz-uid="correct"></span><span data-lia-coordinate-quiz-input><input class="lia-quiz__input"></span></p>
+<div class="lia-quiz" id="quiz-correct"><button type="button" class="lia-quiz__check">Check</button></div>
+
+<span id='construction-quiz3d-spec-constructive' data-language='de' data-spec='{"boardId":"raum","mode":"construction","viewPolicy":"3d","includeAuthored":true,"expected":[{"id":"P","kind":"point3d","point":[0.5403023058681398,0.8414709848078965,0.3333333333333333],"dependency":{"definition":"point-on-object","boundTo":"curve-c","bindingKind":"curve","dependent":true,"parameters":{"kind":"curve","t":1}}}]}' style='display:none'></span>
+<p class="lia-paragraph"><span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction3d" data-lia-coordinate-quiz-uid="constructive"></span><span data-lia-coordinate-quiz-input><input class="lia-quiz__input"></span></p>
+<div class="lia-quiz" id="quiz-constructive"><button type="button" class="lia-quiz__check">Prüfen</button></div>
+<div id="dgs-ui-segment6" data-spec="raum" data-language="de"></div>
+</section></main><script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));window.MathJax={chtml:{fontURL:"/assets/fonts"}};</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script><script>window.profileReady=async()=>{for(let i=0;i<240;i++){if(document.querySelectorAll('[data-lia-coordinate-quiz-reset]').length===3&&__boards?.raum&&Object.keys(__curve3DEntries||{}).length===1&&Object.keys(__surface3DEntries||{}).length===2&&Object.keys(__conic3DEntries||{}).length===1&&Object.keys(__analytic3DEntries||{}).length===7&&Object.keys(__locus3DEntries||{}).length===1&&Object.keys(__locusSurface3DEntries||{}).length===1&&__points?.raum?.P?.__liaPoint3DBindingSource&&__points?.raum?.Q?.__liaPoint3DBindingSource)return true;await new Promise(r=>setTimeout(r,50))}throw Error('segment6 timeout '+JSON.stringify(profileErrors))};</script></body></html>

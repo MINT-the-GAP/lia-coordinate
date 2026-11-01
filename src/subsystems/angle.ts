@@ -1,6 +1,7 @@
 // Angle subsystem (@angle / @Winkel macros).
 // Draws the minor angle defined by three named points and an optional measure.
 
+import { positionAngleLabel } from '../shared/angleLabelPosition';
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getAccentColor, initThemeSync } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
@@ -25,6 +26,7 @@ interface AngleConfig {
   language: 'de' | 'en';
   visible: boolean;
   lineStyle: LineStyle;
+  targetAngle: number | null;
 }
 
 interface XY {
@@ -91,6 +93,13 @@ export function init(): void {
     const visible = !options.some(function(option) {
       return /^(?:visible|sichtbar)\s*=\s*0$/i.test(option);
     });
+    let targetAngle: number | null = null;
+    options.forEach(function(option) {
+      const match = String(option || '').match(/^(?:targetangle|zielwinkel)\s*=\s*(.+)$/i);
+      if (!match) return;
+      const value = Number(String(match[1] || '').replace(',', '.'));
+      if (Number.isFinite(value) && value > 0 && value < 360) targetAngle = value;
+    });
 
     return {
       boardId: String(parts[0] || '').trim(),
@@ -105,7 +114,8 @@ export function init(): void {
       }),
       language: String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de',
       visible: visible,
-      lineStyle: parseLineStyleOptions(options)
+      lineStyle: parseLineStyleOptions(options),
+      targetAngle: targetAngle
     };
   }
 
@@ -181,38 +191,13 @@ export function init(): void {
     return Math.max(0.05, Math.min(0.8, shorterArm * 0.35));
   }
 
-  function angleBisector(points: any[]): XY {
-    const first = coordinates(points[0]);
-    const vertex = coordinates(points[1]);
-    const third = coordinates(points[2]);
-    if (!first || !vertex || !third) return { x: 1, y: 0 };
-
-    const ux = first.x - vertex.x;
-    const uy = first.y - vertex.y;
-    const uLength = Math.hypot(ux, uy);
-    const directedAngle = directedAngleRadians(points);
-    if (uLength <= 1e-12 || !Number.isFinite(directedAngle)) return { x: 1, y: 0 };
-
-    const bisectorAngle = Math.atan2(uy, ux) + directedAngle / 2;
-    return { x: Math.cos(bisectorAngle), y: Math.sin(bisectorAngle) };
-  }
-
-  function labelPosition(board: any, points: any[]): XY {
-    const vertex = coordinates(points[1]);
-    if (!vertex) return { x: 0, y: 0 };
-    const direction = angleBisector(points);
-    const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
-    const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
-    const pixelsPerUnit = Math.max(1e-9, Math.hypot(
-      direction.x * unitX,
-      direction.y * unitY
-    ));
-    const distance = angleRadius(points) * 1.35 + 10 / pixelsPerUnit;
-
-    return {
-      x: vertex.x + direction.x * distance,
-      y: vertex.y + direction.y * distance
-    };
+  function labelPosition(board: any, points: any[], label: any, cfg: AngleConfig): XY {
+    return positionAngleLabel(board, points, angleRadius(points), {
+      label: label,
+      text: labelText(cfg, points),
+      fontSize: Number(label?.visProp?.fontsize) || 16,
+      radians: directedAngleRadians(points)
+    });
   }
 
   function texName(name: string): string {
@@ -326,6 +311,10 @@ export function init(): void {
     angle.__liaDgsOpacity = cfg.opacity;
     angle.__liaDgsShowAngle = cfg.showValue;
     angle.__liaDgsAngleLabel = label || null;
+    angle.__liaDgsMeasuredConstruction = cfg.targetAngle != null;
+    angle.__liaDgsTargetAngle = cfg.targetAngle;
+    if (cfg.targetAngle != null) angle.__liaDgsGeneratedPoint = points[2];
+    else if (angle.__liaDgsGeneratedPoint === points[2]) angle.__liaDgsGeneratedPoint = null;
     applyLineStyle(angle, cfg.lineStyle);
     if (label) {
       label.__liaDgsMacroManaged = true;
@@ -334,10 +323,72 @@ export function init(): void {
     }
   }
 
+  function setPointPosition(point: any, x: number, y: number): boolean {
+    if (!point || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+    try {
+      if (typeof point.setPositionDirectly === 'function' && typeof JXG !== 'undefined') {
+        point.setPositionDirectly(JXG.COORDS_BY_USER, [x, y]);
+        return true;
+      }
+      if (typeof point.moveTo === 'function') {
+        point.moveTo([x, y], 0);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function applyMeasuredAngle(angle: any): boolean {
+    if (!angle || !angle.__liaDgsMeasuredConstruction || angle.__liaDgsMeasuredSyncing) return false;
+    const points = angle.__liaDgsAnglePoints;
+    const degrees = Number(angle.__liaDgsTargetAngle);
+    if (!Array.isArray(points) || points.length !== 3 || !Number.isFinite(degrees)) return false;
+    const first = coordinates(points[0]);
+    const vertex = coordinates(points[1]);
+    if (!first || !vertex) return false;
+    const dx = first.x - vertex.x;
+    const dy = first.y - vertex.y;
+    if (Math.hypot(dx, dy) <= 1e-12) return false;
+    const radians = degrees * Math.PI / 180;
+    angle.__liaDgsMeasuredSyncing = true;
+    try {
+      return setPointPosition(
+        points[2],
+        vertex.x + Math.cos(radians) * dx - Math.sin(radians) * dy,
+        vertex.y + Math.sin(radians) * dx + Math.cos(radians) * dy
+      );
+    } finally {
+      angle.__liaDgsMeasuredSyncing = false;
+    }
+  }
+
+  function configureMeasuredAngle(angle: any, board: any): void {
+    if (!angle || !angle.__liaDgsMeasuredConstruction) return;
+    const points = angle.__liaDgsAnglePoints;
+    if (!Array.isArray(points) || points.length !== 3) return;
+    if (!angle.__liaMacroMeasuredListenersAttached) {
+      angle.__liaMacroMeasuredListenersAttached = true;
+      [points[0], points[1]].forEach(function(point: any) {
+        try { point.on('drag', function() { applyMeasuredAngle(angle); }); } catch (e) {}
+        try { point.on('up', function() { applyMeasuredAngle(angle); }); } catch (e) {}
+      });
+      try {
+        points[2].on('drag', function() {
+          if (angle.__liaDgsMeasuredSyncing || !angle.__liaDgsMeasuredConstruction) return;
+          const value = angleMeasure(points);
+          if (Number.isFinite(value) && value > 0 && value < 360) angle.__liaDgsTargetAngle = value;
+        });
+      } catch (e) {}
+    }
+    applyMeasuredAngle(angle);
+    try { board.update(); } catch (e) {}
+  }
+
   function createLabel(board: any, points: any[], cfg: AngleConfig): any {
-    return board.create('text', [
-      function() { return labelPosition(board, points).x; },
-      function() { return labelPosition(board, points).y; },
+    let label: any = null;
+    label = board.create('text', [
+      function() { return labelPosition(board, points, label, cfg).x; },
+      function() { return labelPosition(board, points, label, cfg).y; },
       function() { return labelText(cfg, points); }
     ], {
       fixed: true,
@@ -356,6 +407,7 @@ export function init(): void {
       cssStyle: 'opacity:' + cfg.opacity + ';',
       fontSize: 16
     });
+    return label;
   }
 
   function samePoints(a: any[], b: any[]): boolean {
@@ -400,6 +452,7 @@ export function init(): void {
       old.showName === cfg.showName &&
       old.language === cfg.language &&
       old.showValue === cfg.showValue &&
+      old.targetAngle === cfg.targetAngle &&
       old.angle &&
       (!(cfg.showName || cfg.showValue) || old.label)
     ) {
@@ -421,6 +474,7 @@ export function init(): void {
       applyLabelStyle(old.label, cfg.color, cfg.opacity);
       applyAngleVisibility(old.angle, old.label, cfg);
       applyAngleDgsMetadata(old.angle, old.points, old.label, cfg);
+      configureMeasuredAngle(old.angle, board);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -466,6 +520,7 @@ export function init(): void {
       angle.__liaDgsShowName = cfg.showName;
       angle.__liaDgsShowAngle = cfg.showValue;
       applyAngleDgsMetadata(angle, points, label, cfg);
+      configureMeasuredAngle(angle, board);
       applyAngleVisibility(angle, label, cfg);
 
       window.__angleEntries[key] = {
@@ -482,6 +537,7 @@ export function init(): void {
         language: cfg.language,
         visible: cfg.visible,
         lineStyle: cfg.lineStyle,
+        targetAngle: cfg.targetAngle,
         valueDisplayAllowed: valueDisplayAllowed,
         board: board,
         angle: angle,

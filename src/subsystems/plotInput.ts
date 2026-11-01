@@ -7,6 +7,10 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { compileFunctionExpression } from '../shared/functionExpression';
 import {
+  keepFunctionGraphLabelOnOneLine,
+  positionFunctionGraphLabel
+} from '../shared/functionGraphLabel';
+import {
   applyLineStyle,
   isLineStyleOption,
   lineStyleAttributes,
@@ -549,61 +553,11 @@ export function init(): void {
     return compileFunctionExpression(raw);
   };
 
-  H.safeBBox = function(board){
-    try {
-      const bb = board.getBoundingBox();
-      if (
-        Array.isArray(bb) &&
-        bb.length === 4 &&
-        bb.every(v => Number.isFinite(v))
-      ) {
-        return bb.slice();
-      }
-    } catch (e) {}
-    return [-5, 5, 5, -5];
-  };
-
   H.texName = function(name) {
     const raw = String(name || '').trim();
     if (!raw) return '';
     if (raw.includes('\\(') || raw.includes('\\[') || raw.includes('$')) return raw;
     return '\\(' + raw + '\\)';
-  };
-
-  H.chooseVisibleAnchorX = function(board, fn){
-    const bb = H.safeBBox(board);
-    const xmin = bb[0];
-    const ymax = bb[1];
-    const xmax = bb[2];
-    const ymin = bb[3];
-
-    const xspan = xmax - xmin;
-    const yspan = ymax - ymin;
-
-    const xStart = xmax - 0.10 * xspan;
-    const xEnd   = xmin + 0.18 * xspan;
-
-    const yPadTop = 0.14 * yspan;
-    const yPadBottom = 0.12 * yspan;
-
-    const steps = 120;
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = xStart - t * (xStart - xEnd);
-
-      let y;
-      try {
-        y = fn(x);
-      } catch (e) {
-        y = NaN;
-      }
-
-      if (!Number.isFinite(y)) continue;
-      if (y <= ymax - yPadTop && y >= ymin + yPadBottom) return x;
-    }
-
-    return xmin + 0.60 * xspan;
   };
 
   H.removePlotObjects = function(board, state){
@@ -627,27 +581,23 @@ export function init(): void {
   H.createFunctionLabel = function(board, fn, state) {
     if (state.showName === false) return { anchor: null, label: null };
     const labelText = H.texName(state.name);
+    let label = null;
+    const placement = function() {
+      return positionFunctionGraphLabel(board, fn, {
+        label: label,
+        text: labelText,
+        fontSize: state.labelFontSize,
+        horizontalGapUser: Math.abs(Number(state.dx) || 0),
+        verticalOffsetUser: Number(state.dy) || 0
+      });
+    };
 
     const anchor = board.create('point', [
       function() {
-        return H.chooseVisibleAnchorX(board, fn);
+        return placement().x;
       },
       function() {
-        const x = H.chooseVisibleAnchorX(board, fn);
-        let y;
-
-        try {
-          y = fn(x);
-        } catch (e) {
-          y = NaN;
-        }
-
-        if (!Number.isFinite(y)) {
-          const bb = H.safeBBox(board);
-          return (bb[1] + bb[3]) / 2;
-        }
-
-        return y;
+        return placement().y;
       }
     ], {
       visible: false,
@@ -656,12 +606,12 @@ export function init(): void {
       name: ''
     });
 
-    const label = board.create('text', [
+    label = board.create('text', [
       function() {
-        return anchor.X() + state.dx;
+        return anchor.X();
       },
       function() {
-        return anchor.Y() + state.dy;
+        return anchor.Y();
       },
       function() {
         return labelText;
@@ -676,8 +626,10 @@ export function init(): void {
       fillColor: state.color,
       fontSize: state.labelFontSize,
       anchorX: 'left',
-      anchorY: 'top'
+      anchorY: 'middle',
+      cssStyle: 'white-space:nowrap;overflow:visible;'
     });
+    keepFunctionGraphLabelOnOneLine(label);
 
     return { anchor, label };
   };

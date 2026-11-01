@@ -63,14 +63,31 @@ function getMacroSourceLayerFromRenderedLayer(
 
 export type MacroLayerMarkerKind =
   | 'point'
+  | 'point3d'
   | 'coord-text'
   | 'distance'
   | 'linear'
+  | 'linear3d'
+  | 'plane3d'
+  | 'circle3d'
+  | 'sphere3d'
+  | 'polygon3d'
+  | 'solid3d'
+  | 'curve3d'
+  | 'surface3d'
+  | 'conic3d'
+  | 'analytic3d'
+  | 'locus3d'
+  | 'locus-surface3d'
+  | 'transformation3d'
+  | 'intersection3d'
   | 'arc'
   | 'relation'
+  | 'transform-point'
   | 'area'
   | 'angle'
   | 'circle'
+  | 'compass-arc'
   | 'tangent'
   | 'sector'
   | 'plot'
@@ -89,15 +106,32 @@ type MarkerDefinition = {
 
 export const MACRO_LAYER_MARKER_DEFINITIONS: readonly MarkerDefinition[] = [
   { prefix: 'point-spec-', kind: 'point' },
+  { prefix: 'point3d-spec-', kind: 'point3d' },
   { prefix: 'point-ui-', kind: 'point' },
   { prefix: 'coord-text-spec-', kind: 'coord-text' },
   { prefix: 'distance-spec-', kind: 'distance' },
   { prefix: 'linear-spec-', kind: 'linear' },
+  { prefix: 'linear3d-spec-', kind: 'linear3d' },
+  { prefix: 'plane3d-spec-', kind: 'plane3d' },
+  { prefix: 'circle3d-spec-', kind: 'circle3d' },
+  { prefix: 'sphere3d-spec-', kind: 'sphere3d' },
+  { prefix: 'polygon3d-spec-', kind: 'polygon3d' },
+  { prefix: 'solid3d-spec-', kind: 'solid3d' },
+  { prefix: 'curve3d-spec-', kind: 'curve3d' },
+  { prefix: 'surface3d-spec-', kind: 'surface3d' },
+  { prefix: 'conic3d-spec-', kind: 'conic3d' },
+  { prefix: 'analytic3d-spec-', kind: 'analytic3d' },
+  { prefix: 'locus3d-spec-', kind: 'locus3d' },
+  { prefix: 'locussurface3d-spec-', kind: 'locus-surface3d' },
+  { prefix: 'transformation3d-spec-', kind: 'transformation3d' },
+  { prefix: 'intersection3d-spec-', kind: 'intersection3d' },
   { prefix: 'arc-spec-', kind: 'arc' },
   { prefix: 'relation-spec-', kind: 'relation' },
+  { prefix: 'transform-point-spec-', kind: 'transform-point' },
   { prefix: 'area-spec-', kind: 'area' },
   { prefix: 'angle-spec-', kind: 'angle' },
   { prefix: 'circle-spec-', kind: 'circle' },
+  { prefix: 'compass-arc-spec-', kind: 'compass-arc' },
   { prefix: 'tangent-spec-', kind: 'tangent' },
   { prefix: 'sector-spec-', kind: 'sector' },
   { prefix: 'plot-spec-', kind: 'plot' },
@@ -211,8 +245,8 @@ function registryEntry(root: any, registryName: string, key: string): any | null
   } catch (e) { return null; }
 }
 
-function pointMacroObject(root: any, boardId: string, uid: string): any | null {
-  const macroKey = 'macro:point:' + String(uid || '');
+function pointMacroObject(root: any, boardId: string, uid: string, kind = 'point'): any | null {
+  const macroKey = 'macro:' + kind + ':' + String(uid || '');
   const board = root && root.__boards && root.__boards[boardId];
   if (!board) return null;
   const candidates: any[] = [];
@@ -290,6 +324,7 @@ export function resolveMacroLayerRegistryEntry(
   if (!uid || !boardId) return null;
 
   if (assignment.kind === 'point') return pointMacroObject(root, boardId, uid);
+  if (assignment.kind === 'point3d') return pointMacroObject(root, boardId, uid, 'point3d');
   if (assignment.kind === 'point-on-graph') {
     return graphQuizMacroEntry(root, '__pointOnGraphLayerEntries', uid, boardId);
   }
@@ -304,11 +339,27 @@ export function resolveMacroLayerRegistryEntry(
     'coord-text': ['__coordTextEntries', 'coord-text-'],
     distance: ['__distanceEntries', 'distance-'],
     linear: ['__linearObjectEntries', 'linear-'],
+    linear3d: ['__linear3DEntries', ''],
+    plane3d: ['__plane3DEntries', ''],
+    circle3d: ['__circle3DEntries', ''],
+    sphere3d: ['__sphere3DEntries', ''],
+    polygon3d: ['__solid3DEntries', 'polygon:'],
+    solid3d: ['__solid3DEntries', 'solid:'],
+    curve3d: ['__curve3DEntries', ''],
+    surface3d: ['__surface3DEntries', ''],
+    conic3d: ['__conic3DEntries', ''],
+    analytic3d: ['__analytic3DEntries', ''],
+    locus3d: ['__locus3DEntries', ''],
+    'locus-surface3d': ['__locusSurface3DEntries', ''],
+    transformation3d: ['__transformation3DEntries', ''],
+    intersection3d: ['__intersection3DEntries', ''],
     arc: ['__arcEntries', 'arc-'],
     relation: ['__relationObjectEntries', 'relation-'],
+    'transform-point': ['__transformedPointEntries', 'transform-point-'],
     area: ['__areaEntries', 'area-'],
     angle: ['__angleEntries', 'angle-'],
     circle: ['__circleEntries', 'circle-'],
+    'compass-arc': ['__compassArcEntries', 'compass-arc-'],
     tangent: ['__tangentEntries', 'tangent-'],
     sector: ['__sectorEntries', 'sector-'],
     plot: ['__plotFunctionEntries', 'plot-'],
@@ -334,14 +385,14 @@ function isLayerableObject(value: any): boolean {
 }
 
 const COMPOSITE_SINGLE_CHILDREN = [
-  'label', 'arc', 'dot',
+  'label', 'arc', 'dot', 'element2D',
   '__liaDgsMeasurementLabel', '__liaDgsAngleLabel', '__liaDgsCircleLabel',
   '__liaDgsCircleNameLabel', '__liaDgsCircleMeasurementLabel',
   '__liaDgsFunctionLabel', '__liaDgsArcLabel', '__liaDgsPolygonBorderLabel'
 ];
 
 const COMPOSITE_ARRAY_CHILDREN = [
-  'borders', '__liaDgsPolygonBorders',
+  'borders', 'faces', '__liaDgsPolygonBorders',
   '__liaDgsStyleCapSegments'
 ];
 
@@ -394,6 +445,12 @@ export function collectOwnedMacroLayerObjects(
     add(entry.segments);
     add(entry.capSegments);
     add(entry.label);
+  } else if (kind === 'point3d') add(entry);
+  else if (kind === 'linear3d' || kind === 'plane3d' || kind === 'circle3d' || kind === 'sphere3d' ||
+      kind === 'polygon3d' || kind === 'solid3d' || kind === 'curve3d' || kind === 'surface3d' || kind === 'conic3d' || kind === 'analytic3d' || kind === 'locus3d' || kind === 'locus-surface3d' ||
+      kind === 'transformation3d' || kind === 'intersection3d') {
+    add(entry.object);
+    add(entry.objects);
   } else if (kind === 'linear') {
     add(entry.object);
     add(entry.label);
@@ -403,6 +460,8 @@ export function collectOwnedMacroLayerObjects(
     add(entry.label);
   } else if (kind === 'relation') {
     add(entry.object);
+  } else if (kind === 'transform-point') {
+    add(entry.point);
   } else if (kind === 'area') {
     add(entry.polygon);
     add(entry.label);

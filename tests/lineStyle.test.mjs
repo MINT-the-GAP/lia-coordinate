@@ -213,7 +213,7 @@ test('README documents the canonical option, alias, examples, and broad DGS scop
   assert.match(readme, /custom and compass arcs/);
   assert.match(readme, /angle contours, circles, circular sectors, and DGS-created or/);
   assert.match(readme, /dashdotted[\s\S]*?closest portable approximation/);
-  assert.match(readme, /per-side override[\s\S]*?not part of macro export/);
+  assert.match(readme, /per-side names[\s\S]*?macro export through `@ObjectFormat`/);
   assert.match(readme, /default[\s\S]*?solid[\s\S]*?is omitted/);
   assert.ok((readme.match(/linestyle=<style>/g) || []).length >= 13);
 });

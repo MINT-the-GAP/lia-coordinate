@@ -1,6 +1,7 @@
 // Relation object subsystem (@Perpendicular/@Orthogonale, @Parallel/@Parallele,
-// @Midpoint/@Mittelpunkt macros). Creates derived lines and midpoint points
-// from existing macro/DGS objects or point pairs.
+// @Midpoint/@Mittelpunkt, and @AngleBisector/@Winkelhalbierende macros).
+// Creates derived lines and midpoint points from existing macro/DGS objects or
+// point references.
 
 import {
   CoordinatePair,
@@ -24,7 +25,7 @@ import {
   type LineStyle
 } from '../shared/lineStyle';
 
-type RelationKind = 'orthogonal' | 'parallel' | 'midpoint';
+type RelationKind = 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector';
 
 interface RelationConfig {
   boardId: string;
@@ -37,6 +38,7 @@ interface RelationConfig {
   point1Name: string;
   point2Name: string;
   midpointCoordinates: CoordinatePair[] | null;
+  anglePointNames: string[];
   color: string;
   hasExplicitColor: boolean;
   objectName: string;
@@ -71,6 +73,9 @@ export function init(): void {
     const value = String(kind || '').trim().toLowerCase();
     if (value === 'parallel' || value === 'parallele') return 'parallel';
     if (value === 'midpoint' || value === 'mittelpunkt') return 'midpoint';
+    if (value === 'angle-bisector' || value === 'anglebisector' || value === 'winkelhalbierende') {
+      return 'angle-bisector';
+    }
     return 'orthogonal';
   }
 
@@ -123,6 +128,41 @@ export function init(): void {
       .map(function(part) { return unquote(part).trim(); });
     const languageValue = String(language || '').trim().toLowerCase() === 'en' ? 'en' : 'de';
 
+    if (relationKind === 'angle-bisector') {
+      const pointList = String(parts[1] || '').trim();
+      const anglePointNames = pointList.startsWith('[') && pointList.endsWith(']')
+        ? splitTopLevel(pointList.slice(1, -1), ';').map(function(pointName) {
+            return unquote(pointName).trim();
+          }).filter(Boolean).slice(0, 3)
+        : [];
+      const explicitColor = String(parts[2] || '').trim();
+      const trailingOptions = parts.slice(3).map(function(part) {
+        return String(part || '').trim();
+      }).filter(Boolean);
+      const objectName = parseObjectName(trailingOptions);
+      return {
+        boardId: String(parts[0] || '').trim(),
+        kind: relationKind,
+        baseName: '',
+        basePointNames: null,
+        baseCoordinates: null,
+        throughPointName: '',
+        throughCoordinate: null,
+        point1Name: '',
+        point2Name: '',
+        midpointCoordinates: null,
+        anglePointNames,
+        color: explicitColor || getAccentColor(),
+        hasExplicitColor: !!explicitColor,
+        objectName: objectName.name,
+        showName: objectName.showName,
+        language: languageValue,
+        showValue: false,
+        visible: optionVisibility(trailingOptions),
+        lineStyle: parseLineStyleOptions(trailingOptions)
+      };
+    }
+
     if (relationKind === 'midpoint') {
       const pointPair = String(parts[1] || '').trim();
       const midpointCoordinates = parseCoordinateList(pointPair);
@@ -158,6 +198,7 @@ export function init(): void {
         point1Name: point1Name,
         point2Name: point2Name,
         midpointCoordinates: midpointCoordinates ? midpointCoordinates.slice(0, 2) : null,
+        anglePointNames: [],
         color: explicitColor || '#ff00ff',
         hasExplicitColor: !!explicitColor,
         objectName: objectName.name,
@@ -203,6 +244,7 @@ export function init(): void {
       point1Name: '',
       point2Name: '',
       midpointCoordinates: null,
+      anglePointNames: [],
       color: explicitColor || getAccentColor(),
       hasExplicitColor: !!explicitColor,
       objectName: objectName.name,
@@ -665,6 +707,161 @@ export function init(): void {
     }
   }
 
+  function angleBisectorDirection(first: any, vertex: any, third: any): { x: number; y: number } | null {
+    try {
+      const firstX = Number(first.X()) - Number(vertex.X());
+      const firstY = Number(first.Y()) - Number(vertex.Y());
+      const thirdX = Number(third.X()) - Number(vertex.X());
+      const thirdY = Number(third.Y()) - Number(vertex.Y());
+      const firstLength = Math.hypot(firstX, firstY);
+      const thirdLength = Math.hypot(thirdX, thirdY);
+      if (firstLength <= 1e-12 || thirdLength <= 1e-12) return null;
+      let x = firstX / firstLength + thirdX / thirdLength;
+      let y = firstY / firstLength + thirdY / thirdLength;
+      let length = Math.hypot(x, y);
+      if (length <= 1e-12) {
+        x = -firstY / firstLength;
+        y = firstX / firstLength;
+        length = Math.hypot(x, y);
+      }
+      return length > 1e-12 ? { x: x / length, y: y / length } : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyAngleBisectorDgsMetadata(
+    line: any,
+    helper: any,
+    points: any[],
+    cfg: RelationConfig
+  ): void {
+    if (!line || points.length < 3) return;
+    line.__liaDgsMacroManaged = true;
+    line.__liaDgsLine = true;
+    line.__liaDgsAngleBisector = true;
+    line.__liaDgsAngleBisectorPoints = points.slice(0, 3);
+    line.__liaDgsAngleBisectorHelper = helper;
+    line.__liaDgsLineName = cfg.objectName;
+    line.__liaDgsLanguage = cfg.language;
+    line.__liaDgsColor = cfg.color;
+    line.__liaDgsTextColor = cfg.color;
+    line.__liaDgsLineColor = cfg.color;
+    line.__liaDgsFillColor = cfg.color;
+    line.__liaDgsShowName = cfg.showName;
+    line.__liaDgsShowObject = cfg.visible;
+    line.__liaDgsOpacity = 1;
+    line.__liaDgsShowEquation = false;
+    helper.__liaDgsMacroManaged = true;
+    helper.__liaDgsAngleBisectorHelper = true;
+    helper.__liaDgsAngleBisectorLine = line;
+    helper.__liaDgsShowObject = false;
+    helper.__liaDgsOpacity = 0;
+    if (line.label) {
+      line.label.__liaDgsMacroManaged = true;
+      line.label.__liaDgsOwner = line;
+    }
+    applyLineStyle(line, cfg.lineStyle);
+  }
+
+  function renderAngleBisector(uid: string, cfg: RelationConfig, board: any): boolean {
+    const key = entryKey(uid);
+    if (cfg.anglePointNames.length !== 3 || !cfg.objectName) {
+      removeEntry(uid);
+      return false;
+    }
+    const points = cfg.anglePointNames.map(function(name) {
+      return getLivePoint(board, cfg.boardId, name);
+    });
+    if (points.some(function(point) { return !point; }) || new Set(points).size !== 3 ||
+        !angleBisectorDirection(points[0], points[1], points[2])) {
+      removeEntry(uid);
+      return false;
+    }
+    const old = window.__relationObjectEntries[key];
+    const geometryUnchanged = !!(old && Array.isArray(old.sourcePoints) &&
+      old.sourcePoints.length === 3 && old.sourcePoints.every(function(point: any, index: number) {
+        return point === points[index];
+      }));
+    if (old && old.board === board && old.kind === 'angle-bisector' && geometryUnchanged &&
+        old.objectName === cfg.objectName && old.showName === cfg.showName && old.language === cfg.language) {
+      old.color = cfg.color;
+      old.hasExplicitColor = cfg.hasExplicitColor;
+      old.visible = cfg.visible;
+      old.lineStyle = cfg.lineStyle;
+      applyRelationVisual(old.object, cfg);
+      applyAngleBisectorDgsMetadata(old.object, old.helperLine, points, cfg);
+      try { board.update(); } catch (e) {}
+      return true;
+    }
+
+    removeEntry(uid);
+    let helper: any = null;
+    let line: any = null;
+    try {
+      helper = board.create('point', [
+        function() {
+          const direction = angleBisectorDirection(points[0], points[1], points[2]);
+          return Number(points[1].X()) + (direction ? direction.x : 1);
+        },
+        function() {
+          const direction = angleBisectorDirection(points[0], points[1], points[2]);
+          return Number(points[1].Y()) + (direction ? direction.y : 0);
+        }
+      ], { name: '', fixed: true, visible: false, withLabel: false });
+      line = board.create('line', [points[1], helper], {
+        name: mathName(cfg.objectName),
+        withLabel: true,
+        fixed: true,
+        visible: cfg.visible,
+        straightFirst: true,
+        straightLast: true,
+        strokeColor: cfg.color,
+        highlightStrokeColor: cfg.color,
+        strokeWidth: 3,
+        highlightStrokeWidth: 4,
+        ...lineStyleAttributes(cfg.lineStyle),
+        label: {
+          visible: cfg.visible && cfg.showName,
+          strokeColor: cfg.color,
+          fillColor: cfg.color,
+          fontSize: 20,
+          parse: false,
+          useMathJax: true
+        }
+      });
+      line.__liaMacroRelationObject = true;
+      line.__liaMacroRelationKind = cfg.kind;
+      line.__liaMacroRelationName = cfg.objectName;
+      applyRelationVisual(line, cfg);
+      applyAngleBisectorDgsMetadata(line, helper, points, cfg);
+      window.__relationObjectEntries[key] = {
+        uid: String(uid),
+        boardId: cfg.boardId,
+        kind: cfg.kind,
+        anglePointNames: cfg.anglePointNames.slice(),
+        sourcePoints: points.slice(),
+        color: cfg.color,
+        hasExplicitColor: cfg.hasExplicitColor,
+        objectName: cfg.objectName,
+        showName: cfg.showName,
+        language: cfg.language,
+        visible: cfg.visible,
+        lineStyle: cfg.lineStyle,
+        board,
+        object: line,
+        helperLine: helper,
+        ownedPoints: []
+      };
+      try { board.update(); } catch (e) {}
+      return true;
+    } catch (e) {
+      try { if (line) board.removeObject(line); } catch (removeError) {}
+      try { if (helper) board.removeObject(helper); } catch (removeError) {}
+      return false;
+    }
+  }
+
   function renderMidpoint(uid: string, cfg: RelationConfig, board: any): boolean {
     const key = entryKey(uid);
     const coordinateMode = !!cfg.midpointCoordinates;
@@ -786,9 +983,9 @@ export function init(): void {
       removeEntry(uid);
       return false;
     }
-    return cfg.kind === 'midpoint'
-      ? renderMidpoint(uid, cfg, board)
-      : renderRelationLine(uid, cfg, board);
+    if (cfg.kind === 'midpoint') return renderMidpoint(uid, cfg, board);
+    if (cfg.kind === 'angle-bisector') return renderAngleBisector(uid, cfg, board);
+    return renderRelationLine(uid, cfg, board);
   };
 
   window.__bootstrapRelationObjects = function(): void {
@@ -863,6 +1060,7 @@ export function init(): void {
         point1Name: String(entry.point1Name || ''),
         point2Name: String(entry.point2Name || ''),
         midpointCoordinates: Array.isArray(entry.midpointCoordinates) ? entry.midpointCoordinates.map(function(point: CoordinatePair) { return { x: point.x, y: point.y }; }) : null,
+        anglePointNames: Array.isArray(entry.anglePointNames) ? entry.anglePointNames.slice() : [],
         color: String(entry.color || (entry.kind === 'midpoint' ? '#ff00ff' : getAccentColor())),
         hasExplicitColor: !!entry.hasExplicitColor,
         objectName: String(entry.objectName || ''),

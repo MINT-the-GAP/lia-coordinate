@@ -1,4 +1,9 @@
-export const DGS_REGRESSION_TOOL_IDS = [910, 920, 930] as const;
+export const DGS_ANALYSIS_TOOL_IDS = [810, 820, 830, 840, 850, 860] as const;
+export const DGS_REGRESSION_TOOL_IDS = [...DGS_ANALYSIS_TOOL_IDS, 910, 920, 930] as const;
+
+export function buildImplicitAnalysisDgsSpec(boardId: string): string {
+  return boardId + ';tools=[' + DGS_ANALYSIS_TOOL_IDS.join(';') + ']';
+}
 
 export type ExplicitDgsOwner = {
   uid: string;

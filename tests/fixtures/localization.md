@@ -15,6 +15,7 @@ import: /coordinate.md
 
 @CoordinateSystem(`xmin=-4;xmax=7;ymin=-3;ymax=6;width=;id=languageBoard;achsen=1;grid=1;border=1`)
 @Schar(`g;x;a*(x-b)^2+c;languageBoard;term=1;#b41f65`)
+@DGS(`languageBoard`)
 
 </div>
 <div class="flex-child">

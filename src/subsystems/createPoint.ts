@@ -79,7 +79,7 @@ export function init(): void {
   }
 
   function parseInternalPointOption(v) {
-    return /^(?:helper|hilfspunkt|xexpr|yexpr|parameter|param)\s*=/i.test(String(v || '').trim());
+    return /^(?:helper|hilfspunkt|xexpr|yexpr|parameter|param|auf|on)\s*=/i.test(String(v || '').trim());
   }
 
   function texName(name) {
@@ -138,10 +138,127 @@ export function init(): void {
         : 1,
       fixed: visualOptions.some(parseFixToken),
       helper: rawOptions.some(parseHelperToken),
+      bindingReference: namedOption(['auf', 'on']),
       xExpression: namedOption('xexpr'),
       yExpression: namedOption('yexpr'),
       coordinateParameter: Number.isFinite(coordinateParameter) ? coordinateParameter : null
     };
+  }
+
+  function normalizeBindingName(value) {
+    return String(value || '').trim()
+      .replace(/^\\\(([\s\S]*)\\\)$/, '$1')
+      .replace(/^\$([\s\S]*)\$$/, '$1')
+      .replace(/_\{([^{}]+)\}/g, '_$1')
+      .replace(/[{}]/g, '')
+      .trim();
+  }
+
+  function getBindingCandidateNames(object) {
+    if (!object) return [];
+    return [
+      object.__liaDgsFunctionName,
+      object.__liaDgsLineName,
+      object.__liaDgsRayName,
+      object.__liaDgsVectorName,
+      object.__liaDgsSegmentName,
+      object.__liaDgsCircleName,
+      object.__liaDgsEllipseName,
+      object.__liaDgsCompassArcName,
+      object.__liaDgsArcName,
+      object.__liaDgsPolygonName,
+      object.__liaDgsSectorName,
+      object.__liaDgsAngleBisectorName,
+      object.name
+    ].map(normalizeBindingName).filter(Boolean);
+  }
+
+  function getBoardBindingObjects(board) {
+    const result = [];
+    const seen = new Set();
+    const add = function(object) {
+      const target = object && object.__liaDgsAnalysisTarget
+        ? object.__liaDgsAnalysisTarget
+        : object;
+      if (!target || typeof target !== 'object' || target.board !== board || seen.has(target)) return;
+      seen.add(target);
+      result.push(target);
+    };
+    if (board && Array.isArray(board.objectsList)) board.objectsList.forEach(add);
+    if (board && board.objects && typeof board.objects === 'object') {
+      Object.keys(board.objects).forEach(function(key) { add(board.objects[key]); });
+    }
+    return result;
+  }
+
+  function findPointBindingSource(boardId, reference) {
+    const board = window.__boards && window.__boards[boardId];
+    const normalizedReference = normalizeBindingName(reference);
+    if (!board || !normalizedReference) return null;
+    const objects = getBoardBindingObjects(board);
+    const sideMatch = normalizedReference.match(/^side:([^:]+):(\d+)$/i);
+    if (sideMatch) {
+      const ownerName = normalizeBindingName(sideMatch[1]);
+      const index = Number(sideMatch[2]);
+      const polygon = objects.find(function(object) {
+        return getBindingCandidateNames(object).some(function(name) { return name === ownerName; });
+      });
+      const borders = polygon && (polygon.__liaDgsPolygonBorders || polygon.borders);
+      return Array.isArray(borders) && borders[index] ? borders[index] : null;
+    }
+    return objects.find(function(object) {
+      if (String(object.elType || '').toLowerCase() === 'point') return false;
+      return getBindingCandidateNames(object).some(function(name) {
+        return name === normalizedReference;
+      });
+    }) || null;
+  }
+
+  function applyPointBinding(target, point, scheduleRetry = true) {
+    if (!point) return false;
+    const reference = String(target && target.bindingReference || '').trim();
+    if (!reference) {
+      if (point.__liaDgsMacroBindingReference) {
+        try {
+          while (point.slideObject && typeof point.popSlideObject === 'function') point.popSlideObject();
+        } catch (e) {}
+      }
+      delete point.__liaDgsMacroBindingReference;
+      delete point.__liaDgsPendingBindingReference;
+      return true;
+    }
+    const source = findPointBindingSource(target.boardId, reference);
+    if (!source) {
+      point.__liaDgsPendingBindingReference = reference;
+      if (scheduleRetry && !point.__liaDgsBindingRetryTimer) {
+        let attempt = 0;
+        const delays = [0, 120, 360, 700];
+        const retry = function() {
+          point.__liaDgsBindingRetryTimer = 0;
+          if (!point.board || applyPointBinding(target, point, false)) return;
+          attempt += 1;
+          if (attempt < delays.length) {
+            point.__liaDgsBindingRetryTimer = setTimeout(retry, delays[attempt]);
+          }
+        };
+        point.__liaDgsBindingRetryTimer = setTimeout(retry, delays[attempt]);
+      }
+      return false;
+    }
+    try {
+      if (point.slideObject !== source) {
+        while (point.slideObject && typeof point.popSlideObject === 'function') point.popSlideObject();
+        if (typeof point.makeGlider !== 'function') return false;
+        point.makeGlider(source);
+      }
+      point.__liaDgsGliderSource = source;
+      point.__liaDgsMacroBindingReference = reference;
+      delete point.__liaDgsPendingBindingReference;
+      try { point.board.update(); } catch (e) {}
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function cancelCreatePointTimers(inst) {
@@ -253,7 +370,7 @@ export function init(): void {
   }
 
   function stylePointLabel(pt) {
-    if (!pt || typeof pt.setAttribute !== 'function') return;
+    if (!pt || pt.__liaPoint3D || pt.__liaPoint3DProxy || typeof pt.setAttribute !== 'function') return;
 
     const visual = pt.__liaPointVisual || null;
     const c = visual && visual.hasExplicitColor
@@ -586,7 +703,9 @@ export function init(): void {
   window.restorePointFromSpec = function(spec) {
     const target = getPointTargetFromSpec(spec);
     if (!target.boardId || !target.name) return null;
-    return restorePointFromState(target.boardId, target.name, target.showName);
+    const point = restorePointFromState(target.boardId, target.name, target.showName);
+    if (point) applyPointBinding(target, point);
+    return point;
   };
 
   window.getPointFromSpec = function(spec) {
@@ -599,10 +718,12 @@ export function init(): void {
       pt.__liaDgsPointName = String(name || '');
       pt.__liaDgsShowName = target.showName !== false;
       stylePointLabel(pt);
+      applyPointBinding(target, pt);
       return pt;
     }
-
-    return restorePointFromState(boardId, name, target.showName);
+    pt = restorePointFromState(boardId, name, target.showName);
+    if (pt) applyPointBinding(target, pt);
+    return pt;
   };
 
   window.ensurePointFromSpec = function(spec) {
@@ -622,12 +743,14 @@ export function init(): void {
       stylePointLabel(pt);
       bindPointPersistence(boardId, name, pt);
       savePointState(boardId, name, pt);
+      applyPointBinding(target, pt);
       try { board.update(); } catch (e) {}
       return true;
     }
 
     pt = restorePointFromState(boardId, name, target.showName);
     if (pt) {
+      applyPointBinding(target, pt);
       try { board.update(); } catch (e) {}
       return true;
     }
@@ -638,6 +761,7 @@ export function init(): void {
     pt = createPoint(board, boardId, name, x0, y0, false, target.showName);
     if (!pt) return false;
 
+    applyPointBinding(target, pt);
     try { board.update(); } catch (e) {}
     return true;
   };
@@ -668,6 +792,7 @@ export function init(): void {
     pt.__liaDgsPointName = String(name || '');
     pt.__liaDgsShowName = target.showName !== false;
     stylePointLabel(pt);
+    applyPointBinding(target, pt);
     savePointState(boardId, name, pt);
 
     try { board.update(); } catch (e) {}
@@ -718,6 +843,7 @@ export function init(): void {
     } catch (e) {}
 
     applyStaticPointVisual(pt, target);
+    applyPointBinding(target, pt);
     bindPointPersistence(boardId, name, pt);
     savePointState(boardId, name, pt);
 
@@ -735,6 +861,9 @@ export function init(): void {
 
     const existing = findPointMacroObject(uid, spec);
     if (existing && String(existing.__liaPointMacroSpec || '') === String(spec || '')) {
+      const target = getPointTargetFromSpec(spec);
+      applyStaticPointVisual(existing, target);
+      applyPointBinding(target, existing);
       assignPointMacroIdentity(uid, spec);
       return true;
     }
@@ -1081,6 +1210,9 @@ export function init(): void {
     updateCreatePointLanguage(uid, uiRoot, languageCode);
     applyCreatePointUi(uid);
     assignPointMacroIdentity(uid, spec);
+    const bindingTarget = getPointTargetFromSpec(spec);
+    const livePoint = getLivePointOnCurrentBoard(bindingTarget.boardId, bindingTarget.name);
+    if (livePoint) applyPointBinding(bindingTarget, livePoint);
 
     if (!checkRoot.__liaPointUiObserved) {
       checkRoot.__liaPointUiObserved = true;

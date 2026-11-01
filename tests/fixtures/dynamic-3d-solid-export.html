@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Coordinate Segment 5 browser fixture</title>
+  <style>
+    body { margin: 12px; font-family: Arial, sans-serif; background: white; color: #222; }
+    .flex-child { width: 840px; min-width: 0; }
+    .jxgbox { position: relative; overflow: hidden; }
+  </style>
+</head>
+<body>
+<main id="fixture">
+  <section class="flex-child">
+    <lia-coordinate-board data-lia-coordinate-key="segment-5-3d"
+      data-spec="id=raum;mode=3d;xmin=-5;xmax=6;ymin=-5;ymax=6;zmin=-4;zmax=6;width=780;projection=parallel;camera=0.9/0.45/0"></lia-coordinate-board>
+
+    <span id="point3d-spec-o" data-spec="raum;O;0;0;0;#d400d4;1;objectid=p-o"></span>
+    <span id="point3d-spec-x" data-spec="raum;X;2;0;0;#d400d4;1;objectid=p-x"></span>
+    <span id="point3d-spec-y" data-spec="raum;Y;0;2;0;#d400d4;1;objectid=p-y"></span>
+    <span id="point3d-spec-xy" data-spec="raum;XY;2;2;0;#d400d4;1;objectid=p-xy"></span>
+    <span id="point3d-spec-z" data-spec="raum;Z;0;0;2;#d400d4;1;objectid=p-z"></span>
+    <span id="point3d-spec-apex" data-spec="raum;A;1;1;3;#d400d4;1;objectid=p-a"></span>
+    <span id="point3d-spec-c1" data-spec="raum;C1;-1;1;1;#1565c0;1"></span>
+    <span id="point3d-spec-c2" data-spec="raum;C2;3;1;1;#1565c0;1"></span>
+    <span id="point3d-spec-vp" data-spec="raum;VP;1;1;-1;#1565c0;1"></span>
+    <span id="point3d-spec-vq" data-spec="raum;VQ;1;1;1;#1565c0;1"></span>
+    <span id="point3d-spec-h0" data-spec="raum;H0;0;0;1;#00897b;1"></span>
+    <span id="point3d-spec-h1" data-spec="raum;H1;2;0;1;#00897b;1"></span>
+    <span id="point3d-spec-h2" data-spec="raum;H2;0;2;1;#00897b;1"></span>
+
+    <span id="linear3d-spec-vx" data-kind="vector" data-language="de" data-spec="raum;vx;O;X;#ef6c00;objectid=v-x"></span>
+    <span id="linear3d-spec-vy" data-kind="vector" data-language="de" data-spec="raum;vy;O;Y;#ef6c00;objectid=v-y"></span>
+    <span id="linear3d-spec-vz" data-kind="vector" data-language="de" data-spec="raum;vz;O;Z;#ef6c00;objectid=v-z"></span>
+    <span id="linear3d-spec-axis" data-kind="line" data-language="de" data-spec="raum;axis;O;Z;#1565c0;objectid=axis"></span>
+    <span id="linear3d-spec-cross" data-kind="line" data-language="de" data-spec="raum;cross;C1;C2;#1565c0;objectid=cross"></span>
+    <span id="linear3d-spec-vertical" data-kind="line" data-language="de" data-spec="raum;vertical;VP;VQ;#1565c0;objectid=vertical"></span>
+    <span id="plane3d-spec-half" data-definition="three-points" data-language="de" data-spec="raum;H;H0;H1;H2;#00897b;0.12;objectid=half-plane"></span>
+
+    <span id="polygon3d-spec-base" data-language="de" data-spec="raum;F0;O;X;XY;Y;linecolor=#00a6a6;fillcolor=#00dfe8;opacity=0.25;wert=1;measure=area;objectid=base-polygon"></span>
+    <span id="solid3d-spec-tetra" data-definition="tetrahedron" data-language="de" data-spec="raum;Tet;O;X;Y;Z;fillcolor=#ff6688;wert=1;measure=volume;objectid=tetra"></span>
+    <span id="solid3d-spec-pyramid" data-definition="pyramid" data-language="de" data-spec="raum;Pyr;F0;A;fillcolor=#ffaa00;objectid=pyramid"></span>
+    <span id="solid3d-spec-prism" data-definition="prism" data-language="de" data-spec="raum;Pr;F0;vz;fillcolor=#42d66b;objectid=prism"></span>
+    <span id="solid3d-spec-parallel" data-definition="parallelepiped" data-language="de" data-spec="raum;Sp;O;vx;vy;vz;fillcolor=#8d7cff;objectid=spat"></span>
+    <span id="solid3d-spec-cuboid" data-definition="cuboid" data-language="de" data-spec="raum;Q;O;vx;vy;vz;fillcolor=#00dfe8;wert=1;measure=surface;objectid=cuboid"></span>
+    <span id="solid3d-spec-cylinder" data-definition="cylinder" data-language="de" data-spec="raum;Zyl;O;Z;radius=1;fillcolor=#42d66b;objectid=cylinder"></span>
+    <span id="solid3d-spec-cone" data-definition="cone" data-language="de" data-spec="raum;K;O;A;radius=1;fillcolor=#ffaa00;objectid=cone"></span>
+
+    <span id="transformation3d-spec-translate" data-definition="translate" data-language="de" data-spec="raum;Qmove;X;vx;linecolor=#00897b;objectid=tr-translate"></span>
+    <span id="transformation3d-spec-reflect-point" data-definition="reflect-point" data-language="de" data-spec="raum;TetRef;X;O;linecolor=#c2185b;objectid=tr-point"></span>
+    <span id="transformation3d-spec-reflect-line" data-definition="reflect-line" data-language="de" data-spec="raum;PyrRef;X;axis;linecolor=#6a1b9a;objectid=tr-line"></span>
+    <span id="transformation3d-spec-reflect-plane" data-definition="reflect-plane" data-language="de" data-spec="raum;PrRef;X;H;linecolor=#ef6c00;objectid=tr-plane"></span>
+    <span id="transformation3d-spec-rotate" data-definition="rotate-axis" data-language="de" data-spec="raum;ZylRot;X;axis;angle=90;linecolor=#1565c0;objectid=tr-rotate"></span>
+    <span id="transformation3d-spec-dilate" data-definition="dilate" data-language="de" data-spec="raum;K2;K;O;factor=2;linecolor=#2e7d32;objectid=tr-dilate"></span>
+
+    <span id="intersection3d-spec-line-polygon" data-language="de" data-spec="raum;IP;vertical;F0;#ff00ff;1;objectid=int-polygon"></span>
+    <span id="intersection3d-spec-line-solid" data-language="de" data-spec="raum;IQ;cross;Q;#ff00ff;1;objectid=int-solid"></span>
+    <span id="intersection3d-spec-plane-solid" data-language="de" data-spec="raum;IS;H;Q;#ff00ff;0.4;objectid=int-section"></span>
+
+    <span id="point3d-spec-bound-polygon" data-spec="raum;BP;0;0;0;#222222;1;auf=F0;u=0;v=0;objectid=bound-polygon"></span>
+    <span id="point3d-spec-bound-solid" data-spec="raum;BK;0;0;0;#222222;1;auf=Zyl;surface=side;angle=0;height=0.5;objectid=bound-solid"></span>
+    <div id="dgs-ui-segment-5-3d" data-spec="raum" data-language="de"></div>
+  </section>
+</main>
+<script>
+  document.querySelectorAll('span[id$="-spec-o"], span[id^="point3d-spec-"], span[id^="linear3d-spec-"], span[id^="plane3d-spec-"], span[id^="polygon3d-spec-"], span[id^="solid3d-spec-"], span[id^="transformation3d-spec-"], span[id^="intersection3d-spec-"]').forEach(function(marker) { marker.style.display = 'none'; });
+  window.profileErrors = [];
+  window.addEventListener('error', function(event) { profileErrors.push(String(event.error && event.error.stack || event.message)); });
+  window.addEventListener('unhandledrejection', function(event) { profileErrors.push(String(event.reason)); });
+</script>
+<script>window.MathJax = { chtml: { fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2" } };</script>
+<script src="/assets/mathjax.js"></script>
+<script src="/assets/jsxgraph-template.js"></script>
+<script src="/bundle.js"></script>
+<script>
+  window.profileReady = async function() {
+    for (var i = 0; i < 1600; i += 1) {
+      var view = window.__coordinateViews3d && window.__coordinateViews3d.raum;
+      var solids = window.__solid3DEntries || {};
+      var transforms = window.__transformation3DEntries || {};
+      var intersections = window.__intersection3DEntries || {};
+      if (view && Object.keys(solids).length === 8 && Object.keys(transforms).length === 6 &&
+          Object.keys(intersections).length === 3 && window.__points && window.__points.raum &&
+          window.__points.raum.BP && window.__points.raum.BK) return true;
+      await new Promise(function(resolve) { setTimeout(resolve, 50); });
+    }
+    throw Error('Segment 5 initialization timeout: ' + JSON.stringify(profileErrors));
+  };
+</script>
+</body>
+</html>

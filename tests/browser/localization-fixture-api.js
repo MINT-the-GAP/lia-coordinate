@@ -6,6 +6,9 @@
   tableInputs() { return Array.from(this.tableRoot().querySelectorAll('.lia-dyn-table-input')); },
   plot() { return Object.values(window.__plotInputInstances || {})[0]; },
   plotState() { return Object.values(window.__plotInputStates || {})[0]; },
+  dgsRoot() {
+    return window.__boards?.languageBoard?.containerObj || this.entry()?.board?.containerObj || null;
+  },
   pointUis() {
     return ['point-ui-', 'graph-ui-', 'multi-graph-ui-'].map(prefix => document.querySelector('[id^="' + prefix + '"]'));
   },
@@ -14,7 +17,8 @@
   },
   async ready() {
     for (let attempt = 0; attempt < 200; attempt++) {
-      if (this.entry()?.panel.isConnected && this.buttons().every(Boolean) && this.plot()?.input && this.tableInputs().length === 4) {
+      if (this.entry()?.panel.isConnected && this.buttons().every(Boolean) && this.plot()?.input &&
+          this.tableInputs().length === 4 && this.dgsRoot()?.querySelector('.lia-dgs-top-menu')) {
         await document.fonts.ready;
         let previous = '', stable = 0;
         for (let frame = 0; frame < 80; frame++) {
@@ -27,7 +31,14 @@
       }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    throw Error('Localized LiaScript controls did not initialize');
+    throw Error('Localized LiaScript controls did not initialize: ' + JSON.stringify({
+      dgsMarkers: Array.from(document.querySelectorAll('[id^=dgs-ui-]')).map(node => ({ id: node.id, spec: node.dataset.spec, language: node.dataset.language })),
+      boards: Object.keys(window.__boards || {}),
+      setupType: typeof window.__setupDGS,
+      dgsReady: window.__dgsReady,
+      staticBoard: window.__coord?.isStaticCoordinateBoard?.('languageBoard'),
+      hasMenu: !!this.dgsRoot()?.querySelector('.lia-dgs-top-menu')
+    }));
   },
   center(element) {
     element.scrollIntoView({ block: 'nearest' });
@@ -60,6 +71,8 @@
     const entry = this.entry();
     const resize = entry.panel.querySelector('.lia-schar-resize-handle');
     const points = Object.entries(window.__points?.languageBoard || {});
+    const dgsRoot = this.dgsRoot();
+    const dgsNodes = Array.from(dgsRoot?.querySelectorAll('button, input, select, [aria-label], [title]') || []);
     return {
       courseLanguage: document.documentElement.lang,
       language: document.querySelector('[id^="schar-spec-"]').dataset.language,
@@ -79,6 +92,16 @@
         placeholder: this.plot().input.placeholder,
         input: this.plot().input.value, message: this.plot().msg.textContent,
         hasGraph: !!this.plotState().graph, graphAtTwo: this.plotState().graph?.Y(2)
+      },
+      dgs: {
+        language: dgsRoot?.dataset.liaDgsLanguage,
+        toolbarAria: dgsRoot?.querySelector('.lia-dgs-top-menu')?.getAttribute('aria-label'),
+        objectListAria: dgsRoot?.querySelector('.lia-dgs-object-list-button')?.getAttribute('aria-label'),
+        fullscreenAria: dgsRoot?.querySelector('.lia-dgs-fullscreen-button')?.getAttribute('aria-label'),
+        pointAria: dgsRoot?.querySelector('.lia-dgs-point-button')?.getAttribute('aria-label'),
+        lineToolsAria: dgsRoot?.querySelector('.lia-dgs-segment-button')?.getAttribute('aria-label'),
+        relationsAria: dgsRoot?.querySelector('.lia-dgs-orthogonal-button')?.getAttribute('aria-label'),
+        strings: dgsNodes.flatMap(node => [node.textContent, node.getAttribute('aria-label'), node.getAttribute('title')]).filter(Boolean)
       },
       pointAria: this.buttons().map(button => button.getAttribute('aria-label')),
       termLabel: entry.termToggleWrapEl.textContent.trim(),

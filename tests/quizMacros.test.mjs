@@ -19,6 +19,7 @@ const quizFamilies = [
   ['CreatePoint_', '__checkCreatePointQuiz'],
   ['PolygonMetricQuiz_', '__checkPolygonMetricQuiz'],
   ['ConstructionQuiz_', '__checkConstructionQuiz'],
+  ['ConstructionQuiz3D_', '__checkConstructionQuiz3D'],
   ['CombinedQuiz_', '__checkCombinedQuiz'],
   ['Rekonstruktion_', '__checkReconstructionQuiz'],
   ['PointOnGraph_', '__checkPointGraphFromSpec'],
@@ -33,7 +34,7 @@ function macroBodies(name) {
   );
 }
 
-test('all seven quiz emitters are synchronized and parser-stable', () => {
+test('all eight quiz emitters are synchronized and parser-stable', () => {
   for (const [name] of quizFamilies) {
     const bodies = macroBodies(name);
     assert.equal(bodies.length, 2, `${name}: header and implementation definitions`);
@@ -167,15 +168,15 @@ test('the full DynFlex fixture covers every quiz, hint, solution, and timer laye
 
   assert.match(fixture, /lia-timer\/924ec0108780ea43e39519cabcaf4f3de8b7dee6\/README\.md/);
   assert.match(fixture, /lia-DynFlex\/9ef8f05c0eae8b51e183efbfe34c5b38e41488c8\/README\.md/);
-  assert.match(fixture, /LiaTemplates\/JSXGraph@main\/README\.md/);
+  assert.match(fixture, /LiaTemplates\/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb\/README\.md/);
   assert.equal((fixture.match(/<section class="dynFlex">/g) || []).length, 1);
-  assert.equal((fixture.match(/<div class="flex-child">/g) || []).length, 7);
-  assert.equal((fixture.match(/data-solution-timer="1s"/g) || []).length, 7);
-  assert.equal((fixture.match(/data-hint-button="1"/g) || []).length, 7);
-  assert.equal((fixture.match(/data-solution-button="2"/g) || []).length, 7);
-  assert.equal((fixture.match(/^\[\[\?\]\]/gm) || []).length, 7);
-  assert.equal((fixture.match(/^\*{17}$/gm) || []).length, 14);
-  assert.equal((fixture.match(/\)\r?\n\[\[\?\]\]/g) || []).length, 7);
+  assert.equal((fixture.match(/<div class="flex-child">/g) || []).length, 8);
+  assert.equal((fixture.match(/data-solution-timer="1s"/g) || []).length, 8);
+  assert.equal((fixture.match(/data-hint-button="1"/g) || []).length, 8);
+  assert.equal((fixture.match(/data-solution-button="2"/g) || []).length, 8);
+  assert.equal((fixture.match(/^\[\[\?\]\]/gm) || []).length, 8);
+  assert.equal((fixture.match(/^\*{17}$/gm) || []).length, 16);
+  assert.equal((fixture.match(/\)\r?\n\[\[\?\]\]/g) || []).length, 8);
 });
 
 

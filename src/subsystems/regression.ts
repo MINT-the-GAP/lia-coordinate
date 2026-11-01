@@ -68,6 +68,7 @@ type AnalysisOverlayOptions = {
 // parameter object. AnalysisEntry<M> captures the common fields.
 type AnalysisEntry<M> = {
   id: string;
+  persistentId?: string;
   title: string;
   color: string;
   panel: HTMLElement | null;
@@ -121,6 +122,7 @@ type RegressionState = {
   pointerId: number | null;
   currentStroke: DrawStroke | null;
   setSquareGuideEdge: number | null;
+  setSquareStrokeEdge: number | null;
   setSquareStrokeInterrupted: boolean;
   eraseRemoved: EraseEntry[];
   autoCreatedPointsData: AutoPointData[];
@@ -153,6 +155,7 @@ type RegressionState = {
 
 type RegressionAnalysisSnapshot = {
   id: string;
+  persistentId?: string;
   classKey: AnalysisClassKey;
   title: string;
   color: string;
@@ -2763,8 +2766,8 @@ const GRAPH_MODELS: Record<string, GraphModelDescriptor> = {
   },
   quadratic: {
     basis: (m) => (x) => m.a * (x + m.c) * (x + m.c) + m.d,
-    // Pan parabola by shifting d only (keep a and c constant)
-    drag: (m, s, _dx, dy) => { m.d = s.d + dy; }
+    // Translate the parabola in both directions while preserving its shape.
+    drag: (m, s, dx, dy) => { m.c = s.c - dx; m.d = s.d + dy; }
   },
   cubic: {
     basis: (m) => (x) => m.a * x * x * x + m.b * x * x + m.c * x + m.d,
@@ -2831,7 +2834,10 @@ const GRAPH_MODELS: Record<string, GraphModelDescriptor> = {
 };
 
 function regressionAnalysisGraphPersistentId(state: RegressionState, entry: AnyAnalysisEntry): string {
-  return 'regression:' + state.boardId + ':' + state.uid + ':' + entry.id;
+  // A board can remount with a different implicit/explicit regression controller.
+  // Retain the curve identity to reconnect DGS analyses and their history.
+  return entry.persistentId || (entry.persistentId =
+    'regression:' + state.boardId + ':' + state.uid + ':' + entry.id);
 }
 
 function markRegressionAnalysisGraph(
@@ -2925,6 +2931,8 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
   if (!targets.length) return;
 
   const onPointerDown = (evt: PointerEvent) => {
+    if (evt.button !== 0 || evt.isPrimary === false || state.activeTool ||
+        board.containerObj?.classList.contains('lia-dgs-construction-mode')) return;
     evt.preventDefault();
     evt.stopPropagation();
     if (entry.cancelActiveDrag) {
@@ -2998,6 +3006,7 @@ function bindEntryDrag(state: RegressionState, entry: AnyAnalysisEntry, descript
     try {
       target.style.cursor = 'grab';
       target.style.touchAction = 'none';
+      target.style.pointerEvents = 'stroke';
       target.addEventListener('pointerdown', onPointerDown, true);
     } catch (e) {}
   });
@@ -3875,6 +3884,7 @@ function collectRegressionAnalysisSnapshots(state: RegressionState): RegressionA
       const scale = readOverlayScaleFromPanel(entry.panel);
       result.push({
         id: String(entry.id || ''),
+        persistentId: entry.persistentId,
         classKey: entry.classKey || list.classKey,
         title: String(entry.title || ''),
         color: String(entry.color || state.drawColor || '#ff0000'),
@@ -4000,6 +4010,7 @@ function openRegressionAnalysisSnapshot(
   const entry = lastRegressionAnalysisEntry(state, snapshot.classKey);
   if (!entry) return null;
   if (snapshot.id) entry.id = String(snapshot.id);
+  entry.persistentId = snapshot.persistentId;
   entry.title = String(snapshot.title || '');
   entry.color = String(snapshot.color || '#ff0000');
   entry.classKey = snapshot.classKey;
@@ -4050,6 +4061,7 @@ function restoreRegressionSnapshot(state: RegressionState): boolean {
   state.pointerId = null;
   state.currentStroke = null;
   state.setSquareGuideEdge = null;
+  state.setSquareStrokeEdge = null;
   state.setSquareStrokeInterrupted = false;
   state.eraseRemoved = [];
   rebuildColorMenu(state);
@@ -7429,10 +7441,35 @@ function applyRedoAction(state: RegressionState, action: DrawAction): void {
   }
 }
 
+function convertSetSquareStrokeToSegment(state: RegressionState): boolean {
+  const stroke = state.currentStroke;
+  if (!stroke || state.setSquareStrokeEdge == null || state.setSquareStrokeInterrupted ||
+      stroke.points.length < 2 || !window.__createDgsDrawnSegment) return false;
+  const start = stroke.points[0];
+  const end = stroke.points[stroke.points.length - 1];
+  const first = userToLocal(state, start);
+  const last = userToLocal(state, end);
+  const dx = last.x - first.x;
+  const dy = last.y - first.y;
+  const length = Math.hypot(dx, dy);
+  // Ignore taps and guard against an instrument or viewport moving mid-stroke.
+  if (!Number.isFinite(length) || length < 8 || stroke.points.some((point) => {
+    const local = userToLocal(state, point);
+    const distance = Math.abs(dx * (local.y - first.y) - dy * (local.x - first.x)) / length;
+    return !Number.isFinite(distance) || distance > 1;
+  })) return false;
+  try {
+    return window.__createDgsDrawnSegment(state.boardId, start, end, stroke.color, stroke.width);
+  } catch (e) {
+    return false;
+  }
+}
+
 function bindDrawLayer(state: RegressionState): void {
   const layer = state.drawLayer;
 
   layer.onpointerdown = (evt: PointerEvent) => {
+    if (state.drawing || (evt.pointerType === 'mouse' && evt.button !== 0)) return;
     if (state.activeTool !== 'draw' && state.activeTool !== 'erase' && state.activeTool !== 'regression') return;
 
     evt.preventDefault();
@@ -7482,6 +7519,7 @@ function bindDrawLayer(state: RegressionState): void {
 
     const constrained = constrainDrawPointToSetSquare(state, point, null);
     state.setSquareGuideEdge = constrained.snappedEdge;
+    state.setSquareStrokeEdge = constrained.snappedEdge;
     state.setSquareStrokeInterrupted = false;
     if (constrained.blocked) return;
 
@@ -7538,6 +7576,7 @@ function bindDrawLayer(state: RegressionState): void {
       }
       state.setSquareStrokeInterrupted = true;
       state.setSquareGuideEdge = null;
+      state.setSquareStrokeEdge = null;
       return;
     }
     const staysOnGuide = state.setSquareGuideEdge != null &&
@@ -7554,8 +7593,10 @@ function bindDrawLayer(state: RegressionState): void {
       }
       state.setSquareStrokeInterrupted = true;
       state.setSquareGuideEdge = null;
+      state.setSquareStrokeEdge = null;
       return;
     }
+    if (constrained.snappedEdge !== state.setSquareStrokeEdge) state.setSquareStrokeEdge = null;
     state.setSquareGuideEdge = constrained.snappedEdge;
     state.currentStroke.points.push(localToUser(state, constrained.point));
     redrawCanvas(state);
@@ -7567,9 +7608,14 @@ function bindDrawLayer(state: RegressionState): void {
     evt.preventDefault();
     evt.stopPropagation();
 
+    // Pointerup may carry the final position without a preceding pointermove.
+    if (evt.type === 'pointerup' && state.activeTool === 'draw') layer.onpointermove?.(evt);
+    const converted = evt.type === 'pointerup' && state.activeTool === 'draw' &&
+      convertSetSquareStrokeToSegment(state);
     state.drawing = false;
     state.pointerId = null;
     state.setSquareGuideEdge = null;
+    state.setSquareStrokeEdge = null;
     state.setSquareStrokeInterrupted = false;
 
     if (state.activeTool === 'regression') {
@@ -7589,7 +7635,11 @@ function bindDrawLayer(state: RegressionState): void {
       return;
     }
 
-    if (state.currentStroke) {
+    if (converted && state.currentStroke) {
+      const index = state.strokes.indexOf(state.currentStroke);
+      if (index >= 0) state.strokes.splice(index, 1);
+      redrawCanvas(state);
+    } else if (state.currentStroke) {
       state.undoActions.push({ type: 'add', stroke: state.currentStroke });
       state.redoActions = [];
 
@@ -7833,6 +7883,7 @@ function disposeRegressionState(state: RegressionState): void {
   try { persistRegressionSnapshot(state); } catch (e) {}
   state.disposing = true;
   state.setSquareGuideEdge = null;
+  state.setSquareStrokeEdge = null;
   state.setSquareStrokeInterrupted = false;
   if (state.dgsSyncFrame != null) {
     try { window.cancelAnimationFrame(state.dgsSyncFrame); } catch (e) {}
@@ -8112,6 +8163,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     pointerId: null,
     currentStroke: null,
     setSquareGuideEdge: null,
+    setSquareStrokeEdge: null,
     setSquareStrokeInterrupted: false,
     eraseRemoved: [],
     autoCreatedPointsData: [],
@@ -8145,6 +8197,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.toolsMenuOpen = false;
     state.activeTool = open ? 'draw' : '';
     state.setSquareGuideEdge = null;
+    state.setSquareStrokeEdge = null;
     state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.drawColorMenu, open);
@@ -8162,6 +8215,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.drawColorMenuOpen = false;
     state.toolsMenuOpen = false;
     state.setSquareGuideEdge = null;
+    state.setSquareStrokeEdge = null;
     state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.drawColorMenu, false);
@@ -8179,6 +8233,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
     state.drawColorMenuOpen = false;
     state.activeTool = open ? 'tools' : '';
     state.setSquareGuideEdge = null;
+    state.setSquareStrokeEdge = null;
     state.setSquareStrokeInterrupted = false;
 
     setMenuOpen(state.toolsMenu, open);
@@ -8202,6 +8257,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
       state.drawing = false;
       state.pointerId = null;
       state.setSquareGuideEdge = null;
+      state.setSquareStrokeEdge = null;
       state.setSquareStrokeInterrupted = false;
       state.toolsMenuOpen = true;
       setMenuOpen(state.toolsMenu, true);
@@ -8214,6 +8270,7 @@ function setupRegressionUI(uid: string, boardId: string, languageCode?: string):
       state.regressionMode = 'select-points';
       state.activeTool = 'regression';
       state.setSquareGuideEdge = null;
+      state.setSquareStrokeEdge = null;
       state.setSquareStrokeInterrupted = false;
       state.toolsMenuOpen = true;
       setMenuOpen(state.toolsMenu, true);

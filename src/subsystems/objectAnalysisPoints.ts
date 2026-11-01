@@ -1,7 +1,7 @@
-// Object analysis point subsystem (@OrdinateIntercept/@Ordinatenabschnitt and
-// @Intersection/@Schnittpunkt macros). Creates dependent points for the
-// ordinate-axis intercept of a function/linear object and for intersections of
-// functions, linear objects, and circles.
+// Object analysis point subsystem (@OrdinateIntercept/@Ordinatenabschnitt,
+// @ObjectZeros/@ObjektNullstellen, and @Intersection/@Schnittpunkt macros).
+// Creates dependent points for linear roots, ordinate-axis intercepts, and
+// intersections of functions, linear objects, circles, and compass arcs.
 
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { getNeutralColor, initThemeSync } from '../shared/theme';
@@ -10,8 +10,8 @@ import { getBoardObjects } from '../shared/boardObjects';
 import { formatNumber } from '../shared/format';
 import { mayDisplayDgsValues } from '../shared/dgsPermissions';
 
-type ObjectAnalysisKind = 'ordinate-intercept' | 'intersections';
-type SourceKind = 'function' | 'linear' | 'circle';
+type ObjectAnalysisKind = 'roots' | 'ordinate-intercept' | 'intersections';
+type SourceKind = 'function' | 'linear' | 'circle' | 'ellipse';
 type LinearMode = 'line' | 'ray' | 'segment';
 
 interface ObjectAnalysisConfig {
@@ -89,11 +89,14 @@ export function init(): void {
     if (value === 'intersection' || value === 'intersections' || value === 'schnittpunkt' || value === 'schnittpunkte') {
       return 'intersections';
     }
+    if (value === 'root' || value === 'roots' || value === 'zero' || value === 'zeros' ||
+        value === 'nullstelle' || value === 'nullstellen') return 'roots';
     return 'ordinate-intercept';
   }
 
   function defaultPrefix(kind: ObjectAnalysisKind, language: 'de' | 'en'): string {
     if (kind === 'intersections') return language === 'de' ? 'S' : 'I';
+    if (kind === 'roots') return language === 'de' ? 'N' : 'Z';
     return 'O';
   }
 
@@ -302,10 +305,14 @@ export function init(): void {
   function sourceFromObject(object: any, kind?: SourceKind, mode?: LinearMode): AnalysisSource | null {
     if (!object) return null;
     const type = String(object.elType || '').toLowerCase();
-    if (kind === 'function' || (typeof object.Y === 'function' && (object.__liaDgsFunction || object.__liaPlotFunctionName || type === 'functiongraph'))) {
+    if (kind === 'function' || (typeof object.Y === 'function' && (object.__liaDgsFunction || object.__liaDgsAnalysisFunction || object.__liaPlotFunctionName || type === 'functiongraph'))) {
       return { object, kind: 'function' };
     }
-    if (kind === 'circle' || object.__liaDgsCircle || type === 'circle' || typeof object.Radius === 'function') {
+    if (kind === 'ellipse' || object.__liaDgsEllipse || type === 'ellipse') {
+      return { object, kind: 'ellipse' };
+    }
+    if (kind === 'circle' || object.__liaDgsCircle || object.__liaDgsCompassArc ||
+        type === 'circle' || typeof object.Radius === 'function') {
       return { object, kind: 'circle' };
     }
     if (kind === 'linear' || object.point1 && object.point2) {
@@ -323,6 +330,8 @@ export function init(): void {
       object && object.__liaDgsRayName,
       object && object.__liaDgsVectorName,
       object && object.__liaDgsCircleName,
+      object && object.__liaDgsEllipseName,
+      object && object.__liaDgsCompassArcName,
       object && object.__liaMacroRelationName,
       object && object.name
     ].map(cleanName).filter(Boolean);
@@ -403,6 +412,15 @@ export function init(): void {
     if (!board || !wanted) return null;
     const pointPairSource = findPointPairSource(board, boardId, sourceName);
     if (pointPairSource) return pointPairSource;
+
+    const scharEntries = window.__scharEntries || {};
+    for (const key of Object.keys(scharEntries)) {
+      const entry = scharEntries[key];
+      if (!entry || entry.boardId !== boardId || entry.board !== board || !entry.graph || entry.graph.board !== board) continue;
+      if (candidateNames(entry.graph).some(function(name) { return namesEqual(name, sourceName); })) {
+        return { object: entry.graph, kind: 'function' };
+      }
+    }
 
     const plotEntries = window.__plotFunctionEntries || {};
     for (const key of Object.keys(plotEntries)) {
@@ -580,11 +598,21 @@ export function init(): void {
     if (!source || source.kind !== 'circle') return null;
     const object = source.object;
     try {
-      const center = object.center || object.midpoint || object.__liaDgsCircleCenter || (Array.isArray(object.parents) ? object.parents[0] : null);
+      const center = object.__liaDgsCompassCenterPoint || object.center || object.midpoint ||
+        object.__liaDgsCircleCenter || (Array.isArray(object.parents) ? object.parents[0] : null);
       const x = Number(center && center.X ? center.X() : object.center && object.center.X());
       const y = Number(center && center.Y ? center.Y() : object.center && object.center.Y());
       let radius = NaN;
-      if (object.__liaDgsCircleRadiusPoint) {
+      if (object.__liaDgsCompassArc && object.__liaDgsCompassFixedRadius === true &&
+          Number.isFinite(Number(object.__liaDgsCompassFixedDx)) &&
+          Number.isFinite(Number(object.__liaDgsCompassFixedDy))) {
+        radius = Math.hypot(Number(object.__liaDgsCompassFixedDx), Number(object.__liaDgsCompassFixedDy));
+      } else if (object.__liaDgsCompassRadiusPoint) {
+        radius = Math.hypot(
+          Number(object.__liaDgsCompassRadiusPoint.X()) - x,
+          Number(object.__liaDgsCompassRadiusPoint.Y()) - y
+        );
+      } else if (object.__liaDgsCircleRadiusPoint) {
         radius = Math.hypot(
           Number(object.__liaDgsCircleRadiusPoint.X()) - x,
           Number(object.__liaDgsCircleRadiusPoint.Y()) - y
@@ -594,6 +622,182 @@ export function init(): void {
       }
       return [x, y, radius].every(Number.isFinite) && radius > 1e-12 ? { x, y, radius } : null;
     } catch (e) { return null; }
+  }
+
+  type EllipseData = { cx: number; cy: number; a: number; b: number; cos: number; sin: number };
+
+  function getEllipseData(source: AnalysisSource | null): EllipseData | null {
+    if (!source || source.kind !== 'ellipse') return null;
+    const object = source.object;
+    try {
+      const focus1 = object.__liaDgsEllipseFocus1;
+      const focus2 = object.__liaDgsEllipseFocus2;
+      const point = object.__liaDgsEllipsePoint;
+      const x1 = Number(focus1.X()); const y1 = Number(focus1.Y());
+      const x2 = Number(focus2.X()); const y2 = Number(focus2.Y());
+      const px = Number(point.X()); const py = Number(point.Y());
+      if (![x1, y1, x2, y2, px, py].every(Number.isFinite)) return null;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const focusDistance = Math.hypot(x2 - x1, y2 - y1);
+      const focalRadius = focusDistance / 2;
+      const a = (Math.hypot(px - x1, py - y1) + Math.hypot(px - x2, py - y2)) / 2;
+      if (a <= focalRadius + 1e-10) return null;
+      const b = Math.sqrt(Math.max(0, a * a - focalRadius * focalRadius));
+      if (b <= 1e-10) return null;
+      const angle = focusDistance > 1e-10
+        ? Math.atan2(y2 - y1, x2 - x1)
+        : Math.atan2(py - cy, px - cx);
+      return { cx, cy, a, b, cos: Math.cos(angle), sin: Math.sin(angle) };
+    } catch (e) { return null; }
+  }
+
+  function ellipsePoint(data: EllipseData, angle: number): AnalysisPosition {
+    const along = data.a * Math.cos(angle);
+    const across = data.b * Math.sin(angle);
+    return {
+      x: data.cx + along * data.cos - across * data.sin,
+      y: data.cy + along * data.sin + across * data.cos
+    };
+  }
+
+  function ellipseValue(data: EllipseData, x: number, y: number): number {
+    const dx = x - data.cx;
+    const dy = y - data.cy;
+    const along = dx * data.cos + dy * data.sin;
+    const across = -dx * data.sin + dy * data.cos;
+    return along * along / (data.a * data.a) + across * across / (data.b * data.b) - 1;
+  }
+
+  function lineEllipseIntersections(
+    line: { x: number; y: number; dx: number; dy: number },
+    ellipse: EllipseData
+  ): Array<{ x: number; y: number }> {
+    const ox = line.x - ellipse.cx;
+    const oy = line.y - ellipse.cy;
+    const u0 = ox * ellipse.cos + oy * ellipse.sin;
+    const v0 = -ox * ellipse.sin + oy * ellipse.cos;
+    const du = line.dx * ellipse.cos + line.dy * ellipse.sin;
+    const dv = -line.dx * ellipse.sin + line.dy * ellipse.cos;
+    const qa = du * du / (ellipse.a * ellipse.a) + dv * dv / (ellipse.b * ellipse.b);
+    const qb = 2 * (u0 * du / (ellipse.a * ellipse.a) + v0 * dv / (ellipse.b * ellipse.b));
+    const qc = u0 * u0 / (ellipse.a * ellipse.a) + v0 * v0 / (ellipse.b * ellipse.b) - 1;
+    if (qa <= 1e-14) return [];
+    const discriminant = qb * qb - 4 * qa * qc;
+    if (discriminant < -1e-10) return [];
+    const root = Math.sqrt(Math.max(0, discriminant));
+    const ratios = root <= 1e-10 ? [-qb / (2 * qa)] : [(-qb - root) / (2 * qa), (-qb + root) / (2 * qa)];
+    return ratios.map((ratio) => ({ x: line.x + ratio * line.dx, y: line.y + ratio * line.dy }));
+  }
+
+  function ellipseImplicitIntersections(
+    ellipse: EllipseData,
+    evaluate: (x: number, y: number) => number
+  ): AnalysisPosition[] {
+    const count = 1440;
+    const step = Math.PI * 2 / count;
+    const values = Array.from({ length: count + 1 }, (_, index) => {
+      const point = ellipsePoint(ellipse, index * step);
+      try { return Number(evaluate(point.x, point.y)); } catch (e) { return NaN; }
+    });
+    const angles: number[] = [];
+    const addAngle = (angle: number) => {
+      const full = Math.PI * 2;
+      const normalized = ((angle % full) + full) % full;
+      if (!angles.some((candidate) => {
+        const difference = Math.abs(candidate - normalized);
+        return Math.min(difference, full - difference) <= step * 0.2;
+      })) angles.push(normalized);
+    };
+    for (let index = 0; index < count; index += 1) {
+      const leftValue = values[index];
+      const rightValue = values[index + 1];
+      if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue)) continue;
+      if (Math.abs(leftValue) <= 1e-8) addAngle(index * step);
+      if (leftValue * rightValue < 0) {
+        let left = index * step;
+        let right = (index + 1) * step;
+        let fLeft = leftValue;
+        for (let iteration = 0; iteration < 55; iteration += 1) {
+          const middle = (left + right) / 2;
+          const point = ellipsePoint(ellipse, middle);
+          const fMiddle = Number(evaluate(point.x, point.y));
+          if (!Number.isFinite(fMiddle)) break;
+          if (Math.abs(fMiddle) <= 1e-10 || right - left <= 1e-11) {
+            left = middle; right = middle; break;
+          }
+          if (fLeft * fMiddle <= 0) right = middle;
+          else { left = middle; fLeft = fMiddle; }
+        }
+        addAngle((left + right) / 2);
+      }
+    }
+    for (let index = 1; index < count; index += 1) {
+      if (!Number.isFinite(values[index]) ||
+          Math.abs(values[index]) > Math.abs(values[index - 1]) ||
+          Math.abs(values[index]) > Math.abs(values[index + 1])) continue;
+      let left = (index - 1) * step;
+      let right = (index + 1) * step;
+      for (let iteration = 0; iteration < 44; iteration += 1) {
+        const first = left + (right - left) / 3;
+        const second = right - (right - left) / 3;
+        const firstPoint = ellipsePoint(ellipse, first);
+        const secondPoint = ellipsePoint(ellipse, second);
+        if (Math.abs(Number(evaluate(firstPoint.x, firstPoint.y))) <=
+            Math.abs(Number(evaluate(secondPoint.x, secondPoint.y)))) right = second;
+        else left = first;
+      }
+      const angle = (left + right) / 2;
+      const point = ellipsePoint(ellipse, angle);
+      if (Math.abs(Number(evaluate(point.x, point.y))) <= 1e-7) addAngle(angle);
+    }
+    return angles.map((angle) => ellipsePoint(ellipse, angle));
+  }
+
+  function normalizePositiveAngle(value: number): number {
+    const full = Math.PI * 2;
+    const normalized = Number(value) % full;
+    return normalized < 0 ? normalized + full : normalized;
+  }
+
+  function isPointOnCircularSource(source: AnalysisSource, x: number, y: number): boolean {
+    const object = source && source.object;
+    if (!object || !object.__liaDgsCompassArc) return true;
+    const circle = getCircleData(source);
+    if (!circle) return false;
+    const sweep = Number(object.__liaDgsCompassSweepAngle);
+    if (!Number.isFinite(sweep) || Math.abs(sweep) <= 1e-9) return false;
+    if (Math.abs(sweep) >= Math.PI * 2 - 1e-8) return true;
+    let endAngle = NaN;
+    const storedDx = Number(object.__liaDgsCompassFixedDx);
+    const storedDy = Number(object.__liaDgsCompassFixedDy);
+    if (object.__liaDgsCompassFixedRadius === true && Number.isFinite(storedDx) && Number.isFinite(storedDy)) {
+      endAngle = Math.atan2(storedDy, storedDx);
+    } else {
+      try {
+        endAngle = Math.atan2(
+          Number(object.__liaDgsCompassRadiusPoint.Y()) - circle.y,
+          Number(object.__liaDgsCompassRadiusPoint.X()) - circle.x
+        );
+      } catch (e) {}
+    }
+    if (!Number.isFinite(endAngle)) return false;
+    const startAngle = endAngle - sweep;
+    const angle = Math.atan2(y - circle.y, x - circle.x);
+    const tolerance = 1e-7;
+    return sweep > 0
+      ? normalizePositiveAngle(angle - startAngle) <= sweep + tolerance
+      : normalizePositiveAngle(startAngle - angle) <= -sweep + tolerance;
+  }
+
+  function getLinearRoots(source: AnalysisSource): AnalysisPosition[] {
+    const line = getLineData(source);
+    if (!line || Math.abs(line.dy) <= 1e-12) return [];
+    const ratio = -line.y / line.dy;
+    if (line.mode === 'ray' && ratio < -1e-8) return [];
+    if (line.mode === 'segment' && (ratio < -1e-8 || ratio > 1 + 1e-8)) return [];
+    const x = line.x + ratio * line.dx;
+    return Number.isFinite(x) ? [{ x, y: 0 }] : [];
   }
 
   function getOrdinateIntercept(board: any, source: AnalysisSource): AnalysisPosition[] {
@@ -633,6 +837,7 @@ export function init(): void {
       const other = first.kind === 'function' ? second : first;
       const otherLine = getLineData(other);
       const otherCircle = getCircleData(other);
+      const otherEllipse = getEllipseData(other);
       const difference = {
         Y: (x: number) => {
           const y = getSourceY(graph, x);
@@ -643,12 +848,14 @@ export function init(): void {
             return (x - otherCircle.x) * (x - otherCircle.x) +
               (y - otherCircle.y) * (y - otherCircle.y) - otherCircle.radius * otherCircle.radius;
           }
+          if (otherEllipse) return ellipseValue(otherEllipse, x, y);
           return NaN;
         }
       };
       getFunctionRoots(board, difference).forEach((x) => {
         const y = getSourceY(graph, x);
         if (otherLine && !isPointOnLinearSource(other, x, y)) return;
+        if (otherCircle && !isPointOnCircularSource(other, x, y)) return;
         add(x, y);
       });
       return positions.sort((a, b) => a.x - b.x || a.y - b.y);
@@ -658,6 +865,8 @@ export function init(): void {
     const secondLine = getLineData(second);
     const firstCircle = getCircleData(first);
     const secondCircle = getCircleData(second);
+    const firstEllipse = getEllipseData(first);
+    const secondEllipse = getEllipseData(second);
     if (firstLine && secondLine) {
       const determinant = firstLine.dx * secondLine.dy - firstLine.dy * secondLine.dx;
       if (Math.abs(determinant) <= 1e-12) return [];
@@ -673,6 +882,13 @@ export function init(): void {
     const lineSource = firstLine ? first : (secondLine ? second : null);
     const line = firstLine || secondLine;
     const circle = firstCircle || secondCircle;
+    const ellipse = firstEllipse || secondEllipse;
+    if (line && ellipse && lineSource) {
+      lineEllipseIntersections(line, ellipse).forEach((point) => {
+        if (isPointOnLinearSource(lineSource, point.x, point.y)) add(point.x, point.y);
+      });
+      return positions.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
     if (line && circle && lineSource) {
       const offsetX = line.x - circle.x;
       const offsetY = line.y - circle.y;
@@ -686,7 +902,8 @@ export function init(): void {
       ratios.forEach((ratio) => {
         const x = line.x + ratio * line.dx;
         const y = line.y + ratio * line.dy;
-        if (isPointOnLinearSource(lineSource, x, y)) add(x, y);
+        const circleSource = firstCircle ? first : second;
+        if (isPointOnLinearSource(lineSource, x, y) && isPointOnCircularSource(circleSource, x, y)) add(x, y);
       });
       return positions.sort((a, b) => a.x - b.x || a.y - b.y);
     }
@@ -705,8 +922,27 @@ export function init(): void {
       const baseY = firstCircle.y + along * dy / distance;
       const perpendicularX = -dy / distance;
       const perpendicularY = dx / distance;
-      add(baseX + height * perpendicularX, baseY + height * perpendicularY);
-      if (height > tolerance) add(baseX - height * perpendicularX, baseY - height * perpendicularY);
+      const addCircleIntersection = (x: number, y: number) => {
+        if (isPointOnCircularSource(first, x, y) && isPointOnCircularSource(second, x, y)) add(x, y);
+      };
+      addCircleIntersection(baseX + height * perpendicularX, baseY + height * perpendicularY);
+      if (height > tolerance) addCircleIntersection(baseX - height * perpendicularX, baseY - height * perpendicularY);
+      return positions.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
+    if (ellipse) {
+      const otherEllipse = firstEllipse && secondEllipse
+        ? (ellipse === firstEllipse ? secondEllipse : firstEllipse)
+        : null;
+      const otherCircle = firstEllipse ? secondCircle : firstCircle;
+      const evaluate = otherEllipse
+        ? (x: number, y: number) => ellipseValue(otherEllipse, x, y)
+        : (otherCircle
+          ? (x: number, y: number) => (x - otherCircle.x) * (x - otherCircle.x) +
+            (y - otherCircle.y) * (y - otherCircle.y) - otherCircle.radius * otherCircle.radius
+          : null);
+      if (evaluate) {
+        ellipseImplicitIntersections(ellipse, evaluate).forEach((point) => add(point.x, point.y));
+      }
     }
     return positions.sort((a, b) => a.x - b.x || a.y - b.y);
   }
@@ -722,6 +958,10 @@ export function init(): void {
     if (!entry) return;
     const first = entry.source && entry.source.object;
     const second = entry.source2 && entry.source2.object;
+    if (entry.kind === 'roots') {
+      if (first && first.__liaDgsRootConstruction === entry) delete first.__liaDgsRootConstruction;
+      return;
+    }
     if (entry.kind === 'ordinate-intercept') {
       if (first && first.__liaDgsYInterceptConstruction === entry) {
         delete first.__liaDgsYInterceptConstruction;
@@ -742,6 +982,10 @@ export function init(): void {
     entry.__liaDgsMacroManaged = true;
     entry.__liaDgsSource = first;
     entry.__liaDgsSource2 = second || null;
+    if (entry.kind === 'roots') {
+      first.__liaDgsRootConstruction = entry;
+      return;
+    }
     if (entry.kind === 'ordinate-intercept') {
       first.__liaDgsYInterceptConstruction = entry;
       return;
@@ -827,12 +1071,13 @@ export function init(): void {
     point.__liaPointVisual = { color: entry.color, opacity: 1, hasExplicitColor: entry.hasExplicitColor };
     point.__liaDgsMacroManaged = true;
     point.__liaDgsPointName = pointNameForIndex(entry, index);
-    point.__liaDgsRootPoint = false;
+    point.__liaDgsRootPoint = entry.kind === 'roots';
     point.__liaDgsExtremumPoint = false;
     point.__liaDgsInflectionPoint = false;
     point.__liaDgsYInterceptPoint = entry.kind === 'ordinate-intercept';
     point.__liaDgsIntersectionPoint = entry.kind === 'intersections';
     point.__liaDgsAnalysisConstruction = entry;
+    point.__liaDgsRootConstruction = entry.kind === 'roots' ? entry : undefined;
     point.__liaDgsYInterceptConstruction = entry.kind === 'ordinate-intercept' ? entry : undefined;
     point.__liaDgsIntersectionConstruction = entry.kind === 'intersections' ? entry : undefined;
     point.__liaDgsRootHolder = entry.holders[index];
@@ -883,6 +1128,7 @@ export function init(): void {
       point.__liaObjectAnalysisKind = entry.kind;
       point.__liaObjectAnalysisPointName = name;
       point.__liaDgsPointName = name;
+      point.__liaDgsRootPoint = entry.kind === 'roots';
       point.__liaDgsYInterceptPoint = entry.kind === 'ordinate-intercept';
       point.__liaDgsIntersectionPoint = entry.kind === 'intersections';
       point.__liaDgsShowName = pointNameVisible(entry, index);
@@ -959,7 +1205,8 @@ export function init(): void {
         }
         return false;
       }
-      if (entry.kind === 'ordinate-intercept' && source.kind !== 'function' && source.kind !== 'linear') {
+      if ((entry.kind === 'roots' && source.kind !== 'linear') ||
+          (entry.kind === 'ordinate-intercept' && source.kind !== 'function' && source.kind !== 'linear')) {
         detachEntryFromSources(entry);
         const changed = syncEntryPoints(entry, []);
         if (changed) {
@@ -975,7 +1222,7 @@ export function init(): void {
       attachEntryToSources(entry);
       const positions = entry.kind === 'intersections' && source2
         ? getIntersectionPositions(entry.board, source, source2)
-        : getOrdinateIntercept(entry.board, source);
+        : (entry.kind === 'roots' ? getLinearRoots(source) : getOrdinateIntercept(entry.board, source));
       const changed = syncEntryPoints(entry, positions);
       if (changed) {
         try { if (entry.board && typeof entry.board.update === 'function') entry.board.update(); } catch (e) {}
@@ -1028,6 +1275,7 @@ export function init(): void {
     const source = findSource(board, cfg.boardId, cfg.sourceName);
     const source2 = cfg.kind === 'intersections' ? findSource(board, cfg.boardId, cfg.source2Name) : null;
     if (!source || (cfg.kind === 'intersections' && !source2) ||
+        (cfg.kind === 'roots' && source.kind !== 'linear') ||
         (cfg.kind === 'ordinate-intercept' && source.kind !== 'function' && source.kind !== 'linear')) {
       removeEntry(uid);
       return false;

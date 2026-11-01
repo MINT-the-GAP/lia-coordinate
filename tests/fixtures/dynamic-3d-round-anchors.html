@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Round solid radius anchors and silhouettes</title>
+<style>body{margin:12px;background:#303030;color:#fff;font-family:Arial,sans-serif}.flex-child{width:1040px;min-width:0}.jxgbox{position:relative;overflow:hidden}</style></head>
+<body><main><section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="round-solid-anchors" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-4;zmax=5;width=1000;projection=parallel;camera=0.8/0.4/0"></lia-coordinate-board>
+<span id="point3d-spec-a" data-spec="raum;A;-2;-1;0;#ff00ff;1" hidden></span>
+<span id="point3d-spec-b" data-spec="raum;B;-2;1;0;#ff00ff;1" hidden></span>
+<span id="point3d-spec-c" data-spec="raum;C;-0.9;1.6;0;#ff00ff;1" hidden></span>
+<span id="point3d-spec-d" data-spec="raum;D;2;-1;0;#ff00ff;1" hidden></span>
+<span id="point3d-spec-e" data-spec="raum;E;2;1;0;#ff00ff;1" hidden></span>
+<span id="point3d-spec-f" data-spec="raum;F;3.3;1.8;0;#ff00ff;1" hidden></span>
+<span id="solid3d-spec-cylinder" data-definition="cylinder" data-spec="raum;Z;A;B;C;linecolor=#ff00ff;fillcolor=#ff00ff;opacity=0.18" hidden></span>
+<span id="solid3d-spec-cone" data-definition="cone" data-spec="raum;K;D;E;F;linecolor=#ff00ff;fillcolor=#ff00ff;opacity=0.18" hidden></span>
+<div id="dgs-ui-round-solid-anchors" data-spec="raum" data-language="de"></div>
+</section></main>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script>window.MathJax={chtml:{fontURL:"https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2"}};</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<300;i++){if(window.__boards?.raum&&window.__solid3DEntries?.['solid:cylinder']&&window.__solid3DEntries?.['solid:cone']&&__boards.raum.containerObj.querySelector('.lia-dgs-point-button'))return true;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('Round anchor fixture timeout: '+JSON.stringify(profileErrors));};
+window.anchorSolid=kind=>__solid3DEntries['solid:'+kind].object;
+window.anchorScreen=point=>{const b=__boards.raum,p=__coordinateViews3d.raum.view.project3DTo2D(point),r=b.containerObj.getBoundingClientRect();return [r.left+b.origin.scrCoords[1]+p[1]*b.unitX,r.top+b.origin.scrCoords[2]-p[2]*b.unitY];};
+window.anchorPointScreen=name=>{const p=__points.raum[name];return anchorScreen([p.X(),p.Y(),p.Z()]);};
+window.inspectAnchor=kind=>{const o=anchorSolid(kind),s=__coord.coordinateSolid3DData(o),p=__points.raum[kind==='cylinder'?'C':'F'],v=[p.X(),p.Y(),p.Z()],d=v.map((c,i)=>c-s.baseCenter[i]),axial=d.reduce((sum,c,i)=>sum+c*s.axis[i],0),radial=Math.sqrt(Math.max(0,d.reduce((sum,c)=>sum+c*c,0)-axial*axial));return {point:v,center:s.baseCenter,axis:s.axis,radius:s.radius,axial,radial,strokeWidth:Number.parseFloat(getComputedStyle(p.element2D.rendNode).strokeWidth)};};
+window.inspectTangents=kind=>{
+  const o=anchorSolid(kind),s=__coord.coordinateSolid3DData(o),sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],circle=t=>s.baseCenter.map((v,i)=>v+s.radius*(s.direction1[i]*Math.cos(t)+s.direction2[i]*Math.sin(t)));
+  const end=anchorScreen(kind==='cone'?s.apex:s.topCenter),ring=Array.from({length:360},(_,i)=>anchorScreen(circle(i*Math.PI/180)));
+  let endInsideBase=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){const [x,y]=ring[i],[px,py]=ring[j];if((y>end[1])!==(py>end[1])&&end[0]<(px-x)*(end[1]-y)/(py-y)+x)endInsideBase=!endInsideBase;}
+  const lines=o.__liaSolid3DGuideCurves.filter(g=>g.__liaSolid3DGuideRole.startsWith('silhouette')).map(g=>{
+    const node=g.element2D?.rendNode,style=node&&getComputedStyle(node),visible=!!style&&style.display!=='none'&&style.visibility==='visible';
+    const p=[g.X(0),g.Y(0),g.Z(0)],q=[g.X(1),g.Y(1),g.Z(1)];
+    if(!p.concat(q).every(Number.isFinite))return {visible,finite:false};
+    const radial=sub(p,s.baseCenter),tangent=cross(s.axis,radial),epsilon=1e-5;
+    const left=anchorScreen(p.map((v,i)=>v-epsilon*tangent[i])),right=anchorScreen(p.map((v,i)=>v+epsilon*tangent[i]));
+    const pp=anchorScreen(p),qp=anchorScreen(q),a=sub(qp,pp),b=sub(right,left),denominator=Math.hypot(...a)*Math.hypot(...b);
+    return {visible,finite:true,strokeWidth:Number.parseFloat(style.strokeWidth),base:p,end:q,tangentError:denominator>1e-8?Math.abs(a[0]*b[1]-a[1]*b[0])/denominator:0,radialError:Math.abs(Math.hypot(...radial)-s.radius),axial:radial.reduce((sum,v,i)=>sum+v*s.axis[i],0)};
+  });
+  return {kind,endInsideBase,lines};
+};
+</script></body></html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Coordinate Segment 5 lifecycle fixture</title>
+  <style>
+    body { margin: 12px; font-family: Arial, sans-serif; background: white; color: #222; }
+    .flex-child { width: 640px; min-width: 0; }
+    .jxgbox { position: relative; overflow: hidden; }
+  </style>
+</head>
+<body>
+<main id="fixture">
+  <section class="flex-child">
+    <lia-coordinate-board data-lia-coordinate-key="segment-5-lifecycle"
+      data-spec="id=raum;mode=3d;xmin=-4;xmax=4;ymin=-4;ymax=4;zmin=-3;zmax=5;width=580;projection=parallel;camera=0.9/0.45/0"></lia-coordinate-board>
+    <span id="point3d-spec-o" data-spec="raum;O;0;0;0;#d400d4;1;objectid=p-o"></span>
+    <span id="point3d-spec-a" data-spec="raum;A;0;0;3;#d400d4;1;objectid=p-a"></span>
+    <span id="solid3d-spec-cone" data-definition="cone" data-language="de" data-spec="raum;K;O;A;radius=1;fillcolor=#ffaa00;objectid=cone"></span>
+    <span id="transformation3d-spec-dilate" data-definition="dilate" data-language="de" data-spec="raum;K2;K;O;factor=2;linecolor=#2e7d32;objectid=tr-dilate"></span>
+  </section>
+</main>
+<script>
+  document.querySelectorAll('span[id^="point3d-spec-"], span[id^="solid3d-spec-"], span[id^="transformation3d-spec-"]').forEach(function(marker) { marker.style.display = 'none'; });
+  window.profileErrors = [];
+  window.addEventListener('error', function(event) { profileErrors.push(String(event.error && event.error.stack || event.message)); });
+  window.addEventListener('unhandledrejection', function(event) { profileErrors.push(String(event.reason)); });
+</script>
+<script>window.MathJax = { chtml: { fontURL: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2" } };</script>
+<script src="/assets/mathjax.js"></script>
+<script src="/assets/jsxgraph-template.js"></script>
+<script src="/bundle.js"></script>
+<script>
+  window.profileReady = async function() {
+    for (var i = 0; i < 800; i += 1) {
+      if (window.__solid3DEntries && window.__solid3DEntries['solid:cone'] &&
+          window.__transformation3DEntries && window.__transformation3DEntries.dilate) return true;
+      await new Promise(function(resolve) { setTimeout(resolve, 50); });
+    }
+    throw Error('Segment 5 lifecycle initialization timeout: ' + JSON.stringify(profileErrors));
+  };
+</script>
+</body>
+</html>

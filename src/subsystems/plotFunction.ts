@@ -4,6 +4,10 @@
 import { isHiddenNameOption, parseMacroName, splitTopLevel, unquote } from '../shared/parser';
 import { compileFunctionExpression } from '../shared/functionExpression';
 import { applyLineStyle, lineStyleAttributes, parseLineStyleOptions } from '../shared/lineStyle';
+import {
+  keepFunctionGraphLabelOnOneLine,
+  positionFunctionGraphLabel
+} from '../shared/functionGraphLabel';
 
 export function init(): void {
   if (window.__plotFunctionReady) {
@@ -37,6 +41,9 @@ export function init(): void {
     const visibilityOptions = options
       .map(visibilityOptionValue)
       .filter(function(value) { return value != null; });
+    const showExpression = options.some(function(option) {
+      return /^(?:expression|term|ausdruck)\s*=\s*(?:1|true)$/i.test(option);
+    });
 
     return {
       boardId: parts[0] ? unquote(parts[0]) : '',
@@ -45,7 +52,8 @@ export function init(): void {
       visible: visibilityOptions.length ? visibilityOptions[visibilityOptions.length - 1] : true,
       expr:    parts[2] ? decodeExprPlaceholders(unquote(parts[2])) : '',
       color:   parts[3] ? unquote(parts[3]) : 'red',
-      lineStyle: parseLineStyleOptions(options)
+      lineStyle: parseLineStyleOptions(options),
+      showExpression: showExpression
     };
   }
 
@@ -252,23 +260,6 @@ export function init(): void {
     }
   }
 
-  function safeBBox(board) {
-    try {
-      const bb = board.getBoundingBox();
-      if (
-        Array.isArray(bb) &&
-        bb.length === 4 &&
-        bb.every(v => Number.isFinite(v)) &&
-        bb[2] > bb[0] &&
-        bb[1] > bb[3]
-      ) {
-        return bb.slice();
-      }
-    } catch (e) {}
-
-    return [-5, 5, 5, -5];
-  }
-
   function texName(name) {
     const raw = String(name || '').trim();
     if (!raw) return '';
@@ -276,65 +267,25 @@ export function init(): void {
     return '\\(' + raw + '\\)';
   }
 
-  function chooseVisibleAnchorX(board, fn) {
-    const bb = safeBBox(board);
-    const xmin = bb[0];
-    const ymax = bb[1];
-    const xmax = bb[2];
-    const ymin = bb[3];
-
-    const xspan = xmax - xmin;
-    const yspan = ymax - ymin;
-
-    const xStart = xmax - 0.10 * xspan;
-    const xEnd   = xmin + 0.18 * xspan;
-
-    const yPadTop = 0.14 * yspan;
-    const yPadBottom = 0.12 * yspan;
-
-    const steps = 120;
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = xStart - t * (xStart - xEnd);
-
-      let y;
-      try {
-        y = fn(x);
-      } catch (e) {
-        y = NaN;
-      }
-
-      if (!Number.isFinite(y)) continue;
-      if (y <= ymax - yPadTop && y >= ymin + yPadBottom) return x;
-    }
-
-    return xmin + 0.60 * xspan;
-  }
-
   function createFunctionLabel(board, fn, name, color, visible) {
     const labelText = texName(name);
+    let label = null;
+    const placement = function() {
+      return positionFunctionGraphLabel(board, fn, {
+        label: label,
+        text: labelText,
+        fontSize: 28,
+        horizontalGapUser: 0.18,
+        verticalOffsetUser: 0.18
+      });
+    };
 
     const anchor = board.create('point', [
       function() {
-        return chooseVisibleAnchorX(board, fn);
+        return placement().x;
       },
       function() {
-        const x = chooseVisibleAnchorX(board, fn);
-        let y;
-
-        try {
-          y = fn(x);
-        } catch (e) {
-          y = NaN;
-        }
-
-        if (!Number.isFinite(y)) {
-          const bb = safeBBox(board);
-          return (bb[1] + bb[3]) / 2;
-        }
-
-        return y;
+        return placement().y;
       }
     ], {
       visible: false,
@@ -343,12 +294,12 @@ export function init(): void {
       name: ''
     });
 
-    const label = board.create('text', [
+    label = board.create('text', [
       function() {
-        return anchor.X() + 0.18;
+        return anchor.X();
       },
       function() {
-        return anchor.Y() + 0.18;
+        return anchor.Y();
       },
       function() {
         return labelText;
@@ -364,8 +315,10 @@ export function init(): void {
       fillColor: color,
       fontSize: 28,
       anchorX: 'left',
-      anchorY: 'top'
+      anchorY: 'middle',
+      cssStyle: 'white-space:nowrap;overflow:visible;'
     });
+    keepFunctionGraphLabelOnOneLine(label);
 
     return { anchor, label };
   }
@@ -393,7 +346,7 @@ export function init(): void {
     graph.__liaDgsFunctionExpression = cfg.expression;
     graph.__liaDgsFunctionNormalized = cfg.normalized;
     graph.__liaDgsShowName = cfg.showName !== false;
-    graph.__liaDgsShowExpression = false;
+    graph.__liaDgsShowExpression = cfg.showExpression === true;
     graph.__liaDgsShowObject = cfg.visible !== false;
     graph.__liaDgsOpacity = 1;
     graph.__liaDgsColor = cfg.color;
@@ -418,6 +371,7 @@ export function init(): void {
     const showName = cfg.showName !== false;
     const visible = cfg.visible !== false;
     const lineStyle = cfg.lineStyle || 'solid';
+    const showExpression = cfg.showExpression === true;
 
     if (!boardId || !expr) return false;
 
@@ -435,6 +389,7 @@ export function init(): void {
       old.boardId === boardId &&
       old.name === name &&
       old.showName === showName &&
+      old.showExpression === showExpression &&
       old.expr === expr &&
       old.color === color &&
       old.graph &&
@@ -455,6 +410,7 @@ export function init(): void {
         expression: expr,
         normalized: compiled.normalized,
         showName,
+        showExpression,
         visible,
         color,
         lineStyle,
@@ -495,6 +451,7 @@ export function init(): void {
         expression: expr,
         normalized: compiled.normalized,
         showName,
+        showExpression,
         visible,
         color,
         lineStyle,
@@ -506,6 +463,7 @@ export function init(): void {
         boardId: boardId,
         name: name,
         showName: showName,
+        showExpression: showExpression,
         visible: visible,
         expr: expr,
         normalized: compiled.normalized,

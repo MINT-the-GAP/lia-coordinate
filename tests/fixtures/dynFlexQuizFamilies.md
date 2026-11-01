@@ -3,7 +3,7 @@ author: lia-coordinate test suite
 language: de
 narrator: Deutsch Male
 import: ../../README.md
-import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
+import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb/README.md
 import: https://raw.githubusercontent.com/MINT-the-GAP/lia-timer/924ec0108780ea43e39519cabcaf4f3de8b7dee6/README.md
 import: https://raw.githubusercontent.com/MINT-the-GAP/lia-DynFlex/9ef8f05c0eae8b51e183efbfe34c5b38e41488c8/README.md
 -->
@@ -103,6 +103,20 @@ Mögliche Punkte sind $(0|-1)$, $(1|0)$ und $(2|1)$.
 [[?]] Bestimme Steigung und Achsenabschnitt.
 *****************
 Setze $m=2$ und $n=-1$.
+*****************
+
+</div>
+<div class="flex-child">
+
+## 3D-Konstruktion
+
+@CoordinateSystem(`xmin=-3;xmax=3;ymin=-3;ymax=3;zmin=-3;zmax=3;mode=3d;width=360;id=q_3d`)
+@DGS(`q_3d`)
+
+@Konstruktionsquiz3D(`q_3d;mode=result;view=3d;objects=[{"id":"A","kind":"point3d","point":[1,1,1]}]`,`<!-- data-solution-timer="1s" data-solution-timer-start="oncheck" data-solution-button="2" data-hint-button="1" data-solution-timer-badge="off" -->`)
+[[?]] Setze den Punkt bei $(1|1|1)$.
+*****************
+Der Zielpunkt ist $A(1|1|1)$.
 *****************
 
 </div>

@@ -103,12 +103,16 @@ try {
     const report = {
         browser: await send('Browser.getVersion'),
         runtime: 'LiaScript 0.16.10',
-        checks: ['All seven native LiaScript quiz families plus area and perimeter variants', 'Native incorrect Check, Hint, correct Check and Resolve', 'Native point creation buttons; JSXGraph point/polygon and Schar parameter geometry prepared explicitly', 'Point lock and unchanged hint geometry assertions'],
+        checks: ['All eight native LiaScript quiz families plus area and perimeter variants', 'Native incorrect Check, Hint, correct Check and Resolve', 'Native point creation buttons; JSXGraph point/polygon and Schar parameter geometry prepared explicitly', 'Point lock and unchanged hint geometry assertions'],
         bundleSha256: createHash('sha256').update(readFileSync(bundle)).digest('hex'),
         scenarios: []
     };
-    const ids = ['q_create', 'q_metric', 'q_construction', 'q_combined', 'q_graph', 'q_multi_graph', 'q_reconstruction', 'q_area'];
+    const ids = ['q_create', 'q_metric', 'q_construction', 'q_combined', 'q_graph', 'q_multi_graph', 'q_reconstruction', 'q_3d', 'q_area'];
     const snap = id => evaluate('quizFixture.snapshot(' + JSON.stringify(id) + ')');
+    const screenshot = async name => {
+        const capture = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+        writeFileSync(join(root, 'tests/browser', name), Buffer.from(capture.data, 'base64'));
+    };
     const click = async (expr) => { const p = await evaluate('quizFixture.center(' + expr + ')'); await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p[0], y: p[1], buttons: 0 }); const hit = await evaluate('(()=>{const e=' + expr + ',p=' + JSON.stringify(p) + ',h=e.getRootNode().elementFromPoint(...p);return{correct:e===h||e.contains(h),wanted:e.outerHTML,hit:h?.outerHTML}})()'); assert.ok(hit.correct, JSON.stringify(hit)); await press(p); await release(p); await delay(350); };
     const quizClick = (id, part) => click('quizFixture.quiz(quizFixture.byBoard(' + JSON.stringify(id) + ')).querySelector(' + JSON.stringify('.lia-quiz__' + part) + ')');
     const polygon = async (id, coords) => evaluate('(()=>{const b=window.__boards[' + JSON.stringify(id) + '],coords=' + JSON.stringify(coords) + ';window.quizPolygons=window.quizPolygons||{};let p=window.quizPolygons[' + JSON.stringify(id) + '];if(p){coords.forEach((c,i)=>p.vertices[i].moveTo(c));}else{const points=coords.map((c,i)=>b.create("point",c,{name:"V"+i,fixed:false}));p=b.create("polygon",points,{fillOpacity:.15});p.__liaDgsPolygon=true;window.quizPolygons[' + JSON.stringify(id) + ']=p;}b.update();})()');
@@ -119,6 +123,9 @@ try {
         }
         else if (id === 'q_reconstruction') {
             await evaluate('(()=>{const e=Object.values(window.__scharEntries).find(e=>e.boardId==="q_reconstruction");e.values.m=2;e.values.n=-1;e.board.update();})()');
+        }
+        else if (id === 'q_3d') {
+            await evaluate('(()=>{window.renderPoint3DFromSpec("quiz-learner-point","q_3d;A;1;1;1");const p=window.__points.q_3d.A;p.__liaDgsMacroManaged=false;p.__liaDgsMacroKey="";p.__liaDgsPersistentId="quiz-learner:A";p.board.update();})()');
         }
         else {
             const coords = id === 'q_metric' ? [[0, 0], [3, 0], [1.5, Math.sqrt(6.75)]] : id === 'q_construction' ? [[0, 0], [3, 0], [-3 * Math.cos(Math.PI / 12), 3 * Math.sin(Math.PI / 12)]] : [[0, 0], [3, 0], [3, 2], [0, 2]];
@@ -133,12 +140,18 @@ try {
         await quizClick(id, 'check');
         const wrong = await snap(id);
         assert.match(wrong.text, /Die richtige Antwort wurde noch nicht gegeben/, id + ' wrong check');
+        if (id === 'q_3d') {
+            assert.match(wrong.text, /Ein benötigtes Objekt fehlt\./, '3D feedback follows the German course language');
+            await screenshot('segment7-lia-quiz-active.png');
+        }
         await quizClick(id, 'hint');
         const hinted = await snap(id);
         assert.ok(hinted.hints?.length, id + ' native hint');
         assert.deepEqual(hinted.points, wrong.points, id + ' hint must not finalize points');
         assert.deepEqual(hinted.schars, wrong.schars, id + ' hint must not change controls');
         assert.deepEqual(hinted.polygons, wrong.polygons, id + ' hint must not change geometry');
+        if (id === 'q_3d')
+            await screenshot('segment7-lia-quiz-hint.png');
         await solve(id);
         const attempted = await snap(id);
         await quizClick(id, 'check');
@@ -174,6 +187,10 @@ try {
         assert.ok(resolved.solution?.length, id + ' native extended solution');
         assert.match(resolved.quizClass, /resolved/, id + ' native resolved state');
         assert.equal(resolved.buttons.find(b => b.class.includes('lia-quiz__check')).disabled, true);
+        if (id === 'q_3d') {
+            assert.doesNotMatch(resolved.text, /benötigtes Objekt fehlt|required object is missing/i, 'resolved solution hides stale 3D feedback');
+            await screenshot('segment7-lia-quiz-solution.png');
+        }
         if (['q_create', 'q_graph', 'q_multi_graph'].includes(id))
             assert.ok(resolved.points.length && resolved.points.every(p => p.fixed), id + ' resolve locks points');
         report.scenarios.find(s => s.id === id).resolve = { passed: true, beforeResolve, resolved };

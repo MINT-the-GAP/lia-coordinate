@@ -1,0 +1,33 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Spatial circles and click-built polygons</title>
+<style>body{margin:12px;background:#303030;color:white;font-family:Arial,sans-serif}.flex-child{width:1020px}.jxgbox{position:relative;overflow:hidden}</style></head><body>
+<section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="surface-draw" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-4;zmax=5;width=1000;camera=0.8/0.4/0"></lia-coordinate-board>
+<div id="dgs-ui-surface-draw" data-spec="raum" data-language="de"></div></section>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script>window.MathJax={chtml:{fontURL:"https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2"}};</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<240;i++){if(window.__coordinateViews3d?.raum&&__boards.raum.containerObj.querySelector('.lia-dgs-solid3d-button'))return true;await new Promise(r=>setTimeout(r,25));}throw Error('Init timeout '+JSON.stringify(profileErrors));};
+window.drawState=()=>{
+  const e=__coordinateViews3d.raum,b=e.board,c=b.containerObj,r=c.getBoundingClientRect();
+  const projected=point=>{const p=e.view.project3DTo2D(point),w=Number(p[0])||1,local=new DOMPoint(b.origin.scrCoords[1]+p[1]/w*b.unitX,b.origin.scrCoords[2]-p[2]/w*b.unitY),actual=local.matrixTransform(b.renderer.svgRoot.getScreenCTM());return[actual.x,actual.y];};
+  const inspect=o=>{
+    const proxy=o.curve?.element2D||o.element2D||o;
+    const circle=!!o.__liaCircle3D,d=circle?__coord.coordinateCircle3DData(o):__coord.coordinatePolygon3DData(o);
+    const node=o.element2D?.rendNode||o.curve?.element2D?.rendNode||o.rendNode,s=node&&getComputedStyle(node),q=node&&node.getBoundingClientRect();
+    const rawFill=node?.getAttribute('fill')||s?.fill||'',gradientId=rawFill.match(/#([^)'\" ]+)/)?.[1],stop=gradientId?document.getElementById(gradientId)?.querySelector('stop'):null;
+    const vertices=d?.vertices||[],anchor=circle?d?.center:vertices[0];
+    const borders=(circle?[]:o.element2D?.borders||o.borders||[]).map(edge=>{const n=edge.element2D?.rendNode||edge.rendNode;return n?{line:n.getAttribute('stroke'),width:parseFloat(n.getAttribute('stroke-width'))}:null;}).filter(Boolean);
+    const lengths=vertices.map((p,i)=>Math.hypot(...p.map((v,j)=>v-vertices[(i+1)%vertices.length][j])));
+    const opacity=Number(node?.getAttribute('fill-opacity')??s?.fillOpacity??0);
+    const radiusSource=o.__liaCircle3DSourcePoints?.[1],radiusPoint3d=radiusSource?[radiusSource.X(),radiusSource.Y(),radiusSource.Z()]:null;
+    return {kind:circle?'circle':'polygon',definition:o.__liaCircle3DDefinition,preview:!!(o.__liaDgsSurfaceDrawPreview||o.__liaDgsSolidDrawPreview),
+      advancedPlot:!!proxy.visProp?.doadvancedplot,sampleCount:Number(proxy.numberPoints)||proxy.dataX?.length||0,name:o.__liaDgsCircle3DName||o.__liaDgsPolygon3DName||'',area:circle?Math.PI*d?.radius*d?.radius:d?.area,radius:d?.radius,vertices,vertexScreens:vertices.map(projected),normal:d?.normal||d?.plane?.normal,
+      anchor:anchor&&projected(anchor),anchor3d:anchor,radiusPoint:radiusPoint3d&&projected(radiusPoint3d),radiusPoint3d,radiusPointConstrained:!!radiusSource?.__liaRoundRadiusPoint3DSync,edgeLengths:lengths,borders,line:borders[0]?.line||node?.getAttribute('stroke'),fill:stop?.getAttribute('stop-color')||stop?.style.stopColor||rawFill,opacity,
+      visible:!!(s&&s.display!=='none'&&s.visibility!=='hidden'&&q.width>2&&q.height>2&&q.right>r.left&&q.left<r.right&&q.bottom>r.top&&q.top<r.bottom),
+      pathLength:String(node?.getAttribute('d')||node?.getAttribute('points')||'').length};
+  };
+  const surfaces=[...e.circleObjects,...e.polygonObjects].map(inspect);
+  const history=Object.values(__liaRegressionStates||{}).find(s=>s.boardId==='raum');
+  return {surfaces,selectedVertices:b.__liaDgs3DHookState?.selectedRoundPoints?.length||0,counts:{points:e.points.size,nativePoints:Object.values(b.objects).filter(o=>o?.elType==='point3d').length,solids:e.solidObjects.size,circles:e.circleObjects.size,polygons:e.polygonObjects.size,lines:e.linearObjects.size},camera:{camera:{...e.camera},ranges:e.spatialRanges.map(v=>v.slice())},mode:e.viewMode,undoCount:history?.undoActions.length||0,errors:profileErrors.slice()};
+};
+</script></body></html>

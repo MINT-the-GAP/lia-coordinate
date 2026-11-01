@@ -70,7 +70,7 @@ export function initCoordinateBoardElement(): void {
       styleCoordinateHost(this);
       const spec = String(this.getAttribute('data-spec') || '');
       const config = parseCoordSpec(spec);
-      if (config.staticMode) {
+      if (config.staticMode && config.mode === '2d') {
         initializeCoordinateBoard(this, spec);
         return;
       }

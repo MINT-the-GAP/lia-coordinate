@@ -1,0 +1,23 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Drag regular solids</title>
+<style>body{margin:12px;background:#303030;color:white;font-family:Arial,sans-serif}.flex-child{width:1020px}.jxgbox{position:relative;overflow:hidden}</style></head><body>
+<section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="solid-draw" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-4;zmax=5;width=1000;camera=0.8/0.4/0"></lia-coordinate-board>
+<div id="dgs-ui-solid-draw" data-spec="raum" data-language="de"></div></section>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script>window.MathJax={chtml:{fontURL:"https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2"}};</script><script src="/assets/mathjax.js"></script><script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<240;i++){if(window.__coordinateViews3d?.raum&&__boards.raum.containerObj.querySelector('.lia-dgs-solid3d-button'))return true;await new Promise(r=>setTimeout(r,25));}throw Error('Init timeout '+JSON.stringify(profileErrors));};
+window.drawState=()=>{
+  const e=__coordinateViews3d.raum,b=e.board,c=b.containerObj,r=c.getBoundingClientRect();
+  const solids=[...e.solidObjects].map(o=>{
+    const d=__coord.coordinateSolid3DData(o),points=d?.vertices||[],edges=d?.edges||[],delta=(a,b)=>a.map((v,i)=>v-b[i]);
+    const lengths=edges.map(([a,z])=>Math.hypot(...delta(points[a],points[z])));
+    const incident=edges.filter(([a,z])=>a===0||z===0).map(([a,z])=>delta(points[a===0?z:a],points[0]));
+    const dots=[];for(let i=0;i<incident.length;i++)for(let j=i+1;j<incident.length;j++)dots.push(incident[i].reduce((s,v,k)=>s+v*incident[j][k],0)/(Math.hypot(...incident[i])*Math.hypot(...incident[j])));
+    const visible=(o.faces||[]).some(f=>{const node=f.element2D?.rendNode||f.rendNode;if(!node)return false;const s=getComputedStyle(node),q=node.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&q.width>2&&q.height>2&&q.right>r.left&&q.left<r.right&&q.bottom>r.top&&q.top<r.bottom;});
+    const projected=points[0]&&e.view.project3DTo2D(points[0]),local=projected?new DOMPoint(b.origin.scrCoords[1]+projected[1]*b.unitX,b.origin.scrCoords[2]-projected[2]*b.unitY):null,matrix=b.renderer.svgRoot.getScreenCTM(),actual=local&&local.matrixTransform(matrix),anchor=actual?[actual.x,actual.y]:null;return {kind:o.__liaSolid3DDefinition||d?.kind,preview:!!o.__liaDgsSolidDrawPreview,volume:d?.volume,vertices:points,anchor,edgeLengths:lengths,cornerDots:dots,visible};
+  });
+  const history=Object.values(__liaRegressionStates||{}).find(s=>s.boardId==='raum');
+  return {solids,counts:{points:e.points.size,solids:e.solidObjects.size,polygons:e.polygonObjects.size,lines:e.linearObjects.size},camera:{camera:{...e.camera},ranges:e.spatialRanges.map(v=>v.slice())},mode:e.viewMode,undoCount:history?.undoActions.length||0,errors:profileErrors.slice()};
+};
+</script></body></html>

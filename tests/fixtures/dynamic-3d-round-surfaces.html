@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Round solid surface regression</title>
+<style>body{margin:12px;background:#303030;color:#fff;font-family:Arial,sans-serif}.flex-child{width:1040px;min-width:0}.jxgbox{position:relative;overflow:hidden}</style></head>
+<body><main><section class="flex-child">
+<lia-coordinate-board data-lia-coordinate-key="round-solid-surfaces" data-spec="id=raum;mode=3d;xmin=-5;xmax=5;ymin=-5;ymax=5;zmin=-4;zmax=5;width=1000;projection=parallel;camera=0.8/0.4/0"></lia-coordinate-board>
+<div id="dgs-ui-round-solid-surfaces" data-spec="raum" data-language="de"></div>
+</section></main>
+<script>window.profileErrors=[];addEventListener('error',e=>profileErrors.push(String(e.error?.stack||e.message)));addEventListener('unhandledrejection',e=>profileErrors.push(String(e.reason)));</script>
+<script src="/assets/jsxgraph-template.js"></script><script src="/bundle.js"></script>
+<script>
+window.profileReady=async()=>{for(let i=0;i<240;i++){if(window.__boards?.raum&&window.__coordinateViews3d?.raum&&__boards.raum.containerObj.querySelector('.lia-dgs-point-button'))return true;await new Promise(resolve=>setTimeout(resolve,25));}throw Error('Round solid fixture timeout: '+JSON.stringify(profileErrors));};
+window.prepareRoundScene=()=>{
+  const b=__boards.raum,point=p=>__coord.createCoordinatePoint3D(b,p,{name:'',withLabel:false,visible:false,fixed:true});
+  const make=(definition,x,name)=>{
+    const p=point([x,0,-1]),q=point([x,0,2]);
+    const solid=__coord.createCoordinateSolid3D(b,definition,[p,q],[],undefined,1,{name,withLabel:true,strokeColor:'#ff00ff',highlightStrokeColor:'#ff00ff',fillColor:'#ff00ff',highlightFillColor:'#ff00ff',fillOpacity:.22,highlightFillOpacity:.22,strokeWidth:2,fixed:true});
+    Object.assign(solid,{__liaDgsSolid3D:true,__liaDgsSolid3DName:name,__liaDgsShowName:true,__liaDgsShowObject:true,__liaDgsFixed:true,__liaDgsLineColor:'#ff00ff',__liaDgsFillColor:'#ff00ff',__liaDgsTextColor:'#ff00ff',__liaDgsOpacity:.22,__liaDgsSegmentStrokeWidth:2,__liaDgsLineStyle:'solid'});
+    return solid;
+  };
+  window.roundProbe={cylinder:make('cylinder',-2,'Z'),cone:make('cone',2,'K'),camera:{azimuth:.8,elevation:.4,bank:0}};
+  b.fullUpdate();return true;
+};
+</script></body></html>

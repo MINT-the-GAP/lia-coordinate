@@ -2,12 +2,102 @@
 // Adds a menu button and a sliding top menu bar to a coordinate board.
 
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { DGS_3D_ADVANCED_TOOLS } from '../shared/dgs3dTools';
+import { mountDgsAxisDrag3D, type DgsAxisDrag3DController } from './dgsAxisDrag3d';
+import { mountDgsSolidDraw3D, type DgsSolidDraw3DController } from './dgsSolidDraw3d';
+import { createRegularSolid3DRecipe, type RegularSolid3DRecipe, type RegularSolid3DKind } from '../shared/regularSolid3d';
+import { createRegularSurface3DRecipe, type RegularSurface3DRecipe, type RegularSurface3DKind } from '../shared/regularSurface3d';
 import { eventTargetsBoardUi } from '../shared/boardUiEvents';
 import { setAttributeIfChanged, setStyleIfChanged } from '../shared/domUpdates';
+import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { getDgsUpdateTargets, trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { getAdaptiveTickMetric, runExternalBootstraps } from '../coord/boardHelpers';
+import {
+  coordinateLinear3DData,
+  coordinateCurve3DData,
+  coordinateLinear3DSourcePoints,
+  coordinatePlane3DData,
+  coordinateCircle3DData,
+  coordinateSphere3DData,
+  coordinatePolygon3DData,
+  coordinateSolid3DData,
+  coordinatePoint3DBindingParameters,
+  coordinateScreenDragDelta3D,
+  coordinateVector3DComponents,
+  clearCoordinatePoint3DConstraint,
+  constrainCoordinatePoint3D,
+  createCoordinateDependentCircle3D,
+  createCoordinateDependentLine3D,
+  createCoordinateDependentPoint3D,
+  createCoordinateCurve3D,
+  createCoordinateFreeVector3D,
+  createCoordinateLinear3D,
+  createCoordinatePlane3D,
+  createCoordinateCircle3D,
+  createCoordinateSphere3D,
+  createCoordinatePolygon3D,
+  createCoordinateDependentPolygon3D,
+  createCoordinateSolid3D,
+  createCoordinateDependentSolid3D,
+  createCoordinatePoint3D,
+  ensureCoordinateView3D,
+  getCoordinateView3D,
+  mountCoordinateView3DControls,
+  point3DCoordinates,
+  projectBoardCoordinatesToXYPlane,
+  setCoordinateCamera,
+  setCoordinateFreeVector3DComponents,
+  setCoordinatePoint3D,
+  setCoordinateProjection,
+  setCoordinateViewMode,
+  setCoordinateViewport3D
+} from '../coord/view3d';
 import { formatMacroName, splitTopLevel, unquote } from '../shared/parser';
+import { createCoordinateTransformedObject3D } from '../coord/transform3dObjects';
+import { createCoordinateAngle3D } from '../coord/angle3dObjects';
+import { vector3Components, vector3Norm } from '../shared/vector3d';
+import {
+  angleBetweenLinePlaneArc3,
+  angleBetweenLinesArc3,
+  angleBetweenPlanesArc3,
+  spatialAngleArcPoint3,
+  spatialAngleLabelPoint3,
+  type SpatialAngle3D,
+  type SpatialAngle3DDefinition
+} from '../shared/angle3d';
+import { intersectLinePlane3D, intersectLines3D, intersectPlanes3D } from '../shared/plane3d';
+import {
+  circleArea, circleCircumference, circleFromCenterNormalRadius,
+  intersectCircles3D, intersectLineCircle3D, intersectPlaneCircle3D,
+  type Circle3
+} from '../shared/circle3d';
+import {
+  intersectCircleSphere3D, intersectLineSphere3D, intersectPlaneSphere3D,
+  intersectSpheres3D, sphereSurfaceArea, sphereVolume
+} from '../shared/sphere3d';
+import type { Vector3 } from '../shared/vector3d';
+import { intersectLinePolygon3D, type Polygon3 } from '../shared/polygon3d';
+import {
+  createEvaluatedCurve3D,
+  curveContainedInPlane3D, intersectCurveLine3D, intersectCurvePlane3D,
+  intersectCurvePolygon3D, intersectCurveSphere3D
+} from '../shared/curve3d';
+import {
+  intersectLineCone3D, intersectLineCylinder3D, intersectLinePolyhedron3D,
+  intersectPlanePolyhedron3D, type Solid3
+} from '../shared/solid3d';
+import {
+  axisRotationTransform3D, dilationTransform3D, lineReflectionTransform3D,
+  planeReflectionTransform3D, pointReflectionTransform3D, translationTransform3D,
+  type SimilarityTransform3D
+} from '../shared/transform3d';
+import type { Solid3DDefinition, Transformation3DDefinition } from '../shared/scene3d';
 import { getAccentColor, getNeutralColor, initThemeSync } from '../shared/theme';
+import {
+  keepFunctionGraphLabelOnOneLine,
+  positionFunctionGraphLabel
+} from '../shared/functionGraphLabel';
+import { positionAngleLabel } from '../shared/angleLabelPosition';
 import {
   applySafeRenderedLayer,
   getMacroLayerRenderRole,
@@ -25,7 +115,8 @@ import {
   prepareFunctionInput,
   transformLatex
 } from '../shared/functionExpression';
-import { resolveRegressionDgsController } from '../shared/dgsRegressionProfile';
+import { buildImplicitAnalysisDgsSpec, resolveRegressionDgsController } from '../shared/dgsRegressionProfile';
+import { formatScharInitialValues, getScharExportDefinition } from '../shared/scharExport';
 import { applyLineStyle } from '../shared/lineStyle';
 import {
   screenToUserCoordinates,
@@ -48,10 +139,35 @@ const DGS_TOOL_IDS = {
   parallel: 420,
   midpoint: 430,
   angleBisector: 440,
-  polygon: 510,
+  reflectLine: 450,
+  reflectPoint: 460,
+  rotatePoint: 470,
+  dilatePoint: 480,
+  translate3D: 481,
+  reflectPoint3D: 482,
+  reflectLine3D: 483,
+  reflectPlane3D: 484,
+  rotateAxis3D: 485,
+  dilate3D: 486,  polygon: 510,
   circle: 520,
   sector: 530,
-  angle: 610,
+  ellipse: 540,
+  planeThreePoints: 550,
+  planePointNormal: 560,
+  planePointVectors: 570,
+  circle3DThreePoints: 580,
+  circle3DCenterNormalPoint: 590,
+  sphere3DCenterPoint: 600,
+  sphere3DFourPoints: 630,
+  sphere3DCenterRadius: 640,
+  polygon3D: 650,
+  tetrahedron3D: 651,
+  pyramid3D: 652,
+  prism3D: 653,
+  parallelepiped3D: 654,
+  cuboid3D: 655,
+  cylinder3D: 656,
+  cone3D: 657,  angle: 610,
   measuredAngle: 620,
   function: 700,
   roots: 810,
@@ -74,7 +190,8 @@ type DgsToolId = typeof DGS_TOOL_IDS[keyof typeof DGS_TOOL_IDS];
 // These are immutable capability identifiers, not visual positions. New tools
 // may be placed anywhere in the UI, but existing ids must never be changed or
 // reused. This keeps old restricted exports stable when the toolbar grows.
-const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
+const DGS_KNOWN_TOOL_IDS: number[] = [
+  ...DGS_3D_ADVANCED_TOOLS.map(tool => tool.id),
   DGS_TOOL_IDS.formatCopy,
   DGS_TOOL_IDS.setSquare,
   DGS_TOOL_IDS.compass,
@@ -88,10 +205,35 @@ const DGS_KNOWN_TOOL_IDS: DgsToolId[] = [
   DGS_TOOL_IDS.parallel,
   DGS_TOOL_IDS.midpoint,
   DGS_TOOL_IDS.angleBisector,
-  DGS_TOOL_IDS.polygon,
+  DGS_TOOL_IDS.reflectLine,
+  DGS_TOOL_IDS.reflectPoint,
+  DGS_TOOL_IDS.rotatePoint,
+  DGS_TOOL_IDS.dilatePoint,
+  DGS_TOOL_IDS.translate3D,
+  DGS_TOOL_IDS.reflectPoint3D,
+  DGS_TOOL_IDS.reflectLine3D,
+  DGS_TOOL_IDS.reflectPlane3D,
+  DGS_TOOL_IDS.rotateAxis3D,
+  DGS_TOOL_IDS.dilate3D,  DGS_TOOL_IDS.polygon,
   DGS_TOOL_IDS.circle,
   DGS_TOOL_IDS.sector,
-  DGS_TOOL_IDS.angle,
+  DGS_TOOL_IDS.ellipse,
+  DGS_TOOL_IDS.planeThreePoints,
+  DGS_TOOL_IDS.planePointNormal,
+  DGS_TOOL_IDS.planePointVectors,
+  DGS_TOOL_IDS.circle3DThreePoints,
+  DGS_TOOL_IDS.circle3DCenterNormalPoint,
+  DGS_TOOL_IDS.sphere3DCenterPoint,
+  DGS_TOOL_IDS.sphere3DFourPoints,
+  DGS_TOOL_IDS.sphere3DCenterRadius,
+  DGS_TOOL_IDS.polygon3D,
+  DGS_TOOL_IDS.tetrahedron3D,
+  DGS_TOOL_IDS.pyramid3D,
+  DGS_TOOL_IDS.prism3D,
+  DGS_TOOL_IDS.parallelepiped3D,
+  DGS_TOOL_IDS.cuboid3D,
+  DGS_TOOL_IDS.cylinder3D,
+  DGS_TOOL_IDS.cone3D,  DGS_TOOL_IDS.angle,
   DGS_TOOL_IDS.measuredAngle,
   DGS_TOOL_IDS.function,
   DGS_TOOL_IDS.roots,
@@ -117,12 +259,19 @@ const DGS_ALWAYS_AVAILABLE_TOOL_IDS = new Set<number>([
   DGS_TOOL_IDS.setSquare,
   DGS_TOOL_IDS.compass
 ]);
-const DGS_EXPORT_SELECTABLE_TOOL_IDS: DgsToolId[] = DGS_KNOWN_TOOL_IDS.filter(
-  (toolId) => !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId)
+const DGS_LOCAL_ONLY_TOOL_IDS = new Set<number>(
+  DGS_3D_ADVANCED_TOOLS.map(tool => tool.id)
+);
+const DGS_EXPORT_SELECTABLE_TOOL_IDS: number[] = DGS_KNOWN_TOOL_IDS.filter(
+  (toolId) => !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId) &&
+    !DGS_LOCAL_ONLY_TOOL_IDS.has(toolId)
 );
 
 function dgsExportSelectableToolIds(toolIds: Iterable<number>): number[] {
-  return Array.from(toolIds).filter((toolId) => !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId));
+  return Array.from(toolIds).filter((toolId) =>
+    !DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId) &&
+    !DGS_LOCAL_ONLY_TOOL_IDS.has(toolId)
+  );
 }
 
 const DGS_RESTRICTION_IDS = {
@@ -144,12 +293,20 @@ const DGS_KNOWN_RESTRICTION_IDS: DgsRestrictionId[] = [
   DGS_RESTRICTION_IDS.exportLocked
 ];
 
+type DgsSceneModePolicy = 'switchable' | '2d' | '3d';
+
 type DgsMacroConfig = {
   boardId: string;
   toolIds: Set<number> | null;
   toolSelectionKey: string;
   restrictionIds: Set<number>;
   restrictionSelectionKey: string;
+  zoomMode: 'both' | 'vertical' | 'horizontal' | null;
+  axisScaleMode: DgsAxisScaleMode | null;
+  setSquarePose: DgsSetSquareStoredPose | null;
+  compassMode: 'free' | 'fixed' | null;
+  compassRadius: number | null;
+  sceneModePolicy: DgsSceneModePolicy;
 };
 
 function canonicalDgsToolIds(ids: Iterable<number>): number[] {
@@ -192,13 +349,28 @@ function parseDgsMacroSpec(spec: string): DgsMacroConfig {
   const boardId = unquote(String(parts[0] || '').trim());
   let rawTools: string | null = null;
   let rawRestrictions: string | null = null;
+  let rawZoomMode: string | null = null;
+  let rawAxisScaleMode: string | null = null;
+  let rawSetSquarePose: string | null = null;
+  let rawCompassState: string | null = null;
+  let rawSceneModePolicy: string | null = null;
 
   parts.slice(1).forEach((part) => {
     const value = String(part || '').trim();
     const toolsMatch = value.match(/^tools\s*=\s*([\s\S]*)$/i);
     const restrictionsMatch = value.match(/^restrictions\s*=\s*([\s\S]*)$/i);
+    const zoomMatch = value.match(/^zoom\s*=\s*([\s\S]*)$/i);
+    const axisScaleMatch = value.match(/^(?:axisscale|achsenskalierung)\s*=\s*([\s\S]*)$/i);
+    const setSquareMatch = value.match(/^(?:setsquare|geodreieck)\s*=\s*([\s\S]*)$/i);
+    const compassMatch = value.match(/^(?:compass|zirkel)\s*=\s*([\s\S]*)$/i);
+    const sceneModeMatch = value.match(/^(?:viewmode|ansichtsmodus|scenemode)\s*=\s*([\s\S]*)$/i);
     if (toolsMatch) rawTools = unquote(String(toolsMatch[1] || '').trim());
     if (restrictionsMatch) rawRestrictions = unquote(String(restrictionsMatch[1] || '').trim());
+    if (zoomMatch) rawZoomMode = unquote(String(zoomMatch[1] || '').trim());
+    if (axisScaleMatch) rawAxisScaleMode = unquote(String(axisScaleMatch[1] || '').trim());
+    if (setSquareMatch) rawSetSquarePose = unquote(String(setSquareMatch[1] || '').trim());
+    if (compassMatch) rawCompassState = unquote(String(compassMatch[1] || '').trim());
+    if (sceneModeMatch) rawSceneModePolicy = unquote(String(sceneModeMatch[1] || '').trim());
   });
 
   // Legacy macros, empty lists and malformed lists intentionally mean the
@@ -215,12 +387,51 @@ function parseDgsMacroSpec(spec: string): DgsMacroConfig {
   if (restrictionIds.has(DGS_RESTRICTION_IDS.objectPropertiesLocked)) {
     restrictionIds.delete(DGS_RESTRICTION_IDS.objectPropertiesColorsTraceOnly);
   }
+  const zoomMode = rawZoomMode && /^(?:both|vertical|horizontal)$/i.test(rawZoomMode)
+    ? normalizeDgsZoomMode(rawZoomMode.toLowerCase())
+    : null;
+  const axisScaleMode = rawAxisScaleMode && /^(?:cartesian|log-x|log-y|log-log)$/i.test(rawAxisScaleMode)
+    ? normalizeDgsAxisScaleMode(rawAxisScaleMode.toLowerCase())
+    : null;
+  let setSquarePose: DgsSetSquareStoredPose | null = null;
+  if (rawSetSquarePose) {
+    const body = rawSetSquarePose.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+    const values = body.split(',').map((value) => Number(String(value || '').trim()));
+    if (values.length >= 6 && values.every(Number.isFinite)) {
+      setSquarePose = {
+        visible: values[0] !== 0,
+        initialized: values[1] !== 0,
+        pivotXRatio: Math.max(0, Math.min(1, values[2])),
+        pivotYRatio: Math.max(0, Math.min(1, values[3])),
+        angle: normalizeDgsSetSquareAngle(values[4]),
+        scale: normalizeDgsSetSquareScale(values[5])
+      };
+    }
+  }
+  let compassMode: 'free' | 'fixed' | null = null;
+  let compassRadius: number | null = null;
+  if (rawCompassState) {
+    const values = rawCompassState.replace(/^\s*\[/, '').replace(/\]\s*$/, '').split(',');
+    const mode = String(values[0] || '').trim().toLowerCase();
+    const radius = Number(String(values[1] || '').trim());
+    if (mode === 'free' || mode === 'fixed') compassMode = mode;
+    if (Number.isFinite(radius) && radius > 0) compassRadius = radius;
+  }
+  const sceneModePolicy: DgsSceneModePolicy = rawSceneModePolicy && /^(?:2d|3d)$/i.test(rawSceneModePolicy)
+    ? rawSceneModePolicy.toLowerCase() as DgsSceneModePolicy
+    : 'switchable';
   return {
     boardId,
     toolIds,
     toolSelectionKey: dgsToolSelectionKey(toolIds),
     restrictionIds,
-    restrictionSelectionKey: dgsRestrictionSelectionKey(restrictionIds)
+    restrictionSelectionKey: dgsRestrictionSelectionKey(restrictionIds),
+    zoomMode,
+    axisScaleMode,
+    setSquarePose,
+    compassMode,
+    compassRadius,
+    sceneModePolicy
   };
 }
 
@@ -263,10 +474,13 @@ type DgsState = {
   exportDialogTitle: HTMLDivElement;
   exportToolsStep: HTMLDivElement;
   exportMacroStep: HTMLDivElement;
-  exportToolButtons: Map<number, HTMLButtonElement>;
+  exportToolButtons: Map<number, HTMLButtonElement[]>;
   exportSelectedToolIds: Set<number>;
   exportRestrictionInputs: Map<number, HTMLInputElement>;
   exportSelectedRestrictionIds: Set<number>;
+  exportSceneModeInputs: Map<DgsSceneModePolicy, HTMLInputElement>;
+  exportSceneModePolicy: DgsSceneModePolicy;
+  sceneModePolicy: DgsSceneModePolicy;
   exportDialogStep: 'tools' | 'macro';
   exportTextarea: HTMLTextAreaElement;
   exportCopyButton: HTMLButtonElement;
@@ -277,6 +491,15 @@ type DgsState = {
   coordinateSection: HTMLDivElement;
   xCoordinateInput: HTMLInputElement;
   yCoordinateInput: HTMLInputElement;
+  zCoordinateInput: HTMLInputElement;
+  vectorComponentsSection: HTMLDivElement;
+  vectorXInput: HTMLInputElement;
+  vectorYInput: HTMLInputElement;
+  vectorZInput: HTMLInputElement;
+  roundGeometrySection: HTMLDivElement;
+  roundCenterValue: HTMLSpanElement;
+  roundSourceValue: HTMLSpanElement;
+  roundRadiusInput: HTMLInputElement;
   angleMeasureSection: HTMLDivElement;
   angleMeasureInput: HTMLInputElement;
   arcSettingsSection: HTMLDivElement;
@@ -284,6 +507,8 @@ type DgsState = {
   arcEntryAngleInput: HTMLInputElement;
   strokeStyleSection: HTMLDivElement;
   lineStyleSelect: HTMLSelectElement;
+  planeEquationField: HTMLLabelElement;
+  planeEquationSelect: HTMLSelectElement;
   strokeDesignField: HTMLLabelElement;
   strokeDesignSelect: HTMLSelectElement;
   strokeWidthField: HTMLLabelElement;
@@ -298,14 +523,28 @@ type DgsState = {
   sliderMinInput: HTMLInputElement;
   sliderMaxInput: HTMLInputElement;
   sliderStepInput: HTMLInputElement;
+  sliderAnimationSpeedRow: HTMLLabelElement;
+  sliderAnimationSpeedInput: HTMLInputElement;
+  sliderAnimationSpeedValue: HTMLSpanElement;
+  sliderAnimationControlOption: HTMLLabelElement;
+  sliderAnimationControlCheckbox: HTMLInputElement;
+  sliderAnimationControlCheckboxText: HTMLSpanElement;
   axisLabelSection: HTMLDivElement;
   axisVariableInput: HTMLInputElement;
   axisDescriptionInput: HTMLInputElement;
   fixedOption: HTMLLabelElement;
   fixedCheckbox: HTMLInputElement;
   fixedCheckboxText: HTMLSpanElement;
+  bindingOption: HTMLLabelElement;
+  bindingCheckbox: HTMLInputElement;
+  bindingCheckboxText: HTMLSpanElement;
   traceOption: HTMLLabelElement;
   traceCheckbox: HTMLInputElement;
+  locusOption: HTMLLabelElement;
+  locusCheckbox: HTMLInputElement;
+  locusCheckboxText: HTMLSpanElement;
+  locusSettingsSection: HTMLDivElement;
+  locusSamplesInput: HTMLInputElement;
   nameCheckbox: HTMLInputElement;
   objectCheckbox: HTMLInputElement;
   objectCheckboxText: HTMLSpanElement;
@@ -314,8 +553,10 @@ type DgsState = {
   measurementCheckboxText: HTMLSpanElement;
   areaOption: HTMLLabelElement;
   areaCheckbox: HTMLInputElement;
+  areaCheckboxText: HTMLSpanElement;
   perimeterOption: HTMLLabelElement;
   perimeterCheckbox: HTMLInputElement;
+  perimeterCheckboxText: HTMLSpanElement;
   colorButton: HTMLButtonElement;
   lineColorButton: HTMLButtonElement;
   traceColorButton: HTMLButtonElement;
@@ -343,6 +584,10 @@ type DgsState = {
   colorSaturation: number;
   colorValue: number;
   selectButton: HTMLButtonElement;
+  constructionColorButton: HTMLButtonElement;
+  constructionColorMenu: HTMLDivElement;
+  constructionColorMenuOpen: boolean;
+  construction3DColor: string;
   setSquareButton: HTMLButtonElement;
   setSquareOverlay: HTMLDivElement;
   setSquareVisible: boolean;
@@ -381,7 +626,13 @@ type DgsState = {
   compassRadiusDialogCancelButton: HTMLButtonElement;
   formatButton: HTMLButtonElement;
   toolsDivider: HTMLSpanElement;
+  shapeDivider: HTMLSpanElement;
+  angleIntersectionDivider: HTMLSpanElement;
+  sceneModeDivider: HTMLSpanElement;
   pointButton: HTMLButtonElement;
+  pointSubmenu: HTMLDivElement;
+  pointToolButton: HTMLButtonElement;
+  pointCoordinatesToolButton: HTMLButtonElement;
   segmentButton: HTMLButtonElement;
   orthogonalButton: HTMLButtonElement;
   relationSubmenu: HTMLDivElement;
@@ -389,13 +640,23 @@ type DgsState = {
   parallelToolButton: HTMLButtonElement;
   midpointToolButton: HTMLButtonElement;
   angleBisectorToolButton: HTMLButtonElement;
+  reflectLineToolButton: HTMLButtonElement;
+  reflectPointToolButton: HTMLButtonElement;
+  rotatePointToolButton: HTMLButtonElement;
+  dilatePointToolButton: HTMLButtonElement;
   polygonButton: HTMLButtonElement;
+  round2DButton: HTMLButtonElement;
+  plane3DButton: HTMLButtonElement;
+  round3DButton: HTMLButtonElement;
+  solid3DButton: HTMLButtonElement;
   angleButton: HTMLButtonElement;
   angleSubmenu: HTMLDivElement;
   angleToolButton: HTMLButtonElement;
   measuredAngleToolButton: HTMLButtonElement;
   angleDialog: HTMLDivElement;
+  angleDialogTitle: HTMLDivElement;
   angleDialogInput: HTMLInputElement;
+  angleDialogUnit: HTMLSpanElement;
   angleDialogConfirmButton: HTMLButtonElement;
   angleDialogCancelButton: HTMLButtonElement;
   arcDialog: HTMLDivElement;
@@ -403,16 +664,37 @@ type DgsState = {
   arcDialogEntryInput: HTMLInputElement;
   arcDialogConfirmButton: HTMLButtonElement;
   arcDialogCancelButton: HTMLButtonElement;
+  equationDialog: HTMLDivElement;
+  equationDialogTitle: HTMLDivElement;
+  equationDialogFormSwitch: HTMLDivElement;
+  equationDialogFields: HTMLDivElement;
+  equationDialogInputs: Record<string, HTMLInputElement>;
+  equationDialogConfirmButton: HTMLButtonElement;
+  equationDialogCancelButton: HTMLButtonElement;
   geometrySubmenu: HTMLDivElement;
   segmentToolButton: HTMLButtonElement;
   rayToolButton: HTMLButtonElement;
   lineToolButton: HTMLButtonElement;
+  lineEquationToolButton: HTMLButtonElement;
   vectorToolButton: HTMLButtonElement;
   arcToolButton: HTMLButtonElement;
+  planeThreePointsToolButton: HTMLButtonElement;
+  planePointNormalToolButton: HTMLButtonElement;
+  planePointVectorsToolButton: HTMLButtonElement;
+  planeEquationToolButton: HTMLButtonElement;
+  circle3DThreePointsToolButton: HTMLButtonElement;
+  circle3DCenterNormalPointToolButton: HTMLButtonElement;
+  sphere3DCenterPointToolButton: HTMLButtonElement;
+  sphere3DFourPointsToolButton: HTMLButtonElement;
+  sphere3DCenterRadiusToolButton: HTMLButtonElement;
+  spatialBodyToolButtons: Array<{ button: HTMLButtonElement; id: number; tool: DgsState['activeTool']; icon: string; group: 'surface' | 'prism' | 'pointed' }>;
+  spatialTransformToolButtons: Array<{ button: HTMLButtonElement; id: number; tool: DgsState['activeTool']; icon: string }>;
   shapeSubmenu: HTMLDivElement;
+  shapeSubmenuAnchor: HTMLButtonElement;
   polygonToolButton: HTMLButtonElement;
   circleToolButton: HTMLButtonElement;
   sectorToolButton: HTMLButtonElement;
+  ellipseToolButton: HTMLButtonElement;
   functionDivider: HTMLSpanElement;
   functionButton: HTMLButtonElement;
   rootButton: HTMLButtonElement;
@@ -457,6 +739,7 @@ type DgsState = {
   axisSyncing: boolean;
   open: boolean;
   compassSubmenuOpen: boolean;
+  pointSubmenuOpen: boolean;
   geometrySubmenuOpen: boolean;
   relationSubmenuOpen: boolean;
   shapeSubmenuOpen: boolean;
@@ -466,6 +749,9 @@ type DgsState = {
   angleDialogOpen: boolean;
   compassRadiusDialogOpen: boolean;
   arcDialogOpen: boolean;
+  equationDialogOpen: boolean;
+  equationDialogKind: 'point' | 'line' | 'plane' | null;
+  equationDialogPlaneForm: 'parameter' | 'normal' | 'coordinate';
   functionDialogOpen: boolean;
   textDialogOpen: boolean;
   exportDialogOpen: boolean;
@@ -488,12 +774,19 @@ type DgsState = {
   fullscreenRenderWidth: number;
   fullscreenRenderHeight: number;
   contextObject: any | null;
-  activeTool: '' | 'compass' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
+  pendingPointBindingPoint: any | null;
+  pendingLocusTarget: any | null;
+  activeTool: '' | 'compass' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'reflect-line' | 'reflect-point' | 'rotate-point' | 'dilate-point' | 'polygon' | 'circle' | 'sector' | 'ellipse' | 'plane-three-points' | 'plane-point-normal' | 'plane-point-vectors' | 'circle3d-three-points' | 'circle3d-center-normal-point' | 'sphere3d-center-point' | 'sphere3d-four-points' | 'sphere3d-center-radius' | 'polygon3d' | 'tetrahedron3d' | 'pyramid3d' | 'prism3d' | 'parallelepiped3d' | 'cuboid3d' | 'cylinder3d' | 'cone3d' | 'translate3d' | 'reflect-point3d' | 'reflect-line3d' | 'reflect-plane3d' | 'rotate-axis3d' | 'dilate3d' | 'angle' | 'angle3d' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text';
   externalToolActive: boolean;
   pendingTextPosition: { x: number; y: number } | null;
   zoomMode: 'both' | 'vertical' | 'horizontal';
   axisScaleMode: DgsAxisScaleMode;
   selectedSegmentPoint: any | null;
+  pendingLinearCreatedPoints: any[];
+  selectedPlanePoints: any[];
+  selectedPlaneVectors: any[];
+  selectedRoundPoints: any[];
+  selectedRoundVectors: any[];
   selectedCompassCenter: any | null;
   selectedCompassPoint: any | null;
   compassPreview: any | null;
@@ -510,12 +803,33 @@ type DgsState = {
   selectedRelationPoint: any | null;
   selectedMidpointPoint: any | null;
   selectedBisectorPoints: any[];
+  selectedTransformObject: any | null;
+  selectedTransformReference: any | null;
   selectedPolygonPoints: any[];
   selectedAnglePoints: any[];
+  selectedAngle3DObjects: any[];
   selectedCircleCenter: any | null;
   selectedSectorPoints: any[];
+  selectedEllipsePoints: any[];
   selectedIntersectionObject: any | null;
   selectedFormatSource: any | null;
+  multiSelectedObjects: any[];
+  axisDrag3D?: DgsAxisDrag3DController;
+  solidDraw3D?: DgsSolidDraw3DController;
+  axisDragStarts?: Array<{
+    target: any; x: number; y: number; z: number | null;
+    sourceDelta: (delta: Vector3) => Vector3;
+  }>;
+  multiSelectPointerId: number | null;
+  multiSelectDragObject: any | null;
+  multiSelectDragWasSelected: boolean;
+  multiSelectMoved: boolean;
+  multiSelectStartClientX: number;
+  multiSelectStartClientY: number;
+  multiSelectStartUserX: number;
+  multiSelectStartUserY: number;
+  multiSelectSpatialAnchor: Vector3 | null;
+  multiSelectPointStarts: Array<{ target: any; x: number; y: number; z: number | null }>;
   circlePreview: any | null;
   circlePreviewPosition: { x: number; y: number } | null;
   restoring: boolean;
@@ -530,13 +844,20 @@ type DgsState = {
   fixedCompassSyncing?: boolean;
   fixedCompassPersistPending?: boolean;
   fixedCompassPersistHistory?: boolean;
+  sliderAnimationSliders: Set<any>;
+  locusUpdateTimer?: number;
+  locusUpdating?: boolean;
   onBoardViewportChange?: () => void;
   onBoardRootUpdate?: () => void;
+  onSceneChange?: EventListener;
+  onScenePointerUp?: EventListener;
+  onFlyoutOpen?: EventListener;
   onBoardPointerDown?: (evt: PointerEvent) => void;
   onBoardPointerMove?: (evt: PointerEvent) => void;
   onBoardLostPointerCapture?: (evt: PointerEvent) => void;
   onBoardContextMenu?: (evt: MouseEvent) => void;
   onDocumentPointerDown?: (evt: PointerEvent) => void;
+  onDocumentKeyDown?: (evt: KeyboardEvent) => void;
   onDocumentPointerUp?: (evt: PointerEvent) => void;
   onDocumentPointerCancel?: (evt: PointerEvent) => void;
   onFullscreenChange?: () => void;
@@ -614,6 +935,8 @@ const DGS_TEXT = {
   de: {
     exportToolsTitle: 'Werkzeuge f\u00fcr den Import ausw\u00e4hlen',
     exportToolsHint: 'Nur gr\u00fcn markierte Werkzeuge stehen im importierten DGS zur Verf\u00fcgung.',
+    exportToolsGeneral: 'Allgemein', exportTools2D: '2D', exportTools3D: '3D',
+    exportModeTitle: 'Ansichtsmodus im importierten DGS', exportModeSwitchable: '2D/3D umschaltbar', exportModeFixed2D: 'Auf 2D festlegen', exportModeFixed3D: 'Auf 3D festlegen',
     exportRestrictionsTitle: 'Einschr\u00e4nkungen im importierten DGS',
     lockObjectProperties: 'Rechtsklick f\u00fcr bestehende Objekte sperren',
     colorsTracePropertiesOnly: 'Im Rechtsklickmen\u00fc nur Farben und Spuren anzeigen',
@@ -628,22 +951,26 @@ const DGS_TEXT = {
     arc: 'Bogen', showArc: 'Bogen anzeigen', createArc: 'Bogen erzeugen',
     exitAngle: 'Austrittswinkel', entryAngle: 'Eintrittswinkel',
     appearance: 'Darstellung', lineStyle: 'Linienart', solid: 'Durchgezogen', dashed: 'Gestrichelt', dotted: 'Gepunktet', dashdotted: 'Strichpunktiert', design: 'Design', strokeWidth: 'Linienstärke',
+    equationForm: 'Gleichungsform', parameterForm: 'Parameterform', normalForm: 'Normalenform', coordinateForm: 'Koordinatenform',
+    sources: 'Quellen',
     enterFullscreen: 'Vollbildmodus starten', exitFullscreen: 'Vollbildmodus beenden',
     objectList: 'Objektliste', noObjects: 'Noch keine Objekte', restoreInitialState: 'Anfangszustand wiederherstellen', confirmRestoreInitialState: 'Wiederherstellen best\u00e4tigen', exportMacros: 'Export', exportMacrosTitle: 'Als Makros exportieren', copyExport: 'Kopieren', copiedExport: 'Kopiert', closeExport: 'Schließen', exportHint: 'Kopiere diesen Block in eine LiaScript-Datei.', exportUnsupported: 'Nicht als Makro exportiert', copyFormat: 'Format übernehmen', selectFormatTarget: 'Zielobjekt für das Format auswählen',
-    point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
-    coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showName: 'Name anzeigen',
-    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
+    point: 'Punkt', root: 'Nullstelle', extremum: 'Extremstelle', inflection: 'Wendepunkt', yIntercept: 'Ordinatenachsenabschnitt', tangent: 'Tangente', intersection: 'Schnittpunkt', locus: 'Ortslinie', line: 'Gerade', ray: 'Strahl', vector: 'Vektor', orthogonal: 'Orthogonale', parallel: 'Parallele', midpoint: 'Mittelpunkt', angleBisector: 'Winkelhalbierende', reflectLine: 'An Gerade spiegeln', reflectPoint: 'An Punkt spiegeln', rotatePoint: 'Um Punkt drehen', dilatePoint: 'Von Punkt strecken', rotationAngle: 'Drehwinkel', dilationFactor: 'Streckfaktor', polygon: 'Vieleck', segment: 'Strecke', angle: 'Winkel', circle: 'Kreis', sector: 'Kreissektor', ellipse: 'Ellipse', function: 'Funktion', text: 'Text', xAxis: 'Querachse', yAxis: 'Hochachse',
+    coordinates: 'Koordinaten', fixed: 'Fixieren', lockPosition: 'Position sperren', boundToObject: 'An Objekt gebunden', selectBindingObject: 'Objekt für die Bindung auswählen', trace: 'Spur', traceColor: 'Spurfarbe', clearTrace: 'Spur löschen', showLocus: 'Ortslinie anzeigen', selectLocusDriver: 'Gebundenen Punkt oder Regler als Treiber auswählen', locusSamples: 'Abtastpunkte', showName: 'Name anzeigen',
+    showPoint: 'Punkt anzeigen', showLine: 'Gerade anzeigen', showRay: 'Strahl anzeigen', showVector: 'Vektor anzeigen', showPolygon: 'Vieleck anzeigen', showCircle: 'Kreis anzeigen', showSector: 'Kreissektor anzeigen', showEllipse: 'Ellipse anzeigen', showAngleObject: 'Winkel anzeigen', showFunction: 'Funktion anzeigen', showText: 'Text anzeigen', showSlider: 'Schieberegler anzeigen',
     showSegment: 'Strecke anzeigen', showEquation: 'Geradengleichung anzeigen',
-    showDistance: 'Distanzwert anzeigen', showArea: 'Flächeninhalt anzeigen',
+    showDistance: 'Distanzwert anzeigen', showArea: 'Fl\u00e4cheninhalt anzeigen',
     showPerimeter: 'Umfang anzeigen', showAngle: 'Winkelwert anzeigen', showTerm: 'Term anzeigen', showValue: 'Wert anzeigen', showCoordinates: 'Koordinaten anzeigen', textColor: 'Schriftfarbe', lineColor: 'Linienfarbe',
     fillColor: 'Inhaltsfarbe', opacity: 'Deckkraft', delete: 'Löschen',
     confirmDelete: 'Löschen bestätigen', setPoint: 'Punkt setzen', stopPoint: 'Punktmodus beenden',
     straightLine: 'Gerade', distance: 'Strecke', createAngle: 'Winkel markieren', createMeasuredAngle: 'Winkel nach Maß', angleMeasure: 'Winkelmaß', create: 'Erzeugen', cancel: 'Abbrechen', shapes: 'Flächenwerkzeuge', layer: 'Ebene',
-    enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Normalmodus', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
+    enterFunction: 'Funktion eingeben', functionInput: 'Funktionsterm in JSXGraph- oder TeX-Syntax', functionEquation: 'Funktionsgleichung', insertText: 'Text einfügen', textInput: 'Textinhalt', fontSize: 'Schriftgröße', insertSlider: 'Schieberegler einfügen', slider: 'Schieberegler', parameterName: 'Parametername', currentValue: 'Aktueller Wert', minimum: 'Minimalwert', maximum: 'Maximalwert', stepWidth: 'Schrittweite', animationSpeed: 'Animationsgeschwindigkeit', animationStepsPerSecond: 'Schritte/s', showAnimationControl: 'Play-/Pause-Schalter anzeigen', startAnimation: 'Animation starten', pauseAnimation: 'Animation pausieren', variableName: 'Variablenname', axisDescription: 'Achsenbeschriftung', normalMode: 'Mehrfachauswahl', zoomBoth: 'Beidachsig zoomen', zoomVertical: 'Nur vertikal zoomen', zoomHorizontal: 'Nur horizontal zoomen', axisScale: 'Achsenskalierung', cartesianScale: 'Kartesisch', logXScale: 'x logarithmisch, y kartesisch', logYScale: 'x kartesisch, y logarithmisch', logLogScale: 'Doppellogarithmisch', createRoots: 'Nullstellen bestimmen', createExtrema: 'Extremstellen bestimmen', createInflections: 'Wendepunkte bestimmen', createYIntercept: 'Ordinatenachsenabschnitt bestimmen', createTangent: 'Tangente anlegen', createIntersection: 'Schnittpunkte bestimmen', analysis: 'Funktionsanalyse'
   },
   en: {
     exportToolsTitle: 'Choose tools for the imported DGS',
     exportToolsHint: 'Only tools marked in green are available in the imported DGS.',
+    exportToolsGeneral: 'General', exportTools2D: '2D', exportTools3D: '3D',
+    exportModeTitle: 'View mode in the imported DGS', exportModeSwitchable: 'Switchable 2D/3D', exportModeFixed2D: 'Lock to 2D', exportModeFixed3D: 'Lock to 3D',
     exportRestrictionsTitle: 'Restrictions in the imported DGS',
     lockObjectProperties: 'Disable right-click for existing objects',
     colorsTracePropertiesOnly: 'Show only colors and traces in the object menu',
@@ -658,18 +985,20 @@ const DGS_TEXT = {
     arc: 'Arc', showArc: 'Show arc', createArc: 'Create arc',
     exitAngle: 'Exit angle', entryAngle: 'Entry angle',
     appearance: 'Appearance', lineStyle: 'Line style', solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted', dashdotted: 'Dash-dotted', design: 'Design', strokeWidth: 'Line width',
+    equationForm: 'Equation form', parameterForm: 'Parametric form', normalForm: 'Normal form', coordinateForm: 'Coordinate form',
+    sources: 'Sources',
     enterFullscreen: 'Enter fullscreen', exitFullscreen: 'Exit fullscreen',
     objectList: 'Object list', noObjects: 'No objects yet', restoreInitialState: 'Restore initial state', confirmRestoreInitialState: 'Confirm restore', exportMacros: 'Export', exportMacrosTitle: 'Export as macros', copyExport: 'Copy', copiedExport: 'Copied', closeExport: 'Close', exportHint: 'Copy this block into a LiaScript file.', exportUnsupported: 'Not exported as a macro', copyFormat: 'Copy formatting', selectFormatTarget: 'Select the target object for the formatting',
-    point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
-    coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showName: 'Show name',
-    showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
+    point: 'Point', root: 'Zero', extremum: 'Extremum', inflection: 'Inflection point', yIntercept: 'Ordinate-axis intercept', tangent: 'Tangent', intersection: 'Intersection', locus: 'Locus', line: 'Straight Line', ray: 'Ray', vector: 'Vector', orthogonal: 'Perpendicular', parallel: 'Parallel', midpoint: 'Midpoint', angleBisector: 'Angle bisector', reflectLine: 'Reflect in line', reflectPoint: 'Reflect in point', rotatePoint: 'Rotate about point', dilatePoint: 'Dilate from point', rotationAngle: 'Rotation angle', dilationFactor: 'Scale factor', polygon: 'Polygon', segment: 'Distance', angle: 'Angle', circle: 'Circle', sector: 'Circular sector', ellipse: 'Ellipse', function: 'Function', text: 'Text', xAxis: 'Horizontal axis', yAxis: 'Vertical axis',
+    coordinates: 'Coordinates', fixed: 'Lock', lockPosition: 'Lock position', boundToObject: 'Bound to object', selectBindingObject: 'Select the object for the binding', trace: 'Trace', traceColor: 'Trace color', clearTrace: 'Clear trace', showLocus: 'Show locus', selectLocusDriver: 'Select a bound point or slider as driver', locusSamples: 'Samples', showName: 'Show name',
+    showPoint: 'Show point', showLine: 'Show straight line', showRay: 'Show ray', showVector: 'Show vector', showPolygon: 'Show polygon', showCircle: 'Show circle', showSector: 'Show circular sector', showEllipse: 'Show ellipse', showAngleObject: 'Show angle', showFunction: 'Show function', showText: 'Show text', showSlider: 'Show slider',
     showSegment: 'Show distance', showEquation: 'Show line equation',
     showDistance: 'Show distance value', showArea: 'Show area',
     showPerimeter: 'Show perimeter', showAngle: 'Show angle value', showTerm: 'Show expression', showValue: 'Show value', showCoordinates: 'Show coordinates', textColor: 'Text color', lineColor: 'Line color',
     fillColor: 'Fill color', opacity: 'Opacity', delete: 'Delete',
     confirmDelete: 'Confirm delete', setPoint: 'Place point', stopPoint: 'Exit point mode',
     straightLine: 'Straight Line', distance: 'Distance', createAngle: 'Mark angle', createMeasuredAngle: 'Angle by measure', angleMeasure: 'Angle measure', create: 'Create', cancel: 'Cancel', shapes: 'Shape tools', layer: 'Layer',
-    enterFunction: 'Enter function', functionInput: 'Function expression in JSXGraph or TeX syntax', functionEquation: 'Function equation', insertText: 'Insert text', textInput: 'Text content', fontSize: 'Font size', insertSlider: 'Insert slider', slider: 'Slider', parameterName: 'Parameter name', currentValue: 'Current value', minimum: 'Minimum', maximum: 'Maximum', stepWidth: 'Step size', variableName: 'Variable name', axisDescription: 'Axis label', normalMode: 'Normal mode', zoomBoth: 'Zoom both axes', zoomVertical: 'Zoom vertically only', zoomHorizontal: 'Zoom horizontally only', axisScale: 'Axis scaling', cartesianScale: 'Cartesian', logXScale: 'logarithmic x, Cartesian y', logYScale: 'Cartesian x, logarithmic y', logLogScale: 'Double logarithmic', createRoots: 'Find zeros', createExtrema: 'Find extrema', createInflections: 'Find inflection points', createYIntercept: 'Find ordinate-axis intercept', createTangent: 'Create tangent', createIntersection: 'Find intersections', analysis: 'Function analysis'
+    enterFunction: 'Enter function', functionInput: 'Function expression in JSXGraph or TeX syntax', functionEquation: 'Function equation', insertText: 'Insert text', textInput: 'Text content', fontSize: 'Font size', insertSlider: 'Insert slider', slider: 'Slider', parameterName: 'Parameter name', currentValue: 'Current value', minimum: 'Minimum', maximum: 'Maximum', stepWidth: 'Step size', animationSpeed: 'Animation speed', animationStepsPerSecond: 'steps/s', showAnimationControl: 'Show play/pause control', startAnimation: 'Start animation', pauseAnimation: 'Pause animation', variableName: 'Variable name', axisDescription: 'Axis label', normalMode: 'Multiple selection', zoomBoth: 'Zoom both axes', zoomVertical: 'Zoom vertically only', zoomHorizontal: 'Zoom horizontally only', axisScale: 'Axis scaling', cartesianScale: 'Cartesian', logXScale: 'logarithmic x, Cartesian y', logYScale: 'Cartesian x, logarithmic y', logLogScale: 'Double logarithmic', createRoots: 'Find zeros', createExtrema: 'Find extrema', createInflections: 'Find inflection points', createYIntercept: 'Find ordinate-axis intercept', createTangent: 'Create tangent', createIntersection: 'Find intersections', analysis: 'Function analysis'
   }
 } as const;
 
@@ -1110,8 +1439,8 @@ function formatDgsLogTickLabel(exponent: number, language: 'de' | 'en'): string 
       return language === 'de' ? text.replace('.', ',') : text;
     }
     const superscript: Record<string, string> = {
-      '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-      '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+      '-': '\u207B', '0': '\u2070', '1': '\u00B9', '2': '\u00B2', '3': '\u00B3', '4': '\u2074',
+      '5': '\u2075', '6': '\u2076', '7': '\u2077', '8': '\u2078', '9': '\u2079'
     };
     return '10' + String(roundedExponent).split('').map((char) => superscript[char] || char).join('');
   }
@@ -1208,6 +1537,48 @@ function setDgsAxisScaleMode(state: DgsState, modeValue: unknown, save = true): 
 }
 
 const states: Record<string, DgsState> = {};
+const dgsConstructionColors: Record<string, string> = {};
+const DGS_CONSTRUCTION_COLORS = [
+  '#ff0000', '#ff7500', '#ffff00', '#ff00ff', '#0055ff',
+  '#00ffff', '#00ff00', '#007500', '#000000', '#ffffff'
+];
+type DgsLocusMacroConfig = DgsLocusOptions & {
+  boardId: string;
+  targetName: string;
+  driverName: string;
+};
+type DgsLocusMacroRequest = {
+  uid: string;
+  spec: string;
+  language: 'de' | 'en';
+  boardId: string;
+};
+const dgsLocusRequests: Record<string, DgsLocusMacroRequest> = {};
+const dgsLocusEntries: Record<string, { board: any; locus: any; signature: string }> = {};
+let hasPendingDgsLoci = false;
+type DgsEllipseMacroConfig = {
+  boardId: string;
+  name: string;
+  focus1Name: string;
+  focus2Name: string;
+  pointName: string;
+  color: string;
+  opacity: number;
+  showName: boolean;
+  showArea: boolean;
+  showPerimeter: boolean;
+  visible: boolean;
+  lineStyle: DgsLineStyle;
+};
+type DgsEllipseMacroRequest = {
+  uid: string;
+  spec: string;
+  language: 'de' | 'en';
+  boardId: string;
+};
+const dgsEllipseRequests: Record<string, DgsEllipseMacroRequest> = {};
+const dgsEllipseEntries: Record<string, { board: any; ellipse: any; signature: string }> = {};
+let hasPendingDgsEllipses = false;
 const standaloneSetSquares: Record<string, DgsStandaloneSetSquareState> = {};
 
 function isLiveStandaloneSetSquare(
@@ -1941,6 +2312,8 @@ const dgsConstructionStates: Record<string, any> =
   ((window as any).__dgsConstructionStates = (window as any).__dgsConstructionStates || {});
 const dgsConstructionBoards: Record<string, any> =
   ((window as any).__dgsConstructionBoards = (window as any).__dgsConstructionBoards || {});
+const dgsSegment6PropertyObjects: Record<string, any> =
+  ((window as any).__dgsSegment6PropertyObjects = (window as any).__dgsSegment6PropertyObjects || {});
 const dgsInitialConstructionStates: Record<string, any> =
   ((window as any).__dgsInitialConstructionStates =
     (window as any).__dgsInitialConstructionStates || {});
@@ -1981,7 +2354,11 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-09-24-1';
+const DGS_STYLE_VERSION = '2026-10-12-1';
+const DGS_SLIDER_DEFAULT_ANIMATION_SPEED = 1.5;
+const DGS_SLIDER_MIN_ANIMATION_SPEED = 0.25;
+const DGS_SLIDER_MAX_ANIMATION_SPEED = 10;
+const DGS_SLIDER_ANIMATION_SPEED_STEP = 0.25;
 
 function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   if (!board) return;
@@ -2011,6 +2388,7 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
         entry.slider?.board,
         entry.object?.board,
         entry.curve?.board,
+        entry.arc?.board,
         entry.polygon?.board,
         entry.angle?.board,
         entry.text?.board,
@@ -2020,6 +2398,7 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
         entry.contactPoint?.board,
         entry.source?.board,
         entry.source?.object?.board,
+        entry.point?.board,
         entry.points?.[0]?.board,
         entry.ownedPoints?.[0]?.board,
         entry.ownedObjects?.[0]?.board,
@@ -2040,6 +2419,35 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
     assignList(entry.ownedPoints, key + ':owned-point', true);
     assign(entry.object, key + ':object', true);
   });
+  visit('__linear3DEntries', (entry, key) => {
+    const persistentId = String(entry?.config?.persistentId || '').trim();
+    assign(entry.object, key + ':object', true);
+    if (persistentId && entry.object) entry.object.__liaDgsPersistentId = persistentId;
+  });
+  visit('__circle3DEntries', (entry, key) => {
+    const persistentId = String(entry?.config?.persistentId || '').trim();
+    assign(entry.object, key + ':object', true);
+    if (persistentId && entry.object) entry.object.__liaDgsPersistentId = persistentId;
+  });
+  visit('__sphere3DEntries', (entry, key) => {
+    const persistentId = String(entry?.config?.persistentId || '').trim();
+    assign(entry.object, key + ':object', true);
+    if (persistentId && entry.object) entry.object.__liaDgsPersistentId = persistentId;
+  });
+  visit('__intersection3DEntries', (entry, key) => {
+    const persistentId = String(entry?.config?.persistentId || '').trim();
+    assign(entry.object, key + ':object', true);
+    assignList(entry.objects, key + ':branch', true);
+    if (persistentId) {
+      const objects = Array.from(new Set<any>([entry.object, ...(entry.objects || [])].filter(Boolean)));
+      objects.forEach((object: any) => {
+        const suffix = object.__liaDgsSpatialIntersectionKind === 'point'
+          ? ':branch:' + Number(object.__liaDgsSpatialIntersectionBranch || 0)
+          : '';
+        object.__liaDgsPersistentId = persistentId + suffix;
+      });
+    }
+  });
   visit('__arcEntries', (entry, key) => {
     assignList(entry.ownedPoints, key + ':owned-point', true);
     assign(entry.curve, key + ':curve', true);
@@ -2048,6 +2456,7 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
     assignList(entry.ownedPoints, key + ':owned-point', true);
     assign(entry.object, key + ':object', true);
   });
+  visit('__transformedPointEntries', (entry, key) => assign(entry.point, key + ':point', true));
   visit('__areaEntries', (entry, key) => {
     assignList(entry.ownedPoints, key + ':owned-point', true);
     assign(entry.polygon, key + ':polygon', true);
@@ -2056,6 +2465,7 @@ function assignDgsMacroPersistentIds(boardId: string, board: any): void {
   visit('__angleEntries', (entry, key) => assign(entry.angle, key + ':angle', true));
   visit('__coordTextEntries', (entry, key) => assign(entry.text, key + ':text', true));
   visit('__circleEntries', (entry, key) => assign(entry.circle, key + ':circle', true));
+  visit('__compassArcEntries', (entry, key) => assign(entry.arc, key + ':arc', true));
   visit('__tangentEntries', (entry, key) => {
     assignList(entry.ownedObjects, key + ':owned-object', true);
     assign(entry.contactPoint, key + ':contact', true);
@@ -2071,12 +2481,18 @@ const DGS_MACRO_ENTRY_REGISTRIES = [
   '__sliderEntries',
   '__distanceEntries',
   '__linearObjectEntries',
+  '__linear3DEntries',
+  '__circle3DEntries',
+  '__sphere3DEntries',
+  '__intersection3DEntries',
   '__arcEntries',
   '__relationObjectEntries',
+  '__transformedPointEntries',
   '__areaEntries',
   '__angleEntries',
   '__coordTextEntries',
   '__circleEntries',
+  '__compassArcEntries',
   '__tangentEntries',
   '__sectorEntries',
   '__functionAnalysisPointEntries',
@@ -2097,6 +2513,7 @@ function discardDgsMacroRegistryEntries(boardId: string, board: any): void {
         entry.slider?.board,
         entry.object?.board,
         entry.curve?.board,
+        entry.arc?.board,
         entry.polygon?.board,
         entry.angle?.board,
         entry.text?.board,
@@ -2118,7 +2535,7 @@ function discardDgsMacroRegistryEntries(boardId: string, board: any): void {
 }
 
 function getExternalDgsMacroSpecSignature(boardId: string): string {
-  const objectSpecId = /^(?:(?:axis-title|point|coord-text|distance|linear|arc|relation|area|angle|circle|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-|point-ui-)/;
+  const objectSpecId = /^(?:(?:axis-title|point|point3d|coord-text|distance|linear|linear3d|plane3d|circle3d|sphere3d|intersection3d|curve3d|surface3d|conic3d|analytic3d|locus3d|locussurface3d|arc|relation|area|angle|circle|ellipse|tangent|sector|plot|function-analysis|object-analysis|slider)-spec-|point-ui-)/;
   try {
     const entries = Array.from(document.querySelectorAll<HTMLElement>('[id][data-spec]:not([data-lia-static-claimed])')).flatMap((node) => {
       if (!objectSpecId.test(String(node.id || ''))) return [];
@@ -2298,7 +2715,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-top-menu-fade-end {
-      right: 98px;
+      right: 145px;
       background: linear-gradient(to left, var(--lia-dgs-menu-bg, #fff), transparent);
     }
 
@@ -2325,7 +2742,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       position: absolute;
       top: 0;
       right: 0;
-      width: 98px;
+      width: 145px;
       height: ${MENU_HEIGHT_PX}px;
       box-sizing: border-box;
       padding: 7.5px 10px;
@@ -2350,6 +2767,13 @@ function ensureStyles(root: Document | ShadowRoot): void {
     .lia-dgs-top-menu-end .lia-dgs-geometry-button {
       position: static;
       flex: 0 0 35px;
+    }
+
+    .lia-dgs-top-menu-end .lia-coordinate-3d-controls {
+      position: relative !important;
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
     }
 
     .lia-dgs-top-menu-scroll-spacer {
@@ -2688,6 +3112,79 @@ function ensureStyles(root: Document | ShadowRoot): void {
       grid-column: 1 / -1;
     }
 
+    .lia-dgs-slider-animation-speed {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 3px 7px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .lia-dgs-slider-animation-speed input {
+      grid-column: 1 / -1;
+      width: 100%;
+      margin: 0;
+      accent-color: var(--lia-dgs-theme-color, currentColor);
+      cursor: pointer;
+    }
+
+    .lia-dgs-slider-animation-speed-output {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      opacity: .8;
+    }
+
+    .lia-dgs-slider-animation-option {
+      margin-top: 3px;
+    }
+
+    .lia-dgs-slider-animation-button {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      min-height: 30px;
+      display: grid;
+      place-items: center;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+      border: 2px solid var(--lia-dgs-slider-color, #ff00ff);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--lia-dgs-menu-bg, #fff) 90%, transparent);
+      color: var(--lia-dgs-slider-color, #ff00ff);
+      box-shadow: 0 2px 7px rgba(0, 0, 0, .22);
+      cursor: pointer;
+      z-index: 25;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .lia-dgs-slider-animation-button:hover,
+    .lia-dgs-slider-animation-button:focus-visible,
+    .lia-dgs-slider-animation-button.is-playing {
+      background: var(--lia-dgs-slider-color, #ff00ff);
+      color: #fff;
+      outline: none;
+    }
+
+    .lia-dgs-slider-animation-button[hidden] {
+      display: none;
+    }
+
+    .lia-dgs-slider-animation-button svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .lia-dgs-slider-animation-button path {
+      fill: currentColor;
+      stroke: none;
+    }
+
     .lia-dgs-slider-field input,
     .lia-dgs-slider-field select {
       min-width: 0;
@@ -2761,7 +3258,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-coordinate-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: 7px;
     }
 
@@ -3030,6 +3527,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-tools-divider,
+    .lia-dgs-shape-divider,
+    .lia-dgs-angle-intersection-divider,
+    .lia-dgs-scene-mode-divider,
     .lia-dgs-function-divider,
     .lia-dgs-regression-divider,
     .lia-dgs-text-divider,
@@ -3337,6 +3837,59 @@ function ensureStyles(root: Document | ShadowRoot): void {
       left: 268px;
     }
 
+    .lia-dgs-sectioned-submenu {
+      --lia-dgs-visible-sections: 1;
+      width: fit-content;
+      min-width: min(300px, calc(100% - 16px));
+      max-width: calc(100% - 16px);
+      grid-template-columns: repeat(var(--lia-dgs-visible-sections), minmax(270px, 340px));
+      align-items: start;
+      gap: 9px;
+      max-height: min(68vh, 620px);
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .lia-dgs-tool-section {
+      min-width: 0;
+      display: grid;
+      align-content: start;
+      gap: 5px;
+      padding: 6px;
+      border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 6%, transparent);
+    }
+
+    .lia-dgs-tool-section[hidden] {
+      display: none;
+    }
+
+    .lia-dgs-sectioned-submenu .lia-dgs-tool-section {
+      gap: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+
+    .lia-dgs-sectioned-submenu .lia-dgs-tool-section > .lia-dgs-tool-section-title {
+      display: none;
+    }
+
+    .lia-dgs-tool-section-title {
+      margin: 0;
+      padding: 2px 4px 4px;
+      color: var(--lia-dgs-theme-color, currentColor);
+      font: 700 12px/1.2 system-ui, sans-serif;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+
+    .lia-dgs-tool-section-items {
+      display: grid;
+      gap: 4px;
+    }
+
     .lia-dgs-compass-submenu {
       min-width: min(270px, calc(100% - 16px));
     }
@@ -3419,6 +3972,49 @@ function ensureStyles(root: Document | ShadowRoot): void {
       fill: var(--lia-dgs-neutral-color, currentColor);
       stroke: var(--lia-dgs-neutral-color, currentColor);
       stroke-width: 1.2;
+    }
+    .lia-dgs-construction-color-button svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .lia-dgs-construction-color-button .lia-dgs-color-pen {
+      fill: none !important;
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .lia-dgs-construction-color-button .lia-dgs-color-dot {
+      fill: var(--lia-dgs-construction-color, #ff00ff) !important;
+      stroke: var(--lia-dgs-neutral-color, currentColor) !important;
+      stroke-width: 1.4;
+    }
+
+    .lia-dgs-construction-color-menu {
+      min-width: min(214px, calc(100% - 16px));
+      width: fit-content;
+      grid-template-columns: repeat(10, 16px);
+      gap: 3px;
+      padding: 10px;
+    }
+
+    .lia-dgs-construction-color-item {
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      margin: 0;
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+      border-radius: 50%;
+      background: var(--lia-dgs-swatch-color, #ff00ff);
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+
+    .lia-dgs-construction-color-item[data-active="1"] {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
     }
 
     .lia-dgs-set-square-button .lia-dgs-set-square-icon-fill {
@@ -3724,8 +4320,16 @@ function ensureStyles(root: Document | ShadowRoot): void {
         drop-shadow(0 0 4px var(--lia-dgs-theme-color, #00a8b5));
     }
 
+    .lia-dgs-multi-selected {
+      filter:
+        drop-shadow(0 0 2px var(--lia-dgs-theme-color, #00a8b5))
+        drop-shadow(0 0 5px var(--lia-dgs-theme-color, #00a8b5));
+    }
+
     .lia-dgs-geometry-button circle,
-    .lia-dgs-geometry-tool circle {
+    .lia-dgs-geometry-button ellipse,
+    .lia-dgs-geometry-tool circle,
+    .lia-dgs-geometry-tool ellipse {
       fill: none;
       stroke: #ff00ff;
       stroke-width: 2;
@@ -3794,10 +4398,78 @@ function ensureStyles(root: Document | ShadowRoot): void {
       opacity: .75;
     }
 
+    .lia-dgs-equation-dialog {
+      width: min(650px, calc(100% - 24px));
+      max-height: min(90vh, calc(100% - 24px));
+      overflow: auto;
+    }
+
+    .lia-dgs-equation-form-switch {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .lia-dgs-equation-form-button {
+      min-height: 34px;
+      padding: 5px 10px;
+      border: 1.5px solid currentColor;
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .lia-dgs-equation-form-button[aria-pressed=true] {
+      border-color: var(--lia-dgs-theme-color, currentColor);
+      color: var(--lia-dgs-theme-color, currentColor);
+      box-shadow: inset 0 0 0 1px var(--lia-dgs-theme-color, currentColor);
+    }
+
+    .lia-dgs-equation-fields {
+      display: grid;
+      gap: 10px;
+    }
+
+    .lia-dgs-equation-row {
+      display: grid;
+      grid-template-columns: minmax(110px, auto) repeat(3, minmax(72px, 1fr));
+      align-items: end;
+      gap: 8px;
+    }
+
+    .lia-dgs-equation-row-caption {
+      align-self: center;
+      font-weight: 600;
+    }
+
+    .lia-dgs-equation-component {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 5px;
+    }
+
+    .lia-dgs-equation-hint {
+      font-size: 13px;
+      opacity: .8;
+    }
+
+    @media (max-width: 620px) {
+      .lia-dgs-equation-row {
+        grid-template-columns: repeat(3, minmax(64px, 1fr));
+      }
+
+      .lia-dgs-equation-row-caption {
+        grid-column: 1 / -1;
+      }
+    }
+
     .lia-dgs-export-dialog {
-      width: min(920px, calc(100% - 32px));
-      max-width: calc(100% - 32px);
-      max-height: min(82vh, calc(100% - 32px));
+      width: min(1480px, calc(100% - 16px));
+      max-width: calc(100% - 16px);
+      max-height: min(94vh, calc(100% - 16px));
       grid-template-rows: auto minmax(0, 1fr) auto;
       overflow: hidden;
     }
@@ -3815,7 +4487,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-export-tools-step {
       display: grid;
-      gap: 10px;
+      grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+      gap: 10px 12px;
+      align-content: start;
       min-height: 0;
       padding-right: 3px;
       overflow-y: auto;
@@ -3823,23 +4497,88 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-export-tools-hint {
+      grid-column: 1 / -1;
       font-size: 13px;
       line-height: 1.35;
       opacity: .82;
     }
 
+    .lia-dgs-export-tool-sections {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: start;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .lia-dgs-export-dimension-section {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid color-mix(
+        in srgb,
+        var(--lia-dgs-neutral-color, currentColor) 30%,
+        transparent
+      );
+      border-radius: 10px;
+      background: color-mix(
+        in srgb,
+        var(--lia-dgs-neutral-color, currentColor) 4%,
+        transparent
+      );
+    }
+
+    .lia-dgs-export-dimension-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--lia-dgs-theme-color, currentColor);
+    }
+
     .lia-dgs-export-tool-groups {
       min-width: 0;
-      max-height: min(42vh, 360px);
+      display: block;
+      columns: 150px;
+      column-gap: 8px;
+      padding: 0;
+      overflow: visible;
+    }
+
+    .lia-dgs-export-mode {
+      grid-column: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+      gap: 7px 12px;
+      padding-top: 10px;
+      border-top: 2px solid var(--lia-dgs-theme-color, currentColor);
+    }
+
+    .lia-dgs-export-mode-title {
+      grid-column: 1 / -1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .lia-dgs-export-mode-option {
       display: flex;
-      align-items: stretch;
-      gap: 10px;
-      padding: 2px 8px 8px 2px;
-      overflow: auto;
-      overscroll-behavior: contain;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .lia-dgs-export-mode-option input {
+      width: 17px;
+      height: 17px;
+      margin: 0;
+      accent-color: var(--lia-dgs-theme-color, currentColor);
     }
 
     .lia-dgs-export-restrictions {
+      grid-column: 2;
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
       gap: 7px 18px;
@@ -3874,22 +4613,30 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-export-tool-group {
-      flex: 0 0 auto;
+      break-inside: avoid;
+      margin-bottom: 8px;
       display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
       align-items: flex-start;
-      gap: 8px;
-      min-height: 44px;
-    }
-
-    .lia-dgs-export-tool-group + .lia-dgs-export-tool-group {
-      padding-left: 10px;
+      gap: 5px;
+      min-width: 0;
+      min-height: 0;
+      padding-left: 6px;
       border-left: 2px solid var(--lia-dgs-theme-color, currentColor);
     }
 
+    .lia-dgs-export-tool-group-title {
+      flex: 0 0 100%;
+      min-width: 0;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.25;
+      opacity: .72;
+    }
+
     .lia-dgs-export-tool-column {
-      display: grid;
-      grid-auto-rows: 44px;
-      gap: 8px;
+      display: contents;
     }
 
     .lia-dgs-export-tool.lia-dgs-geometry-button {
@@ -3897,17 +4644,17 @@ function ensureStyles(root: Document | ShadowRoot): void {
       top: auto !important;
       left: auto !important;
       right: auto !important;
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
-      min-height: 44px;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      min-height: 36px;
       border-radius: 11px;
       overflow: visible;
     }
 
     .lia-dgs-export-tool-icon {
-      width: 34px;
-      height: 34px;
+      width: 28px;
+      height: 28px;
       display: grid;
       place-items: center;
       transition: opacity 140ms ease, filter 140ms ease;
@@ -3915,8 +4662,8 @@ function ensureStyles(root: Document | ShadowRoot): void {
     }
 
     .lia-dgs-export-tool-icon > svg {
-      width: 32px;
-      height: 32px;
+      width: 27px;
+      height: 27px;
       display: block;
       overflow: visible;
     }
@@ -3936,11 +4683,11 @@ function ensureStyles(root: Document | ShadowRoot): void {
 
     .lia-dgs-export-tool-status {
       position: absolute;
-      right: -6px;
-      bottom: -6px;
+      right: -4px;
+      bottom: -4px;
       z-index: 2;
-      width: 17px;
-      height: 17px;
+      width: 15px;
+      height: 15px;
       display: grid;
       place-items: center;
       box-sizing: border-box;
@@ -3948,7 +4695,7 @@ function ensureStyles(root: Document | ShadowRoot): void {
       border-radius: 50%;
       background: #24a148;
       color: #fff;
-      font: 700 13px/1 Arial, sans-serif;
+      font: 700 12px/1 Arial, sans-serif;
       pointer-events: none;
     }
 
@@ -3961,6 +4708,27 @@ function ensureStyles(root: Document | ShadowRoot): void {
       border-color: var(--lia-dgs-theme-color, currentColor);
       outline: 2px solid color-mix(in srgb, var(--lia-dgs-theme-color, currentColor) 55%, transparent);
       outline-offset: 2px;
+    }
+
+    @media (max-width: 1100px) {
+      .lia-dgs-export-tool-sections {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 900px) {
+      .lia-dgs-export-tools-step {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .lia-dgs-export-tool-sections {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .lia-dgs-export-mode,
+      .lia-dgs-export-restrictions {
+        grid-column: 1;
+      }
     }
 
     .lia-dgs-export-tool .ico-color-dot {
@@ -4134,7 +4902,7 @@ function getUsedPointNames(state: DgsState): Set<string> {
   const visitPoint = (point: any) => {
     if (!point || typeof point !== 'object') return;
     const type = String(point.elType || '').toLowerCase();
-    if (type !== 'point' && type !== 'glider') return;
+    if (type !== 'point' && type !== 'glider' && !point.__liaPoint3D) return;
     add(point.__liaDgsPointName);
     add(point.name);
   };
@@ -4212,16 +4980,19 @@ function eventToUserCoordinates(state: DgsState, evt: PointerEvent): { x: number
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
-function createDgsPoint(state: DgsState, x: number, y: number): any | null {
+function createDgsPoint(state: DgsState, x: number, y: number, slideObject: any = null, z = 0, preferredName = ''): any | null {
   const board = state.board;
   if (!board) return null;
 
-  const name = getNextPointName(state);
+  const name = preferredName || getNextPointName(state);
   const texName = '\\(' + name + '\\)';
   const labelColor = getNeutralColor();
 
   try {
-    const point = board.create('point', [x, y], {
+    const createPoint = board.__liaSceneMode === '3d'
+      ? (attributes: any) => createCoordinatePoint3D(board, [x, y, z], attributes)
+      : (attributes: any) => board.create('point', [x, y], attributes);
+    const point = createPoint({
       name: texName,
       fixed: false,
       withLabel: true,
@@ -4249,6 +5020,11 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
     point.__liaDgsShowName = true;
     point.__liaDgsShowObject = true;
     point.__liaDgsOpacity = 1;
+    point.__liaDgsGliderSource = null;
+    if (slideObject && typeof point.makeGlider === 'function') {
+      point.makeGlider(slideObject);
+      point.__liaDgsGliderSource = slideObject;
+    }
     point.__liaPointVisual = { color: '#ff00ff', opacity: 1, hasExplicitColor: false };
     window.__points = window.__points || {};
     window.__pointStates = window.__pointStates || {};
@@ -4262,11 +5038,12 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
         window.__pointStates[state.boardId][currentName] = {
           x: point.X(),
           y: point.Y(),
+          ...(point.__liaPoint3D ? { z: point.Z() } : {}),
           fixed: getDgsObjectFixed(point)
         };
       } catch (e) {}
       refreshSideMenusForObject(point);
-      persistDgsConstruction(state, recordHistory);
+      if (!point.__liaDgsPendingLinearPoint) persistDgsConstruction(state, recordHistory);
     };
     const syncDependentCoordinates = (readDraggedParameter: boolean) => {
       if (!point.__liaDgsCoordinateExpressions || point.__liaDgsCoordinateSyncing) return;
@@ -4278,22 +5055,91 @@ function createDgsPoint(state: DgsState, x: number, y: number): any | null {
       }
       syncDgsCoordinatePoint(state, point);
     };
+    const interactionPoint = point.element2D || point;
     try {
-      point.on('drag', () => {
+      interactionPoint.on('drag', () => {
         syncDependentCoordinates(true);
         translateDgsFixedCompassComponent(state, point);
         recordDgsPointTraceMotion(state, point);
         savePosition(false);
       });
     } catch (e) {}
-    try {
-      point.on('up', () => {
+    let spatialDragCompletionArmed = false;
+    let spatialDragStart: [number, number, number] | null = null;
+    const finishSpatialDragHistory = () => {
+      if (!spatialDragCompletionArmed) return;
+      const start = spatialDragStart;
+      spatialDragCompletionArmed = false;
+      spatialDragStart = null;
+      window.removeEventListener('pointerup', finishSpatialDragHistory, true);
+      window.removeEventListener('pointercancel', finishSpatialDragHistory, true);
+      window.removeEventListener('mouseup', finishSpatialDragHistory, true);
+      window.setTimeout(() => {
+        if (state.restoring || point.board !== state.board) return;
+        const current = point3DCoordinates(point);
+        if (!start || !current || Math.hypot(
+          current[0] - start[0],
+          current[1] - start[1],
+          current[2] - start[2]
+        ) <= 1e-10) return;
         syncDependentCoordinates(false);
         translateDgsFixedCompassComponent(state, point);
         recordDgsPointTraceMotion(state, point);
         savePosition(true);
+      }, 0);
+    };
+    const armSpatialDragHistory = (event: PointerEvent) => {
+      // Selecting a construction source is not a point drag. In particular,
+      // closing a polygon must not snapshot its unfinished vertices as history.
+      if (state.activeTool || point.__liaDgsPendingLinearPoint ||
+          !point.__liaPoint3D || event.button !== 0 || getDgsObjectFixed(point)) return;
+      const container = point.board?.containerObj || state.boardContainer;
+      const target = event.target as Element | null;
+      if (eventTargetsBoardUi(event)) return;
+      const rect = container.getBoundingClientRect();
+      let hit = false;
+      try { hit = interactionPoint.hasPoint?.(event.clientX - rect.left, event.clientY - rect.top) === true; } catch (e) {}
+      if (!hit) return;
+      if (spatialDragCompletionArmed) {
+        spatialDragCompletionArmed = false;
+        spatialDragStart = null;
+        window.removeEventListener('pointerup', finishSpatialDragHistory, true);
+        window.removeEventListener('pointercancel', finishSpatialDragHistory, true);
+        window.removeEventListener('mouseup', finishSpatialDragHistory, true);
+      }
+      spatialDragStart = point3DCoordinates(point);
+      if (!spatialDragStart) return;
+      if (dgsPendingHistoryBefore[state.boardId]) persistDgsConstruction(state, true);
+      persistDgsConstruction(state, false);
+      delete dgsPendingHistoryBefore[state.boardId];
+      spatialDragCompletionArmed = true;
+      window.addEventListener('pointerup', finishSpatialDragHistory, true);
+      window.addEventListener('pointercancel', finishSpatialDragHistory, true);
+      window.addEventListener('mouseup', finishSpatialDragHistory, true);
+    };
+    if (point.__liaPoint3D) {
+      window.addEventListener('pointerdown', armSpatialDragHistory, true);
+      const previousCleanup = point.__liaPoint3DCleanup;
+      point.__liaPoint3DCleanup = () => {
+        spatialDragCompletionArmed = false;
+        spatialDragStart = null;
+        window.removeEventListener('pointerdown', armSpatialDragHistory, true);
+        window.removeEventListener('pointerup', finishSpatialDragHistory, true);
+        window.removeEventListener('pointercancel', finishSpatialDragHistory, true);
+        window.removeEventListener('mouseup', finishSpatialDragHistory, true);
+        try { previousCleanup?.(); } catch (e) {}
+      };
+    }
+    try {
+      interactionPoint.on('up', () => {
+        syncDependentCoordinates(false);
+        translateDgsFixedCompassComponent(state, point);
+        recordDgsPointTraceMotion(state, point);
+        if (point.__liaPoint3D && spatialDragCompletionArmed) return;
+        savePosition(true);
       });
     } catch (e) {}
+    applyDgsConstructionColor(state, point, true);
     savePosition();
 
     try { if (window.__scheduleBootstrapDistances) window.__scheduleBootstrapDistances(); } catch (e) {}
@@ -4359,14 +5205,286 @@ function createDgsMidpoint(state: DgsState, first: any, second: any): any | null
   }
 }
 
+type DgsTransformKind = 'reflect-line' | 'reflect-point' | 'rotate-point' | 'dilate-point';
+
+function getDgsTransformedCoordinates(
+  source: any,
+  kind: DgsTransformKind,
+  reference: any,
+  axisSecond: any | null,
+  value: number
+): { x: number; y: number } {
+  const x = Number(source.X());
+  const y = Number(source.Y());
+  const cx = Number(reference.X());
+  const cy = Number(reference.Y());
+  if (kind === 'reflect-line') {
+    const bx = Number(axisSecond.X());
+    const by = Number(axisSecond.Y());
+    const dx = bx - cx;
+    const dy = by - cy;
+    const denominator = dx * dx + dy * dy;
+    if (!(denominator > 1e-20)) return { x: NaN, y: NaN };
+    const parameter = ((x - cx) * dx + (y - cy) * dy) / denominator;
+    return { x: 2 * (cx + parameter * dx) - x, y: 2 * (cy + parameter * dy) - y };
+  }
+  if (kind === 'reflect-point') return { x: 2 * cx - x, y: 2 * cy - y };
+  if (kind === 'dilate-point') return { x: cx + value * (x - cx), y: cy + value * (y - cy) };
+  const radians = value * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: cx + cos * (x - cx) - sin * (y - cy),
+    y: cy + sin * (x - cx) + cos * (y - cy)
+  };
+}
+
+function createDgsTransformedPoint(
+  state: DgsState,
+  source: any,
+  kind: DgsTransformKind,
+  reference: any,
+  axisSecond: any | null,
+  value: number
+): any | null {
+  if (!state.board || !source || typeof source.X !== 'function' || typeof source.Y !== 'function' || !reference ||
+      (kind === 'reflect-line' && !axisSecond) ||
+      (kind === 'dilate-point' && Math.abs(value) <= 1e-12)) return null;
+  const name = getNextPointName(state);
+  const labelColor = getNeutralColor();
+  try {
+    const point = state.board.create('point', [
+      function() { return getDgsTransformedCoordinates(source, kind, reference, axisSecond, value).x; },
+      function() { return getDgsTransformedCoordinates(source, kind, reference, axisSecond, value).y; }
+    ], {
+      name: '\\(' + name + '\\)', fixed: true, withLabel: true, showInfobox: false,
+      strokeColor: '#ff00ff', fillColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+      highlightFillColor: '#ff00ff', strokeWidth: 3, highlightStrokeWidth: 3,
+      face: 'x', size: 7,
+      label: { strokeColor: labelColor, fillColor: labelColor, fontSize: 24, parse: false, useMathJax: true }
+    });
+    point.__liaDgsPointName = name;
+    point.__liaDgsTransformPoint = true;
+    point.__liaDgsTransformSource = source;
+    point.__liaDgsTransformKind = kind;
+    point.__liaDgsTransformReference = reference;
+    point.__liaDgsTransformAxisSecond = axisSecond;
+    point.__liaDgsTransformValue = value;
+    point.__liaDgsLanguage = state.language;
+    point.__liaDgsColor = '#ff00ff';
+    point.__liaDgsTextColor = labelColor;
+    point.__liaDgsLineColor = '#ff00ff';
+    point.__liaDgsFillColor = '#ff00ff';
+    point.__liaDgsShowName = true;
+    point.__liaDgsShowObject = true;
+    point.__liaDgsOpacity = 1;
+    point.__liaPointVisual = { color: '#ff00ff', opacity: 1, hasExplicitColor: false };
+    window.__points = window.__points || {};
+    window.__points[state.boardId] = window.__points[state.boardId] || {};
+    window.__points[state.boardId][name] = point;
+    refreshDgsObjectLabel(point);
+    return point;
+  } catch (e) { return null; }
+}
+
+function getDgsTransformSourcePoints(object: any): any[] {
+  if (isDgsPoint(object)) return [object];
+  if (isDgsLinearObject(object)) return (getDgsLinearSourcePoints(object) || []).filter(Boolean);
+  if (isDgsPolygon(object)) {
+    const vertices = Array.isArray(object.vertices) ? object.vertices.slice() : [];
+    if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+    return vertices;
+  }
+  if (isDgsCircle(object)) return [object.__liaDgsCircleCenter, object.__liaDgsCircleRadiusPoint].filter(Boolean);
+  if (isDgsEllipse(object)) return [
+    object.__liaDgsEllipseFocus1, object.__liaDgsEllipseFocus2, object.__liaDgsEllipsePoint
+  ].filter(Boolean);
+  if (isDgsSector(object)) return [
+    object.__liaDgsSectorCenter, object.__liaDgsSectorRadiusPoint, object.__liaDgsSectorAnglePoint
+  ].filter(Boolean);
+  if (isDgsAngle(object)) return Array.isArray(object.__liaDgsAnglePoints) ? object.__liaDgsAnglePoints.slice() : [];
+  if (isDgsCompassArc(object)) return [
+    object.__liaDgsCompassCenterPoint, object.__liaDgsCompassRadiusPoint
+  ].filter(Boolean);
+  return [];
+}
+
+function isDgsTransformableObject(object: any): boolean {
+  const points = getDgsTransformSourcePoints(object);
+  return points.length > 0 && points.every((point) =>
+    !!point && typeof point.X === 'function' && typeof point.Y === 'function'
+  );
+}
+
+function dgsPolygonContainsUserPoint(polygon: any, x: number, y: number): boolean {
+  if (!isDgsPolygon(polygon) || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const vertices = Array.isArray(polygon.vertices) ? polygon.vertices.slice() : [];
+  if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+  if (vertices.length < 3) return false;
+  let inside = false;
+  for (let index = 0, previous = vertices.length - 1; index < vertices.length; previous = index++) {
+    let xi = NaN; let yi = NaN; let xj = NaN; let yj = NaN;
+    try {
+      xi = Number(vertices[index].X()); yi = Number(vertices[index].Y());
+      xj = Number(vertices[previous].X()); yj = Number(vertices[previous].Y());
+    } catch (e) { return false; }
+    if (![xi, yi, xj, yj].every(Number.isFinite)) return false;
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+
+function findDgsSpatialObjectAt(
+  state: DgsState,
+  evt: PointerEvent,
+  predicate: (object: any) => boolean
+): any | null {
+  const direct = findDgsContextObject(state, evt as any);
+  if (direct && predicate(direct) && direct.__liaDgsShowObject !== false) return direct;
+  const rect = state.boardContainer.getBoundingClientRect();
+  const localX = evt.clientX - rect.left;
+  const localY = evt.clientY - rect.top;
+  let nearest: any | null = null;
+  let layer = -1;
+  getDgsBoardObjects(state.board).forEach(object => {
+    if (!predicate(object) || object.__liaDgsShowObject === false) return;
+    let hit = false;
+    try { hit = typeof object.hasPoint === 'function' && object.hasPoint(localX, localY); } catch (e) {}
+    // JSXGraph's polygon hasPoint normally tests only its border. A filled
+    // spatial base must also be selectable by clicking its projected interior.
+    if (!hit && (isDgsPolygon3D(object) || isDgsPlane(object))) {
+      const view = getCoordinateView3D(state.board)?.view;
+      const polygon = isDgsPlane(object)
+        ? (Array.isArray(object.__liaPlane3DClippedPolygon) ? object.__liaPlane3DClippedPolygon : [])
+        : (coordinatePolygon3DData(object)?.vertices || []);
+      if (view && polygon.length >= 3) {
+        const vertices = polygon.map((point: Vector3) => {
+          const projected = view.project3DTo2D(point);
+          return [
+            state.board.origin.scrCoords[1] + projected[1] * state.board.unitX,
+            state.board.origin.scrCoords[2] - projected[2] * state.board.unitY
+          ];
+        });
+        for (let index = 0, previous = vertices.length - 1; index < vertices.length; previous = index++) {
+          const [x, y] = vertices[index];
+          const [px, py] = vertices[previous];
+          if ((y > localY) !== (py > localY) &&
+              localX < (px - x) * (localY - y) / (py - y) + x) hit = !hit;
+        }
+      }
+    }
+    const objectLayer = getDgsObjectRenderedLayer(object);
+    if (hit && objectLayer >= layer) {
+      nearest = object;
+      layer = objectLayer;
+    }
+  });
+  return nearest;
+}
+
+function findDgsTransformSource(state: DgsState, evt: PointerEvent): any | null {
+  const direct = findDgsContextObject(state, evt as any);
+  if (isDgsTransformableObject(direct)) return direct;
+  const coordinates = eventToUserCoordinates(state, evt);
+  if (!coordinates) return null;
+  let polygon: any | null = null;
+  let layer = -1;
+  getDgsBoardObjects(state.board).forEach((candidate) => {
+    if (!isDgsPolygon(candidate) || candidate.__liaDgsShowObject === false ||
+        !dgsPolygonContainsUserPoint(candidate, coordinates.x, coordinates.y)) return;
+    const candidateLayer = getDgsObjectRenderedLayer(candidate);
+    if (candidateLayer >= layer) { polygon = candidate; layer = candidateLayer; }
+  });
+  return polygon;
+}
+
+function createDgsTransformedObject(
+  state: DgsState,
+  source: any,
+  kind: DgsTransformKind,
+  reference: any,
+  value: number
+): any | null {
+  if (!isDgsTransformableObject(source)) return null;
+  const axisFirst = kind === 'reflect-line' ? reference && reference.point1 : reference;
+  const axisSecond = kind === 'reflect-line' ? reference && reference.point2 : null;
+  if (!axisFirst || (kind === 'reflect-line' && !axisSecond)) return null;
+  const sourcePoints = getDgsTransformSourcePoints(source);
+  const transformedBySource = new Map<any, any>();
+  const transformedPoints: any[] = [];
+  const removeTransformedPoints = () => {
+    transformedBySource.forEach((point) => {
+      const name = String(point && point.__liaDgsPointName || '');
+      try {
+        if (window.__points?.[state.boardId]?.[name] === point) delete window.__points[state.boardId][name];
+      } catch (e) {}
+      try { state.board.removeObject(point); } catch (e) {}
+    });
+  };
+  for (const sourcePoint of sourcePoints) {
+    let point = transformedBySource.get(sourcePoint);
+    if (!point) {
+      point = createDgsTransformedPoint(state, sourcePoint, kind, axisFirst, axisSecond, value);
+      if (!point) { removeTransformedPoints(); return null; }
+      transformedBySource.set(sourcePoint, point);
+    }
+    transformedPoints.push(point);
+  }
+  let result: any = null;
+  if (isDgsPoint(source)) result = transformedPoints[0];
+  else if (isDgsVector(source)) result = createDgsVector(state, transformedPoints[0], transformedPoints[1]);
+  else if (isDgsRay(source)) result = createDgsRay(state, transformedPoints[0], transformedPoints[1]);
+  else if (isDgsLine(source)) result = createDgsLine(state, transformedPoints[0], transformedPoints[1]);
+  else if (source.__liaDgsSegment) result = createDgsSegment(state, transformedPoints[0], transformedPoints[1]);
+  else if (isDgsPolygon(source)) result = createDgsPolygon(state, transformedPoints);
+  else if (isDgsCircle(source)) result = createDgsCircle(state, transformedPoints[0], transformedPoints[1]);
+  else if (isDgsEllipse(source)) result = createDgsEllipse(state, transformedPoints[0], transformedPoints[1], transformedPoints[2]);
+  else if (isDgsSector(source)) result = createDgsSector(state, transformedPoints[0], transformedPoints[1], transformedPoints[2]);
+  else if (isDgsAngle(source)) result = createDgsAngle(state, transformedPoints);
+  else if (isDgsCompassArc(source)) {
+    const geometry = getDgsCompassArcGeometry(source);
+    const sweep = kind === 'reflect-line' ? -geometry.sweepAngle : geometry.sweepAngle;
+    result = createDgsCompassArc(state, transformedPoints[0], transformedPoints[1], sweep, false);
+  }
+  if (!result) { removeTransformedPoints(); return null; }
+  copyDgsObjectFormat(state, source, result, false);
+  result.__liaDgsOpacity = getDgsObjectOpacity(source);
+  result.__liaDgsShowName = source.__liaDgsShowName !== false;
+  result.__liaDgsShowLength = !!source.__liaDgsShowLength;
+  result.__liaDgsShowArea = !!source.__liaDgsShowArea;
+  result.__liaDgsShowPerimeter = !!source.__liaDgsShowPerimeter;
+  result.__liaDgsShowAngle = !!source.__liaDgsShowAngle;
+  applyDgsObjectOpacity(result);
+  if (isDgsStrokeStyleTarget(source) && isDgsStrokeStyleTarget(result)) {
+    applyDgsLineStyle(state, result, getDgsLineStyle(source), false);
+  }
+  // Standalone segments and arcs carry arrow/end-cap design separately from dash style.
+  if ((isDgsSegmentStyleTarget(source) || isDgsArc(source)) &&
+      (isDgsSegmentStyleTarget(result) || isDgsArc(result))) {
+    applyDgsStrokeStyle(state, result, getDgsStrokeDesign(source), getDgsStrokeWidth(source), false);
+  }
+  if (isDgsPolygon(result)) refreshDgsPolygonMeasurementLabel(result);
+  else refreshDgsObjectLabel(result);
+  try { state.board.update(); } catch (e) {}
+  return result;
+}
+
 function getSelectableBoardPoints(state: DgsState): any[] {
   const points: any[] = [];
   const seen = new Set<any>();
   const add = (point: any) => {
+    const spatialProxy = point?.__liaPoint3DProxy;
+    if (spatialProxy && spatialProxy !== point) {
+      add(spatialProxy);
+      return;
+    }
     if (!point || typeof point !== 'object' || point.__liaDgsTraceMarker ||
         point.__liaDgsSlider || point.__liaDgsSliderOwner || seen.has(point)) return;
+    const spatialScene = state.board?.__liaSceneMode === '3d';
+    if (spatialScene !== (point.__liaPoint3D === true)) return;
     const type = String(point.elType || '').toLowerCase();
-    if (type !== 'point' && type !== 'glider') return;
+    if (type !== 'point' && type !== 'glider' && !point.__liaPoint3D) return;
 
     try {
       if (point.visPropCalc && point.visPropCalc.visible === false) return;
@@ -4401,6 +5519,20 @@ function getSelectableBoardPoints(state: DgsState): any[] {
   return points;
 }
 
+function dgsPointScreenCoordinates(state: DgsState, point: any): { x: number; y: number } | null {
+  if (point?.__liaPoint3D) {
+    const projected = point.element2D;
+    const x = Number(projected?.coords?.scrCoords?.[1]);
+    const y = Number(projected?.coords?.scrCoords?.[2]);
+    if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+  }
+  const board = state.board;
+  try {
+    const x = Number(board.origin.scrCoords[1]) + Number(point.X()) * Number(board.unitX);
+    const y = Number(board.origin.scrCoords[2]) - Number(point.Y()) * Number(board.unitY);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  } catch (e) { return null; }
+}
 function findNearestBoardPoint(
   state: DgsState,
   evt: MouseEvent | PointerEvent,
@@ -4423,16 +5555,10 @@ function findNearestBoardPoint(
   let nearestDistance = maxDistancePx;
   getSelectableBoardPoints(state).forEach((point) => {
     if (predicate && !predicate(point)) return;
-    let x = NaN;
-    let y = NaN;
-    try {
-      x = Number(point.X());
-      y = Number(point.Y());
-    } catch (e) {}
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-
-    const dx = originX + x * unitX - localX;
-    const dy = originY - y * unitY - localY;
+    const screen = dgsPointScreenCoordinates(state, point);
+    if (!screen) return;
+    const dx = screen.x - localX;
+    const dy = screen.y - localY;
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (distance <= nearestDistance) {
       nearest = point;
@@ -4456,13 +5582,25 @@ function getNextFunctionName(state: DgsState): string {
   }
 }
 
-function findOrCreateDgsPoint(state: DgsState, evt: PointerEvent): any | null {
+function findOrCreateDgsPoint(
+  state: DgsState,
+  evt: PointerEvent,
+  createdPoints?: any[]
+): any | null {
   const existing = findNearestBoardPoint(state, evt);
   if (existing) return existing;
 
   const coordinates = eventToUserCoordinates(state, evt);
   if (!coordinates) return null;
-  return createDgsPoint(state, coordinates.x, coordinates.y);
+  let point: any | null = null;
+  if (state.board.__liaSceneMode === '3d') {
+    const spatial = projectBoardCoordinatesToXYPlane(state.board, coordinates.x, coordinates.y);
+    point = createDgsPoint(state, spatial[0], spatial[1], null, spatial[2]);
+  } else {
+    point = createDgsPoint(state, coordinates.x, coordinates.y, findDgsPointBindingTarget(state, evt));
+  }
+  if (point && createdPoints) createdPoints.push(point);
+  return point;
 }
 
 function isDgsLinearObject(object: any): boolean {
@@ -4471,10 +5609,1095 @@ function isDgsLinearObject(object: any): boolean {
   );
 }
 
+function getDgsLinearSourcePoints(object: any): [any, any] | null {
+  const spatial = coordinateLinear3DSourcePoints(object);
+  if (spatial) return spatial;
+  const points = object && [object.point1, object.point2];
+  return points && points[0] && points[1] ? points as [any, any] : null;
+}
+
+function isDgsSpatialLinearObject(object: any): boolean {
+  return !!object && object.__liaLinear3D === true && isDgsLinearObject(object);
+}
+
+function getDgsRenderedObject(object: any): any {
+  return object && (object.__liaPoint3D || object.__liaLinear3D || object.__liaPlane3D ||
+    object.__liaCircle3D || object.__liaSphere3D || object.__liaPolygon3D || object.__liaSolid3D ||
+    object.__liaCurve3D) && object.element2D
+    ? object.element2D
+    : object;
+}
+
+function getDgsRenderedParts(object: any): any[] {
+  const sphereGuides = Array.isArray(object?.__liaSphere3DGuideCurves)
+    ? object.__liaSphere3DGuideCurves : [];
+  const solidGuides = Array.isArray(object?.__liaSolid3DGuideCurves)
+    ? object.__liaSolid3DGuideCurves : [];
+  const angleGuides = Array.isArray(object?.__liaDgsAngle3DHelpers)
+    ? object.__liaDgsAngle3DHelpers : [];
+  const conicParts = Array.isArray(object?.__liaConic3DParts) ? object.__liaConic3DParts : [];
+  const candidates = [
+    object,
+    object?.curve,
+    ...conicParts,
+    ...conicParts.map((part: any) => part?.element2D),
+    ...conicParts.map((part: any) => part?.label),
+    object?.element2D,
+    ...(Array.isArray(object?.aux2D) ? object.aux2D : []),
+    ...(object?.__liaPolygon3D && Array.isArray(object?.element2D?.borders) ? object.element2D.borders : []),
+    ...sphereGuides,
+    ...sphereGuides.map((guide: any) => guide?.element2D),
+    ...solidGuides,
+    ...solidGuides.map((guide: any) => guide?.element2D),
+    ...angleGuides,
+    ...angleGuides.map((guide: any) => guide?.element2D),
+    object?.label
+  ];
+  return candidates.filter((candidate, index) =>
+    !!candidate && candidates.indexOf(candidate) === index
+  );
+}
+
+function dgsPointCoordinates3D(point: any): Vector3 | null {
+  if (!point || typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
+  const coordinates: Vector3 = [
+    Number(point.X()),
+    Number(point.Y()),
+    point.__liaPoint3D && typeof point.Z === 'function' ? Number(point.Z()) : 0
+  ];
+  return coordinates.every(Number.isFinite) ? coordinates : null;
+}
+
+function createDgsLinearElement(
+  state: DgsState,
+  kind: 'segment' | 'line' | 'ray' | 'vector',
+  point1: any,
+  point2: any,
+  attributes: Record<string, unknown>
+): any {
+  if (state.board.__liaSceneMode === '3d') {
+    return createCoordinateLinear3D(state.board, kind, point1, point2, attributes);
+  }
+  const type = kind === 'line' || kind === 'ray' ? 'line' : 'segment';
+  return state.board.create(type, [point1, point2], attributes);
+}
+
+function isDgsPlane(object: any): boolean {
+  return !!object && object.__liaPlane3D === true && object.__liaDgsPlane === true;
+}
+
+function getNextDgsPlaneName(state: DgsState): string {
+  const used = new Set(getDgsBoardObjects(state.board)
+    .filter(isDgsPlane)
+    .map(object => String(object.__liaDgsPlaneName || object.name || '').replace(/[\\()$]/g, '')));
+  if (!used.has('E')) return 'E';
+  for (let index = 2; ; index += 1) {
+    const candidate = 'E_' + index;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+function createDgsPlane(
+  state: DgsState,
+  definition: 'three-points' | 'point-normal' | 'point-vectors',
+  points: any[],
+  vectors: any[]
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const name = getNextDgsPlaneName(state);
+  try {
+    const plane = createCoordinatePlane3D(state.board, definition, points, vectors, {
+      name: '\\(' + name + '\\)',
+      withLabel: true,
+      fixed: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      highlightFillColor: '#ff00ff',
+      strokeWidth: 2,
+      fillOpacity: 0.22,
+      highlightFillOpacity: 0.32,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 18,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    plane.__liaDgsPlane = true;
+    plane.__liaDgsPlaneName = name;
+    plane.__liaDgsLanguage = state.language;
+    plane.__liaDgsShowName = true;
+    plane.__liaDgsShowEquation = false;
+    plane.__liaDgsPlaneEquationForm = 'parameter';
+    plane.__liaDgsShowObject = true;
+    plane.__liaDgsFixed = true;
+    plane.__liaDgsLineColor = '#ff00ff';
+    plane.__liaDgsFillColor = '#ff00ff';
+    plane.__liaDgsTextColor = '#ff00ff';
+    plane.__liaDgsOpacity = 0.22;
+    plane.__liaDgsLineStyle = 'solid';
+    plane.__liaDgsSegmentStrokeWidth = 2;
+    return applyDgsConstructionColor(state, plane, true);
+  } catch (e) {
+    return null;
+  }
+}
+
+function isDgsCircle3D(object: any): boolean {
+  return !!object && object.__liaCircle3D === true && object.__liaDgsCircle3D === true;
+}
+
+function isDgsSphere3D(object: any): boolean {
+  return !!object && object.__liaSphere3D === true && object.__liaDgsSphere3D === true;
+}
+
+function dgsCircleHasFill(object: any): boolean {
+  const source = object?.element2D?.visProp?.fillcolor;
+  const color = typeof source === 'function' ? source() : source;
+  return !!color && color !== 'none' && color !== 'transparent';
+}
+function getNextDgsRoundName(state: DgsState, kind: 'circle' | 'sphere'): string {
+  const prefix = kind === 'sphere' ? 'S' : 'k';
+  const used = new Set(getDgsBoardObjects(state.board)
+    .filter(object => kind === 'sphere' ? isDgsSphere3D(object) : isDgsCircle3D(object))
+    .map(object => String(object.__liaDgsSphere3DName || object.__liaDgsCircle3DName || object.name || '')
+      .replace(/[\()$]/g, '')));
+  if (!used.has(prefix)) return prefix;
+  for (let index = 2; ; index += 1) {
+    const candidate = prefix + '_' + index;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+function applyDgsRoundMetadata(
+  state: DgsState,
+  object: any,
+  kind: 'circle' | 'sphere',
+  name: string,
+  includeFill = true
+): any {
+  object.__liaDgsLanguage = state.language;
+  object.__liaDgsShowName = true;
+  object.__liaDgsShowValue = false;
+  object.__liaDgsShowArea = false;
+  object.__liaDgsShowPerimeter = false;
+  object.__liaDgsShowObject = true;
+  object.__liaDgsFixed = true;
+  object.__liaDgsLineColor = '#ff00ff';
+  object.__liaDgsFillColor = '#ff00ff';
+  object.__liaDgsTextColor = '#ff00ff';
+  object.__liaDgsOpacity = kind === 'sphere' ? 0.18 : 0.22;
+  object.__liaDgsLineStyle = 'solid';
+  object.__liaDgsSegmentStrokeWidth = 2;
+  if (kind === 'circle') {
+    object.__liaDgsCircle3D = true;
+    object.__liaDgsCircle3DName = name;
+  } else {
+    object.__liaDgsSphere3D = true;
+    object.__liaDgsSphere3DName = name;
+  }
+  refreshDgsObjectLabel(object);
+  return applyDgsConstructionColor(state, object, includeFill);
+}
+
+function createDgsCircle3D(
+  state: DgsState,
+  definition: 'three-points' | 'center-normal-radius' | 'center-normal-point',
+  points: any[],
+  vectors: any[] = [],
+  radiusSource?: number | (() => number),
+  requestedName = '',
+  constrainRadiusPoint = false
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const name = requestedName || getNextDgsRoundName(state, 'circle');
+  try {
+    const object = createCoordinateCircle3D(state.board, definition, points, vectors, radiusSource, {
+      constrainRadiusPoint,
+      name: '\(' + name + '\)',
+      withLabel: true,
+      fixed: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      fillColor: '#ff00ff', highlightFillColor: '#ff00ff',
+      fillOpacity: 0.22, highlightFillOpacity: 0.22,
+      strokeWidth: 2,
+      highlightStrokeWidth: 3,
+      label: {
+        strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18,
+        parse: false, useMathJax: true
+      }
+    });
+    return applyDgsRoundMetadata(state, object, 'circle', name);
+  } catch (e) {
+    return null;
+  }
+}
+
+function createDgsSphere3D(
+  state: DgsState,
+  definition: 'center-point' | 'center-radius' | 'four-points',
+  points: any[],
+  radiusSource?: number | (() => number),
+  requestedName = ''
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const name = requestedName || getNextDgsRoundName(state, 'sphere');
+  try {
+    const object = createCoordinateSphere3D(state.board, definition, points, radiusSource, {
+      name: '\(' + name + '\)',
+      withLabel: true,
+      fixed: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      highlightFillColor: '#ff00ff',
+      strokeWidth: 2,
+      highlightStrokeWidth: 3,
+      fillOpacity: 0.18,
+      highlightFillOpacity: 0.27,
+      label: {
+        strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18,
+        parse: false, useMathJax: true
+      }
+    });
+    return applyDgsRoundMetadata(state, object, 'sphere', name);
+  } catch (e) {
+    return null;
+  }
+}
+
+
+function isDgsPolygon3D(object: any): boolean {
+  return !!object && object.__liaPolygon3D === true &&
+    (object.__liaDgsPolygon3D === true || object.__liaDgsTransformation3D === true ||
+     object.__liaDgsSpatialIntersectionKind === 'polygon');
+}
+
+function isDgsSolid3D(object: any): boolean {
+  return !!object && object.__liaSolid3D === true &&
+    (object.__liaDgsSolid3D === true || object.__liaDgsTransformation3D === true);
+}
+
+function isDgsTransformation3D(object: any): boolean {
+  return !!object && object.__liaTransformation3D === true &&
+    object.__liaDgsTransformation3D === true;
+}
+
+
+function dgsSpatialPersistentType(object: any): string {
+  if (isDgsTransformation3D(object)) return 'transformation3d';
+  if (isDgsSolid3D(object)) return 'solid3d';
+  if (isDgsPolygon3D(object)) return 'polygon3d';
+  if (isDgsPlane(object)) return 'plane';
+  if (isDgsCircle3D(object)) return 'circle3d';
+  if (isDgsSphere3D(object)) return 'sphere3d';
+  if (isDgsVector(object)) return 'vector';
+  if (isDgsRay(object)) return 'ray';
+  if (isDgsSpatialLinearObject(object)) return object.__liaLinear3DKind || 'linear3d';
+  if (isDgsPoint(object)) return 'point';
+  return 'object';
+}
+
+function nextDgsSpatialName(state: DgsState, prefix: string): string {
+  const used = new Set(getDgsBoardObjects(state.board).map(object => String(
+    object?.__liaDgsPolygon3DName || object?.__liaDgsSolid3DName ||
+    object?.__liaDgsTransformation3DName || object?.name || ''
+  ).replace(/[\()$]/g, '')));
+  if (!used.has(prefix)) return prefix;
+  for (let index = 2; ; index += 1) {
+    const candidate = prefix + '_' + index;
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+function applyDgsSpatialBodyMetadata(
+  state: DgsState,
+  object: any,
+  kind: 'polygon' | 'solid',
+  name: string,
+  includeFill = true
+): any {
+  object.__liaDgsLanguage = state.language;
+  object.__liaDgsShowName = true;
+  object.__liaDgsShowValue = false;
+  object.__liaDgsShowArea = false;
+  object.__liaDgsShowPerimeter = false;
+  object.__liaDgsShowObject = true;
+  object.__liaDgsFixed = true;
+  object.__liaDgsLineColor = '#ff00ff';
+  object.__liaDgsFillColor = '#ff00ff';
+  object.__liaDgsTextColor = '#ff00ff';
+  object.__liaDgsOpacity = kind === 'polygon' ? 0.25 : 0.18;
+  object.__liaDgsLineStyle = 'solid';
+  object.__liaDgsSegmentStrokeWidth = 2;
+  if (kind === 'polygon') {
+    object.__liaDgsPolygon3D = true;
+    object.__liaDgsPolygon3DName = name;
+    object.__liaPolygon3DUserVisible = true;
+  } else {
+    object.__liaDgsSolid3D = true;
+    object.__liaDgsSolid3DName = name;
+    object.__liaSolid3DUserVisible = true;
+  }
+  try {
+    object.setAttribute?.({ name: '\\(' + name + '\\)', withLabel: true });
+  } catch (e) {}
+  refreshDgsObjectLabel(object);
+  return applyDgsConstructionColor(state, object, true);
+}
+
+function createDgsPolygon3D(
+  state: DgsState,
+  points: any[],
+  requestedName = ''
+): any | null {
+  if (state.board.__liaSceneMode !== '3d' || points.length < 3) return null;
+  const name = requestedName || nextDgsSpatialName(state, 'P');
+  try {
+    const object = createCoordinatePolygon3D(state.board, points, {
+      name: '\\(' + name + '\\)', withLabel: true, fixed: true,
+      strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+      fillColor: '#ff00ff', highlightFillColor: '#ff00ff',
+      strokeWidth: 2, fillOpacity: 0.25, highlightFillOpacity: 0.35,
+      label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+    });
+    return applyDgsSpatialBodyMetadata(state, object, 'polygon', name);
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateDgsSolidConstructionStatus(state: DgsState, error = ''): void {
+  const tool = state.activeTool;
+  const supported = ['angle3d', 'circle3d-three-points', 'circle3d-center-normal-point', 'polygon3d', 'tetrahedron3d', 'pyramid3d', 'prism3d',
+    'parallelepiped3d', 'cuboid3d', 'cylinder3d', 'cone3d'].includes(tool);
+  let status = state.boardContainer.querySelector('.lia-dgs-construction-status') as HTMLDivElement | null;
+  if (!supported || state.board.__liaSceneMode !== '3d') { status?.remove(); return; }
+  if (!status) {
+    status = document.createElement('div');
+    status.className = 'lia-dgs-construction-status';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    Object.assign(status.style, {
+      position: 'absolute', left: '12px', bottom: '12px', zIndex: '20',
+      maxWidth: 'calc(100% - 36px)', padding: '7px 10px', borderRadius: '6px',
+      background: 'var(--lia-dgs-menu-bg, #172024)', color: 'var(--lia-dgs-neutral-color, #fff)',
+      font: '14px/1.4 Arial, sans-serif', pointerEvents: 'none'
+    });
+    state.boardContainer.appendChild(status);
+  }
+  const de = state.language === 'de';
+  const count = tool === 'angle3d' ? state.selectedAngle3DObjects.length : state.selectedRoundPoints.length;
+  let message = '';
+  if (tool === 'angle3d') message = count
+    ? (de ? 'Zweites Objekt wählen: Gerade oder Ebene.' : 'Select the second object: line or plane.')
+    : (de ? 'Erstes Objekt wählen: Gerade oder Ebene.' : 'Select the first object: line or plane.');
+  else if (tool === 'circle3d-three-points' || tool === 'circle3d-center-normal-point') message = de
+    ? 'Klicken und ziehen: Kreisfläche aufziehen. Einzelklick: ' +
+      (tool === 'circle3d-three-points' ? 'drei Kreispunkte wählen.' : 'Mittelpunkt, Normalenvektor und Radiuspunkt wählen.')
+    : 'Click and drag to draw a disk. Single click: ' +
+      (tool === 'circle3d-three-points' ? 'select three circle points.' : 'select a center, normal vector and radius point.');
+  else if (tool === 'polygon3d') message = de
+    ? 'Eckpunkte in einer Ebene wählen; zum Schließen den ersten Punkt anklicken.'
+    : 'Select coplanar vertices; click the first point to close the polygon.';
+  else if (tool === 'tetrahedron3d') message = count < 3
+    ? (de ? 'Tetraeder: Punkt ' : 'Tetrahedron: select point ') + (count + 1) + (de ? ' von 4 wählen.' : ' of 4.')
+    : (de ? 'Tetraeder: vierten Punkt außerhalb der Grundebene wählen. Neue Punkte starten bei z = 0.'
+      : 'Tetrahedron: select a fourth point outside the base plane. New points start at z = 0.');
+  else if (tool === 'pyramid3d' || tool === 'prism3d') message = !state.selectedTransformObject
+    ? (de ? 'Zuerst ein Raumvieleck als Grundfläche auswählen.' : 'First select a spatial polygon as the base.')
+    : tool === 'pyramid3d'
+      ? (de ? 'Spitze außerhalb der Grundebene wählen. Neue Punkte starten bei z = 0.'
+        : 'Select an apex outside the base plane. New points start at z = 0.')
+      : (de ? 'Einen Verschiebungsvektor wählen, der aus der Grundebene herausführt.'
+        : 'Select a translation vector that leaves the base plane.');
+  else if (tool === 'parallelepiped3d' || tool === 'cuboid3d') message = !count
+    ? (de ? 'Zuerst den Eckpunkt des Körpers wählen.' : 'First select the corner point of the solid.')
+    : (de ? 'Kantenvektor ' : 'Select edge vector ') + (state.selectedRoundVectors.length + 1) +
+      (de ? ' von 3 wählen.' : ' of 3.') + (tool === 'cuboid3d'
+        ? (de ? ' Die drei Vektoren müssen paarweise senkrecht sein.' : ' The three vectors must be mutually perpendicular.') : '');
+  else message = count < 2
+    ? (de ? (count ? 'Zweiten Achsenpunkt' : 'Mittelpunkt der Grundfläche') + ' wählen.'
+      : (count ? 'Select the second axis point.' : 'Select the base center.'))
+    : (de ? 'Radiuspunkt außerhalb der Achse wählen.' : 'Select a radius point outside the axis.');
+  if (!error && regularSolidKindForTool(tool) && !count &&
+      !state.selectedRoundVectors.length &&
+      !((tool === 'pyramid3d' || tool === 'prism3d') && state.selectedTransformObject)) {
+    message = (de
+      ? tool === 'cuboid3d' ? 'Klicken und ziehen: Würfel aufziehen. ' : 'Klicken und ziehen: gleichmäßigen Körper aufziehen. '
+      : tool === 'cuboid3d' ? 'Click and drag to draw a cube. ' : 'Click and drag to draw a regular solid. ') +
+      (de ? 'Einzelklick: ' : 'Single click: ') + message;
+  }
+  status.textContent = error || message;
+  status.dataset.error = error ? '1' : '0';
+}
+function regularSolidKindForTool(tool: string): RegularSolid3DKind | null {
+  const kinds: Record<string, RegularSolid3DKind> = {
+    tetrahedron3d: 'tetrahedron', pyramid3d: 'pyramid', prism3d: 'prism',
+    parallelepiped3d: 'parallelepiped', cuboid3d: 'cuboid'
+  };
+  return kinds[tool] || null;
+}
+
+function regularSurfaceKindForTool(tool: string): RegularSurface3DKind | null {
+  return (tool === 'circle3d-three-points' || tool === 'circle3d-center-normal-point') ? 'circle' : null;
+}
+
+function createDgsDrawnShape3D(
+  state: DgsState, recipe: RegularSolid3DRecipe | RegularSurface3DRecipe, existingAnchor: any
+): any | null {
+  // Preserve existing points and save the complete construction as one undo step.
+  if (dgsPendingHistoryBefore[state.boardId]) persistDgsConstruction(state, true);
+  persistDgsConstruction(state, false);
+  delete dgsPendingHistoryBefore[state.boardId];
+  const created: any[] = [];
+  const wasRestoring = state.restoring;
+  const resume = !state.board.isSuspendedUpdate;
+  let result: any = null;
+  state.restoring = true;
+  if (resume) state.board.suspendUpdate?.();
+  try {
+    const points = recipe.points.map((coordinates, index) => {
+      if (index === 0 && existingAnchor?.board === state.board) return existingAnchor;
+      const point = createDgsPoint(state, coordinates[0], coordinates[1], null, coordinates[2]);
+      if (!point) throw new Error('Cannot create a construction point.');
+      created.push(point);
+      return point;
+    });
+    const hideSupport = (object: any): any => {
+      if (!object) throw new Error('Cannot create construction sources.');
+      if (!created.includes(object)) created.push(object);
+      object.__liaDgsShowName = false;
+      setDgsObjectVisible(object, false);
+      refreshDgsObjectLabel(object);
+      return object;
+    };
+    if (recipe.kind === 'circle') {
+      hideSupport(points[2]);
+      const normal = hideSupport(createDgsVector(state, points[0], points[2]));
+      result = createDgsCircle3D(state, 'center-normal-point', [points[0], points[1]], [normal], undefined, '', true);
+    } else {
+      const solidRecipe = recipe as RegularSolid3DRecipe;
+      const polygon = solidRecipe.baseIndices.length
+        ? hideSupport(createDgsPolygon3D(state, solidRecipe.baseIndices.map(index => points[index])))
+        : null;
+      const vectors = solidRecipe.vectorIndices.map(([from, to]) =>
+        hideSupport(createDgsVector(state, points[from], points[to])));
+      result = createDgsSolid3D(
+        state, solidRecipe.kind, solidRecipe.pointIndices.map(index => points[index]), vectors, polygon
+      );
+    }
+    if (!result) throw new Error('Cannot create the drawn shape.');
+    created.push(result);
+  } catch (error) {
+    for (const object of created.reverse()) {
+      try { deleteDgsObject(state, object, false); } catch (cleanupError) {}
+    }
+    result = null;
+  } finally {
+    if (resume) state.board.unsuspendUpdate?.();
+    state.restoring = wasRestoring;
+  }
+  if (result) {
+    persistDgsConstruction(state, true);
+    refreshDgsObjectList(state, true);
+  }
+  return result;
+}
+
+function mountDgsRegularSolidDrawing(state: DgsState): DgsSolidDraw3DController {
+  let preview: any = null;
+  let recipe: RegularSolid3DRecipe | RegularSurface3DRecipe | null = null;
+  let existingAnchor: any = null;
+  const removePreview = (): void => {
+    if (preview) {
+      try { preview.__liaSolid3DCleanup?.(); } catch (error) {}
+      try { preview.__liaCircle3DCleanup?.(); } catch (error) {}
+      try { state.board.removeObject?.(preview); } catch (error) {}
+      preview = null;
+    }
+    recipe = null;
+  };
+  return mountDgsSolidDraw3D(state.board, state.boardContainer, {
+    begin(event) {
+      const kind = regularSolidKindForTool(state.activeTool) || regularSurfaceKindForTool(state.activeTool);
+      if (!kind || state.selectedRoundPoints.length || state.selectedRoundVectors.length ||
+          ((kind === 'pyramid' || kind === 'prism') && state.selectedTransformObject) ||
+          eventTargetsBoardUi(event)) return null;
+      const hit = findDgsContextObject(state, event as any);
+      if (hit && !hit.__liaPoint3D) return null;
+      existingAnchor = hit?.__liaPoint3D ? hit : null;
+      let anchor = existingAnchor ? point3DCoordinates(existingAnchor) : null;
+      if (!anchor) {
+        const entry = getCoordinateView3D(state.board);
+        if (!entry) return null;
+        const origin = entry.view.project3DTo2D([0, 0, 0]);
+        const rect = state.boardContainer.getBoundingClientRect();
+        const weight = Number(origin[0]) || 1;
+        const x = (event.clientX - rect.left) * state.board.canvasWidth / Math.max(1, rect.width);
+        const y = (event.clientY - rect.top) * state.board.canvasHeight / Math.max(1, rect.height);
+        anchor = coordinateScreenDragDelta3D(state.board, [0, 0, 0],
+          x - (state.board.origin.scrCoords[1] + origin[1] / weight * state.board.unitX),
+          y - (state.board.origin.scrCoords[2] - origin[2] / weight * state.board.unitY), 'camera');
+      }
+      return anchor ? { anchor, tool: state.activeTool } : null;
+    },
+    preview(start, size) {
+      const solidKind = regularSolidKindForTool(start.tool);
+      const surfaceKind = regularSurfaceKindForTool(start.tool);
+      recipe = solidKind ? createRegularSolid3DRecipe(solidKind, start.anchor, size) :
+        surfaceKind ? createRegularSurface3DRecipe(surfaceKind, start.anchor, size) : null;
+      if (!recipe) return false;
+      if (!preview) {
+        const constructionColor = getDgsConstructionColor(state);
+        const attributes = {
+          name: '', withLabel: false, fixed: true,
+          strokeColor: constructionColor, highlightStrokeColor: constructionColor,
+          fillColor: constructionColor, highlightFillColor: constructionColor,
+          strokeWidth: 2, fillOpacity: surfaceKind ? 0.22 : 0.18,
+          highlightFillOpacity: surfaceKind ? 0.22 : 0.18, highlight: false
+        };
+        preview = recipe.kind === 'circle'
+          ? createCoordinateDependentCircle3D(state.board,
+            () => recipe?.kind === 'circle' ? recipe.circle || null : null, attributes)
+          : createCoordinateDependentSolid3D(state.board,
+            () => recipe && 'solid' in recipe ? recipe.solid : null, attributes);
+        if (surfaceKind) preview.__liaDgsSurfaceDrawPreview = true;
+        else preview.__liaDgsSolidDrawPreview = true;
+      }
+      state.board.update?.();
+      return true;
+    },
+    finish(cancelled) {
+      const completed = recipe;
+      const anchorPoint = existingAnchor;
+      existingAnchor = null;
+      removePreview();
+      if (!cancelled && completed && state.board.__liaSceneMode === '3d') {
+        const object = createDgsDrawnShape3D(state, completed, anchorPoint);
+        if (object) {
+          setActiveTool(state, '', false);
+          updateSideMenuControls(state, object);
+        }
+      }
+      state.board.update?.();
+    },
+    click(event) {
+      existingAnchor = null;
+      state.onBoardPointerDown?.(event);
+    }
+  });
+}
+function createDgsSolid3D(
+  state: DgsState,
+  definition: Solid3DDefinition,
+  points: any[] = [],
+  vectors: any[] = [],
+  polygon: any = null,
+  radius?: number | (() => number),
+  requestedName = ''
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const prefix = definition === 'tetrahedron' ? 'T' :
+    definition === 'pyramid' ? 'Py' : definition === 'prism' ? 'Pr' :
+    definition === 'cuboid' ? 'Q' : definition === 'parallelepiped' ? 'S' :
+    definition === 'cylinder' ? 'Z' : 'K';
+  const name = requestedName || nextDgsSpatialName(state, prefix);
+  try {
+    const object = createCoordinateSolid3D(state.board, definition, points, vectors, polygon || undefined, radius, {
+      name: '\\(' + name + '\\)', withLabel: true, fixed: true,
+      strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+      fillColor: '#ff00ff', highlightFillColor: '#ff00ff',
+      strokeWidth: 2, fillOpacity: 0.18, highlightFillOpacity: 0.28,
+      label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+    });
+    return applyDgsSpatialBodyMetadata(state, object, 'solid', name);
+  } catch (e) {
+    return null;
+  }
+}
+
+function applyDgsTransformation3DMetadata(
+  state: DgsState, object: any, name: string, source: any, reference: any,
+  definition: Transformation3DDefinition, parameter?: number | (() => number)
+): any {
+  object.__liaDgsTransformation3D = true;
+  object.__liaDgsTransformation3DName = name;
+  object.__liaDgsTransformation3DSource = source;
+  object.__liaDgsTransformation3DReference = reference;
+  object.__liaDgsTransformation3DDefinition = definition;
+  object.__liaDgsTransformation3DValue = parameter;
+  object.__liaDgsLanguage = state.language;
+  object.__liaDgsShowName = true;
+  object.__liaDgsShowObject = true;
+  object.__liaDgsFixed = true;
+  object.__liaDgsLineColor = '#ff00ff';
+  object.__liaDgsFillColor = '#ff00ff';
+  object.__liaDgsTextColor = '#ff00ff';
+  object.__liaDgsOpacity = object.__liaSolid3D ? 0.18 : (object.__liaPolygon3D ? 0.25 : (object.__liaCircle3D ? 0.22 : 1));
+  object.__liaDgsLineStyle = 'solid';
+  object.__liaDgsSegmentStrokeWidth = 2;
+  if (object.__liaPoint3D) {
+    object.__liaDgsPointName = name;
+    window.__points = window.__points || {};
+    window.__points[state.boardId] = window.__points[state.boardId] || {};
+    window.__points[state.boardId][name] = object;
+  } else if (object.__liaLinear3D) {
+    if (object.__liaLinear3DKind === 'vector') object.__liaDgsVectorName = name;
+    else if (object.__liaLinear3DKind === 'segment') object.__liaDgsSegmentName = name;
+    else if (object.__liaLinear3DKind === 'ray') object.__liaDgsRayName = name;
+    else object.__liaDgsLineName = name;
+  } else if (object.__liaPlane3D) object.__liaDgsPlaneName = name;
+  else if (object.__liaCircle3D) object.__liaDgsCircle3DName = name;
+  else if (object.__liaSphere3D) object.__liaDgsSphere3DName = name;
+  else if (object.__liaPolygon3D) object.__liaDgsPolygon3DName = name;
+  else if (object.__liaSolid3D) object.__liaDgsSolid3DName = name;
+  try { object.setAttribute?.({ name: '\\(' + name + '\\)', withLabel: true }); } catch (e) {}
+  refreshDgsObjectLabel(object);
+  const includeFill = !!(object.__liaPoint3D || object.__liaPlane3D || object.__liaCircle3D ||
+    object.__liaSphere3D || object.__liaPolygon3D || object.__liaSolid3D);
+  return applyDgsConstructionColor(state, object, includeFill);
+}
+
+function createDgsTransformation3D(
+  state: DgsState,
+  source: any,
+  reference: any,
+  definition: Transformation3DDefinition,
+  parameter?: number | (() => number),
+  requestedName = ''
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const evaluator = (): SimilarityTransform3D | null => {
+    if (definition === 'translate') {
+      const vector = coordinateVector3DComponents(reference);
+      return vector ? translationTransform3D(vector) : null;
+    }
+    if (definition === 'reflect-point') {
+      const point = point3DCoordinates(reference);
+      return point ? pointReflectionTransform3D(point) : null;
+    }
+    if (definition === 'reflect-line') {
+      const line = coordinateLinear3DData(reference);
+      return line ? lineReflectionTransform3D(line.anchor, line.direction) : null;
+    }
+    if (definition === 'reflect-plane') {
+      const plane = coordinatePlane3DData(reference);
+      return plane ? planeReflectionTransform3D(plane) : null;
+    }
+    const value = typeof parameter === 'function' ? Number(parameter()) : Number(parameter);
+    if (!Number.isFinite(value)) return null;
+    if (definition === 'rotate-axis') {
+      const line = coordinateLinear3DData(reference);
+      return line ? axisRotationTransform3D(line.anchor, line.direction, value * Math.PI / 180) : null;
+    }
+    const center = point3DCoordinates(reference);
+    return center ? dilationTransform3D(center, value) : null;
+  };
+  const name = requestedName || nextDgsSpatialName(state, 'T');
+  try {
+    const object = createCoordinateTransformedObject3D(
+      state.board, source, evaluator, definition, [reference], parameter,
+      {
+        name: '\\(' + name + '\\)', withLabel: true, fixed: true,
+        strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+        fillColor: '#ff00ff', highlightFillColor: '#ff00ff',
+        strokeWidth: 2, fillOpacity: source.__liaSolid3D ? 0.18 : (source.__liaCircle3D ? 0.22 : 0.25),
+        label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+      }
+    );
+    return applyDgsTransformation3DMetadata(
+      state, object, name, source, reference, definition, parameter
+    );
+  } catch (e) {
+    return null;
+  }
+}
+
+type DgsSpatialIntersectionValue =
+  | { kind: 'point'; points: Vector3[] }
+  | { kind: 'points'; points: Vector3[] }
+  | { kind: 'line'; point: Vector3; direction: Vector3 }
+  | { kind: 'circle'; circle: Circle3 }
+  | { kind: 'polygon'; polygon: Polygon3 }
+  | { kind: 'coincident' | 'invalid' | 'none'; points?: Vector3[] };
+
+function dgsSpatialIntersectionValue(first: any, second: any): DgsSpatialIntersectionValue {
+  const firstPlane = coordinatePlane3DData(first);
+  const secondPlane = coordinatePlane3DData(second);
+  const firstLine = coordinateLinear3DData(first);
+  const secondLine = coordinateLinear3DData(second);
+  const firstCircle = coordinateCircle3DData(first);
+  const secondCircle = coordinateCircle3DData(second);
+  const firstSphere = coordinateSphere3DData(first);
+  const secondSphere = coordinateSphere3DData(second);
+  const firstPolygon = coordinatePolygon3DData(first);
+  const secondPolygon = coordinatePolygon3DData(second);
+  const firstSolid = coordinateSolid3DData(first);
+  const secondSolid = coordinateSolid3DData(second);
+  const firstCurve = coordinateCurve3DData(first);
+  const secondCurve = coordinateCurve3DData(second);
+  const pointResult = (result: any): DgsSpatialIntersectionValue => ({
+    kind: result.kind === 'points' ? 'points' :
+      (result.kind === 'point' ? 'point' :
+        (result.kind === 'coincident' ? 'coincident' :
+          (result.kind === 'invalid' ? 'invalid' : 'none'))),
+    points: Array.isArray(result.points) ? result.points : []
+  });
+
+  if (firstCurve && secondPlane) {
+    if (curveContainedInPlane3D(firstCurve, secondPlane)) return { kind: 'coincident' };
+    const points = intersectCurvePlane3D(firstCurve, secondPlane).map(result => result.point);
+    return points.length ? { kind: points.length === 1 ? 'point' : 'points', points } : { kind: 'none' };
+  }
+  if (firstPlane && secondCurve) return dgsSpatialIntersectionValue(second, first);
+  if (firstCurve && secondSphere) {
+    const points = intersectCurveSphere3D(firstCurve, secondSphere).map(result => result.point);
+    return points.length ? { kind: points.length === 1 ? 'point' : 'points', points } : { kind: 'none' };
+  }
+  if (firstSphere && secondCurve) return dgsSpatialIntersectionValue(second, first);
+  if (firstCurve && secondPolygon) {
+    const points = intersectCurvePolygon3D(firstCurve, secondPolygon).map(result => result.point);
+    return points.length ? { kind: points.length === 1 ? 'point' : 'points', points } : { kind: 'none' };
+  }
+  if (firstPolygon && secondCurve) return dgsSpatialIntersectionValue(second, first);
+  if (firstCurve && first.__liaConicSection3D && secondLine) {
+    const points = intersectCurveLine3D(
+      firstCurve, secondLine.anchor, secondLine.direction, secondLine.domain
+    ).map(result => result.point);
+    return points.length ? { kind: points.length === 1 ? 'point' : 'points', points } : { kind: 'none' };
+  }
+  if (firstLine && secondCurve && second.__liaConicSection3D) {
+    return dgsSpatialIntersectionValue(second, first);
+  }
+  if (firstLine && secondPolygon) {
+    const result = intersectLinePolygon3D(firstLine.anchor, firstLine.direction, secondPolygon, firstLine.domain);
+    return result.kind === 'point' && result.point
+      ? { kind: 'point', points: [result.point] }
+      : { kind: result.kind === 'contained' ? 'coincident' : (result.kind === 'invalid' ? 'invalid' : 'none') };
+  }
+  if (firstPolygon && secondLine) return dgsSpatialIntersectionValue(second, first);
+  if (firstLine && secondSolid) {
+    const result = secondSolid.kind === 'cylinder'
+      ? intersectLineCylinder3D(firstLine.anchor, firstLine.direction, secondSolid, firstLine.domain)
+      : secondSolid.kind === 'cone'
+        ? intersectLineCone3D(firstLine.anchor, firstLine.direction, secondSolid, firstLine.domain)
+        : intersectLinePolyhedron3D(firstLine.anchor, firstLine.direction, secondSolid, firstLine.domain);
+    return pointResult(result);
+  }
+  if (firstSolid && secondLine) return dgsSpatialIntersectionValue(second, first);
+  if (firstPlane && secondSolid && secondSolid.kind !== 'cylinder' && secondSolid.kind !== 'cone') {
+    const polygon = intersectPlanePolyhedron3D(firstPlane, secondSolid);
+    return polygon ? { kind: 'polygon', polygon } : { kind: 'none' };
+  }
+  if (firstSolid && secondPlane) return dgsSpatialIntersectionValue(second, first);
+  if (firstPlane && secondPlane) {
+    const result = intersectPlanes3D(firstPlane, secondPlane);
+    return result.kind === 'line'
+      ? { kind: 'line', point: result.point, direction: result.direction }
+      : { kind: result.kind === 'invalid' ? 'invalid' : (result.kind === 'coincident' ? 'coincident' : 'none') };
+  }
+  if (firstLine && secondPlane) {
+    const result = intersectLinePlane3D(firstLine.anchor, firstLine.direction, secondPlane, firstLine.domain);
+    return result.kind === 'point' ? { kind: 'point', points: [result.point] } :
+      { kind: result.kind === 'invalid' ? 'invalid' : (result.kind === 'contained' ? 'coincident' : 'none') };
+  }
+  if (firstPlane && secondLine) return dgsSpatialIntersectionValue(second, first);
+  if (firstLine && secondLine) {
+    const result = intersectLines3D(
+      firstLine.anchor, firstLine.direction, secondLine.anchor, secondLine.direction,
+      firstLine.domain, secondLine.domain
+    );
+    return result.kind === 'point' ? { kind: 'point', points: [result.point] } :
+      { kind: result.kind === 'invalid' ? 'invalid' : (result.kind === 'coincident' ? 'coincident' : 'none') };
+  }
+  if (firstLine && secondCircle) return pointResult(intersectLineCircle3D(
+    firstLine.anchor, firstLine.direction, secondCircle, firstLine.domain
+  ));
+  if (firstCircle && secondLine) return dgsSpatialIntersectionValue(second, first);
+  if (firstLine && secondSphere) return pointResult(intersectLineSphere3D(
+    firstLine.anchor, firstLine.direction, secondSphere, firstLine.domain
+  ));
+  if (firstSphere && secondLine) return dgsSpatialIntersectionValue(second, first);
+  if (firstPlane && secondCircle) {
+    const result = intersectPlaneCircle3D(firstPlane, secondCircle);
+    return result.kind === 'coincident' ? { kind: 'circle', circle: secondCircle } : pointResult(result);
+  }
+  if (firstCircle && secondPlane) return dgsSpatialIntersectionValue(second, first);
+  if (firstPlane && secondSphere) {
+    const result = intersectPlaneSphere3D(firstPlane, secondSphere);
+    if (result.kind === 'circle' && result.circle) return { kind: 'circle', circle: result.circle };
+    if (result.kind === 'point' && result.point) return { kind: 'point', points: [result.point] };
+    return { kind: result.kind === 'invalid' ? 'invalid' : (result.kind === 'coincident' ? 'coincident' : 'none') };
+  }
+  if (firstSphere && secondPlane) return dgsSpatialIntersectionValue(second, first);
+  if (firstCircle && secondCircle) return pointResult(intersectCircles3D(firstCircle, secondCircle));
+  if (firstCircle && secondSphere) return pointResult(intersectCircleSphere3D(firstCircle, secondSphere));
+  if (firstSphere && secondCircle) return dgsSpatialIntersectionValue(second, first);
+  if (firstSphere && secondSphere) {
+    const result = intersectSpheres3D(firstSphere, secondSphere);
+    if (result.kind === 'circle' && result.circle) return { kind: 'circle', circle: result.circle };
+    if (result.kind === 'point' && result.point) return { kind: 'point', points: [result.point] };
+    return { kind: result.kind === 'invalid' ? 'invalid' : (result.kind === 'coincident' ? 'coincident' : 'none') };
+  }
+  return { kind: 'invalid' };
+}
+
+function dgsSpatialIntersectionCapabilities(first: any, second: any): {
+  points: number; line: boolean; circle: boolean; polygon: boolean;
+} {
+  const curve1 = coordinateCurve3DData(first);
+  const curve2 = coordinateCurve3DData(second);
+  if (curve1 || curve2) {
+    const current = dgsSpatialIntersectionValue(first, second);
+    return {
+      points: current.kind === 'point' || current.kind === 'points' ? current.points.length : 0,
+      line: false, circle: false, polygon: false
+    };
+  }
+  const line1 = !!coordinateLinear3DData(first);
+  const line2 = !!coordinateLinear3DData(second);
+  const plane1 = !!coordinatePlane3DData(first);
+  const plane2 = !!coordinatePlane3DData(second);
+  const circle1 = !!coordinateCircle3DData(first);
+  const circle2 = !!coordinateCircle3DData(second);
+  const sphere1 = !!coordinateSphere3DData(first);
+  const sphere2 = !!coordinateSphere3DData(second);
+  const polygon1 = !!coordinatePolygon3DData(first);
+  const polygon2 = !!coordinatePolygon3DData(second);
+  const solid1 = coordinateSolid3DData(first);
+  const solid2 = coordinateSolid3DData(second);
+  const polygon = !!(
+    (plane1 && solid2 && solid2.kind !== 'cylinder' && solid2.kind !== 'cone') ||
+    (solid1 && solid1.kind !== 'cylinder' && solid1.kind !== 'cone' && plane2)
+  );
+  return {
+    line: plane1 && plane2,
+    polygon,
+    circle: (plane1 && sphere2) || (sphere1 && plane2) || (sphere1 && sphere2) ||
+      (plane1 && circle2) || (circle1 && plane2),
+    points: ((line1 && (circle2 || sphere2 || solid2)) ||
+      (line2 && (circle1 || sphere1 || solid1)) ||
+      (plane1 && (circle2 || sphere2)) || (plane2 && (circle1 || sphere1)) ||
+      (circle1 && (circle2 || sphere2)) || (circle2 && sphere1))
+      ? 2
+      : ((line1 && (line2 || plane2 || polygon2)) ||
+         (line2 && (plane1 || polygon1)) ? 1 : 0)
+  };
+}
+
+function createDgsConicIntersectionConstruction(state: DgsState, first: any, second: any): any | null {
+  const firstPlane = coordinatePlane3DData(first);
+  const secondPlane = coordinatePlane3DData(second);
+  const firstSolid = coordinateSolid3DData(first);
+  const secondSolid = coordinateSolid3DData(second);
+  const planeObject = firstPlane && secondSolid ? first : (secondPlane && firstSolid ? second : null);
+  const solidObject = firstPlane && secondSolid ? second : (secondPlane && firstSolid ? first : null);
+  const solid = solidObject ? coordinateSolid3DData(solidObject) : null;
+  if (!planeObject || !solidObject || !solid || (solid.kind !== 'cylinder' && solid.kind !== 'cone')) return null;
+  const existingEntry = Object.values(window.__conic3DEntries || {}).find((entry: any) =>
+    entry?.board === state.board && entry.planeObject === planeObject && entry.solidObject === solidObject
+  ) as any;
+  if (existingEntry?.object) return existingEntry.object;
+  const planeName = getDgsObjectName(planeObject);
+  const solidName = getDgsObjectName(solidObject);
+  if (!planeName || !solidName || typeof window.renderConic3DFromSpec !== 'function') return null;
+  const name = nextDgsSpatialName(state, 'K');
+  dgsPersistentIdCounter += 1;
+  const uid = 'dgs-conic-' + state.uid + '-' + Date.now().toString(36) + '-' + dgsPersistentIdCounter.toString(36);
+  const objectId = 'dgs:conic-intersection:' + state.boardId + ':' + dgsPersistentIdCounter.toString(36);
+  const spec = [
+    state.boardId, name, planeName, solidName,
+    'linecolor=' + getDgsConstructionColor(state), 'width=3', 'visible=true', 'fixed=true',
+    'objectid=' + objectId
+  ].join(';');
+  const marker = document.createElement('span');
+  marker.id = 'conic3d-spec-' + uid;
+  marker.dataset.spec = spec;
+  marker.dataset.dgsCreated = 'true';
+  marker.hidden = true;
+  (document.body || document.documentElement).appendChild(marker);
+  if (!window.renderConic3DFromSpec(uid, spec)) {
+    marker.remove();
+    return null;
+  }
+  const entry = window.__conic3DEntries?.[uid];
+  if (!entry?.object) {
+    marker.remove();
+    return null;
+  }
+  entry.objects?.forEach((object: any) => {
+    object.__liaDgsSpatialIntersection = true;
+    object.__liaDgsSpatialIntersectionSource = first;
+    object.__liaDgsSpatialIntersectionSource2 = second;
+    object.__liaDgsLanguage = state.language;
+  });
+  window.__persistDgsSegment6?.(state.boardId);
+  return entry.object;
+}
+function createDgsSpatialIntersectionConstruction(state: DgsState, first: any, second: any): any | null {
+  if (state.board.__liaSceneMode !== '3d' || first === second) return null;
+  const conic = createDgsConicIntersectionConstruction(state, first, second);
+  if (conic) return conic;
+  const initial = dgsSpatialIntersectionValue(first, second);
+  if (initial.kind === 'none' || initial.kind === 'invalid' || initial.kind === 'coincident') return null;
+  const existing = getDgsBoardObjects(state.board).find(object =>
+    object?.__liaDgsSpatialIntersection && !object.__liaDgsSpatialIntersectionBranchHelper &&
+    ((object.__liaDgsSpatialIntersectionSource === first && object.__liaDgsSpatialIntersectionSource2 === second) ||
+     (object.__liaDgsSpatialIntersectionSource === second && object.__liaDgsSpatialIntersectionSource2 === first))
+  );
+  if (existing) return existing;
+  const capabilities = dgsSpatialIntersectionCapabilities(first, second);
+  const objects: any[] = [];
+  try {
+    const decorate = (object: any, resultKind: 'point' | 'line' | 'circle' | 'polygon', branch = 0) => {
+      object.__liaDgsSpatialIntersection = true;
+      object.__liaDgsSpatialIntersectionKind = resultKind;
+      object.__liaDgsSpatialIntersectionBranch = branch;
+      object.__liaDgsSpatialIntersectionSource = first;
+      object.__liaDgsSpatialIntersectionSource2 = second;
+      object.__liaDgsLanguage = state.language;
+      object.__liaDgsShowName = true;
+      object.__liaDgsShowObject = true;
+      object.__liaDgsFixed = true;
+      object.__liaDgsLineColor = '#ff00ff';
+      object.__liaDgsFillColor = '#ff00ff';
+      object.__liaDgsTextColor = '#ff00ff';
+      object.__liaDgsOpacity = 1;
+      applyDgsConstructionColor(state, object, resultKind === 'point' || resultKind === 'polygon');
+      objects.push(object);
+      return object;
+    };
+    for (let branch = 0; branch < capabilities.points; branch += 1) {
+      const seed = (initial.kind === 'point' || initial.kind === 'points')
+        ? (initial.points[branch] || initial.points[0])
+        : [0, 0, 0] as Vector3;
+      let initializing = true;
+      const name = getNextPointName(state);
+      const point = createCoordinateDependentPoint3D(state.board, () => {
+        const value = dgsSpatialIntersectionValue(first, second);
+        if (value.kind === 'point' || value.kind === 'points') return value.points[branch] || null;
+        return initializing ? seed : null;
+      }, {
+        name: '\(' + name + '\)', withLabel: true, fixed: true,
+        strokeColor: '#ff00ff', fillColor: '#ff00ff',
+        highlightStrokeColor: '#ff00ff', highlightFillColor: '#ff00ff', size: 4,
+        label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+      });
+      initializing = false;
+      point.__liaDgsPointName = name;
+      point.__liaPointVisual = { color: '#ff00ff', opacity: 1, hasExplicitColor: false };
+      window.__points = window.__points || {};
+      window.__points[state.boardId] = window.__points[state.boardId] || {};
+      window.__points[state.boardId][name] = point;
+      decorate(point, 'point', branch);
+    }
+    if (capabilities.line) {
+      const seed = initial.kind === 'line'
+        ? { point: initial.point, direction: initial.direction }
+        : { point: [0, 0, 0] as Vector3, direction: [1, 0, 0] as Vector3 };
+      let initializing = true;
+      const name = getNextSegmentName(state);
+      const line = createCoordinateDependentLine3D(state.board, () => {
+        const value = dgsSpatialIntersectionValue(first, second);
+        return value.kind === 'line'
+          ? { point: value.point, direction: value.direction }
+          : (initializing ? seed : null);
+      }, {
+        name: '\(' + name + '\)', withLabel: true, fixed: true,
+        strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff', strokeWidth: 3,
+        highlightStrokeWidth: 4,
+        label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+      });
+      initializing = false;
+      line.__liaDgsLine = true;
+      line.__liaDgsLineName = name;
+      decorate(line, 'line');
+    }
+    if (capabilities.circle) {
+      const fallbackPlane = coordinatePlane3DData(first) || coordinatePlane3DData(second);
+      const seedCircle = initial.kind === 'circle'
+        ? initial.circle
+        : circleFromCenterNormalRadius(
+          (initial.kind === 'point' || initial.kind === 'points') ? initial.points[0] : [0, 0, 0],
+          fallbackPlane?.normal || [0, 0, 1],
+          1
+        );
+      if (seedCircle) {
+        let initializing = true;
+        const name = getNextDgsRoundName(state, 'circle');
+        const circle = createCoordinateDependentCircle3D(state.board, () => {
+          const value = dgsSpatialIntersectionValue(first, second);
+          return value.kind === 'circle' ? value.circle : (initializing ? seedCircle : null);
+        }, {
+          name: '\(' + name + '\)', withLabel: true, fixed: true,
+          strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+          strokeWidth: 2, highlightStrokeWidth: 3,
+          label: { strokeColor: '#ff00ff', fillColor: '#ff00ff', fontSize: 18, parse: false, useMathJax: true }
+        });
+        initializing = false;
+        applyDgsRoundMetadata(state, circle, 'circle', name, false);
+        decorate(circle, 'circle');
+      }
+    }
+    if (capabilities.polygon && initial.kind === 'polygon') {
+      let initializing = true;
+      const name = nextDgsSpatialName(state, 'S');
+      const polygon = createCoordinateDependentPolygon3D(state.board, () => {
+        const value = dgsSpatialIntersectionValue(first, second);
+        return value.kind === 'polygon' ? value.polygon : (initializing ? initial.polygon : null);
+      }, {
+        name: '\\(' + name + '\\)', withLabel: true, fixed: true,
+        strokeColor: '#ff00ff', highlightStrokeColor: '#ff00ff',
+        fillColor: '#ff00ff', highlightFillColor: '#ff00ff',
+        strokeWidth: 2, fillOpacity: 0.25, highlightFillOpacity: 0.35
+      });
+      initializing = false;
+      applyDgsSpatialBodyMetadata(state, polygon, 'polygon', name);
+      decorate(polygon, 'polygon');
+    }
+    const owner = initial.kind === 'line'
+      ? objects.find(object => object.__liaDgsSpatialIntersectionKind === 'line')
+      : (initial.kind === 'circle'
+        ? objects.find(object => object.__liaDgsSpatialIntersectionKind === 'circle')
+        : objects.find(object => object.__liaDgsSpatialIntersectionKind === 'point'));
+    if (!owner) return null;
+    objects.forEach(object => {
+      object.__liaDgsSpatialIntersectionOwner = owner;
+      object.__liaDgsSpatialIntersectionObjects = objects;
+      if (object !== owner) object.__liaDgsSpatialIntersectionBranchHelper = true;
+    });
+    return owner;
+  } catch (e) {
+    objects.forEach(object => {
+      try { object.__liaCircle3DCleanup?.(); } catch (e2) {}
+      try { object.__liaLinear3DCleanup?.(); } catch (e2) {}
+      try { object.__liaPolygon3DCleanup?.(); } catch (e2) {}
+      try { state.board.removeObject(object); } catch (e2) {}
+    });
+    return null;
+  }
+}
+function installDgsSpatialPointBinding(
+  point: any,
+  source: any,
+  parameters?: { kind: 'line'; t: number } | { kind: 'plane'; u: number; v: number } |
+    { kind: 'circle'; angle: number } | { kind: 'sphere'; direction: Vector3 } |
+    { kind: 'polygon'; u: number; v: number } |
+    { kind: 'curve'; t: number } | { kind: 'surface'; u: number; v: number } |
+    { kind: 'solid'; surface: 'side' | 'base' | 'top' | 'face'; face?: number; u?: number; v?: number; angle?: number; height?: number; radial?: number } | null
+): boolean {
+  return constrainCoordinatePoint3D(point, source, parameters);
+}
 function findNearestDgsLinearObject(
   state: DgsState,
   evt: MouseEvent | PointerEvent,
-  maxDistancePx = 12
+  maxDistancePx = 12,
+  excludedObject: any = null,
+  predicate: (object: any) => boolean = () => true
 ): any | null {
   const board = state.board;
   if (!board || !board.origin || !board.origin.scrCoords) return null;
@@ -4492,7 +6715,8 @@ function findNearestDgsLinearObject(
   let nearestLayer = -1;
   const seen = new Set<any>();
   const consider = (line: any) => {
-    if (!isDgsLinearObject(line) || seen.has(line) || line.__liaDgsShowObject === false) return;
+    if (line === excludedObject || !isDgsLinearObject(line) || !predicate(line) || seen.has(line) ||
+        line.__liaDgsShowObject === false) return;
     seen.add(line);
     try {
       if (typeof line.hasPoint === 'function' && line.hasPoint(localX, localY)) {
@@ -4505,8 +6729,9 @@ function findNearestDgsLinearObject(
         return;
       }
     } catch (e) {}
-    const point1 = line.point1;
-    const point2 = line.point2;
+    const sourcePoints = getDgsLinearSourcePoints(line);
+    const point1 = sourcePoints?.[0];
+    const point2 = sourcePoints?.[1];
     if (!point1 || !point2 || typeof point1.X !== 'function' || typeof point2.X !== 'function') return;
     try {
       const x1 = originX + Number(point1.X()) * unitX;
@@ -4531,6 +6756,7 @@ function findNearestDgsLinearObject(
       }
     } catch (e) {}
   };
+  getCoordinateView3D(board)?.linearObjects.forEach(consider);
   if (Array.isArray(board.objectsList)) board.objectsList.forEach(consider);
   if (board.objects && typeof board.objects === 'object') {
     Object.keys(board.objects).forEach((key) => consider(board.objects[key]));
@@ -4557,8 +6783,142 @@ function isDgsTangentTarget(object: any): boolean {
 }
 
 function isDgsIntersectionTarget(object: any): boolean {
-  return isDgsTangentTarget(object) ||
+  return isDgsTangentTarget(object) || isDgsPlane(object) || isDgsCircle3D(object) ||
+    isDgsSphere3D(object) || isDgsPolygon3D(object) || isDgsSolid3D(object) ||
+    isDgsCurve3D(object) || isDgsEllipse(object) ||
     (isDgsCompassArc(object) && !object.__liaDgsCompassDraft);
+}
+
+function getDgsPointBindingSource(point: any): any | null {
+  if (!point) return null;
+  const source = point.slideObject || point.__liaDgsGliderSource || point.__liaPoint3DBindingSource || null;
+  return source && source.__liaDgsAnalysisTarget ? source.__liaDgsAnalysisTarget : source;
+}
+
+function isDgsBindablePoint(point: any): boolean {
+  const measuredAnglePoint = isDgsPoint(point) && getDgsBoardObjects(point.board).some((object) =>
+    object && object.__liaDgsMeasuredConstruction && object.__liaDgsGeneratedPoint === point
+  );
+  return isDgsPoint(point) && !point.__liaPoint3DDependent && !measuredAnglePoint && !point.__liaDgsHelperPoint && !point.__liaDgsMidpoint &&
+    !point.__liaDgsTransformPoint &&
+    !point.__liaDgsRootPoint && !point.__liaDgsExtremumPoint &&
+    !point.__liaDgsInflectionPoint && !point.__liaDgsYInterceptPoint &&
+    !point.__liaDgsIntersectionPoint && !point.__liaDgsTangentPoint &&
+    !point.__liaDgsGeneratedPoint && !point.__liaDgsCoordinateExpressions;
+}
+
+function isDgsPointBindingTarget(object: any): boolean {
+  const target = object && object.__liaDgsAnalysisTarget ? object.__liaDgsAnalysisTarget : object;
+  return !!target && target.__liaDgsShowObject !== false && !target.__liaDgsCompassDraft && (
+    isDgsLinearObject(target) || isDgsPlane(target) || isDgsCircle3D(target) || isDgsSphere3D(target) ||
+    isDgsPolygon3D(target) || isDgsSolid3D(target) || isDgsCurve3D(target) || isDgsSurface3D(target) ||
+    isDgsFunctionTarget(target) || isDgsCircle(target) || isDgsEllipse(target) ||
+    isDgsArc(target) || isDgsCompassArc(target)
+  );
+}
+
+function getDgsPointBindingSourceKind(source: any): string {
+  if (isDgsSurface3D(source)) return 'surface3d';
+  if (isDgsCurve3D(source)) return 'curve3d';
+  if (isDgsPolygon3D(source)) return 'polygon3d';
+  if (isDgsSolid3D(source)) return 'solid3d';
+  if (isDgsPlane(source)) return 'plane';
+  if (isDgsCircle3D(source)) return 'circle3d';
+  if (isDgsSphere3D(source)) return 'sphere3d';
+  if (isDgsFunctionTarget(source)) return 'function';
+  if (isDgsCircle(source)) return 'circle';
+  if (isDgsEllipse(source)) return 'ellipse';
+  if (isDgsCompassArc(source)) return 'compass-arc';
+  if (isDgsArc(source)) return 'arc';
+  if (isDgsRay(source)) return 'ray';
+  if (isDgsVector(source)) return 'vector';
+  if (source && source.__liaDgsSegment) return 'segment';
+  return 'line';
+}
+
+function findDgsPointBindingTarget(
+  state: DgsState,
+  evt: MouseEvent | PointerEvent,
+  excludedPoint: any = null
+): any | null {
+  const rect = state.boardContainer.getBoundingClientRect();
+  const localX = evt.clientX - rect.left;
+  const localY = evt.clientY - rect.top;
+  let nearest: any | null = null;
+  let nearestLayer = -1;
+  const seen = new Set<any>();
+  getDgsBoardObjects(state.board).forEach((object) => {
+    const target = object && object.__liaDgsAnalysisTarget ? object.__liaDgsAnalysisTarget : object;
+    if (!target || target === excludedPoint || seen.has(target) || !isDgsPointBindingTarget(target)) return;
+    seen.add(target);
+    let hit = false;
+    try { hit = typeof target.hasPoint === 'function' && target.hasPoint(localX, localY); } catch (e) {}
+    if (!hit) return;
+    const layer = getDgsObjectRenderedLayer(target);
+    if (layer >= nearestLayer) {
+      nearest = target;
+      nearestLayer = layer;
+    }
+  });
+  return nearest || findNearestDgsLinearObject(state, evt, 12, excludedPoint);
+}
+
+function findDgsPointBindingTargetAtPoint(state: DgsState, point: any): any | null {
+  if (!point || !state.boardContainer) return null;
+  const rect = state.boardContainer.getBoundingClientRect();
+  let clientX = NaN;
+  let clientY = NaN;
+  try {
+    clientX = rect.left + Number(state.board.origin.scrCoords[1]) + Number(point.X()) * Number(state.board.unitX);
+    clientY = rect.top + Number(state.board.origin.scrCoords[2]) - Number(point.Y()) * Number(state.board.unitY);
+  } catch (e) {}
+  if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+  return findDgsPointBindingTarget(state, { clientX, clientY } as PointerEvent, point);
+}
+
+function bindDgsPointToObject(
+  state: DgsState,
+  point: any,
+  source: any,
+  parameters?: { kind: 'line'; t: number } | { kind: 'plane'; u: number; v: number } |
+    { kind: 'circle'; angle: number } | { kind: 'sphere'; direction: Vector3 } |
+    { kind: 'polygon'; u: number; v: number } |
+    { kind: 'curve'; t: number } | { kind: 'surface'; u: number; v: number } |
+    { kind: 'solid'; surface: 'side' | 'base' | 'top' | 'face'; face?: number; u?: number; v?: number; angle?: number; height?: number; radial?: number } | null
+): boolean {
+  if (!isDgsBindablePoint(point) || !isDgsPointBindingTarget(source) || source === point) return false;
+  const current = getDgsPointBindingSource(point);
+  if (point.__liaPoint3D) {
+    if (current === source) return true;
+    return installDgsSpatialPointBinding(point, source, parameters);
+  }
+  if (current === source) return true;
+  try {
+    while (point.slideObject && typeof point.popSlideObject === 'function') point.popSlideObject();
+    if (typeof point.makeGlider !== 'function') return false;
+    point.makeGlider(source);
+    point.__liaDgsGliderSource = source;
+    if (state.board && typeof state.board.update === 'function') state.board.update();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function unbindDgsPoint(state: DgsState, point: any): boolean {
+  if (!isDgsBindablePoint(point) || !getDgsPointBindingSource(point)) return false;
+  if (point.__liaPoint3D) {
+    clearCoordinatePoint3DConstraint(point);
+    return true;
+  }
+  try {
+    while (point.slideObject && typeof point.popSlideObject === 'function') point.popSlideObject();
+    point.__liaDgsGliderSource = null;
+    if (state.board && typeof state.board.update === 'function') state.board.update();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
@@ -4579,7 +6939,7 @@ function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
     } catch (e) {}
     const objectLayer = getDgsObjectRenderedLayer(object);
     if (hit && objectLayer >= layer) {
-      nearest = object;
+      nearest = object.__liaDgsAnalysisTarget || object;
       layer = objectLayer;
     }
   });
@@ -4587,29 +6947,36 @@ function findDgsTangentTarget(state: DgsState, evt: PointerEvent): any | null {
 }
 
 function findDgsIntersectionTarget(state: DgsState, evt: PointerEvent): any | null {
-  const context = findDgsContextObject(state, evt as any);
-  if (isDgsIntersectionTarget(context)) return context;
+  // At a crossing, the first selected object can remain the topmost hit.
+  // Exclude it so a second click can select the other contributing object.
+  const excluded = state.selectedIntersectionObject;
+  const contextObject = findDgsContextObject(state, evt as any);
+  const context = contextObject?.__liaDgsAnalysisTarget || contextObject;
+  if (context !== excluded && context?.__liaDgsShowObject !== false &&
+      isDgsIntersectionTarget(context)) return context;
   const rect = state.boardContainer.getBoundingClientRect();
   const localX = evt.clientX - rect.left;
   const localY = evt.clientY - rect.top;
   let nearest: any | null = null;
   let layer = -1;
   getDgsBoardObjects(state.board).forEach((object) => {
-    if (!isDgsFunctionTarget(object) && !isDgsCircle(object) && !isDgsCompassArc(object)) return;
-    if (object.__liaDgsCompassDraft || object.__liaDgsShowObject === false) return;
+    if (!isDgsFunctionTarget(object) && !isDgsPlane(object) && !isDgsCircle(object) &&
+        !isDgsEllipse(object) && !isDgsCompassArc(object) &&
+        !isDgsPolygon3D(object) && !isDgsSolid3D(object) && !isDgsCurve3D(object)) return;
+    if ((object.__liaDgsAnalysisTarget || object) === excluded || object.__liaDgsCompassDraft || object.__liaDgsShowObject === false) return;
     let hit = false;
     try {
-      hit = isDgsCircle(object)
-        ? dgsCircleContainsPointer(state, object, localX, localY)
+      hit = isDgsCircle(object) || isDgsEllipse(object)
+        ? dgsClosedConicContainsPointer(state, object, localX, localY)
         : (typeof object.hasPoint === 'function' && object.hasPoint(localX, localY));
     } catch (e) {}
     const objectLayer = getDgsObjectRenderedLayer(object);
     if (hit && objectLayer >= layer) {
-      nearest = object;
+      nearest = object.__liaDgsAnalysisTarget || object;
       layer = objectLayer;
     }
   });
-  return nearest || findNearestDgsLinearObject(state, evt);
+  return nearest || findNearestDgsLinearObject(state, evt, 12, excluded);
 }
 
 function findDgsRootTarget(state: DgsState, evt: PointerEvent, functionsOnly = false): any | null {
@@ -4633,7 +7000,7 @@ function findDgsRootTarget(state: DgsState, evt: PointerEvent, functionsOnly = f
       if (typeof object.hasPoint !== 'function' || !object.hasPoint(localX, localY)) return;
       const objectLayer = getDgsObjectRenderedLayer(object);
       if (objectLayer >= layer) {
-        nearest = object;
+        nearest = object.__liaDgsAnalysisTarget || object;
         layer = objectLayer;
       }
     } catch (e) {}
@@ -4818,6 +7185,157 @@ function getDgsCircleData(source: any): { x: number; y: number; radius: number }
   } catch (e) { return null; }
 }
 
+type DgsEllipseData = {
+  cx: number;
+  cy: number;
+  a: number;
+  b: number;
+  cos: number;
+  sin: number;
+};
+
+function getDgsEllipseData(source: any): DgsEllipseData | null {
+  if (!isDgsEllipse(source)) return null;
+  try {
+    const focus1 = source.__liaDgsEllipseFocus1;
+    const focus2 = source.__liaDgsEllipseFocus2;
+    const point = source.__liaDgsEllipsePoint;
+    const x1 = Number(focus1.X());
+    const y1 = Number(focus1.Y());
+    const x2 = Number(focus2.X());
+    const y2 = Number(focus2.Y());
+    const px = Number(point.X());
+    const py = Number(point.Y());
+    if (![x1, y1, x2, y2, px, py].every(Number.isFinite)) return null;
+    const cx = (x1 + x2) / 2;
+    const cy = (y1 + y2) / 2;
+    const focusDistance = Math.hypot(x2 - x1, y2 - y1);
+    const focalRadius = focusDistance / 2;
+    const a = (Math.hypot(px - x1, py - y1) + Math.hypot(px - x2, py - y2)) / 2;
+    if (!Number.isFinite(a) || a <= focalRadius + 1e-10) return null;
+    const b = Math.sqrt(Math.max(0, a * a - focalRadius * focalRadius));
+    if (!Number.isFinite(b) || b <= 1e-10) return null;
+    const angle = focusDistance > 1e-10
+      ? Math.atan2(y2 - y1, x2 - x1)
+      : Math.atan2(py - cy, px - cx);
+    return { cx, cy, a, b, cos: Math.cos(angle), sin: Math.sin(angle) };
+  } catch (e) { return null; }
+}
+
+function getDgsEllipsePoint(data: DgsEllipseData, angle: number): DgsAnalysisPosition {
+  const along = data.a * Math.cos(angle);
+  const across = data.b * Math.sin(angle);
+  return {
+    x: data.cx + along * data.cos - across * data.sin,
+    y: data.cy + along * data.sin + across * data.cos
+  };
+}
+
+function getDgsEllipseImplicitValue(data: DgsEllipseData, x: number, y: number): number {
+  const dx = x - data.cx;
+  const dy = y - data.cy;
+  const along = dx * data.cos + dy * data.sin;
+  const across = -dx * data.sin + dy * data.cos;
+  return along * along / (data.a * data.a) + across * across / (data.b * data.b) - 1;
+}
+
+function getDgsLineEllipseIntersections(
+  line: { x: number; y: number; dx: number; dy: number },
+  ellipse: DgsEllipseData
+): Array<{ ratio: number; x: number; y: number }> {
+  const offsetX = line.x - ellipse.cx;
+  const offsetY = line.y - ellipse.cy;
+  const u0 = offsetX * ellipse.cos + offsetY * ellipse.sin;
+  const v0 = -offsetX * ellipse.sin + offsetY * ellipse.cos;
+  const du = line.dx * ellipse.cos + line.dy * ellipse.sin;
+  const dv = -line.dx * ellipse.sin + line.dy * ellipse.cos;
+  const a = du * du / (ellipse.a * ellipse.a) + dv * dv / (ellipse.b * ellipse.b);
+  const b = 2 * (u0 * du / (ellipse.a * ellipse.a) + v0 * dv / (ellipse.b * ellipse.b));
+  const c = u0 * u0 / (ellipse.a * ellipse.a) + v0 * v0 / (ellipse.b * ellipse.b) - 1;
+  if (a <= 1e-14) return [];
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < -1e-10) return [];
+  const root = Math.sqrt(Math.max(0, discriminant));
+  const ratios = root <= 1e-10 ? [-b / (2 * a)] : [(-b - root) / (2 * a), (-b + root) / (2 * a)];
+  return ratios.map((ratio) => ({
+    ratio,
+    x: line.x + ratio * line.dx,
+    y: line.y + ratio * line.dy
+  }));
+}
+
+function getDgsEllipseImplicitIntersections(
+  ellipse: DgsEllipseData,
+  evaluate: (x: number, y: number) => number
+): DgsAnalysisPosition[] {
+  const count = 1440;
+  const step = Math.PI * 2 / count;
+  const values: number[] = [];
+  for (let index = 0; index <= count; index += 1) {
+    const point = getDgsEllipsePoint(ellipse, index * step);
+    let value = NaN;
+    try { value = Number(evaluate(point.x, point.y)); } catch (e) {}
+    values.push(value);
+  }
+  const angles: number[] = [];
+  const addAngle = (angle: number) => {
+    if (!Number.isFinite(angle)) return;
+    const full = Math.PI * 2;
+    const normalized = ((angle % full) + full) % full;
+    if (!angles.some((candidate) => {
+      const difference = Math.abs(candidate - normalized);
+      return Math.min(difference, full - difference) <= step * 0.2;
+    })) angles.push(normalized);
+  };
+  for (let index = 0; index < count; index += 1) {
+    const leftValue = values[index];
+    const rightValue = values[index + 1];
+    if (!Number.isFinite(leftValue) || !Number.isFinite(rightValue)) continue;
+    if (Math.abs(leftValue) <= 1e-8) addAngle(index * step);
+    if (leftValue * rightValue < 0) {
+      let left = index * step;
+      let right = (index + 1) * step;
+      let fLeft = leftValue;
+      for (let iteration = 0; iteration < 55; iteration += 1) {
+        const middle = (left + right) / 2;
+        const point = getDgsEllipsePoint(ellipse, middle);
+        const fMiddle = Number(evaluate(point.x, point.y));
+        if (!Number.isFinite(fMiddle)) break;
+        if (Math.abs(fMiddle) <= 1e-10 || right - left <= 1e-11) {
+          left = middle;
+          right = middle;
+          break;
+        }
+        if (fLeft * fMiddle <= 0) right = middle;
+        else { left = middle; fLeft = fMiddle; }
+      }
+      addAngle((left + right) / 2);
+    }
+  }
+  for (let index = 1; index < count; index += 1) {
+    if (!Number.isFinite(values[index]) ||
+        Math.abs(values[index]) > Math.abs(values[index - 1]) ||
+        Math.abs(values[index]) > Math.abs(values[index + 1])) continue;
+    let left = (index - 1) * step;
+    let right = (index + 1) * step;
+    for (let iteration = 0; iteration < 44; iteration += 1) {
+      const first = left + (right - left) / 3;
+      const second = right - (right - left) / 3;
+      const firstPoint = getDgsEllipsePoint(ellipse, first);
+      const secondPoint = getDgsEllipsePoint(ellipse, second);
+      const firstValue = Math.abs(Number(evaluate(firstPoint.x, firstPoint.y)));
+      const secondValue = Math.abs(Number(evaluate(secondPoint.x, secondPoint.y)));
+      if (!Number.isFinite(firstValue) || !Number.isFinite(secondValue)) break;
+      if (firstValue <= secondValue) right = second;
+      else left = first;
+    }
+    const angle = (left + right) / 2;
+    const point = getDgsEllipsePoint(ellipse, angle);
+    if (Math.abs(Number(evaluate(point.x, point.y))) <= 1e-7) addAngle(angle);
+  }
+  return angles.map((angle) => getDgsEllipsePoint(ellipse, angle));
+}
+
 function getDgsIntersectionCircleData(
   source: any
 ): { x: number; y: number; radius: number } | null {
@@ -4894,6 +7412,7 @@ function getDgsIntersectionPositions(
     const other = firstFunction ? second : first;
     const otherLine = getDgsLineData(other);
     const otherCircle = getDgsIntersectionCircleData(other);
+    const otherEllipse = getDgsEllipseData(other);
     const evaluateGraph = (x: number) => {
       try {
         const y = Number(graph.Y(x));
@@ -4918,6 +7437,7 @@ function getDgsIntersectionPositions(
             (y - otherCircle.y) * (y - otherCircle.y) -
             otherCircle.radius * otherCircle.radius;
         }
+        if (otherEllipse) return getDgsEllipseImplicitValue(otherEllipse, x, y);
         return NaN;
       }
     };
@@ -4933,6 +7453,8 @@ function getDgsIntersectionPositions(
   const secondLine = getDgsLineData(second);
   const firstCircle = getDgsIntersectionCircleData(first);
   const secondCircle = getDgsIntersectionCircleData(second);
+  const firstEllipse = getDgsEllipseData(first);
+  const secondEllipse = getDgsEllipseData(second);
   if (firstLine && secondLine) {
     const determinant = firstLine.dx * secondLine.dy - firstLine.dy * secondLine.dx;
     if (Math.abs(determinant) <= 1e-12) return [];
@@ -4948,6 +7470,13 @@ function getDgsIntersectionPositions(
   const lineSource = firstLine ? first : (secondLine ? second : null);
   const line = firstLine || secondLine;
   const circle = firstCircle || secondCircle;
+  const ellipse = firstEllipse || secondEllipse;
+  if (line && ellipse && lineSource) {
+    getDgsLineEllipseIntersections(line, ellipse).forEach((position) => {
+      if (isPointOnDgsLinearObject(lineSource, position.x, position.y)) add(position.x, position.y);
+    });
+    return positions.sort((a, b) => a.x - b.x || a.y - b.y);
+  }
   if (line && circle && lineSource) {
     const offsetX = line.x - circle.x;
     const offsetY = line.y - circle.y;
@@ -4984,6 +7513,23 @@ function getDgsIntersectionPositions(
     const perpendicularY = dx / distance;
     add(baseX + height * perpendicularX, baseY + height * perpendicularY);
     if (height > tolerance) add(baseX - height * perpendicularX, baseY - height * perpendicularY);
+    return positions.sort((a, b) => a.x - b.x || a.y - b.y);
+  }
+
+  if (ellipse) {
+    const otherEllipse = firstEllipse && secondEllipse
+      ? (ellipse === firstEllipse ? secondEllipse : firstEllipse)
+      : null;
+    const otherCircle = firstEllipse ? secondCircle : firstCircle;
+    const evaluate = otherEllipse
+      ? (x: number, y: number) => getDgsEllipseImplicitValue(otherEllipse, x, y)
+      : (otherCircle
+        ? (x: number, y: number) => (x - otherCircle.x) * (x - otherCircle.x) +
+          (y - otherCircle.y) * (y - otherCircle.y) - otherCircle.radius * otherCircle.radius
+        : null);
+    if (evaluate) {
+      getDgsEllipseImplicitIntersections(ellipse, evaluate).forEach((point) => add(point.x, point.y));
+    }
   }
   return positions.sort((a, b) => a.x - b.x || a.y - b.y);
 }
@@ -5280,6 +7826,11 @@ function createDgsRootConstruction(state: DgsState, source: any): any | null {
 
 function createDgsIntersectionConstruction(state: DgsState, first: any, second: any): any | null {
   if (!isDgsIntersectionTarget(first) || !isDgsIntersectionTarget(second) || first === second) return null;
+  if (state.board.__liaSceneMode === '3d' &&
+      ((isDgsSpatialLinearObject(first) || isDgsPlane(first) || isDgsCircle3D(first) || isDgsSphere3D(first)) &&
+       (isDgsSpatialLinearObject(second) || isDgsPlane(second) || isDgsCircle3D(second) || isDgsSphere3D(second)))) {
+    return createDgsSpatialIntersectionConstruction(state, first, second);
+  }
   const candidates = state.rootConstructions.concat(
     Array.isArray(first.__liaDgsIntersectionConstructions)
       ? first.__liaDgsIntersectionConstructions
@@ -5590,12 +8141,396 @@ function setSelectedBisectorPoints(state: DgsState, points: any[]): void {
   });
 }
 
+function setSelectedTransformInputs(state: DgsState, object: any | null, reference: any | null): void {
+  [state.selectedTransformObject, state.selectedTransformReference].forEach((candidate) => {
+    const node = candidate && candidate.rendNode;
+    try { node?.classList?.remove('lia-dgs-relation-source'); } catch (e) {}
+  });
+  state.selectedTransformObject = object || null;
+  state.selectedTransformReference = reference || null;
+  [state.selectedTransformObject, state.selectedTransformReference].forEach((candidate) => {
+    const node = candidate && candidate.rendNode;
+    try { node?.classList?.add('lia-dgs-relation-source'); } catch (e) {}
+  });
+}
+
 function setSelectedIntersectionObject(state: DgsState, object: any | null): void {
   const previousNode = state.selectedIntersectionObject && state.selectedIntersectionObject.rendNode;
   try { if (previousNode && previousNode.classList) previousNode.classList.remove('lia-dgs-relation-source'); } catch (e) {}
   state.selectedIntersectionObject = object || null;
   const nextNode = state.selectedIntersectionObject && state.selectedIntersectionObject.rendNode;
   try { if (nextNode && nextNode.classList) nextNode.classList.add('lia-dgs-relation-source'); } catch (e) {}
+}
+
+function normalizeDgsMultiSelectObject(object: any): any | null {
+  if (object?.__liaDgsPolygonBorderOwner) return object.__liaDgsPolygonBorderOwner;
+  if (object?.__liaDgsDesignOwner) return object.__liaDgsDesignOwner;
+  return object || null;
+}
+
+function getDgsMultiSelectObjectTargets(object: any): any[] {
+  const normalized = normalizeDgsMultiSelectObject(object);
+  let targets: any[] = [];
+  if (isDgsPoint(normalized) || isDgsText(normalized)) targets = [normalized];
+  else if (isDgsTransformation3D(normalized)) {
+    targets = getDgsMultiSelectObjectTargets(
+      normalized.__liaDgsTransformation3DSource || normalized.__liaTransformation3DSource
+    );
+  } else if (isDgsPlane(normalized)) {
+    targets = Array.isArray(normalized.__liaPlane3DSourcePoints)
+      ? normalized.__liaPlane3DSourcePoints.slice() : [];
+  } else if (isDgsCircle3D(normalized)) {
+    targets = Array.isArray(normalized.__liaCircle3DSourcePoints)
+      ? normalized.__liaCircle3DSourcePoints.slice() : [];
+  } else if (isDgsSphere3D(normalized)) {
+    targets = Array.isArray(normalized.__liaSphere3DSourcePoints)
+      ? normalized.__liaSphere3DSourcePoints.slice() : [];
+  } else if (isDgsPolygon3D(normalized)) {
+    targets = Array.isArray(normalized.__liaPolygon3DSourcePoints)
+      ? normalized.__liaPolygon3DSourcePoints.slice() : [];
+  } else if (isDgsSolid3D(normalized)) {
+    targets = Array.isArray(normalized.__liaSolid3DSourcePoints)
+      ? normalized.__liaSolid3DSourcePoints.slice() : [];
+    if (normalized.__liaSolid3DSourcePolygon) {
+      targets.push(...getDgsMultiSelectObjectTargets(normalized.__liaSolid3DSourcePolygon));
+    }
+  } else if (isDgsArc(normalized)) targets = [
+    normalized.__liaDgsArcStartPoint, normalized.__liaDgsArcEndPoint
+  ];
+  else if (isDgsLinearObject(normalized)) {
+    const points = getDgsLinearSourcePoints(normalized);
+    targets = points
+      ? (normalized.__liaLinear3DFreeVector ? [points[0]] : points.slice())
+      : [];
+  } else if (isDgsCompassArc(normalized)) targets = [
+    normalized.__liaDgsCompassCenterPoint, normalized.__liaDgsCompassRadiusPoint
+  ];
+  else if (isDgsPolygon(normalized)) {
+    targets = Array.isArray(normalized.vertices) ? normalized.vertices.slice() : [];
+    if (targets.length > 1 && targets[0] === targets[targets.length - 1]) targets.pop();
+  } else if (isDgsCircle(normalized)) targets = [
+    normalized.__liaDgsCircleCenter, normalized.__liaDgsCircleRadiusPoint
+  ];
+  else if (isDgsEllipse(normalized)) targets = [
+    normalized.__liaDgsEllipseFocus1, normalized.__liaDgsEllipseFocus2,
+    normalized.__liaDgsEllipsePoint
+  ];
+  else if (isDgsSector(normalized)) targets = [
+    normalized.__liaDgsSectorCenter, normalized.__liaDgsSectorRadiusPoint,
+    normalized.__liaDgsSectorAnglePoint
+  ];
+  else if (isDgsAngle(normalized)) {
+    targets = Array.isArray(normalized.__liaDgsAnglePoints)
+      ? normalized.__liaDgsAnglePoints.slice()
+      : [];
+  }
+  return Array.from(new Set(targets.filter(Boolean)));
+}
+
+function isDgsMultiSelectTargetMovable(target: any): boolean {
+  if (!target || typeof target.X !== 'function' || typeof target.Y !== 'function' ||
+      getDgsObjectFixed(target)) return false;
+  if (!isDgsPoint(target)) return isDgsText(target);
+  if (target.__liaDgsCoordinateExpressions || target.__liaDgsTransformPoint ||
+      target.__liaDgsRootPoint || target.__liaDgsExtremumPoint ||
+      target.__liaDgsInflectionPoint || target.__liaDgsYInterceptPoint ||
+      target.__liaDgsIntersectionPoint || target.__liaDgsMidpoint ||
+      getDgsPointBindingSource(target)) return false;
+  return true;
+}
+
+function getDgsMultiSelectMovableTargets(object: any): any[] {
+  const targets = getDgsMultiSelectObjectTargets(object);
+  return targets.length && targets.every(isDgsMultiSelectTargetMovable) ? targets : [];
+}
+
+function getDgsAxisDragTransforms(object: any): SimilarityTransform3D[] | null {
+  const transforms: SimilarityTransform3D[] = [];
+  const seen = new Set<any>();
+  const targets = new Set(getDgsMultiSelectMovableTargets(object));
+  let current = object;
+  while (isDgsTransformation3D(current)) {
+    if (seen.has(current)) return null;
+    seen.add(current);
+    const reference = current.__liaDgsTransformation3DReference;
+    // Moving a transformation's own reference can rotate or resize the result.
+    // Such a dependent construction has no independent translation handle.
+    if (reference && getDgsMultiSelectObjectTargets(reference).some(target => targets.has(target))) return null;
+    const transform = current.__liaTransformation3DEvaluator?.() as SimilarityTransform3D | null;
+    if (!transform || !Number.isFinite(transform.scale) || transform.scale <= 1e-12) return null;
+    transforms.push(transform);
+    current = current.__liaDgsTransformation3DSource || current.__liaTransformation3DSource;
+  }
+  return transforms;
+}
+function getDgsAxisDragAnchor(state: DgsState, object: any): Vector3 | null {
+  if (state.board.__liaSceneMode !== '3d' || state.activeTool || state.externalToolActive ||
+      !state.multiSelectedObjects.includes(object) || object?.board !== state.board ||
+      state.board.objects?.[object.id] !== object || object.__liaDgsShowObject === false) return null;
+  const targets = getDgsMultiSelectMovableTargets(object);
+  if (!targets.length || targets.some(target => !target.__liaPoint3D)) return null;
+  const transforms = getDgsAxisDragTransforms(object);
+  if (!transforms) return null;
+  const sphere = coordinateSphere3DData(object);
+  if (sphere) return sphere.center;
+  const circle = coordinateCircle3DData(object);
+  if (circle) return circle.center;
+  const polygon = coordinatePolygon3DData(object);
+  if (polygon) return polygon.centroid;
+  const solid = coordinateSolid3DData(object);
+  if (solid) return solid.centroid;
+  const points = targets.map(point3DCoordinates);
+  if (points.some(point => !point)) return null;
+  let anchor = (points as Vector3[]).reduce<Vector3>((sum, point) => [
+    sum[0] + point[0] / points.length,
+    sum[1] + point[1] / points.length,
+    sum[2] + point[2] / points.length
+  ], [0, 0, 0]);
+  transforms.slice().reverse().forEach(transform => {
+    anchor = transform.matrix.map((row, index) =>
+      row[0] * anchor[0] + row[1] * anchor[1] + row[2] * anchor[2] + transform.translation[index]
+    ) as Vector3;
+  });
+  return anchor;
+}
+
+function refreshDgsAxisDragSelection(state: DgsState): void {
+  const object = state.multiSelectedObjects[state.multiSelectedObjects.length - 1];
+  if (!object || !getDgsAxisDragAnchor(state, object)) {
+    state.axisDrag3D?.clear();
+    return;
+  }
+  if (!state.axisDrag3D) {
+    state.axisDrag3D = mountDgsAxisDrag3D(state.board, {
+      start: () => {
+        if (state.activeTool || state.externalToolActive || state.multiSelectPointerId != null ||
+            state.board.__liaSceneMode !== '3d') return false;
+        const targetMappings = new Map<any, (delta: Vector3) => Vector3>();
+        for (const selected of state.multiSelectedObjects) {
+          const transforms = getDgsAxisDragTransforms(selected);
+          if (!transforms) return false;
+          const sourceDelta = (delta: Vector3): Vector3 => transforms.reduce<Vector3>((vector, transform) => {
+            // A similarity's inverse linear part is transpose(M) / scale².
+            const denominator = transform.scale ** 2;
+            return [0, 1, 2].map(index => (
+              transform.matrix[0][index] * vector[0] +
+              transform.matrix[1][index] * vector[1] +
+              transform.matrix[2][index] * vector[2]
+            ) / denominator) as Vector3;
+          }, delta);
+          getDgsMultiSelectMovableTargets(selected).forEach(target => targetMappings.set(target, sourceDelta));
+        }
+        const starts = Array.from(targetMappings, ([target, sourceDelta]) => {
+          const point = point3DCoordinates(target);
+          return point ? { target, x: point[0], y: point[1], z: point[2], sourceDelta } : null;
+        });
+        if (!starts.length || starts.some(start => !start)) return false;
+        if (dgsPendingHistoryBefore[state.boardId]) persistDgsConstruction(state, true);
+        persistDgsConstruction(state, false);
+        delete dgsPendingHistoryBefore[state.boardId];
+        state.axisDragStarts = starts as NonNullable<DgsState['axisDragStarts']>;
+        return true;
+      },
+      move: (_axis, _event, delta) => {
+        const starts = state.axisDragStarts;
+        if (!starts?.length) return;
+        starts.forEach(({ target, x, y, z, sourceDelta }) => {
+          const movement = sourceDelta(delta);
+          setCoordinatePoint3D(target, [x + movement[0], y + movement[1], Number(z) + movement[2]], false);
+        });
+        updateDgsMultiSelectBoard(state, false, starts, false);
+      },
+      finish: cancelled => {
+        const starts = state.axisDragStarts;
+        state.axisDragStarts = undefined;
+        if (!starts?.length) return;
+        if (cancelled) {
+          starts.forEach(({ target, x, y, z }) => setCoordinatePoint3D(target, [x, y, Number(z)], false));
+        }
+        const moved = starts.some(({ target, x, y, z }) => {
+          const point = point3DCoordinates(target);
+          return point && Math.hypot(point[0] - x, point[1] - y, point[2] - Number(z)) > 1e-10;
+        });
+        updateDgsMultiSelectBoard(state, !cancelled && moved, starts);
+      }
+    }, state.language);
+  }
+  state.axisDrag3D.setSelection(object, () => getDgsAxisDragAnchor(state, object));
+}
+function setDgsMultiSelection(state: DgsState, objects: any[]): void {
+  (state.multiSelectedObjects || []).forEach((object) => {
+    try { object?.rendNode?.classList?.remove('lia-dgs-multi-selected'); } catch (e) {}
+    try { delete object.__liaDgsMultiSelected; } catch (e) {}
+  });
+  const selected: any[] = [];
+  const seen = new Set<any>();
+  (objects || []).forEach((candidate) => {
+    const object = normalizeDgsMultiSelectObject(candidate);
+    if (!object || seen.has(object) || !isDgsObjectListEntry(object) ||
+        !getDgsMultiSelectMovableTargets(object).length) return;
+    seen.add(object);
+    selected.push(object);
+  });
+  state.multiSelectedObjects = selected;
+  selected.forEach((object) => {
+    object.__liaDgsMultiSelected = true;
+    try { object?.rendNode?.classList?.add('lia-dgs-multi-selected'); } catch (e) {}
+  });
+  if (state.selectButton) {
+    state.selectButton.dataset.selectionCount = String(selected.length);
+    const label = dgsText(state.language).normalMode +
+      (selected.length ? ' (' + selected.length + ')' : '');
+    state.selectButton.setAttribute('aria-label', label);
+    state.selectButton.title = label;
+  }
+  refreshDgsAxisDragSelection(state);
+}
+
+function resetDgsMultiSelectDrag(state: DgsState): void {
+  const pointerId = state.multiSelectPointerId;
+  state.multiSelectPointerId = null;
+  state.multiSelectDragObject = null;
+  state.multiSelectDragWasSelected = false;
+  state.multiSelectMoved = false;
+  state.multiSelectSpatialAnchor = null;
+  state.multiSelectPointStarts = [];
+  state.boardContainer?.classList?.remove('lia-dgs-group-dragging');
+  if (pointerId != null) {
+    try { state.boardContainer.releasePointerCapture(pointerId); } catch (e) {}
+  }
+}
+
+function updateDgsMultiSelectBoard(
+  state: DgsState,
+  recordHistory: boolean,
+  starts = state.multiSelectPointStarts,
+  persist = true
+): void {
+  starts.forEach(({ target }) => {
+    if (!isDgsPoint(target)) return;
+    syncDgsCoordinatePoint(state, target);
+    updateDgsCoordinatePointState(state, target);
+    recordDgsPointTraceMotion(state, target);
+  });
+  syncDgsFixedCompassConstructions(state);
+  try {
+    if (state.board?.__liaSceneMode === '3d' && !recordHistory && typeof state.board?.update === 'function') {
+      state.board.update();
+    } else if (typeof state.board?.fullUpdate === 'function') state.board.fullUpdate();
+    else if (typeof state.board?.update === 'function') state.board.update();
+  } catch (e) {}
+  scheduleDgsRootUpdate(state);
+  scheduleDgsLocusUpdate(state);
+  if (persist) persistDgsConstruction(state, recordHistory);
+}
+
+function startDgsMultiSelectDrag(state: DgsState, evt: PointerEvent, candidate: any): boolean {
+  const object = normalizeDgsMultiSelectObject(candidate);
+  if (!object || !getDgsMultiSelectMovableTargets(object).length) return false;
+  const spatial = state.board.__liaSceneMode === '3d';
+  const coordinates = spatial ? null : eventToUserCoordinates(state, evt);
+  if (!spatial && !coordinates) return false;
+  const currentSelection = state.multiSelectedObjects || [];
+  const wasSelected = currentSelection.includes(object);
+  if (!wasSelected) setDgsMultiSelection(state, currentSelection.concat(object));
+  const targets = Array.from(new Set(
+    state.multiSelectedObjects.flatMap((selected) => getDgsMultiSelectMovableTargets(selected))
+  ));
+  const starts: Array<{ target: any; x: number; y: number; z: number | null }> = [];
+  targets.forEach((target) => {
+    try {
+      const x = Number(target.X());
+      const y = Number(target.Y());
+      const z = target.__liaPoint3D && typeof target.Z === 'function' ? Number(target.Z()) : null;
+      if (Number.isFinite(x) && Number.isFinite(y) && (z == null || Number.isFinite(z))) {
+        starts.push({ target, x, y, z });
+      }
+    } catch (e) {}
+  });
+  if (!starts.length || (spatial && starts.some(start => start.z == null))) return false;
+  state.multiSelectPointerId = evt.pointerId;
+  state.multiSelectDragObject = object;
+  state.multiSelectDragWasSelected = wasSelected;
+  state.multiSelectMoved = false;
+  state.multiSelectStartClientX = evt.clientX;
+  state.multiSelectStartClientY = evt.clientY;
+  state.multiSelectStartUserX = coordinates?.x || 0;
+  state.multiSelectStartUserY = coordinates?.y || 0;
+  state.multiSelectSpatialAnchor = spatial
+    ? starts.reduce<Vector3>((sum, start) => [
+        sum[0] + start.x / starts.length,
+        sum[1] + start.y / starts.length,
+        sum[2] + Number(start.z) / starts.length
+      ], [0, 0, 0])
+    : null;
+  state.multiSelectPointStarts = starts;
+  state.boardContainer.classList.add('lia-dgs-group-dragging');
+  evt.preventDefault();
+  evt.stopImmediatePropagation();
+  try { state.boardContainer.setPointerCapture(evt.pointerId); } catch (e) {}
+  return true;
+}
+
+function updateDgsMultiSelectDrag(state: DgsState, evt: PointerEvent): boolean {
+  if (state.multiSelectPointerId == null || evt.pointerId !== state.multiSelectPointerId) return false;
+  evt.preventDefault();
+  evt.stopImmediatePropagation();
+  const clientDx = evt.clientX - state.multiSelectStartClientX;
+  const clientDy = evt.clientY - state.multiSelectStartClientY;
+  if (!state.multiSelectMoved && Math.hypot(clientDx, clientDy) < 3) return true;
+  const spatialAnchor = state.multiSelectSpatialAnchor;
+  if (spatialAnchor) {
+    const dragPlane = isDgsPoint(state.multiSelectDragObject) ? 'xy' : 'camera';
+    const delta = coordinateScreenDragDelta3D(state.board, spatialAnchor, clientDx, clientDy, dragPlane);
+    if (!delta) return true;
+    state.multiSelectMoved = true;
+    state.multiSelectPointStarts.forEach(({ target, x, y, z }) => {
+      if (target.__liaPoint3D && z != null) {
+        setCoordinatePoint3D(target, [x + delta[0], y + delta[1], z + delta[2]], false);
+      }
+    });
+    updateDgsMultiSelectBoard(state, false);
+    return true;
+  }
+  const coordinates = eventToUserCoordinates(state, evt);
+  if (!coordinates) return true;
+  state.multiSelectMoved = true;
+  const dx = coordinates.x - state.multiSelectStartUserX;
+  const dy = coordinates.y - state.multiSelectStartUserY;
+  state.multiSelectPointStarts.forEach(({ target, x, y }) => {
+    setDgsPointPosition(target, x + dx, y + dy);
+  });
+  updateDgsMultiSelectBoard(state, false);
+  return true;
+}
+
+function finishDgsMultiSelectDrag(
+  state: DgsState,
+  evt: PointerEvent | null,
+  cancelled: boolean
+): boolean {
+  if (state.multiSelectPointerId == null ||
+      (evt && evt.pointerId !== state.multiSelectPointerId)) return false;
+  if (evt) {
+    evt.preventDefault();
+    evt.stopImmediatePropagation();
+  }
+  const moved = state.multiSelectMoved;
+  const dragObject = state.multiSelectDragObject;
+  const wasSelected = state.multiSelectDragWasSelected;
+  if (cancelled && moved) {
+    state.multiSelectPointStarts.forEach(({ target, x, y, z }) => setDgsPointPosition(target, x, y, z == null ? undefined : z));
+    updateDgsMultiSelectBoard(state, false);
+  } else if (!cancelled && moved) {
+    updateDgsMultiSelectBoard(state, true);
+  } else if (!cancelled && wasSelected && dragObject) {
+    setDgsMultiSelection(
+      state,
+      state.multiSelectedObjects.filter((object) => object !== dragObject)
+    );
+  }
+  resetDgsMultiSelectDrag(state);
+  return true;
 }
 
 function setSelectedPolygonPoints(state: DgsState, points: any[]): void {
@@ -5623,6 +8558,18 @@ function setSelectedSectorPoints(state: DgsState, points: any[]): void {
   });
 }
 
+function setSelectedEllipsePoints(state: DgsState, points: any[]): void {
+  state.selectedEllipsePoints.forEach((point) => {
+    const node = point && point.rendNode;
+    try { if (node && node.classList) node.classList.remove('lia-dgs-angle-point'); } catch (e) {}
+  });
+  state.selectedEllipsePoints = Array.isArray(points) ? points.slice() : [];
+  state.selectedEllipsePoints.forEach((point) => {
+    const node = point && point.rendNode;
+    try { if (node && node.classList) node.classList.add('lia-dgs-angle-point'); } catch (e) {}
+  });
+}
+
 function setSelectedAnglePoints(state: DgsState, points: any[]): void {
   state.selectedAnglePoints.forEach((point) => {
     const node = point && point.rendNode;
@@ -5634,6 +8581,19 @@ function setSelectedAnglePoints(state: DgsState, points: any[]): void {
     const node = point && point.rendNode;
     try { if (node && node.classList) node.classList.add('lia-dgs-angle-point'); } catch (e) {}
   });
+}
+
+function setSelectedAngle3DObjects(state: DgsState, objects: any[]): void {
+  state.selectedAngle3DObjects.forEach((object) => {
+    const node = getDgsRenderedObject(object)?.rendNode;
+    try { if (node?.classList) node.classList.remove('lia-dgs-relation-source'); } catch (e) {}
+  });
+  state.selectedAngle3DObjects = Array.isArray(objects) ? objects.slice() : [];
+  state.selectedAngle3DObjects.forEach((object) => {
+    const node = getDgsRenderedObject(object)?.rendNode;
+    try { if (node?.classList) node.classList.add('lia-dgs-relation-source'); } catch (e) {}
+  });
+  updateDgsSolidConstructionStatus(state);
 }
 
 function styleDgsSegments(state: DgsState): void {
@@ -5721,8 +8681,11 @@ function readDgsLineStyleDash(object: any): unknown {
 function isDgsLineStyleTarget(object: any): boolean {
   return !!object && (
     isDgsLinearObject(object) || isDgsArc(object) || isDgsCompassArc(object) ||
-    isDgsPolygon(object) || isDgsCircle(object) || isDgsSector(object) ||
-    isDgsAngle(object) || isDgsFunction(object)
+    isDgsPolygon(object) || isDgsCircle(object) || isDgsEllipse(object) || isDgsSector(object) ||
+    isDgsAngle(object) || isDgsFunction(object) || isDgsLocus(object) || isDgsPlane(object) ||
+    isDgsCircle3D(object) || isDgsSphere3D(object) || isDgsPolygon3D(object) ||
+    isDgsSolid3D(object) || isDgsTransformation3D(object) || isDgsCurve3D(object) ||
+    isDgsSurface3D(object) || isDgsConic3D(object)
   );
 }
 
@@ -5750,6 +8713,19 @@ function getDgsLineStyleRenderTargets(object: any): any[] {
     targets.push(candidate);
   };
   add(object);
+  if (object?.__liaLinear3D || object?.__liaCircle3D || object?.__liaSphere3D ||
+      object?.__liaPolygon3D || object?.__liaSolid3D) add(object.element2D);
+  if (Array.isArray(object?.faces)) object.faces.forEach((face: any) => { add(face); add(face?.element2D); });
+  if (Array.isArray(object?.borders)) object.borders.forEach((border: any) => { add(border); add(border?.element2D); });
+  if (object?.__liaCircle3D) add(object.curve);
+  if (object?.__liaPolygon3D && Array.isArray(object.element2D?.borders)) object.element2D.borders.forEach(add);
+  if (Array.isArray(object?.aux2D)) object.aux2D.forEach(add);
+  if (Array.isArray(object?.__liaSolid3DGuideCurves)) {
+    object.__liaSolid3DGuideCurves.forEach((guide: any) => { add(guide); add(guide?.element2D); });
+  }
+  if (Array.isArray(object?.__liaDgsAngle3DHelpers)) {
+    object.__liaDgsAngle3DHelpers.forEach((guide: any) => { add(guide); add(guide?.element2D); });
+  }
   if (isDgsPolygon(object)) {
     const borders = object.__liaDgsPolygonBorders || object.borders;
     if (Array.isArray(borders)) borders.forEach(add);
@@ -5859,20 +8835,30 @@ function isDgsSegmentStyleTarget(object: any): boolean {
 }
 
 function isDgsStrokeStyleTarget(object: any): boolean {
-  return isDgsSegmentStyleTarget(object) || isDgsArc(object);
+  return isDgsSegmentStyleTarget(object) || isDgsSpatialLinearObject(object) || isDgsArc(object) ||
+    isDgsLocus(object) || isDgsPlane(object) || isDgsCircle3D(object) || isDgsSphere3D(object) ||
+    isDgsCurve3D(object) || isDgsSurface3D(object) || isDgsConic3D(object);
 }
 
 function getDgsStrokeDesign(object: any): string {
   return normalizeDgsStrokeDesign(isDgsArc(object)
     ? object.__liaDgsArcDesign
-    : object && object.__liaDgsSegmentDesign);
+    : (isDgsLocus(object) ? object.__liaDgsLocusDesign : object && object.__liaDgsSegmentDesign));
 }
 
 function getDgsStrokeWidth(object: any): number {
   const stored = isDgsArc(object)
     ? object.__liaDgsArcStrokeWidth
-    : object && object.__liaDgsSegmentStrokeWidth;
-  return parseDgsStrokeWidth(stored) ?? 3;
+    : (isDgsLocus(object) ? object.__liaDgsLocusStrokeWidth : object && object.__liaDgsSegmentStrokeWidth);
+  const explicit = parseDgsStrokeWidth(stored);
+  if (explicit != null) return explicit;
+  for (const part of [object, object?.element2D]) {
+    try {
+      const rendered = parseDgsStrokeWidth(part?.getAttribute?.('strokeWidth') ?? part?.visProp?.strokewidth);
+      if (rendered != null) return rendered;
+    } catch (e) {}
+  }
+  return 3;
 }
 
 function getDgsStrokeCapSegments(object: any): any[] {
@@ -5906,7 +8892,7 @@ function getDgsStrokeEndpoints(object: any): any[] {
   if (isDgsArc(object)) {
     return [object.__liaDgsArcStartPoint, object.__liaDgsArcEndPoint].filter(Boolean);
   }
-  return [object && object.point1, object && object.point2].filter(Boolean);
+  return (getDgsLinearSourcePoints(object) || []).filter(Boolean);
 }
 
 function getDgsStrokeTangentScreen(
@@ -6043,9 +9029,27 @@ function applyDgsStrokeStyle(
   const design = parseDgsStrokeDesign(designValue);
   const strokeWidth = parseDgsStrokeWidth(strokeWidthValue);
   if (strokeWidth == null) return false;
+  if ((isDgsSpatialLinearObject(object) && !isDgsSegmentStyleTarget(object)) ||
+      isDgsCircle3D(object) || isDgsSphere3D(object) || isDgsPolygon3D(object) ||
+    isDgsSolid3D(object) || isDgsTransformation3D(object) || isDgsPlane(object)) {
+    object.__liaDgsSegmentDesign = design.normalized;
+    object.__liaDgsSegmentStrokeWidth = strokeWidth;
+    getDgsRenderedParts(object).forEach((part) => {
+      try { part.setAttribute?.({ strokeWidth, highlightStrokeWidth: strokeWidth + 1 }); } catch (e) {}
+    });
+    if (isDgsCircle3D(object) || isDgsSphere3D(object)) {
+      applyDgsLineStyle(state, object, object.__liaDgsLineStyle || 'solid', false);
+    }
+    try { state.board?.fullUpdate?.(); } catch (e) { try { state.board?.update?.(); } catch (e2) {} }
+    persistDgsConstruction(state, recordHistory);
+    return true;
+  }
   if (isDgsArc(object)) {
     object.__liaDgsArcDesign = design.normalized;
     object.__liaDgsArcStrokeWidth = strokeWidth;
+  } else if (isDgsLocus(object)) {
+    object.__liaDgsLocusDesign = design.normalized;
+    object.__liaDgsLocusStrokeWidth = strokeWidth;
   } else {
     object.__liaDgsSegmentDesign = design.normalized;
     object.__liaDgsSegmentStrokeWidth = strokeWidth;
@@ -6082,7 +9086,7 @@ function createDgsSegment(state: DgsState, point1: any, point2: any): any | null
 
   const name = getNextSegmentName(state);
   try {
-    const segment = state.board.create('segment', [point1, point2], {
+    const segment = createDgsLinearElement(state, 'segment', point1, point2, {
       name: '\\(' + name + '\\)',
       withLabel: true,
       fixed: true,
@@ -6100,6 +9104,7 @@ function createDgsSegment(state: DgsState, point1: any, point2: any): any | null
       }
     });
     segment.__liaDgsSegment = true;
+    segment.__liaDgsLinearPoints = [point1, point2];
     segment.__liaDgsSegmentName = name;
     segment.__liaDgsLanguage = state.language;
     segment.__liaDgsColor = '#ff00ff';
@@ -6112,7 +9117,7 @@ function createDgsSegment(state: DgsState, point1: any, point2: any): any | null
     segment.__liaDgsSegmentStrokeWidth = 3;
     segment.__liaDgsStyleCapSegments = [];
     segment.__liaDgsStyleCapPoints = [];
-    refreshDgsObjectLabel(segment);
+    applyDgsConstructionColor(state, segment);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return segment;
   } catch (e) {
@@ -6125,9 +9130,9 @@ function createDgsRay(state: DgsState, point1: any, point2: any): any | null {
 
   const name = getNextSegmentName(state);
   try {
-    const ray = state.board.create('line', [point1, point2], {
-      name: '',
-      withLabel: false,
+    const ray = createDgsLinearElement(state, 'ray', point1, point2, {
+      name: state.board.__liaSceneMode === '3d' ? '\\(' + name + '\\)' : '',
+      withLabel: state.board.__liaSceneMode === '3d',
       fixed: true,
       straightFirst: false,
       straightLast: true,
@@ -6140,6 +9145,7 @@ function createDgsRay(state: DgsState, point1: any, point2: any): any | null {
       dash: 0
     });
     ray.__liaDgsRay = true;
+    ray.__liaDgsLinearPoints = [point1, point2];
     ray.__liaDgsRayName = name;
     ray.__liaDgsLanguage = state.language;
     ray.__liaDgsColor = '#ff00ff';
@@ -6147,7 +9153,7 @@ function createDgsRay(state: DgsState, point1: any, point2: any): any | null {
     ray.__liaDgsShowObject = true;
     ray.__liaDgsOpacity = 1;
     ray.__liaDgsLineStyle = 'solid';
-    const label = state.board.create('text', [
+    const label = ray.__liaLinear3D ? ray.label : state.board.create('text', [
       function() { return (Number(point1.X()) + Number(point2.X())) / 2; },
       function() { return (Number(point1.Y()) + Number(point2.Y())) / 2; },
       function() { return dgsObjectLabelText(ray); }
@@ -6166,7 +9172,7 @@ function createDgsRay(state: DgsState, point1: any, point2: any): any | null {
     });
     ray.label = label;
     ray.__liaDgsRayLabel = label;
-    refreshDgsObjectLabel(ray);
+    applyDgsConstructionColor(state, ray);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return ray;
   } catch (e) {
@@ -6196,7 +9202,7 @@ function createDgsVector(state: DgsState, point1: any, point2: any): any | null 
   const automaticName = getAutomaticDgsVectorName(point1, point2);
   const name = automaticName || getNextSegmentName(state);
   try {
-    const vector = state.board.create('segment', [point1, point2], {
+    const vector = createDgsLinearElement(state, 'vector', point1, point2, {
       name: '\\(' + formatDgsVectorTexName(name) + '\\)',
       withLabel: true,
       fixed: true,
@@ -6216,6 +9222,7 @@ function createDgsVector(state: DgsState, point1: any, point2: any): any | null 
       }
     });
     vector.__liaDgsVector = true;
+    vector.__liaDgsLinearPoints = [point1, point2];
     vector.__liaDgsVectorName = name;
     vector.__liaDgsVectorAutoName = !!automaticName;
     vector.__liaDgsLanguage = state.language;
@@ -6224,7 +9231,7 @@ function createDgsVector(state: DgsState, point1: any, point2: any): any | null 
     vector.__liaDgsShowObject = true;
     vector.__liaDgsOpacity = 1;
     vector.__liaDgsLineStyle = 'solid';
-    refreshDgsObjectLabel(vector);
+    applyDgsConstructionColor(state, vector);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return vector;
   } catch (e) {
@@ -6232,6 +9239,53 @@ function createDgsVector(state: DgsState, point1: any, point2: any): any | null 
   }
 }
 
+function createDgsFreeVector3D(
+  state: DgsState,
+  anchor: any,
+  components: Vector3,
+  preferredName = ''
+): any | null {
+  if (!state.board || state.board.__liaSceneMode !== '3d' || !anchor?.__liaPoint3D) return null;
+  const name = String(preferredName || getNextSegmentName(state));
+  try {
+    const vector = createCoordinateFreeVector3D(state.board, anchor, components, {
+      name: '\\(' + formatDgsVectorTexName(name) + '\\)',
+      withLabel: true,
+      fixed: true,
+      firstArrow: false,
+      lastArrow: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      dash: 0,
+      label: {
+        strokeColor: '#ff00ff',
+        fillColor: '#ff00ff',
+        fontSize: 20,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    const points = getDgsLinearSourcePoints(vector);
+    vector.__liaDgsVector = true;
+    vector.__liaDgsLinearPoints = points || [anchor, vector.__liaLinear3DHelperPoint];
+    vector.__liaDgsVectorName = name;
+    vector.__liaDgsVectorAutoName = false;
+    vector.__liaDgsLanguage = state.language;
+    vector.__liaDgsColor = '#ff00ff';
+    vector.__liaDgsShowName = true;
+    vector.__liaDgsShowObject = true;
+    vector.__liaDgsShowValue = false;
+    vector.__liaDgsOpacity = 1;
+    vector.__liaDgsLineStyle = 'solid';
+    applyDgsConstructionColor(state, vector);
+    try { state.board.update?.(); } catch (e) {}
+    return vector;
+  } catch (e) {
+    return null;
+  }
+}
 type DgsArcGeometry = {
   p0: { x: number; y: number };
   p1: { x: number; y: number };
@@ -6244,7 +9298,7 @@ function parseDgsArcAngle(value: unknown): number | null {
   const raw = String(value == null ? '' : value)
     .trim()
     .toLowerCase()
-    .replace(/(?:\s*(?:deg|grad|°))$/, '')
+    .replace(/(?:\s*(?:deg|grad|\u00B0))$/, '')
     .replace(',', '.');
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)) return null;
   const parsed = Number(raw);
@@ -6539,6 +9593,373 @@ function getDgsCompassArcPoint(arc: any, t: number): { x: number; y: number } {
   };
 }
 
+type DgsLocusOptions = {
+  name?: string;
+  sampleCount?: number;
+  color?: string;
+  opacity?: number;
+  visible?: boolean;
+  showName?: boolean;
+  lineStyle?: DgsLineStyle;
+  strokeWidth?: number;
+};
+
+type DgsLocusDriverSample = { x?: number; y?: number; value?: number };
+
+const DGS_LOCUS_DEFAULT_SAMPLES = 240;
+const DGS_LOCUS_MIN_SAMPLES = 32;
+const DGS_LOCUS_MAX_SAMPLES = 720;
+
+function normalizeDgsLocusSampleCount(value: unknown): number {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) return DGS_LOCUS_DEFAULT_SAMPLES;
+  return Math.max(DGS_LOCUS_MIN_SAMPLES, Math.min(DGS_LOCUS_MAX_SAMPLES, parsed));
+}
+
+function getNextDgsLocusName(state: DgsState): string {
+  const used = new Set(
+    getDgsBoardObjects(state.board)
+      .filter(isDgsLocus)
+      .map((object) => String(object.__liaDgsLocusName || '').trim())
+      .filter(Boolean)
+  );
+  for (let index = 1; ; index += 1) {
+    const name = 'l_' + index;
+    if (!used.has(name)) return name;
+  }
+}
+
+function getDgsLocusForTarget(state: DgsState, target: any): any | null {
+  return getDgsBoardObjects(state.board).find((object) =>
+    isDgsLocus(object) && object.__liaDgsLocusTarget === target
+  ) || null;
+}
+
+function getDgsLocusLinearParameterRange(
+  state: DgsState,
+  source: any
+): { minimum: number; maximum: number } | null {
+  let x1 = NaN;
+  let y1 = NaN;
+  let x2 = NaN;
+  let y2 = NaN;
+  try {
+    x1 = Number(source.point1.X());
+    y1 = Number(source.point1.Y());
+    x2 = Number(source.point2.X());
+    y2 = Number(source.point2.Y());
+  } catch (e) {}
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  if (![x1, y1, x2, y2].every(Number.isFinite) || Math.hypot(dx, dy) <= 1e-12) return null;
+  if (!isDgsLine(source) && !isDgsRay(source)) return { minimum: 0, maximum: 1 };
+
+  let bbox = [-5, 5, 5, -5];
+  try {
+    const current = state.board.getBoundingBox();
+    if (Array.isArray(current) && current.length === 4 && current.every(Number.isFinite)) bbox = current;
+  } catch (e) {}
+  const left = Math.min(Number(bbox[0]), Number(bbox[2]));
+  const right = Math.max(Number(bbox[0]), Number(bbox[2]));
+  const bottom = Math.min(Number(bbox[1]), Number(bbox[3]));
+  const top = Math.max(Number(bbox[1]), Number(bbox[3]));
+  const candidates: number[] = [];
+  const add = (value: number) => {
+    if (!Number.isFinite(value)) return;
+    const x = x1 + value * dx;
+    const y = y1 + value * dy;
+    if (x >= left - 1e-8 && x <= right + 1e-8 && y >= bottom - 1e-8 && y <= top + 1e-8) {
+      candidates.push(value);
+    }
+  };
+  if (Math.abs(dx) > 1e-12) {
+    add((left - x1) / dx);
+    add((right - x1) / dx);
+  }
+  if (Math.abs(dy) > 1e-12) {
+    add((bottom - y1) / dy);
+    add((top - y1) / dy);
+  }
+  if (x1 >= left && x1 <= right && y1 >= bottom && y1 <= top) add(0);
+  if (!candidates.length) return null;
+  let minimum = Math.min(...candidates);
+  let maximum = Math.max(...candidates);
+  if (isDgsRay(source)) {
+    minimum = Math.max(0, minimum);
+    maximum = Math.max(0, maximum);
+  }
+  return maximum >= minimum ? { minimum, maximum } : null;
+}
+
+function getDgsLocusDriverSamples(
+  state: DgsState,
+  driver: any,
+  requestedCount: number
+): DgsLocusDriverSample[] {
+  const sampleCount = normalizeDgsLocusSampleCount(requestedCount);
+  if (isDgsSlider(driver)) {
+    const minimum = Number(driver.__liaDgsSliderMinimum);
+    const maximum = Number(driver.__liaDgsSliderMaximum);
+    const step = Number(driver.__liaDgsSliderStep);
+    if (![minimum, maximum].every(Number.isFinite) || maximum <= minimum) return [];
+    const availableSteps = Number.isFinite(step) && step > 0
+      ? Math.max(1, Math.round((maximum - minimum) / step))
+      : sampleCount;
+    const segments = Math.min(sampleCount, availableSteps);
+    return Array.from({ length: segments + 1 }, (_, index) => {
+      const stepIndex = Math.round(index * availableSteps / segments);
+      const value = Number.isFinite(step) && step > 0
+        ? Math.min(maximum, minimum + stepIndex * step)
+        : minimum + (maximum - minimum) * index / segments;
+      return { value };
+    });
+  }
+  if (!isDgsPoint(driver)) return [];
+  const source = getDgsPointBindingSource(driver);
+  if (!source) return [];
+  const ratios = (count: number, closed = false) => Array.from(
+    { length: count + 1 },
+    (_, index) => index / count
+  ).slice(0, closed ? count + 1 : count + 1);
+
+  if (isDgsLinearObject(source)) {
+    const range = getDgsLocusLinearParameterRange(state, source);
+    if (!range) return [];
+    let x1 = NaN;
+    let y1 = NaN;
+    let x2 = NaN;
+    let y2 = NaN;
+    try {
+      x1 = Number(source.point1.X()); y1 = Number(source.point1.Y());
+      x2 = Number(source.point2.X()); y2 = Number(source.point2.Y());
+    } catch (e) {}
+    return ratios(sampleCount).map((ratio) => {
+      const parameter = range.minimum + (range.maximum - range.minimum) * ratio;
+      return { x: x1 + (x2 - x1) * parameter, y: y1 + (y2 - y1) * parameter };
+    });
+  }
+  if (isDgsCircle(source)) {
+    const center = source.__liaDgsCircleCenter;
+    const radiusPoint = source.__liaDgsCircleRadiusPoint;
+    let cx = NaN;
+    let cy = NaN;
+    let radius = NaN;
+    try {
+      cx = Number(center.X());
+      cy = Number(center.Y());
+      radius = typeof source.Radius === 'function'
+        ? Number(source.Radius())
+        : Math.hypot(Number(radiusPoint.X()) - cx, Number(radiusPoint.Y()) - cy);
+    } catch (e) {}
+    if (![cx, cy, radius].every(Number.isFinite) || radius <= 1e-12) return [];
+    return ratios(sampleCount, true).map((ratio) => {
+      const angle = 2 * Math.PI * ratio;
+      return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    });
+  }
+  if (isDgsEllipse(source)) {
+    const ellipse = getDgsEllipseData(source);
+    if (!ellipse) return [];
+    return ratios(sampleCount, true).map((ratio) =>
+      getDgsEllipsePoint(ellipse, 2 * Math.PI * ratio)
+    );
+  }
+  if (isDgsCompassArc(source)) {
+    return ratios(sampleCount).map((ratio) => getDgsCompassArcPoint(source, ratio));
+  }
+  if (isDgsArc(source)) {
+    const geometry = getDgsArcGeometry(
+      source.__liaDgsArcStartPoint,
+      source.__liaDgsArcEndPoint,
+      Number(source.__liaDgsArcExitAngle),
+      Number(source.__liaDgsArcEntryAngle)
+    );
+    return ratios(sampleCount).map((ratio) => getDgsArcPoint(geometry, ratio));
+  }
+  if (isDgsFunctionTarget(source)) {
+    let bbox = [-5, 5, 5, -5];
+    try {
+      const current = state.board.getBoundingBox();
+      if (Array.isArray(current) && current.length === 4 && current.every(Number.isFinite)) bbox = current;
+    } catch (e) {}
+    const minimum = Math.min(Number(bbox[0]), Number(bbox[2]));
+    const maximum = Math.max(Number(bbox[0]), Number(bbox[2]));
+    return ratios(sampleCount).map((ratio) => {
+      const x = minimum + (maximum - minimum) * ratio;
+      let y = NaN;
+      try { y = Number(source.Y(x)); } catch (e) {}
+      return { x, y };
+    });
+  }
+  return [];
+}
+
+function setDgsLocusDriverSample(driver: any, sample: DgsLocusDriverSample): boolean {
+  if (isDgsSlider(driver)) {
+    if (!Number.isFinite(sample.value)) return false;
+    try {
+      if (typeof driver.setValue === 'function') driver.setValue(Number(sample.value));
+      else driver.__liaDgsSliderValue = Number(sample.value);
+      return true;
+    } catch (e) { return false; }
+  }
+  return setDgsPointPosition(driver, Number(sample.x), Number(sample.y));
+}
+
+function syncDgsLocusDependencies(state: DgsState): void {
+  try { state.board?.update?.(); } catch (e) {}
+  let changed = syncDgsCoordinatePoints(state);
+  state.rootConstructions.slice().forEach((construction) => {
+    try { changed = updateDgsRootConstruction(state, construction) || changed; } catch (e) {}
+  });
+  if (changed) {
+    try { state.board?.update?.(); } catch (e) {}
+  }
+}
+
+function updateDgsLocus(state: DgsState, locus: any): boolean {
+  if (!isDgsLocus(locus) || state.locusUpdating) return false;
+  const target = locus.__liaDgsLocusTarget;
+  const driver = locus.__liaDgsLocusDriver;
+  if (!isDgsPoint(target) || (!isDgsSlider(driver) && !isDgsPoint(driver))) return false;
+  const samples = getDgsLocusDriverSamples(state, driver, locus.__liaDgsLocusSampleCount);
+  if (samples.length < 2) return false;
+  const original = isDgsSlider(driver)
+    ? { value: getDgsSliderValue(driver) }
+    : readDgsPointPosition(driver);
+  if (!original) return false;
+
+  let bbox = [-5, 5, 5, -5];
+  try {
+    const current = state.board.getBoundingBox();
+    if (Array.isArray(current) && current.length === 4 && current.every(Number.isFinite)) bbox = current;
+  } catch (e) {}
+  const jumpLimit = Math.max(1e-8, Math.hypot(Number(bbox[2]) - Number(bbox[0]), Number(bbox[1]) - Number(bbox[3])) * 0.35);
+  const xValues: number[] = [];
+  const yValues: number[] = [];
+  let previous: { x: number; y: number } | null = null;
+  const appendGap = () => {
+    if (xValues.length && Number.isFinite(xValues[xValues.length - 1])) {
+      xValues.push(NaN);
+      yValues.push(NaN);
+    }
+    previous = null;
+  };
+
+  state.locusUpdating = true;
+  try {
+    samples.forEach((sample) => {
+      if (!setDgsLocusDriverSample(driver, sample)) { appendGap(); return; }
+      syncDgsLocusDependencies(state);
+      let x = NaN;
+      let y = NaN;
+      try { x = Number(target.X()); y = Number(target.Y()); } catch (e) {}
+      if (!Number.isFinite(x) || !Number.isFinite(y)) { appendGap(); return; }
+      if (previous && Math.hypot(x - previous.x, y - previous.y) > jumpLimit) appendGap();
+      xValues.push(x);
+      yValues.push(y);
+      previous = { x, y };
+    });
+  } finally {
+    if (isDgsSlider(driver)) setDgsLocusDriverSample(driver, { value: Number((original as any).value) });
+    else setDgsLocusDriverSample(driver, original as DgsLocusDriverSample);
+    syncDgsLocusDependencies(state);
+  }
+
+  try {
+    const dataX = locus.__liaDgsLocusDataX as number[];
+    const dataY = locus.__liaDgsLocusDataY as number[];
+    dataX.splice(0, dataX.length, ...xValues);
+    dataY.splice(0, dataY.length, ...yValues);
+    if (typeof locus.updateCurve === 'function') locus.updateCurve();
+    state.board?.update?.();
+  } catch (e) {
+  } finally {
+    state.locusUpdating = false;
+  }
+  return xValues.some(Number.isFinite);
+}
+
+function scheduleDgsLocusUpdate(state: DgsState, delay = 70): void {
+  if (!state || state.locusUpdating || state.locusUpdateTimer != null ||
+      !getDgsBoardObjects(state.board).some(isDgsLocus)) return;
+  state.locusUpdateTimer = window.setTimeout(() => {
+    state.locusUpdateTimer = undefined;
+    if (states[state.uid] !== state || !state.boardContainer?.isConnected) return;
+    getDgsBoardObjects(state.board).filter(isDgsLocus).forEach((locus) => updateDgsLocus(state, locus));
+  }, Math.max(0, delay));
+}
+
+function createDgsLocus(
+  state: DgsState,
+  target: any,
+  driver: any,
+  options: DgsLocusOptions = {}
+): any | null {
+  if (!state.board || !isDgsPoint(target) || target === driver) return null;
+  if (!isDgsSlider(driver) && (!isDgsPoint(driver) || !getDgsPointBindingSource(driver))) return null;
+  const sampleCount = normalizeDgsLocusSampleCount(options.sampleCount);
+  if (getDgsLocusDriverSamples(state, driver, sampleCount).length < 2) return null;
+  const name = String(options.name || getNextDgsLocusName(state)).trim() || getNextDgsLocusName(state);
+  const color = normalizeHexColor(options.color) || '#ff00ff';
+  const opacity = Number.isFinite(Number(options.opacity))
+    ? Math.max(0, Math.min(1, Number(options.opacity)))
+    : 1;
+  const strokeWidth = parseDgsStrokeWidth(options.strokeWidth) ?? 3;
+  const showName = options.showName === true;
+  const visible = options.visible !== false;
+  const dataX: number[] = [];
+  const dataY: number[] = [];
+  try {
+    const locus = state.board.create('curve', [dataX, dataY], {
+      name: '\\(' + name + '\\)',
+      withLabel: showName,
+      fixed: true,
+      visible: true,
+      strokeColor: color,
+      highlightStrokeColor: color,
+      strokeWidth,
+      highlightStrokeWidth: Math.max(strokeWidth, strokeWidth + 1),
+      strokeOpacity: visible ? opacity : 0,
+      highlightStrokeOpacity: visible ? opacity : 0,
+      dash: 0,
+      label: {
+        strokeColor: color,
+        fillColor: color,
+        fontSize: 20,
+        parse: false,
+        useMathJax: true
+      }
+    });
+    locus.__liaDgsLocus = true;
+    locus.__liaDgsLocusName = name;
+    locus.__liaDgsLocusTarget = target;
+    locus.__liaDgsLocusDriver = driver;
+    locus.__liaDgsLocusSampleCount = sampleCount;
+    locus.__liaDgsLocusDataX = dataX;
+    locus.__liaDgsLocusDataY = dataY;
+    locus.__liaDgsLocusDesign = '-';
+    locus.__liaDgsLocusStrokeWidth = strokeWidth;
+    locus.__liaDgsLanguage = state.language;
+    locus.__liaDgsColor = color;
+    locus.__liaDgsLineColor = color;
+    locus.__liaDgsTextColor = color;
+    locus.__liaDgsFillColor = color;
+    locus.__liaDgsShowName = showName;
+    locus.__liaDgsShowObject = visible;
+    locus.__liaDgsOpacity = opacity;
+    locus.__liaDgsLineStyle = normalizeDgsLineStyle(options.lineStyle || 'solid');
+    applyLineStyle(locus, locus.__liaDgsLineStyle);
+    applyDgsObjectOpacity(locus);
+    refreshDgsObjectLabel(locus);
+    updateDgsLocus(state, locus);
+    return locus;
+  } catch (e) {
+    state.locusUpdating = false;
+    return null;
+  }
+}
+
 function getDgsCompassArcLabelPosition(arc: any): { x: number; y: number } {
   const geometry = getDgsCompassArcGeometry(arc);
   const midpoint = getDgsCompassArcPoint(arc, 0.5);
@@ -6713,7 +10134,7 @@ function createDgsLine(state: DgsState, point1: any, point2: any): any | null {
 
   const name = getNextSegmentName(state);
   try {
-    const line = state.board.create('line', [point1, point2], {
+    const line = createDgsLinearElement(state, 'line', point1, point2, {
       name: '\\(' + name + '\\)',
       withLabel: true,
       fixed: true,
@@ -6733,6 +10154,7 @@ function createDgsLine(state: DgsState, point1: any, point2: any): any | null {
       }
     });
     line.__liaDgsLine = true;
+    line.__liaDgsLinearPoints = [point1, point2];
     line.__liaDgsLineName = name;
     line.__liaDgsLanguage = state.language;
     line.__liaDgsColor = '#ff00ff';
@@ -6741,7 +10163,7 @@ function createDgsLine(state: DgsState, point1: any, point2: any): any | null {
     line.__liaDgsOpacity = 1;
     line.__liaDgsLineStyle = 'solid';
     line.__liaDgsShowEquation = false;
-    refreshDgsObjectLabel(line);
+    applyDgsConstructionColor(state, line);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return line;
   } catch (e) {
@@ -6834,7 +10256,7 @@ function createDgsAngleBisector(
     line.__liaDgsOpacity = 1;
     line.__liaDgsLineStyle = 'solid';
     line.__liaDgsShowEquation = false;
-    refreshDgsObjectLabel(line);
+    applyDgsConstructionColor(state, line);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return line;
   } catch (e) {
@@ -7105,7 +10527,7 @@ function createDgsPerpendicular(state: DgsState, baseLine: any, throughPoint: an
     line.__liaDgsOpacity = 1;
     line.__liaDgsLineStyle = 'solid';
     line.__liaDgsShowEquation = false;
-    refreshDgsObjectLabel(line);
+    applyDgsConstructionColor(state, line);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return line;
   } catch (e) {
@@ -7149,7 +10571,7 @@ function createDgsParallel(state: DgsState, baseLine: any, throughPoint: any): a
     line.__liaDgsOpacity = 1;
     line.__liaDgsLineStyle = 'solid';
     line.__liaDgsShowEquation = false;
-    refreshDgsObjectLabel(line);
+    applyDgsConstructionColor(state, line);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return line;
   } catch (e) {
@@ -7375,6 +10797,99 @@ function createDgsCircle(state: DgsState, center: any, radiusPoint: any): any | 
   } catch (e) { return null; }
 }
 
+function getNextEllipseName(state: DgsState): string {
+  const used = new Set<string>();
+  getDgsBoardObjects(state.board).forEach((object) => {
+    if (isDgsEllipse(object)) used.add(String(object.__liaDgsEllipseName || ''));
+  });
+  for (let index = 0; ; index += 1) {
+    const name = 'e' + (index ? "'".repeat(index) : '');
+    if (!used.has(name)) return name;
+  }
+}
+
+function getDgsEllipseLabelPosition(ellipse: any): { x: number; y: number } {
+  const data = getDgsEllipseData(ellipse);
+  return data ? getDgsEllipsePoint(data, Math.PI * 0.72) : { x: 0, y: 0 };
+}
+
+function createDgsEllipse(state: DgsState, focus1: any, focus2: any, point: any): any | null {
+  if (!state.board || !focus1 || !focus2 || !point ||
+      focus1 === focus2 || focus1 === point || focus2 === point) return null;
+  try {
+    const x1 = Number(focus1.X());
+    const y1 = Number(focus1.Y());
+    const x2 = Number(focus2.X());
+    const y2 = Number(focus2.Y());
+    const px = Number(point.X());
+    const py = Number(point.Y());
+    const focusDistance = Math.hypot(x2 - x1, y2 - y1);
+    const distanceSum = Math.hypot(px - x1, py - y1) + Math.hypot(px - x2, py - y2);
+    if (![x1, y1, x2, y2, px, py, focusDistance, distanceSum].every(Number.isFinite) ||
+        distanceSum <= focusDistance + 1e-10) return null;
+  } catch (e) { return null; }
+
+  const name = getNextEllipseName(state);
+  let ellipse: any = null;
+  try {
+    ellipse = state.board.create('ellipse', [focus1, focus2, point], {
+      name: '\\(' + name + '\\)',
+      withLabel: false,
+      fixed: false,
+      hasInnerPoints: true,
+      strokeColor: '#ff00ff',
+      highlightStrokeColor: '#ff00ff',
+      strokeWidth: 3,
+      highlightStrokeWidth: 4,
+      dash: 0,
+      fillColor: '#ff00ff',
+      highlightFillColor: '#ff00ff',
+      fillOpacity: 0.2,
+      highlightFillOpacity: 0.3
+    });
+    ellipse.__liaDgsEllipse = true;
+    ellipse.__liaDgsEllipseName = name;
+    ellipse.__liaDgsEllipseFocus1 = focus1;
+    ellipse.__liaDgsEllipseFocus2 = focus2;
+    ellipse.__liaDgsEllipsePoint = point;
+    ellipse.__liaDgsLanguage = state.language;
+    ellipse.__liaDgsColor = '#ff00ff';
+    ellipse.__liaDgsTextColor = '#ff00ff';
+    ellipse.__liaDgsLineColor = '#ff00ff';
+    ellipse.__liaDgsFillColor = '#ff00ff';
+    ellipse.__liaDgsShowName = true;
+    ellipse.__liaDgsShowObject = true;
+    ellipse.__liaDgsOpacity = 0.2;
+    ellipse.__liaDgsLineStyle = 'solid';
+    ellipse.__liaDgsShowArea = false;
+    ellipse.__liaDgsShowPerimeter = false;
+    const label = state.board.create('text', [
+      function() { return getDgsEllipseLabelPosition(ellipse).x; },
+      function() { return getDgsEllipseLabelPosition(ellipse).y; },
+      function() { return dgsObjectLabelText(ellipse); }
+    ], {
+      fixed: true,
+      highlight: false,
+      parse: false,
+      useMathJax: true,
+      display: 'html',
+      anchorX: 'middle',
+      anchorY: 'middle',
+      strokeColor: '#ff00ff',
+      fillColor: '#ff00ff',
+      fontSize: 15
+    });
+    ellipse.label = label;
+    ellipse.__liaDgsEllipseLabel = label;
+    refreshDgsObjectLabel(ellipse);
+    try { state.board.update?.(); } catch (e) {}
+    return ellipse;
+  } catch (e) {
+    try { if (ellipse) state.board.removeObject(ellipse); } catch (e2) {}
+    return null;
+  }
+}
+
 function createDgsSector(state: DgsState, center: any, radiusPoint: any, anglePoint: any): any | null {
   if (!state.board || !center || !radiusPoint || !anglePoint ||
       center === radiusPoint || center === anglePoint || radiusPoint === anglePoint) return null;
@@ -7464,7 +10979,101 @@ function startDgsCirclePreview(state: DgsState, center: any): void {
   } catch (e) { state.circlePreview = null; }
 }
 
+function inferDgsAngle3DDefinition(first: any, second: any): SpatialAngle3DDefinition | null {
+  if (isDgsSpatialLinearObject(first) && isDgsSpatialLinearObject(second)) return 'lines';
+  if ((isDgsSpatialLinearObject(first) && isDgsPlane(second)) ||
+      (isDgsPlane(first) && isDgsSpatialLinearObject(second))) return 'line-plane';
+  if (isDgsPlane(first) && isDgsPlane(second)) return 'planes';
+  return null;
+}
+
+function getDgsAngle3DGeometry(angle: any): SpatialAngle3D | null {
+  if (!angle?.__liaDgsAngle3D || !Array.isArray(angle.__liaDgsAngle3DSources) ||
+      angle.__liaDgsAngle3DSources.length !== 2) return null;
+  const sources = angle.__liaDgsAngle3DSources;
+  const definition = angle.__liaDgsAngle3DDefinition as SpatialAngle3DDefinition;
+  if (definition === 'lines') {
+    const first = coordinateLinear3DData(sources[0]);
+    const second = coordinateLinear3DData(sources[1]);
+    return first && second ? angleBetweenLinesArc3(first, second) : null;
+  }
+  if (definition === 'line-plane') {
+    const lineObject = isDgsSpatialLinearObject(sources[0]) ? sources[0] : sources[1];
+    const planeObject = isDgsPlane(sources[0]) ? sources[0] : sources[1];
+    const line = coordinateLinear3DData(lineObject);
+    const plane = coordinatePlane3DData(planeObject);
+    return line && plane ? angleBetweenLinePlaneArc3(line, plane) : null;
+  }
+  if (definition === 'planes') {
+    const first = coordinatePlane3DData(sources[0]);
+    const second = coordinatePlane3DData(sources[1]);
+    return first && second ? angleBetweenPlanesArc3(first, second) : null;
+  }
+  return null;
+}
+
+function getDgsAngle3DRadius(state: DgsState): number {
+  const entry = getCoordinateView3D(state.board);
+  const spans = entry ? [
+    Number(entry.config.xmax) - Number(entry.config.xmin),
+    Number(entry.config.ymax) - Number(entry.config.ymin),
+    Number(entry.config.zmax) - Number(entry.config.zmin)
+  ].filter(value => Number.isFinite(value) && value > 0) : [];
+  return Math.max(0.12, (spans.length ? Math.min(...spans) : 8) * 0.11);
+}
+
+function dgsAngle3DProjectedLabelPosition(state: DgsState, angle: any): { x: number; y: number } {
+  const entry = getCoordinateView3D(state.board);
+  const geometry = getDgsAngle3DGeometry(angle);
+  const point = geometry && spatialAngleLabelPoint3(geometry, getDgsAngle3DRadius(state));
+  if (!entry || !point) return { x: 0, y: 0 };
+  try {
+    const projected = entry.view.project3DTo2D(point);
+    const x = Number(projected?.[1]);
+    const y = Number(projected?.[2]);
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : { x: 0, y: 0 };
+  } catch (e) { return { x: 0, y: 0 }; }
+}
+
+function getNextDgsAngle3DName(state: DgsState): string {
+  const used = new Set(getDgsBoardObjects(state.board)
+    .filter(object => object?.__liaDgsAngle3D)
+    .map(object => String(object.__liaDgsAngleName || '')));
+  const bases = ['\\alpha', '\\beta', '\\gamma', '\\delta', '\\varepsilon', '\\varphi'];
+  for (const base of bases) if (!used.has(base)) return base;
+  for (let index = 2; ; index += 1) {
+    const candidate = '\\alpha_{' + index + '}';
+    if (!used.has(candidate)) return candidate;
+  }
+}
+
+function createDgsAngle3D(
+  state: DgsState,
+  firstSource: any,
+  secondSource: any,
+  requestedDefinition?: SpatialAngle3DDefinition,
+  requestedName = ''
+): any | null {
+  if (state.board.__liaSceneMode !== '3d') return null;
+  const definition = requestedDefinition || inferDgsAngle3DDefinition(firstSource, secondSource);
+  if (!definition) return null;
+  const angle = createCoordinateAngle3D(state.board, firstSource, secondSource, definition, {
+    name: requestedName || getNextDgsAngle3DName(state),
+    autoName: !requestedName,
+    color: getDgsConstructionColor(state),
+    language: state.language,
+    labelText: object => dgsObjectLabelText(object)
+  });
+  if (angle) {
+    applyDgsConstructionColor(state, angle, false);
+    refreshDgsObjectLabel(angle);
+    try { state.board.update?.(); } catch (e) {}
+  }
+  return angle;
+}
+
 function getDgsAngleRadians(angle: any): number {
+  if (angle?.__liaDgsAngle3D) return getDgsAngle3DGeometry(angle)?.radians ?? NaN;
   const points = angle && Array.isArray(angle.__liaDgsAnglePoints) ? angle.__liaDgsAnglePoints : [];
   if (points.length !== 3) return NaN;
   try {
@@ -7480,7 +11089,7 @@ function getDgsAngleRadians(angle: any): number {
 }
 
 function syncDgsRightAngleStyle(angle: any): void {
-  if (!isDgsAngle(angle)) return;
+  if (!isDgsAngle(angle) || angle.__liaDgsAngle3D) return;
   const orthoType = 'sectordot';
   const color = getDgsObjectColor(angle, 'line');
   try {
@@ -7536,25 +11145,12 @@ function getDgsAngleRadius(points: any[]): number {
 function getDgsAngleLabelPosition(angle: any): { x: number; y: number } {
   const points = angle && angle.__liaDgsAnglePoints;
   if (!Array.isArray(points) || points.length !== 3) return { x: 0, y: 0 };
-  try {
-    const vertexX = Number(points[1].X());
-    const vertexY = Number(points[1].Y());
-    const startX = Number(points[0].X()) - vertexX;
-    const startY = Number(points[0].Y()) - vertexY;
-    const startLength = Math.hypot(startX, startY);
-    const radians = getDgsAngleRadians(angle);
-    if (startLength <= 1e-12 || !Number.isFinite(radians)) return { x: vertexX, y: vertexY };
-
-    const direction = Math.atan2(startY, startX) + radians / 2;
-    const dx = Math.cos(direction);
-    const dy = Math.sin(direction);
-    const board = angle.board;
-    const unitX = Math.max(1e-9, Math.abs(Number(board && board.unitX) || 1));
-    const unitY = Math.max(1e-9, Math.abs(Number(board && board.unitY) || 1));
-    const pixelsPerUnit = Math.max(1e-9, Math.hypot(dx * unitX, dy * unitY));
-    const distance = getDgsAngleRadius(points) * 1.35 + 10 / pixelsPerUnit;
-    return { x: vertexX + dx * distance, y: vertexY + dy * distance };
-  } catch (e) { return { x: 0, y: 0 }; }
+  return positionAngleLabel(angle.board, points, getDgsAngleRadius(points), {
+    label: angle.__liaDgsAngleLabel,
+    text: dgsObjectLabelText(angle),
+    fontSize: Number(angle.__liaDgsAngleLabel?.visProp?.fontsize) || 18,
+    radians: getDgsAngleRadians(angle)
+  });
 }
 
 function createDgsAngle(state: DgsState, points: any[]): any | null {
@@ -7641,8 +11237,15 @@ function parseDgsAngleDegrees(value: unknown): number | null {
   return text && Number.isFinite(degrees) && degrees > 0 && degrees < 360 ? degrees : null;
 }
 
-function setDgsPointPosition(point: any, x: number, y: number): boolean {
+function setDgsPointPosition(point: any, x: number, y: number, z?: number): boolean {
   if (!point || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+  if (point.__liaPoint3D) {
+    let nextZ = Number(z);
+    if (!Number.isFinite(nextZ)) {
+      try { nextZ = Number(point.Z()); } catch (e) { nextZ = 0; }
+    }
+    return setCoordinatePoint3D(point, [x, y, Number.isFinite(nextZ) ? nextZ : 0]);
+  }
   try {
     if (typeof point.setPositionDirectly === 'function' && typeof JXG !== 'undefined') {
       point.setPositionDirectly(JXG.COORDS_BY_USER, [x, y]);
@@ -7663,12 +11266,15 @@ type DgsCompassTranslationSnapshot = {
   pointY: number;
 };
 
-function readDgsPointPosition(point: any): { x: number; y: number } | null {
+function readDgsPointPosition(point: any): { x: number; y: number; z?: number } | null {
   if (!point) return null;
   try {
     const x = Number(point.X());
     const y = Number(point.Y());
-    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    const z = point.__liaPoint3D && typeof point.Z === 'function' ? Number(point.Z()) : NaN;
+    return Number.isFinite(x) && Number.isFinite(y)
+      ? { x, y, ...(Number.isFinite(z) ? { z } : {}) }
+      : null;
   } catch (e) {
     return null;
   }
@@ -7728,7 +11334,7 @@ function fixedCompassSnapshotPosition(
 function isDgsFixedCompassFollowerBlocked(point: any): boolean {
   return !point || getDgsObjectFixed(point) || !!point.__liaDgsCoordinateExpressions ||
     String(point.elType || '').toLowerCase() === 'glider' ||
-    point.__liaDgsMidpoint === true || point.__liaDgsRootPoint === true ||
+    point.__liaDgsMidpoint === true || point.__liaDgsTransformPoint === true || point.__liaDgsRootPoint === true ||
     point.__liaDgsExtremumPoint === true || point.__liaDgsInflectionPoint === true ||
     point.__liaDgsYInterceptPoint === true || point.__liaDgsIntersectionPoint === true ||
     point.__liaDgsTangentPoint === true || point.__liaDgsGeneratedPoint === true ||
@@ -7933,34 +11539,21 @@ function ensureDgsPersistentId(object: any, prefix: string): string {
 }
 
 function getDgsFunctionLabelPosition(state: DgsState, graph: any): [number, number] {
-  let bbox = [-5, 5, 5, -5];
-  try {
-    const current = state.board.getBoundingBox();
-    if (Array.isArray(current) && current.length === 4 && current.every(Number.isFinite)) bbox = current;
-  } catch (e) {}
-  const unitX = Math.max(1, Math.abs(Number(state.board && state.board.unitX) || 1));
-  const unitY = Math.max(1, Math.abs(Number(state.board && state.board.unitY) || 1));
-  const xmin = bbox[0];
-  const ymax = bbox[1];
-  const xmax = bbox[2];
-  const ymin = bbox[3];
-  const rightInset = (state.sideMenuOpen ? SIDE_MENU_WIDTH_PX + 14 : 14) / unitX;
-  const topInset = (state.open ? MENU_HEIGHT_PX + 18 : 18) / unitY;
-  const bottomInset = 18 / unitY;
-  const startX = xmax - rightInset;
-  const endX = xmin + 18 / unitX;
-  const topY = ymax - topInset;
-  const bottomY = ymin + bottomInset;
-  for (let index = 0; index <= 180; index += 1) {
-    const ratio = index / 180;
-    const x = startX - ratio * (startX - endX);
-    let y = NaN;
-    try { y = Number(graph.Y(x)); } catch (e) {}
-    if (Number.isFinite(y) && y <= topY && y >= bottomY) return [x, y];
-  }
-  let fallbackY = NaN;
-  try { fallbackY = Number(graph.Y(startX)); } catch (e) {}
-  return [startX, fallbackY];
+  const placement = positionFunctionGraphLabel(
+    state.board,
+    (x: number) => Number(graph.Y(x)),
+    {
+      label: graph && (graph.__liaDgsFunctionLabel || graph.label),
+      text: dgsObjectLabelText(graph),
+      fontSize: 16,
+      leftInsetPx: 14,
+      rightInsetPx: state.sideMenuOpen ? SIDE_MENU_WIDTH_PX + 14 : 14,
+      topInsetPx: state.open ? MENU_HEIGHT_PX + 18 : 18,
+      bottomInsetPx: 18,
+      horizontalGapPx: 8
+    }
+  );
+  return [placement.x, placement.y];
 }
 
 const dgsFunctionEvaluationStack = new Set<any>();
@@ -8197,6 +11790,229 @@ function refreshDgsSliderDependents(state: DgsState, recordHistory = false): voi
   if (recordHistory) persistDgsConstruction(state);
 }
 
+function normalizeDgsSliderAnimationSpeed(value: unknown): number {
+  const parsed = Number(String(value == null ? '' : value).trim().replace(',', '.'));
+  if (!Number.isFinite(parsed)) return DGS_SLIDER_DEFAULT_ANIMATION_SPEED;
+  const clamped = Math.max(
+    DGS_SLIDER_MIN_ANIMATION_SPEED,
+    Math.min(DGS_SLIDER_MAX_ANIMATION_SPEED, parsed)
+  );
+  return Number((
+    Math.round(clamped / DGS_SLIDER_ANIMATION_SPEED_STEP) *
+    DGS_SLIDER_ANIMATION_SPEED_STEP
+  ).toFixed(2));
+}
+
+function getDgsSliderAnimationSpeed(slider: any): number {
+  return normalizeDgsSliderAnimationSpeed(slider && slider.__liaDgsSliderAnimationSpeed);
+}
+
+function formatDgsSliderAnimationSpeed(state: DgsState, slider: any): string {
+  const value = String(getDgsSliderAnimationSpeed(slider));
+  const localized = state.language === 'de' ? value.replace('.', ',') : value;
+  return localized + ' ' + dgsText(state.language).animationStepsPerSecond;
+}
+
+const DGS_SLIDER_ANIMATION_ICONS = {
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"></path></svg>'
+};
+
+function renderDgsSliderAnimationButton(state: DgsState, slider: any): void {
+  const button = slider && slider.__liaDgsSliderAnimationButton as HTMLButtonElement | undefined;
+  if (!button) return;
+  const playing = slider.__liaDgsSliderAnimating === true;
+  const label = playing
+    ? dgsText(state.language).pauseAnimation
+    : dgsText(state.language).startAnimation;
+  const visible = slider.__liaDgsSliderDeleted !== true &&
+    slider.__liaDgsShowAnimationControl !== false &&
+    slider.__liaDgsShowObject !== false;
+  button.hidden = !visible;
+  button.innerHTML = DGS_SLIDER_ANIMATION_ICONS[playing ? 'pause' : 'play'];
+  button.classList.toggle('is-playing', playing);
+  button.setAttribute('aria-label', label);
+  button.setAttribute('aria-pressed', playing ? 'true' : 'false');
+  button.title = label;
+  setStyleIfChanged(button, '--lia-dgs-slider-color', getDgsObjectColor(slider, 'line') || '#ff00ff');
+}
+
+function positionDgsSliderAnimationButton(state: DgsState, slider: any): void {
+  const button = slider && slider.__liaDgsSliderAnimationButton as HTMLButtonElement | undefined;
+  if (!button) return;
+  renderDgsSliderAnimationButton(state, slider);
+  if (button.hidden || !slider.point1 || !slider.point2) return;
+  let first: { x: number; y: number } | null = null;
+  let second: { x: number; y: number } | null = null;
+  try {
+    first = userToScreenCoordinates(state.board, {
+      x: Number(slider.point1.X()),
+      y: Number(slider.point1.Y())
+    });
+    second = userToScreenCoordinates(state.board, {
+      x: Number(slider.point2.X()),
+      y: Number(slider.point2.Y())
+    });
+  } catch (e) {}
+  if (!first || !second) return;
+  const size = 30;
+  const inset = 4;
+  const width = Math.max(size + inset * 2, state.boardContainer.clientWidth || 0);
+  const height = Math.max(size + inset * 2, state.boardContainer.clientHeight || 0);
+  let left = first.x - size - 8;
+  if (left < inset) left = second.x + 8;
+  left = Math.max(inset, Math.min(width - size - inset, left));
+  const top = Math.max(
+    inset,
+    Math.min(height - size - inset, (first.y + second.y) / 2 - size / 2)
+  );
+  setStyleIfChanged(button, 'left', left.toFixed(2) + 'px');
+  setStyleIfChanged(button, 'top', top.toFixed(2) + 'px');
+}
+
+function stopDgsSliderAnimation(state: DgsState, slider: any, persistValue = false): void {
+  if (!slider) return;
+  const wasPlaying = slider.__liaDgsSliderAnimating === true;
+  slider.__liaDgsSliderAnimating = false;
+  if (slider.__liaDgsSliderAnimationRAF != null) {
+    cancelAnimationFrame(slider.__liaDgsSliderAnimationRAF);
+    slider.__liaDgsSliderAnimationRAF = undefined;
+  }
+  slider.__liaDgsSliderAnimationLastTime = undefined;
+  slider.__liaDgsSliderAnimationAccumulator = 0;
+  renderDgsSliderAnimationButton(state, slider);
+  if (persistValue && wasPlaying) persistDgsConstruction(state, true);
+}
+
+function advanceDgsSliderAnimation(state: DgsState, slider: any): void {
+  const minimum = Number(slider.__liaDgsSliderMinimum);
+  const maximum = Number(slider.__liaDgsSliderMaximum);
+  const step = Number(slider.__liaDgsSliderStep);
+  if (![minimum, maximum, step].every(Number.isFinite) || maximum <= minimum || step <= 0) return;
+  const currentValue = getDgsSliderValue(slider);
+  const current = Number.isFinite(currentValue) ? currentValue : minimum;
+  const epsilon = Math.max(1e-12, Math.abs(step) * 1e-9);
+  let next = current + step;
+  if (current >= maximum - epsilon || next > maximum + epsilon) next = minimum;
+  const precision = Math.max(0, Math.min(12, String(step).split('.')[1]?.length || 0));
+  next = Number(Math.max(minimum, Math.min(maximum, next)).toFixed(precision));
+  try {
+    if (typeof slider.setValue === 'function') slider.setValue(next);
+    slider.__liaDgsSliderValue = next;
+  } catch (e) {
+    stopDgsSliderAnimation(state, slider, false);
+    return;
+  }
+  if (state.contextObject === slider && state.sliderValueInput) {
+    state.sliderValueInput.value = formatCoordinate(next);
+  }
+  refreshDgsSliderDependents(state, false);
+}
+
+function startDgsSliderAnimation(state: DgsState, slider: any): void {
+  if (!slider || slider.__liaDgsSliderDeleted || slider.__liaDgsSliderAnimating === true ||
+      slider.__liaDgsShowAnimationControl === false || slider.__liaDgsShowObject === false) return;
+  slider.__liaDgsSliderAnimating = true;
+  slider.__liaDgsSliderAnimationLastTime = undefined;
+  slider.__liaDgsSliderAnimationAccumulator = 0;
+  renderDgsSliderAnimationButton(state, slider);
+  const tick = (time: number) => {
+    if (slider.__liaDgsSliderAnimating !== true || slider.__liaDgsSliderDeleted ||
+        slider.__liaDgsShowAnimationControl === false || slider.__liaDgsShowObject === false ||
+        !state.boardContainer.isConnected) {
+      stopDgsSliderAnimation(state, slider, false);
+      return;
+    }
+    const previous = Number(slider.__liaDgsSliderAnimationLastTime);
+    slider.__liaDgsSliderAnimationLastTime = time;
+    if (Number.isFinite(previous)) {
+      const elapsed = Math.max(0, Math.min(1000, time - previous));
+      slider.__liaDgsSliderAnimationAccumulator =
+        Number(slider.__liaDgsSliderAnimationAccumulator || 0) + elapsed;
+      const interval = 1000 / getDgsSliderAnimationSpeed(slider);
+      let updates = 0;
+      while (slider.__liaDgsSliderAnimationAccumulator + 1e-9 >= interval && updates < 10) {
+        slider.__liaDgsSliderAnimationAccumulator -= interval;
+        advanceDgsSliderAnimation(state, slider);
+        updates += 1;
+      }
+    }
+    slider.__liaDgsSliderAnimationRAF = requestAnimationFrame(tick);
+  };
+  slider.__liaDgsSliderAnimationRAF = requestAnimationFrame(tick);
+}
+
+function removeDgsSliderAnimationControl(state: DgsState, slider: any): void {
+  if (!slider) return;
+  stopDgsSliderAnimation(state, slider, false);
+  const button = slider.__liaDgsSliderAnimationButton as HTMLButtonElement | undefined;
+  if (button) {
+    state.sliderAnimationSliders.delete(slider);
+    try { button.remove(); } catch (e) {}
+  }
+  delete slider.__liaDgsSliderAnimationButton;
+  delete slider.__liaDgsSliderAnimationControlStateUid;
+}
+
+function ensureDgsSliderAnimationControl(state: DgsState, slider: any): void {
+  if (!isDgsSlider(slider) || slider.__liaDgsSliderDeleted) return;
+  if (!Number.isFinite(Number(slider.__liaDgsSliderAnimationSpeed))) {
+    slider.__liaDgsSliderAnimationSpeed = DGS_SLIDER_DEFAULT_ANIMATION_SPEED;
+  } else {
+    slider.__liaDgsSliderAnimationSpeed = getDgsSliderAnimationSpeed(slider);
+  }
+  if (slider.__liaDgsShowAnimationControl == null) slider.__liaDgsShowAnimationControl = true;
+  let button = slider.__liaDgsSliderAnimationButton as HTMLButtonElement | undefined;
+  if (button && slider.__liaDgsSliderAnimationControlStateUid !== state.uid) {
+    try { button.remove(); } catch (e) {}
+    button = undefined;
+  }
+  if (!button) {
+    button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'lia-dgs-slider-animation-button';
+    button.dataset.liaDgsUi = '1';
+    button.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+    button.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (slider.__liaDgsSliderAnimating === true) stopDgsSliderAnimation(state, slider, true);
+      else startDgsSliderAnimation(state, slider);
+    });
+    state.boardContainer.appendChild(button);
+    slider.__liaDgsSliderAnimationButton = button;
+    slider.__liaDgsSliderAnimationControlStateUid = state.uid;
+  }
+  if (!slider.__liaDgsSliderAnimationDragBound) {
+    slider.__liaDgsSliderAnimationDragBound = true;
+    try { slider.on('down', () => stopDgsSliderAnimation(state, slider, true)); } catch (e) {}
+  }
+  state.sliderAnimationSliders.add(slider);
+  positionDgsSliderAnimationButton(state, slider);
+}
+
+function refreshDgsSliderAnimationControls(state: DgsState): void {
+  const current = new Set(
+    getDgsBoardObjects(state.board).filter((object) => isDgsSlider(object) && !object.__liaDgsSliderDeleted)
+  );
+  Array.from(state.sliderAnimationSliders).forEach((slider) => {
+    if (!current.has(slider)) removeDgsSliderAnimationControl(state, slider);
+  });
+  current.forEach((slider) => ensureDgsSliderAnimationControl(state, slider));
+}
+
+function positionDgsSliderAnimationControls(state: DgsState): void {
+  state.sliderAnimationSliders.forEach((slider) => positionDgsSliderAnimationButton(state, slider));
+}
+
+window.__refreshDgsSliderAnimationControls = function(boardId?: string): void {
+  Object.keys(states).forEach((uid) => {
+    const state = states[uid];
+    if (!state || (boardId && state.boardId !== boardId)) return;
+    refreshDgsSliderAnimationControls(state);
+  });
+};
+
 function dgsSliderNameToTex(nameValue: unknown): string {
   const name = normalizeDgsParameterName(nameValue);
   if (!name) return '';
@@ -8233,6 +12049,7 @@ function refreshDgsSliderTypography(state: DgsState): void {
 function removeDgsSliderImmediately(state: DgsState, slider: any): void {
   if (!isDgsSlider(slider)) return;
   slider.__liaDgsSliderDeleted = true;
+  removeDgsSliderAnimationControl(state, slider);
   [slider.label, slider.highline, slider.baseline, slider.point1, slider.point2, slider].forEach((part) => {
     try { if (part && state.board) state.board.removeObject(part); } catch (e) {}
   });
@@ -8306,6 +12123,9 @@ function createDgsSlider(
     slider.__liaDgsSliderStep = settings.step;
     slider.__liaDgsSliderValue = settings.value;
     slider.__liaDgsSliderPositionLocked = false;
+    slider.__liaDgsSliderAnimationSpeed = DGS_SLIDER_DEFAULT_ANIMATION_SPEED;
+    slider.__liaDgsShowAnimationControl = true;
+    slider.__liaDgsSliderAnimating = false;
     slider.__liaDgsSliderFontBaseScale = Math.sqrt(
       Math.max(1e-9, Math.abs(Number(state.board.unitX) || 1)) *
       Math.max(1e-9, Math.abs(Number(state.board.unitY) || 1))
@@ -8337,6 +12157,7 @@ function createDgsSlider(
     });
     refreshDgsObjectLabel(slider);
     refreshDgsSliderTypography(state);
+    ensureDgsSliderAnimationControl(state, slider);
     refreshDgsSliderDependents(state, false);
     return slider;
   } catch (e) {
@@ -8423,12 +12244,14 @@ function createDgsFunction(state: DgsState, expression: string): any | null {
       strokeColor: '#ff00ff',
       fillColor: '#ff00ff',
       fontSize: 16,
-      anchorX: 'right',
+      anchorX: 'left',
       anchorY: 'middle',
+      cssStyle: 'white-space:nowrap;overflow:visible;',
       highlight: false
     });
     graph.label = label;
     graph.__liaDgsFunctionLabel = label;
+    keepFunctionGraphLabelOnOneLine(label);
     refreshDgsObjectLabel(graph);
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return graph;
@@ -8606,6 +12429,14 @@ function getDgsBoardObjects(board: any): any[] {
   const objects: any[] = [];
   const seen = new Set<any>();
   const add = (object: any) => {
+    const spatialProxy = object?.__liaPoint3DProxy || object?.__liaLinear3DProxy || object?.__liaPlane3DProxy ||
+      object?.__liaCircle3DProxy || object?.__liaSphere3DProxy ||
+      object?.__liaPolygon3DProxy || object?.__liaSolid3DProxy ||
+      object?.__liaCurve3DProxy || object?.__liaSurface3DProxy;
+    if (spatialProxy && spatialProxy !== object) {
+      add(spatialProxy);
+      return;
+    }
     if (!object || typeof object !== 'object' || seen.has(object)) return;
     seen.add(object);
     objects.push(object);
@@ -8614,9 +12445,136 @@ function getDgsBoardObjects(board: any): any[] {
   if (board && board.objects && typeof board.objects === 'object') {
     Object.keys(board.objects).forEach((key) => add(board.objects[key]));
   }
+  [
+    window.__curve3DEntries, window.__surface3DEntries, window.__conic3DEntries,
+    window.__analytic3DEntries, window.__locus3DEntries, window.__locusSurface3DEntries
+  ].forEach(registry => Object.values(registry || {}).forEach((entry: any) => {
+    if (entry?.board === board) add(entry.object);
+  }));
   return objects;
 }
 
+type DgsSegment6Type = 'curve3d' | 'surface3d' | 'conic3d' | 'analytic3d' | 'locus3d' | 'locus-surface3d';
+type DgsSegment6EntryInfo = {
+  type: DgsSegment6Type;
+  prefix: string;
+  key: string;
+  registry: Record<string, any>;
+  entry: any;
+};
+
+function dgsSegment6Registries(): Array<{
+  type: DgsSegment6Type;
+  prefix: string;
+  registry: Record<string, any> | undefined;
+}> {
+  return [
+    { type: 'curve3d', prefix: 'curve3d', registry: window.__curve3DEntries },
+    { type: 'surface3d', prefix: 'surface3d', registry: window.__surface3DEntries },
+    { type: 'conic3d', prefix: 'conic3d', registry: window.__conic3DEntries },
+    { type: 'analytic3d', prefix: 'analytic3d', registry: window.__analytic3DEntries },
+    { type: 'locus3d', prefix: 'locus3d', registry: window.__locus3DEntries },
+    { type: 'locus-surface3d', prefix: 'locussurface3d', registry: window.__locusSurface3DEntries }
+  ];
+}
+
+function getDgsSegment6EntryInfo(object: any): DgsSegment6EntryInfo | null {
+  for (const descriptor of dgsSegment6Registries()) {
+    const registry = descriptor.registry;
+    if (!registry) continue;
+    for (const [key, entry] of Object.entries(registry)) {
+      if ((entry as any)?.object === object) {
+        return { ...descriptor, key, registry, entry } as DgsSegment6EntryInfo;
+      }
+    }
+  }
+  return null;
+}
+
+function cleanupDgsSegment6Entry(info: DgsSegment6EntryInfo, removeMarker = true): void {
+  if (removeMarker) document.getElementById(info.prefix + '-spec-' + info.key)?.remove();
+  const entry = info.registry[info.key] || info.entry;
+  (entry?.objects || [entry?.object]).filter(Boolean).forEach((object: any) => {
+    try { object?.__liaDgsAngle3DCleanup?.(); } catch (e) {}
+    try { object?.__liaCurve3DCleanup?.(); } catch (e) {}
+    try { object?.__liaSurface3DCleanup?.(); } catch (e) {}
+    try { object?.__liaLinear3DCleanup?.(); } catch (e) {}
+    try { object?.__liaPlane3DCleanup?.(); } catch (e) {}
+    try { object?.__liaPoint3DCleanup?.(); } catch (e) {}
+    try { entry?.board?.removeObject?.(object); } catch (e) {}
+  });
+  delete info.registry[info.key];
+}
+
+function clearDgsSegment6Entries(board: any, preservedMacroKeys: Set<string>): void {
+  dgsSegment6Registries().forEach(descriptor => {
+    const registry = descriptor.registry;
+    Object.entries(registry || {}).forEach(([key, rawEntry]) => {
+      const entry = rawEntry as any;
+      if (entry?.board !== board || !entry.object) return;
+      const macroKey = String(entry.object.__liaDgsMacroKey || '');
+      if (macroKey && preservedMacroKeys.has(macroKey)) return;
+      cleanupDgsSegment6Entry({ ...descriptor, key, registry: registry!, entry } as DgsSegment6EntryInfo);
+    });
+  });
+}
+
+function collectDgsSegment6EntriesForRemoval(board: any, toRemove: Set<any>): void {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    dgsSegment6Registries().forEach(descriptor => {
+      const registry = descriptor.registry;
+      Object.entries(registry || {}).forEach(([key, rawEntry]) => {
+        const entry = rawEntry as any;
+        if (entry?.board !== board || !entry.object) return;
+        const dependencies = ([] as any[]).concat(
+          entry.planeObject || [], entry.solidObject || [], entry.trace || [],
+          entry.driver || [], entry.drivers || [], entry.object.__liaDgsAnalytic3DSources || []
+        ).filter(Boolean);
+        if (!toRemove.has(entry.object) && !dependencies.some(dependency => toRemove.has(dependency))) return;
+        (entry.objects || [entry.object]).filter(Boolean).forEach((candidate: any) => {
+          if (!toRemove.has(candidate)) { toRemove.add(candidate); changed = true; }
+        });
+        document.getElementById(descriptor.prefix + '-spec-' + key)?.remove();
+        delete registry![key];
+      });
+    });
+  }
+}
+function restoreDgsSegment6Record(state: DgsState, record: any): any | null {
+  const type = String(record.type || '').replace(/^segment6-/, '') as DgsSegment6Type;
+  const descriptor = dgsSegment6Registries().find(candidate => candidate.type === type);
+  const key = String(record.segment6Key || '').trim();
+  const spec = String(record.segment6Spec || '').trim();
+  if (!descriptor || !key || !spec) return null;
+  const markerId = descriptor.prefix + '-spec-' + key;
+  let marker = document.getElementById(markerId) as HTMLElement | null;
+  if (!marker && !record.segment6DgsCreated) return null;
+  if (!marker) {
+    marker = document.createElement('span');
+    marker.id = markerId;
+    marker.hidden = true;
+    (document.body || document.documentElement).appendChild(marker);
+  }
+  marker.dataset.spec = spec;
+  marker.dataset.dgsCreated = record.segment6DgsCreated ? 'true' : 'false';
+  if (type === 'surface3d') marker.dataset.functionGraph = record.functionGraph ? 'true' : 'false';
+  if (type === 'analytic3d') marker.dataset.operation = String(record.operation || 'dot');
+  let rendered = false;
+  if (type === 'curve3d') rendered = window.renderCurve3DFromSpec?.(key, spec) === true;
+  else if (type === 'surface3d') rendered = window.renderSurface3DFromSpec?.(key, spec, !!record.functionGraph) === true;
+  else if (type === 'conic3d') rendered = window.renderConic3DFromSpec?.(key, spec) === true;
+  else if (type === 'analytic3d') rendered = window.renderAnalytic3DFromSpec?.(key, spec, String(record.operation || 'dot')) === true;
+  else if (type === 'locus3d') rendered = window.renderLocus3DFromSpec?.(key, spec) === true;
+  else if (type === 'locus-surface3d') rendered = window.renderLocusSurface3DFromSpec?.(key, spec) === true;
+  if (!rendered) return null;
+  const current = descriptor.registry?.[key]?.object;
+  if (!current) return null;
+  applyRestoredDgsProperties(state, current, record);
+  applyRestoredDgsSpecificState(state, current, record);
+  return current;
+}
 type DgsAxisLabelEntry = { variable: string; description: string };
 type DgsAxisLabels = { x: DgsAxisLabelEntry; y: DgsAxisLabelEntry };
 
@@ -8808,8 +12766,83 @@ function dgsPolygonBorderRecord(border: any): any {
   };
 }
 
+function getDgsSceneSnapshot(state: DgsState): any {
+  const entry = state && state.board ? getCoordinateView3D(state.board) : null;
+  if (!entry) return { mode: '2d', viewMode: '2d' };
+  const read = (slider: any, fallback: number) => {
+    try {
+      const value = Number(slider && slider.Value());
+      return Number.isFinite(value) ? value : fallback;
+    } catch (e) { return fallback; }
+  };
+  return {
+    mode: '3d',
+    viewMode: entry.viewMode,
+    projection: entry.projection,
+    camera: entry.viewMode === '2d' ? { ...entry.camera } : {
+      azimuth: read(entry.view.az_slide, entry.camera.azimuth),
+      elevation: read(entry.view.el_slide, entry.camera.elevation),
+      bank: read(entry.view.bank_slide, entry.camera.bank)
+    },
+    zmin: entry.config.zmin,
+    zmax: entry.config.zmax,
+    viewport3d: entry.spatialRanges.map(range => range.slice())
+  };
+}
+
+function applyDgsSceneSnapshot(state: DgsState, scene: any): void {
+  if (!scene || scene.mode !== '3d') {
+    state.board.__liaSceneMode = '2d';
+    state.board.__liaSceneViewMode = '2d';
+    const entry = getCoordinateView3D(state.board);
+    if (entry) setCoordinateViewMode(entry, '2d');
+    applyDgsSceneModePolicy(state, state.sceneModePolicy);
+    return;
+  }
+  try {
+    const entry = ensureCoordinateView3D(state.board);
+    state.board.__liaSceneMode = '3d';
+    if (scene.projection === 'central' || scene.projection === 'parallel') {
+      setCoordinateProjection(entry, scene.projection, false);
+    }
+    if (scene.camera && typeof scene.camera === 'object') {
+      setCoordinateCamera(entry, {
+        azimuth: Number(scene.camera.azimuth),
+        elevation: Number(scene.camera.elevation),
+        bank: Number(scene.camera.bank)
+      }, false);
+    }
+    if (scene.viewport3d) setCoordinateViewport3D(entry, scene.viewport3d, false);
+    setCoordinateViewMode(entry, scene.viewMode === '2d' ? '2d' : '3d');
+  } catch (e) {}
+  applyDgsSceneModePolicy(state, state.sceneModePolicy);
+}
+function applyDgsSceneModePolicy(state: DgsState, policyValue: unknown): void {
+  const policy: DgsSceneModePolicy = policyValue === '2d' || policyValue === '3d'
+    ? policyValue
+    : 'switchable';
+  const board = state.board;
+  if (policy === '3d') {
+    try {
+      const entry = ensureCoordinateView3D(board);
+      setCoordinateViewMode(entry, '3d');
+    } catch (e) {}
+  } else if (policy === '2d') {
+    const entry = getCoordinateView3D(board);
+    if (entry) setCoordinateViewMode(entry, '2d');
+    else {
+      board.__liaSceneMode = '2d';
+      board.__liaSceneViewMode = '2d';
+    }
+  }
+  state.sceneModePolicy = policy;
+  board.__liaDgsSceneModePolicy = policy;
+  board.__liaDgsSceneModeLanguage = state.language;
+}
 function persistDgsConstruction(state: DgsState, recordHistory = true): void {
-  if (!state || state.restoring || !state.board) return;
+  // History restoration temporarily clears the scene before rebuilding it.
+  // Camera and UI events must not save that empty intermediate construction.
+  if (!state || state.restoring || !state.board || dgsHistoryApplying.has(state.boardId)) return;
   if (state.fixedCompassSyncing) {
     state.fixedCompassPersistPending = true;
     state.fixedCompassPersistHistory =
@@ -8821,13 +12854,26 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   const records: any[] = [];
   getDgsBoardObjects(state.board).forEach((object) => {
     if (object && object.__liaDgsCompassDraft) return;
+    if (object && object.__liaDgsSpatialIntersectionBranchHelper) return;
+    if (object && object.__liaDgsSegment6Helper) return;
     if (object && (object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
         object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
         object.__liaDgsIntersectionPoint)) return;
     if (object && (object.__liaDgsTangentPoint === true || object.__liaDgsTangentHelper === true)) return;
     if (object && object.__liaDgsPolygonBorder) return;
+    const segment6Info = getDgsSegment6EntryInfo(object);
     let type = '';
-    if (object && object.__liaDgsTangent) type = 'tangent';
+    if (segment6Info) type = 'segment6-' + segment6Info.type;
+    else if (object && object.__liaDgsSpatialIntersection) type = 'spatial-intersection';
+    else if (isDgsTransformation3D(object)) type = 'transformation3d';
+    else if (isDgsSolid3D(object)) type = 'solid3d';
+    else if (isDgsPolygon3D(object)) type = 'polygon3d';
+    else if (isDgsCircle3D(object)) type = 'circle3d';
+    else if (isDgsSphere3D(object)) type = 'sphere3d';
+    else if (isDgsPlane(object)) type = 'plane';
+    else if (isDgsLocus(object)) type = 'locus';
+    else if (object && object.__liaDgsTangent) type = 'tangent';
+    else if (object && object.__liaDgsTransformPoint) type = 'transform-point';
     else if (object && object.__liaDgsMidpoint) type = 'midpoint';
     else if (object && object.__liaDgsAngleBisector) type = 'angle-bisector';
     else if (isDgsSlider(object)) type = 'slider';
@@ -8848,6 +12894,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
     else if (isDgsLine(object)) type = 'line';
     else if (isDgsPolygon(object)) type = 'polygon';
     else if (isDgsSector(object)) type = 'sector';
+    else if (isDgsEllipse(object)) type = 'ellipse';
     else if (isDgsCircle(object)) type = 'circle';
     else if (isDgsAngle(object)) type = 'angle';
     if (!type) return;
@@ -8885,8 +12932,105 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
         ? object.__liaDgsVectorAutoName !== false
         : object.__liaDgsPolygonAutoName !== false && object.__liaDgsAngleAutoName !== false
     };
-    if (isDgsLineStyleTarget(object)) record.lineStyle = getDgsLineStyle(object);
-    if (type === 'tangent') {
+    if (segment6Info) {
+      record.segment6Key = segment6Info.key;
+      record.segment6Spec = String(segment6Info.entry.spec || '');
+      record.segment6DgsCreated = document.getElementById(segment6Info.prefix + '-spec-' + segment6Info.key)?.dataset.dgsCreated === 'true';
+      if (segment6Info.type === 'surface3d') record.functionGraph = !!segment6Info.entry.functionGraph;
+      if (segment6Info.type === 'analytic3d') record.operation = String(segment6Info.entry.operation || 'dot');
+    }
+    if (isDgsLineStyleTarget(object) || !!segment6Info || type === 'plane' || type === 'circle3d' || type === 'sphere3d' ||
+        type === 'polygon3d' || type === 'solid3d' || type === 'transformation3d') {
+      record.lineStyle = getDgsLineStyle(object);
+    }
+    if (segment6Info) {
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'polygon3d') {
+      record.points = (object.__liaPolygon3DSourcePoints || []).map(dgsPointReference);
+      record.valueMode = object.__liaDgsValueMode || 'area';
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'solid3d') {
+      record.definition = object.__liaSolid3DDefinition;
+      record.points = (object.__liaSolid3DSourcePoints || []).map(dgsPointReference);
+      record.vectorIds = (object.__liaSolid3DSourceVectors || []).map((vector: any) =>
+        ensureDgsPersistentId(vector, 'vector')
+      );
+      if (object.__liaSolid3DSourcePolygon) {
+        record.polygonId = ensureDgsPersistentId(object.__liaSolid3DSourcePolygon, 'polygon3d');
+      }
+      const radius = Number(typeof object.__liaSolid3DRadiusSource === 'function'
+        ? object.__liaSolid3DRadiusSource()
+        : object.__liaSolid3DRadiusSource);
+      if (Number.isFinite(radius)) record.radius = radius;
+      record.valueMode = object.__liaDgsValueMode || 'volume';
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'transformation3d') {
+      const source = object.__liaDgsTransformation3DSource || object.__liaTransformation3DSource;
+      const reference = object.__liaDgsTransformation3DReference ||
+        (object.__liaTransformation3DReferences || [])[0];
+      record.definition = object.__liaDgsTransformation3DDefinition || object.__liaTransformation3DDefinition;
+      record.sourceId = ensureDgsPersistentId(source, dgsSpatialPersistentType(source));
+      record.referenceId = ensureDgsPersistentId(reference, dgsSpatialPersistentType(reference));
+      const parameter = object.__liaDgsTransformation3DValue ?? object.__liaTransformation3DValue;
+      const value = Number(typeof parameter === 'function' ? parameter() : parameter);
+      if (Number.isFinite(value)) record.transformValue = value;
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'circle3d') {
+      record.definition = object.__liaCircle3DDefinition;
+      record.radiusPointInPlane = object.__liaCircle3DConstrainRadiusPoint === true;
+      record.filled = dgsCircleHasFill(object);
+      record.points = (object.__liaCircle3DSourcePoints || []).map(dgsPointReference);
+      record.vectorIds = (object.__liaCircle3DSourceVectors || []).map((vector: any) =>
+        ensureDgsPersistentId(vector, 'vector')
+      );
+      const radius = Number(typeof object.__liaCircle3DRadiusSource === 'function'
+        ? object.__liaCircle3DRadiusSource()
+        : object.__liaCircle3DRadiusSource);
+      if (Number.isFinite(radius)) record.radius = radius;
+      record.valueMode = object.__liaDgsValueMode || 'radius';
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'sphere3d') {
+      record.definition = object.__liaSphere3DDefinition;
+      record.points = (object.__liaSphere3DSourcePoints || []).map(dgsPointReference);
+      const radius = Number(typeof object.__liaSphere3DRadiusSource === 'function'
+        ? object.__liaSphere3DRadiusSource()
+        : object.__liaSphere3DRadiusSource);
+      if (Number.isFinite(radius)) record.radius = radius;
+      record.valueMode = object.__liaDgsValueMode || 'radius';
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'plane') {
+      record.definition = object.__liaPlane3DDefinition;
+      record.points = (object.__liaPlane3DSourcePoints || []).map(dgsPointReference);
+      record.vectorIds = (object.__liaPlane3DSourceVectors || []).map((vector: any) =>
+        ensureDgsPersistentId(vector, 'vector')
+      );
+      record.equationForm = object.__liaDgsPlaneEquationForm || 'parameter';
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'spatial-intersection') {
+      record.resultKind = object.__liaDgsSpatialIntersectionKind;
+      record.branchIds = (object.__liaDgsSpatialIntersectionObjects || [object]).map((branch: any) =>
+        ensureDgsPersistentId(branch, 'spatial-intersection-branch')
+      );
+      const sourcePersistentType = (source: any) => isDgsPlane(source) ? 'plane'
+        : (isDgsCircle3D(source) ? 'circle3d' : (isDgsSphere3D(source) ? 'sphere3d' : 'linear3d'));
+      record.sourceId = ensureDgsPersistentId(
+        object.__liaDgsSpatialIntersectionSource,
+        sourcePersistentType(object.__liaDgsSpatialIntersectionSource)
+      );
+      record.source2Id = ensureDgsPersistentId(
+        object.__liaDgsSpatialIntersectionSource2,
+        sourcePersistentType(object.__liaDgsSpatialIntersectionSource2)
+      );
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'locus') {
+      const target = object.__liaDgsLocusTarget;
+      const driver = object.__liaDgsLocusDriver;
+      record.targetId = ensureDgsPersistentId(target, 'point');
+      record.driverId = ensureDgsPersistentId(driver, isDgsSlider(driver) ? 'slider' : 'point');
+      record.sampleCount = normalizeDgsLocusSampleCount(object.__liaDgsLocusSampleCount);
+      record.design = getDgsStrokeDesign(object);
+      record.strokeWidth = getDgsStrokeWidth(object);
+    } else if (type === 'tangent') {
       const point = object.__liaDgsTangentPoint;
       const source = object.__liaDgsTangentSource;
       const sourceType = isDgsFunctionTarget(source)
@@ -8903,6 +13047,16 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       };
     } else if (type === 'angle-bisector') {
       record.points = (object.__liaDgsAngleBisectorPoints || []).map(dgsPointReference);
+    } else if (type === 'transform-point') {
+      record.transformKind = String(object.__liaDgsTransformKind || 'rotate-point');
+      record.transformValue = Number(object.__liaDgsTransformValue);
+      record.points = [
+        dgsPointReference(object.__liaDgsTransformSource),
+        dgsPointReference(object.__liaDgsTransformReference)
+      ];
+      if (object.__liaDgsTransformAxisSecond) {
+        record.points.push(dgsPointReference(object.__liaDgsTransformAxisSecond));
+      }
     } else if (type === 'midpoint') {
       record.points = [
         dgsPointReference(object.__liaDgsMidpointFirst),
@@ -8921,9 +13075,23 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.maximum = Number(object.__liaDgsSliderMaximum);
       record.step = Number(object.__liaDgsSliderStep);
       record.value = getDgsSliderValue(object);
+      record.animationSpeed = getDgsSliderAnimationSpeed(object);
+      record.showAnimationControl = object.__liaDgsShowAnimationControl !== false;
     } else if (type === 'point') {
-      try { record.x = Number(object.X()); record.y = Number(object.Y()); } catch (e) {}
+      try {
+        record.x = Number(object.X());
+        record.y = Number(object.Y());
+        if (object.__liaPoint3D && typeof object.Z === 'function') record.z = Number(object.Z());
+      } catch (e) {}
       Object.assign(record, dgsDerivedPointRecord(object));
+      const bindingSource = getDgsPointBindingSource(object);
+      if (bindingSource) {
+        record.bindingSourceId = ensureDgsPersistentId(
+          bindingSource,
+          getDgsPointBindingSourceKind(bindingSource)
+        );
+        record.bindingParameters = coordinatePoint3DBindingParameters(object);
+      }
       if (object.__liaDgsCoordinateExpressions) {
         record.coordinateExpressions = {
           x: String(object.__liaDgsCoordinateExpressions.x || ''),
@@ -8969,9 +13137,18 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       record.design = String(object.__liaDgsArcDesign || '-');
       record.strokeWidth = Number(object.__liaDgsArcStrokeWidth) || 3;
     } else if (type === 'segment' || type === 'ray' || type === 'vector' || type === 'line') {
-      record.points = [dgsPointReference(object.point1), dgsPointReference(object.point2)];
-      if (type === 'segment' && isDgsSegmentStyleTarget(object)) {
-        record.design = getDgsStrokeDesign(object);
+      const sourcePoints = getDgsLinearSourcePoints(object);
+      record.dimension = isDgsSpatialLinearObject(object) ? 3 : 2;
+      if (type === 'vector' && object.__liaLinear3DFreeVector) {
+        record.freeVector = true;
+        record.points = sourcePoints ? [dgsPointReference(sourcePoints[0])] : [];
+        record.anchorPointId = sourcePoints ? ensureDgsPersistentId(sourcePoints[0], 'point') : '';
+        record.components = coordinateVector3DComponents(object);
+      } else {
+        record.points = sourcePoints ? sourcePoints.map(dgsPointReference) : [];
+      }
+      if ((type === 'segment' && isDgsSegmentStyleTarget(object)) || isDgsSpatialLinearObject(object)) {
+        record.design = type === 'segment' ? getDgsStrokeDesign(object) : '-';
         record.strokeWidth = getDgsStrokeWidth(object);
       }
     } else if (type === 'polygon') {
@@ -8989,8 +13166,23 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       ];
     } else if (type === 'circle') {
       record.points = [dgsPointReference(object.__liaDgsCircleCenter), dgsPointReference(object.__liaDgsCircleRadiusPoint)];
+    } else if (type === 'ellipse') {
+      record.points = [
+        dgsPointReference(object.__liaDgsEllipseFocus1),
+        dgsPointReference(object.__liaDgsEllipseFocus2),
+        dgsPointReference(object.__liaDgsEllipsePoint)
+      ];
     } else if (type === 'angle') {
-      record.points = (object.__liaDgsAnglePoints || []).map(dgsPointReference);
+      if (object.__liaDgsAngle3D) {
+        record.dimension = 3;
+        record.definition = object.__liaDgsAngle3DDefinition;
+        record.sourceIds = (object.__liaDgsAngle3DSources || []).map((source: any) =>
+          ensureDgsPersistentId(source, dgsSpatialPersistentType(source))
+        );
+        record.strokeWidth = getDgsStrokeWidth(object);
+      } else {
+        record.points = (object.__liaDgsAnglePoints || []).map(dgsPointReference);
+      }
     }
     if (type === 'midpoint') Object.assign(record, dgsDerivedPointRecord(object));
     if (object.__liaDgsRootConstruction) {
@@ -9039,6 +13231,7 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
       getExternalDgsMacroSpecSignature(state.boardId)
     ),
     axisLabels: getDgsAxisLabels(state),
+    scene: getDgsSceneSnapshot(state),
     records
   };
   const previous = dgsConstructionStates[state.boardId] || {
@@ -9049,6 +13242,15 @@ function persistDgsConstruction(state: DgsState, recordHistory = true): void {
   };
   if (!previous.axisLabels) previous.axisLabels = cloneDgsSnapshot(next.axisLabels);
   const changed = JSON.stringify(previous) !== JSON.stringify(next);
+  const quizGeometryChanged = JSON.stringify(previous.records || []) !==
+    JSON.stringify(next.records || []);
+  if (quizGeometryChanged) {
+    try {
+      state.boardContainer.dispatchEvent(new CustomEvent('lia-coordinate-geometry-change', {
+        detail: { boardId: state.boardId }
+      }));
+    } catch (error) {}
+  }
   dgsConstructionStates[state.boardId] = next;
   dgsConstructionBoards[state.boardId] = state.board;
   if (changed && !recordHistory && !dgsPendingHistoryBefore[state.boardId]) {
@@ -9133,7 +13335,7 @@ function findDgsPointForRestore(state: DgsState, reference: any, byId: Map<strin
   const registered = window.__points && window.__points[state.boardId] && window.__points[state.boardId][name];
   try { if (registered && registered.board === state.board) return registered; } catch (e) {}
   return getDgsBoardObjects(state.board).find((point) => {
-    if (!point || (String(point.elType || '').toLowerCase() !== 'point' && String(point.elType || '').toLowerCase() !== 'glider')) return false;
+    if (!isDgsPoint(point)) return false;
     return String(point.__liaDgsPointName || point.name || '') === name;
   }) || null;
 }
@@ -9228,7 +13430,11 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   }
   setDgsObjectColor(object, 'text', record.textColor || '#ff00ff');
   setDgsObjectColor(object, 'line', record.lineColor || '#ff00ff');
-  setDgsObjectColor(object, 'fill', record.fillColor || '#ff00ff');
+  // Older editor snapshots could keep a separate fill after a border-color change.
+  // Authored macros may still explicitly choose a separate fill color.
+  const surfaceFill = (object.__liaPlane3D === true || object.__liaSphere3D === true || object.__liaCircle3D === true || object.__liaPolygon3D === true) && record.origin === 'dgs'
+    ? record.lineColor : record.fillColor;
+  setDgsObjectColor(object, 'fill', surfaceFill || '#ff00ff');
   if (Number.isFinite(Number(record.formatFontSize))) {
     setDgsFormatFontSize(state, object, Number(record.formatFontSize));
   }
@@ -9236,6 +13442,13 @@ function applyRestoredDgsProperties(state: DgsState, object: any, record: any): 
   setDgsObjectOpacity(object, Number.isFinite(record.opacity) ? record.opacity : 1);
   setDgsObjectVisible(object, record.showObject !== false);
   setDgsObjectNameVisible(object, record.showName !== false);
+  if (object.__liaCircle3D && record.filled === false) {
+    object.__liaDgsFillColor = 'none';
+    getDgsRenderedParts(object).forEach(part => {
+      if (part === object.label) return;
+      part.setAttribute?.({ fillColor: 'none', highlightFillColor: 'none', fillOpacity: 0, highlightFillOpacity: 0 });
+    });
+  }
   if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
   else refreshDgsObjectLabel(object);
 }
@@ -9339,7 +13552,7 @@ function restoreDgsPointTraceState(state: DgsState, point: any, record: any): vo
 function applyRestoredDgsSpecificState(state: DgsState, object: any, record: any): void {
   if (!object || !record) return;
   if (record.type === 'point') {
-    setDgsPointPosition(object, Number(record.x), Number(record.y));
+    setDgsPointPosition(object, Number(record.x), Number(record.y), Number(record.z));
     restoreDgsPointTraceState(state, object, record);
   } else if (record.type === 'midpoint') {
     restoreDgsPointTraceState(state, object, record);
@@ -9355,8 +13568,12 @@ function applyRestoredDgsSpecificState(state: DgsState, object: any, record: any
       record.value,
       false
     );
+    object.__liaDgsSliderAnimationSpeed = normalizeDgsSliderAnimationSpeed(record.animationSpeed);
+    object.__liaDgsShowAnimationControl = record.showAnimationControl !== false;
+    stopDgsSliderAnimation(state, object, false);
+    ensureDgsSliderAnimationControl(state, object);
   } else if (record.type === 'text') {
-    setDgsPointPosition(object, Number(record.x), Number(record.y));
+    setDgsPointPosition(object, Number(record.x), Number(record.y), Number(record.z));
     setDgsTextContent(state, object, String(record.content || record.name || ''));
     setDgsTextFontSize(state, object, Number(record.fontSize || record.formatFontSize));
   } else if (record.type === 'function') {
@@ -9364,6 +13581,17 @@ function applyRestoredDgsSpecificState(state: DgsState, object: any, record: any
     if (expression && expression !== String(object.__liaDgsFunctionExpression || '').trim()) {
       applyDgsFunctionExpression(state, object, expression, false);
     }
+  } else if (record.type === 'circle3d' && record.definition === 'center-normal-radius') {
+    object.__liaCircle3DSetRadius?.(Number(record.radius));
+    object.__liaDgsValueMode = record.valueMode || 'radius';
+  } else if (record.type === 'sphere3d' && record.definition === 'center-radius') {
+    object.__liaSphere3DSetRadius?.(Number(record.radius));
+    object.__liaDgsValueMode = record.valueMode || 'radius';
+  } else if (record.type === 'vector' && record.freeVector && Array.isArray(record.components)) {
+    setCoordinateFreeVector3DComponents(object, record.components as Vector3);
+  } else if (record.type === 'locus') {
+    object.__liaDgsLocusSampleCount = normalizeDgsLocusSampleCount(record.sampleCount);
+    scheduleDgsLocusUpdate(state, 0);
   } else if (record.type === 'arc') {
     setDgsArcAngles(state, object, record.exitAngle, record.entryAngle, false);
   } else if (record.type === 'tangent') {
@@ -9421,6 +13649,14 @@ function restoreDgsPendingRecords(
     pending.forEach((record: any) => {
       const existingKey = String(record.id || record.macroKey || '');
       const existing = existingKey ? existingById.get(existingKey) : null;
+      if (String(record.type || '').startsWith('segment6-')) {
+        const restored = restoreDgsSegment6Record(state, record);
+        if (!restored) { unresolved.push(record); return; }
+        if (record.id) existingById.set(String(record.id), restored);
+        if (record.macroKey) existingById.set(String(record.macroKey), restored);
+        restoredThisPass += 1;
+        return;
+      }
       if (existing) {
         applyRestoredDgsProperties(state, existing, record);
         applyRestoredDgsSpecificState(state, existing, record);
@@ -9456,6 +13692,9 @@ function restoreDgsPendingRecords(
         );
         if (!slider) { unresolved.push(record); return; }
         applyRestoredDgsProperties(state, slider, record);
+        slider.__liaDgsSliderAnimationSpeed = normalizeDgsSliderAnimationSpeed(record.animationSpeed);
+        slider.__liaDgsShowAnimationControl = record.showAnimationControl !== false;
+        ensureDgsSliderAnimationControl(state, slider);
         existingById.set(record.id, slider);
         restoredThisPass += 1;
         return;
@@ -9514,6 +13753,215 @@ function restoreDgsPendingRecords(
         restoredThisPass += 1;
         return;
       }
+      if (record.type === 'locus') {
+        const target = existingById.get(String(record.targetId || ''));
+        const driver = existingById.get(String(record.driverId || ''));
+        if (!isDgsPoint(target) || (!isDgsSlider(driver) && !isDgsPoint(driver))) {
+          unresolved.push(record);
+          return;
+        }
+        const locus = createDgsLocus(state, target, driver, {
+          name: String(record.name || ''),
+          sampleCount: record.sampleCount,
+          color: record.lineColor,
+          opacity: record.opacity,
+          visible: record.showObject !== false,
+          showName: record.showName !== false,
+          lineStyle: record.lineStyle,
+          strokeWidth: record.strokeWidth
+        });
+        if (!locus) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, locus, record);
+        applyRestoredDgsSpecificState(state, locus, record);
+        existingById.set(record.id, locus);
+        restoredThisPass += 1;
+        return;
+      }
+
+      if (record.type === 'polygon3d') {
+        const points = (record.points || []).map((reference: any) =>
+          findDgsPointForRestore(state, reference, existingById)
+        );
+        if (points.length < 3 || points.some((point: any) => !point)) {
+          unresolved.push(record);
+          return;
+        }
+        const polygon = createDgsPolygon3D(state, points, String(record.name || ''));
+        if (!polygon) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, polygon, record);
+        polygon.__liaDgsValueMode = record.valueMode || 'area';
+        existingById.set(record.id, polygon);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'solid3d') {
+        const points = (record.points || []).map((reference: any) =>
+          findDgsPointForRestore(state, reference, existingById)
+        );
+        const vectors = (record.vectorIds || []).map((id: unknown) =>
+          existingById.get(String(id || ''))
+        );
+        const polygon = record.polygonId
+          ? existingById.get(String(record.polygonId || ''))
+          : null;
+        const definition = record.definition as Solid3DDefinition;
+        const valid = definition === 'tetrahedron'
+          ? points.length >= 4 && points.slice(0, 4).every(Boolean)
+          : definition === 'pyramid'
+            ? !!polygon && points.length >= 1 && !!points[0]
+            : definition === 'prism'
+              ? !!polygon && vectors.length >= 1 && !!vectors[0]
+              : (definition === 'parallelepiped' || definition === 'cuboid')
+                ? points.length >= 1 && !!points[0] && vectors.length >= 3 && vectors.slice(0, 3).every(Boolean)
+                : points.length >= 2 && points.slice(0, 2).every(Boolean) &&
+                  (points.length >= 3 || Number(record.radius) > 0);
+        if (!valid) { unresolved.push(record); return; }
+        const solid = createDgsSolid3D(
+          state, definition, points.filter(Boolean), vectors.filter(Boolean), polygon,
+          points.length >= 3 ? undefined : Number(record.radius),
+          String(record.name || '')
+        );
+        if (!solid) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, solid, record);
+        solid.__liaDgsValueMode = record.valueMode || 'volume';
+        existingById.set(record.id, solid);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'transformation3d') {
+        const source = existingById.get(String(record.sourceId || ''));
+        const reference = existingById.get(String(record.referenceId || ''));
+        if (!source || !reference) { unresolved.push(record); return; }
+        const definition = record.definition as Transformation3DDefinition;
+        const parameter = definition === 'rotate-axis' || definition === 'dilate'
+          ? Number(record.transformValue)
+          : undefined;
+        if ((definition === 'rotate-axis' || definition === 'dilate') &&
+            !Number.isFinite(parameter)) {
+          unresolved.push(record);
+          return;
+        }
+        const transformed = createDgsTransformation3D(
+          state, source, reference, definition, parameter, String(record.name || '')
+        );
+        if (!transformed) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, transformed, record);
+        existingById.set(record.id, transformed);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'circle3d') {
+        const points = (record.points || []).map((reference: any) =>
+          findDgsPointForRestore(state, reference, existingById)
+        );
+        const vectors = (record.vectorIds || []).map((id: unknown) => existingById.get(String(id || '')));
+        const requiredPoints = record.definition === 'three-points' ? 3 :
+          (record.definition === 'center-normal-point' ? 2 : 1);
+        const requiredVectors = record.definition === 'three-points' ? 0 : 1;
+        if (points.length < requiredPoints || points.slice(0, requiredPoints).some((point: any) => !point) ||
+            vectors.length < requiredVectors || vectors.slice(0, requiredVectors).some((vector: any) => !vector)) {
+          unresolved.push(record);
+          return;
+        }
+        const circle = createDgsCircle3D(
+          state, record.definition, points, vectors,
+          record.definition === 'center-normal-radius' ? Number(record.radius) : undefined,
+          String(record.name || ''), record.radiusPointInPlane === true
+        );
+        if (!circle) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, circle, record);
+        circle.__liaDgsValueMode = record.valueMode || 'radius';
+        existingById.set(record.id, circle);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'sphere3d') {
+        const points = (record.points || []).map((reference: any) =>
+          findDgsPointForRestore(state, reference, existingById)
+        );
+        const requiredPoints = record.definition === 'four-points' ? 4 :
+          (record.definition === 'center-point' ? 2 : 1);
+        if (points.length < requiredPoints || points.slice(0, requiredPoints).some((point: any) => !point)) {
+          unresolved.push(record);
+          return;
+        }
+        const sphere = createDgsSphere3D(
+          state, record.definition, points,
+          record.definition === 'center-radius' ? Number(record.radius) : undefined,
+          String(record.name || '')
+        );
+        if (!sphere) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, sphere, record);
+        sphere.__liaDgsValueMode = record.valueMode || 'radius';
+        existingById.set(record.id, sphere);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'plane') {
+        const points = (record.points || []).map((reference: any) =>
+          findDgsPointForRestore(state, reference, existingById)
+        );
+        const vectors = (record.vectorIds || []).map((id: unknown) => existingById.get(String(id || '')));
+        const requiredPoints = record.definition === 'three-points' ? 3 : 1;
+        const requiredVectors = record.definition === 'point-vectors' ? 2 : 1;
+        if (points.length < requiredPoints || points.some((point: any) => !point) ||
+            vectors.length < (record.definition === 'three-points' ? 0 : requiredVectors) ||
+            vectors.some((vector: any) => !vector)) {
+          unresolved.push(record);
+          return;
+        }
+        const plane = createDgsPlane(state, record.definition, points, vectors);
+        if (!plane) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, plane, record);
+        plane.__liaDgsPlaneEquationForm = record.equationForm || 'parameter';
+        existingById.set(record.id, plane);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'angle' && Number(record.dimension) === 3) {
+        const sources = (record.sourceIds || []).map((id: unknown) =>
+          existingById.get(String(id || ''))
+        );
+        if (sources.length !== 2 || sources.some((source: any) => !source)) {
+          unresolved.push(record);
+          return;
+        }
+        const angle = createDgsAngle3D(
+          state,
+          sources[0],
+          sources[1],
+          record.definition as SpatialAngle3DDefinition,
+          String(record.name || '')
+        );
+        if (!angle) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, angle, record);
+        applyRestoredDgsSpecificState(state, angle, record);
+        existingById.set(record.id, angle);
+        restoredThisPass += 1;
+        return;
+      }
+      if (record.type === 'spatial-intersection') {
+        const first = existingById.get(String(record.sourceId || ''));
+        const second = existingById.get(String(record.source2Id || ''));
+        if (!first || !second) { unresolved.push(record); return; }
+        const object = createDgsSpatialIntersectionConstruction(state, first, second);
+        if (!object) { unresolved.push(record); return; }
+        applyRestoredDgsProperties(state, object, record);
+        const branches = Array.isArray(object.__liaDgsSpatialIntersectionObjects)
+          ? object.__liaDgsSpatialIntersectionObjects : [object];
+        const branchIds = Array.isArray(record.branchIds) ? record.branchIds : [];
+        branches.forEach((branch: any, index: number) => {
+          if (index > 0) applyRestoredDgsProperties(state, branch, {
+            ...record,
+            id: branchIds[index] || ensureDgsPersistentId(branch, 'spatial-intersection-branch'),
+            name: getDgsObjectName(branch)
+          });
+          if (branchIds[index]) existingById.set(String(branchIds[index]), branch);
+        });
+        existingById.set(record.id, object);
+        restoredThisPass += 1;
+        return;
+      }
       const points = (record.points || []).map((reference: any) =>
         findDgsPointForRestore(state, reference, existingById)
       );
@@ -9530,12 +13978,24 @@ function restoreDgsPendingRecords(
         const baseLine = existingById.get(String(record.baseId || ''));
         if (!isDgsLinearObject(baseLine)) { unresolved.push(record); return; }
         object = createDgsParallel(state, baseLine, points[0]);
+      } else if (record.type === 'transform-point') {
+        object = createDgsTransformedPoint(
+          state,
+          points[0],
+          String(record.transformKind || 'rotate-point') as DgsTransformKind,
+          points[1],
+          points[2] || null,
+          Number(record.transformValue)
+        );
       } else if (record.type === 'midpoint') {
         object = createDgsMidpoint(state, points[0], points[1]);
       } else if (record.type === 'angle-bisector') {
         object = createDgsAngleBisector(state, points[0], points[1], points[2]);
       } else if (record.type === 'segment') object = createDgsSegment(state, points[0], points[1]);
       else if (record.type === 'ray') object = createDgsRay(state, points[0], points[1]);
+      else if (record.type === 'vector' && record.freeVector && Array.isArray(record.components)) {
+        object = createDgsFreeVector3D(state, points[0], record.components as Vector3, String(record.name || ''));
+      }
       else if (record.type === 'vector') object = createDgsVector(state, points[0], points[1]);
       else if (record.type === 'compass-arc') {
         object = createDgsCompassArc(state, points[0], points[1], record.sweepAngle, false);
@@ -9546,6 +14006,7 @@ function restoreDgsPendingRecords(
       else if (record.type === 'line') object = createDgsLine(state, points[0], points[1]);
       else if (record.type === 'polygon') object = createDgsPolygon(state, points);
       else if (record.type === 'sector') object = createDgsSector(state, points[0], points[1], points[2]);
+      else if (record.type === 'ellipse') object = createDgsEllipse(state, points[0], points[1], points[2]);
       else if (record.type === 'circle') object = createDgsCircle(state, points[0], points[1]);
       else if (record.type === 'angle') object = createDgsAngle(state, points);
       if (!object) { unresolved.push(record); return; }
@@ -9568,21 +14029,27 @@ function restoreDgsConstruction(state: DgsState): boolean {
   const saved = dgsConstructionStates[state.boardId];
   if (!saved || saved.boardId !== state.boardId || !Array.isArray(saved.records)) return false;
   dgsConstructionBoards[state.boardId] = state.board;
-  assignDgsMacroPersistentIds(state.boardId, state.board);
-  const registered = window.__points && window.__points[state.boardId];
-  if (registered && typeof registered === 'object') {
-    Object.keys(registered).forEach((name) => {
-      try { if (!registered[name] || registered[name].board !== state.board) delete registered[name]; } catch (e) {}
-    });
-  }
-  const existingById = new Map<string, any>();
-  getDgsBoardObjects(state.board).forEach((object) => {
-    if (object && object.__liaDgsPersistentId) existingById.set(String(object.__liaDgsPersistentId), object);
-    if (object && object.__liaDgsMacroKey) existingById.set(String(object.__liaDgsMacroKey), object);
-  });
-
   state.restoring = true;
+  let ownsBoardBatch = false;
   try {
+    if (!state.board.isSuspendedUpdate && typeof state.board.suspendUpdate === 'function') {
+      state.board.suspendUpdate();
+      ownsBoardBatch = true;
+    }
+    applyDgsSceneSnapshot(state, saved.scene);
+    assignDgsMacroPersistentIds(state.boardId, state.board);
+    const registered = window.__points && window.__points[state.boardId];
+    if (registered && typeof registered === 'object') {
+      Object.keys(registered).forEach((name) => {
+        try { if (!registered[name] || registered[name].board !== state.board) delete registered[name]; } catch (e) {}
+      });
+    }
+    const existingById = new Map<string, any>();
+    getDgsBoardObjects(state.board).forEach((object) => {
+      if (object && object.__liaDgsPersistentId) existingById.set(String(object.__liaDgsPersistentId), object);
+      if (object && object.__liaDgsMacroKey) existingById.set(String(object.__liaDgsMacroKey), object);
+    });
+
     let needsDeferredRestore = false;
     if (saved.axisLabels && saved.axisLabels.x && saved.axisLabels.y) {
       applyDgsAxisLabels(state, saved.axisLabels);
@@ -9597,8 +14064,11 @@ function restoreDgsConstruction(state: DgsState): boolean {
         needsDeferredRestore = true;
         return;
       }
-      if (!point) point = createDgsPoint(state, Number(record.x), Number(record.y));
+      if (!point) point = createDgsPoint(state, Number(record.x), Number(record.y), null, Number(record.z));
       if (!point) return;
+      if (!record.bindingSourceId && getDgsPointBindingSource(point)) {
+        unbindDgsPoint(state, point);
+      }
       applyRestoredDgsProperties(state, point, record);
       applyRestoredDgsSpecificState(state, point, record);
       if (record.coordinateExpressions) {
@@ -9714,6 +14184,16 @@ function restoreDgsConstruction(state: DgsState): boolean {
     if (pending.length) pending = restoreDgsPendingRecords(state, pending, existingById);
     if (pending.length) needsDeferredRestore = true;
     saved.records
+      .filter((record: any) => record.type === 'point' && record.bindingSourceId)
+      .forEach((record: any) => {
+        const point = existingById.get(String(record.id || record.macroKey || ''));
+        const source = existingById.get(String(record.bindingSourceId || ''));
+        if (!point || !source || !bindDgsPointToObject(state, point, source, record.bindingParameters)) {
+          needsDeferredRestore = true;
+        }
+      });
+    if (pending.length) pending = restoreDgsPendingRecords(state, pending, existingById);
+    saved.records
       .filter((record: any) => record.type === 'intersection-construction')
       .forEach((record: any) => {
         const first = existingById.get(String(record.sourceId || ''));
@@ -9748,6 +14228,9 @@ function restoreDgsConstruction(state: DgsState): boolean {
     try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     return needsDeferredRestore;
   } finally {
+    if (ownsBoardBatch) {
+      try { state.board.unsuspendUpdate?.(); } catch (error) {}
+    }
     state.restoring = false;
   }
 }
@@ -9775,7 +14258,16 @@ function scheduleDgsConstructionRestore(state: DgsState): void {
   attempt(0);
 }
 
-function clearDgsConstructionFromBoard(state: DgsState): void {
+function clearDgsConstructionFromBoard(
+  state: DgsState,
+  preservedMacroKeys: Set<string> = new Set()
+): void {
+  finishDgsMultiSelectDrag(state, null, true);
+  setDgsMultiSelection(state, []);
+  if (state.locusUpdateTimer != null) window.clearTimeout(state.locusUpdateTimer);
+  state.locusUpdateTimer = undefined;
+  state.locusUpdating = false;
+  state.pendingLocusTarget = null;
   clearDgsCompassInteraction(state, true);
   clearDgsCirclePreview(state);
   setAngleDialogOpen(state, false);
@@ -9790,10 +14282,20 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
   setSelectedPolygonPoints(state, []);
   setSelectedAnglePoints(state, []);
   setSelectedSectorPoints(state, []);
+  setSelectedEllipsePoints(state, []);
+  state.selectedPlanePoints = [];
+  state.selectedPlaneVectors = [];
+  state.selectedRoundPoints = [];
+  state.selectedRoundVectors = [];
   if (state.sideMenuOpen) setSideMenuOpen(state, false);
   state.rootConstructions.slice().forEach((construction) => removeDgsRootConstruction(state, construction, false));
 
-  const objects = getDgsBoardObjects(state.board);
+  // Snapshot restoration updates live macro objects in place; their macro
+  // bootstraps do not necessarily rerun after an undo operation.
+  clearDgsSegment6Entries(state.board, preservedMacroKeys);
+  const objects = getDgsBoardObjects(state.board).filter((object) =>
+    !preservedMacroKeys.has(String(object?.__liaDgsMacroKey || ''))
+  );
   objects.filter(isDgsPoint).forEach((point) => {
     point.__liaDgsTraceRecording = true;
     point.__liaDgsTraceMarkers = [];
@@ -9819,6 +14321,9 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     if (object && object.__liaDgsCircle && object.__liaDgsCircleLabel) {
       try { state.board.removeObject(object.__liaDgsCircleLabel); } catch (e) {}
     }
+    if (object && object.__liaDgsEllipse && object.__liaDgsEllipseLabel) {
+      try { state.board.removeObject(object.__liaDgsEllipseLabel); } catch (e) {}
+    }
     if (object && object.__liaDgsRay && object.__liaDgsRayLabel) {
       try { state.board.removeObject(object.__liaDgsRayLabel); } catch (e) {}
     }
@@ -9831,19 +14336,42 @@ function clearDgsConstructionFromBoard(state: DgsState): void {
     if (object && object.__liaDgsFunction && object.__liaDgsFunctionLabel) {
       try { state.board.removeObject(object.__liaDgsFunctionLabel); } catch (e) {}
     }
-    if (isDgsSlider(object)) object.__liaDgsSliderDeleted = true;
+    if (isDgsSlider(object)) {
+      object.__liaDgsSliderDeleted = true;
+      removeDgsSliderAnimationControl(state, object);
+    }
   });
   objects.filter((object) => object && object.__liaDgsSliderOwner).forEach((part) => {
     try { state.board.removeObject(part); } catch (e) {}
   });
   objects.filter((object) => object && !isDgsPoint(object) && (
     object.__liaDgsSegment || object.__liaDgsRay || object.__liaDgsVector || object.__liaDgsLine || object.__liaDgsArc || object.__liaDgsCompassArc || object.__liaDgsPolygon ||
-    object.__liaDgsCircle || object.__liaDgsSector || object.__liaDgsAngle || object.__liaDgsFunction || object.__liaDgsText || object.__liaDgsSlider || object.__liaDgsTangentHelper ||
-    object.__liaDgsAngleBisectorHelper
+    object.__liaDgsCircle || object.__liaDgsEllipse || object.__liaDgsSector || object.__liaDgsAngle || object.__liaDgsFunction || object.__liaDgsLocus || object.__liaDgsText || object.__liaDgsSlider || object.__liaDgsTangentHelper ||
+    object.__liaDgsAngleBisectorHelper || object.__liaDgsPlane ||
+    object.__liaDgsCircle3D || object.__liaDgsSphere3D ||
+    object.__liaDgsPolygon3D || object.__liaDgsSolid3D || object.__liaDgsTransformation3D ||
+    isDgsCurve3D(object) || isDgsSurface3D(object) || isDgsConic3D(object) || isDgsAnalytic3D(object)
   )).forEach((object) => {
+    try { object?.__liaLinear3DCleanup?.(); } catch (e) {}
+    try { object?.__liaPlane3DCleanup?.(); } catch (e) {}
+    try { object?.__liaCircle3DCleanup?.(); } catch (e) {}
+    try { object?.__liaSphere3DCleanup?.(); } catch (e) {}
+    try { object?.__liaPolygon3DCleanup?.(); } catch (e) {}
+    try { object?.__liaSolid3DCleanup?.(); } catch (e) {}
+    try { object?.__liaDgsAngle3DCleanup?.(); } catch (e) {}
+    try { object?.__liaCurve3DCleanup?.(); } catch (e) {}
+    try { object?.__liaSurface3DCleanup?.(); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.linearObjects?.delete(object); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.planeObjects?.delete(object); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.circleObjects?.delete(object); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.sphereObjects?.delete(object); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.polygonObjects?.delete(object); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.solidObjects?.delete(object); } catch (e) {}
     try { state.board.removeObject(object); } catch (e) {}
   });
   objects.filter(isDgsPoint).forEach((point) => {
+    try { point?.__liaPoint3DCleanup?.(); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.points?.delete(point); } catch (e) {}
     const name = String(point.__liaDgsPointName || '');
     try {
       const pointRegistry = window.__points && window.__points[state.boardId];
@@ -9868,8 +14396,50 @@ window.__applyDgsHistory = function(boardId: string, snapshot: any): void {
   if (!state) return;
   dgsHistoryApplying.add(boardId);
   delete dgsPendingHistoryBefore[boardId];
+  let ownsBoardBatch = false;
   try {
-    clearDgsConstructionFromBoard(state);
+    if (!state.board.isSuspendedUpdate && typeof state.board.suspendUpdate === 'function') {
+      state.board.suspendUpdate();
+      ownsBoardBatch = true;
+    }
+    const macroKeys = new Set<string>(
+      (Array.isArray(snapshot?.records) ? snapshot.records : [])
+        .filter(isDgsMacroSnapshotRecord).map(dgsSnapshotRecordKey)
+    );
+    clearDgsConstructionFromBoard(state, macroKeys);
+    applyDgsSceneSnapshot(state, snapshot?.scene);
+    // A source deleted through the DGS can itself be macro-managed. Recreate
+    // only macro types that are present in the target snapshot but missing
+    // from the live board, then resolve the ordinary DGS records.
+    const liveMacroKeys = new Set<string>(
+      getDgsBoardObjects(state.board)
+        .map((object: any) => String(object?.__liaDgsMacroKey || ''))
+        .filter(Boolean)
+    );
+    const missingMacroTypes = new Set<string>(
+      (Array.isArray(snapshot?.records) ? snapshot.records : [])
+        .filter((record: any) => isDgsMacroSnapshotRecord(record) &&
+          !liveMacroKeys.has(dgsSnapshotRecordKey(record)))
+        .map((record: any) => String(record.type || ''))
+    );
+    if (missingMacroTypes.has('point')) {
+      try { window.__bootstrapPoint3D?.(); } catch (e) {}
+    }
+    if (['segment', 'line', 'ray', 'vector'].some((type) => missingMacroTypes.has(type))) {
+      try { window.__bootstrapLinear3D?.(); } catch (e) {}
+    }
+    if (missingMacroTypes.has('plane')) {
+      try { window.__bootstrapPlane3D?.(); } catch (e) {}
+    }
+    if (missingMacroTypes.has('circle3d')) {
+      try { window.__bootstrapCircle3D?.(); } catch (e) {}
+    }
+    if (missingMacroTypes.has('sphere3d')) {
+      try { window.__bootstrapSphere3D?.(); } catch (e) {}
+    }
+    if (missingMacroTypes.has('spatial-intersection')) {
+      try { window.__bootstrapIntersection3D?.(); } catch (e) {}
+    }
     dgsConstructionStates[boardId] = cloneDgsSnapshot(snapshot || {
       boardId,
       language: state.language,
@@ -9878,6 +14448,9 @@ window.__applyDgsHistory = function(boardId: string, snapshot: any): void {
     if (restoreDgsConstruction(state)) scheduleDgsConstructionRestore(state);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
   } finally {
+    if (ownsBoardBatch) {
+      try { state.board.unsuspendUpdate?.(); } catch (error) {}
+    }
     dgsHistoryApplying.delete(boardId);
   }
 };
@@ -10032,6 +14605,27 @@ function dgsCircleContainsPointer(state: DgsState, circle: any, localX: number, 
   } catch (e) { return false; }
 }
 
+function dgsEllipseContainsPointer(state: DgsState, ellipse: any, localX: number, localY: number): boolean {
+  const board = state.board;
+  const data = getDgsEllipseData(ellipse);
+  if (!board || !board.origin || !data) return false;
+  try {
+    const unitX = Number(board.unitX);
+    const unitY = Number(board.unitY);
+    if (!Number.isFinite(unitX) || !Number.isFinite(unitY) ||
+        Math.abs(unitX) < 1e-12 || Math.abs(unitY) < 1e-12) return false;
+    const x = (localX - Number(board.origin.scrCoords[1])) / unitX;
+    const y = (Number(board.origin.scrCoords[2]) - localY) / unitY;
+    return getDgsEllipseImplicitValue(data, x, y) <= 1e-8;
+  } catch (e) { return false; }
+}
+
+function dgsClosedConicContainsPointer(state: DgsState, object: any, localX: number, localY: number): boolean {
+  return isDgsEllipse(object)
+    ? dgsEllipseContainsPointer(state, object, localX, localY)
+    : dgsCircleContainsPointer(state, object, localX, localY);
+}
+
 function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   const rect = state.boardContainer.getBoundingClientRect();
   const localX = evt.clientX - rect.left;
@@ -10042,9 +14636,9 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   getSelectableBoardPoints(state).forEach((candidate) => {
     if (!candidate.__liaDgsPointName) return;
     try {
-      const screenX = Number(state.board.origin.scrCoords[1]) + Number(candidate.X()) * Number(state.board.unitX);
-      const screenY = Number(state.board.origin.scrCoords[2]) - Number(candidate.Y()) * Number(state.board.unitY);
-      const distance = Math.hypot(localX - screenX, localY - screenY);
+      const screen = dgsPointScreenCoordinates(state, candidate);
+      if (!screen) return;
+      const distance = Math.hypot(localX - screen.x, localY - screen.y);
       const layer = getDgsObjectRenderedLayer(candidate);
       if (distance <= 18 && (layer > pointLayer || (layer === pointLayer && distance < pointDistance))) {
         point = candidate;
@@ -10053,21 +14647,28 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
       }
     } catch (e) {}
   });
+  // A direct point hit must win over coincident carrier objects, even when a
+  // line or curve is rendered on a higher layer. Otherwise a glider's own
+  // context menu cannot be opened while it lies on its source object.
+  if (point) return point;
   const candidates: any[] = [];
   const seen = new Set<any>();
-  const add = (segment: any) => {
+  const add = (candidate: any) => {
+    const segment = candidate?.__liaPoint3DProxy || candidate?.__liaLinear3DProxy ||
+      candidate?.__liaPlane3DProxy || candidate?.__liaCurve3DProxy || candidate?.__liaCircle3DProxy ||
+      candidate?.__liaSphere3DProxy || candidate?.__liaPolygon3DProxy ||
+      candidate?.__liaSolid3DProxy || candidate;
     if (!segment || typeof segment !== 'object' || seen.has(segment) ||
-        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsVector && !segment.__liaDgsLine && !segment.__liaDgsArc && !segment.__liaDgsCompassArc &&
-         !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsSector &&
+        (!segment.__liaDgsSegment && !segment.__liaDgsRay && !segment.__liaDgsVector && !segment.__liaDgsLine && !segment.__liaDgsArc && !segment.__liaDgsCompassArc && !segment.__liaDgsLocus &&
+         !segment.__liaDgsPolygon && !segment.__liaDgsCircle && !segment.__liaDgsEllipse && !segment.__liaDgsSector &&
+         !segment.__liaDgsPlane && !segment.__liaDgsCircle3D && !segment.__liaDgsSphere3D &&
+         !segment.__liaDgsPolygon3D && !segment.__liaDgsSolid3D && !segment.__liaDgsTransformation3D &&
          !segment.__liaDgsAngle && !segment.__liaDgsFunction && !segment.__liaDgsText && !segment.__liaDgsSlider)) return;
     if (segment.__liaDgsCompassDraft) return;
     seen.add(segment);
     candidates.push(segment);
   };
-  if (state.board && Array.isArray(state.board.objectsList)) state.board.objectsList.forEach(add);
-  if (state.board && state.board.objects && typeof state.board.objects === 'object') {
-    Object.keys(state.board.objects).forEach((key) => add(state.board.objects[key]));
-  }
+  getDgsBoardObjects(state.board).forEach(add);
 
   let nearest: any | null = point;
   let nearestDistance = point ? 0 : 10;
@@ -10075,6 +14676,14 @@ function findDgsContextObject(state: DgsState, evt: MouseEvent): any | null {
   candidates.forEach((segment) => {
     const layer = getDgsObjectRenderedLayer(segment);
     if (isDgsCircle(segment) && dgsCircleContainsPointer(state, segment, localX, localY)) {
+      if (layer > nearestLayer) {
+        nearest = segment;
+        nearestDistance = 0;
+        nearestLayer = layer;
+      }
+      return;
+    }
+    if (isDgsEllipse(segment) && dgsEllipseContainsPointer(state, segment, localX, localY)) {
       if (layer > nearestLayer) {
         nearest = segment;
         nearestDistance = 0;
@@ -10212,15 +14821,65 @@ function isDgsCircle(object: any): boolean {
   return !!object && !!object.__liaDgsCircle;
 }
 
+function isDgsEllipse(object: any): boolean {
+  return !!object && !!object.__liaDgsEllipse;
+}
+
 function isDgsSector(object: any): boolean {
   return !!object && !!object.__liaDgsSector;
 }
 
+function isDgsLocus(object: any): boolean {
+  return !!object && !!object.__liaDgsLocus;
+}
+
+function isDgsCurve3D(object: any): boolean {
+  return !!object?.__liaCurve3D && !!object.__liaSceneRecord && !object.__liaConicSection3D;
+}
+
+function isDgsSurface3D(object: any): boolean {
+  return !!object?.__liaSurface3D && !!object.__liaSceneRecord;
+}
+
+function isDgsConic3D(object: any): boolean {
+  return !!object?.__liaConicSection3D && !!object.__liaSceneRecord;
+}
+
+function isDgsAnalytic3D(object: any): boolean {
+  return !!object?.__liaDgsAnalytic3D;
+}
+function updateDgsSegment6EntryName(object: any, name: string): void {
+  const registries = [
+    window.__curve3DEntries, window.__surface3DEntries, window.__conic3DEntries,
+    window.__analytic3DEntries, window.__locus3DEntries, window.__locusSurface3DEntries
+  ];
+  registries.forEach(registry => Object.values(registry || {}).forEach((entry: any) => {
+    if (entry?.object !== object) return;
+    const parts = splitTopLevel(String(entry.spec || ''), ';');
+    if (parts.length > 1) {
+      parts[1] = name;
+      entry.spec = parts.join(';');
+    }
+    if (entry.config) entry.config.name = name;
+  }));
+  if (object.__liaSceneRecord) object.__liaSceneRecord.name = name;
+}
 function getDgsObjectName(object: any): string {
+  if (object?.__liaDgsAngle3D) return String(object.__liaDgsAngleName || '');
+  if (isDgsConic3D(object)) return String(object.__liaDgsConic3DName || object.__liaSceneRecord?.name || object.name || '');
+  if (isDgsCurve3D(object)) return String(object.__liaDgsCurve3DName || object.__liaSceneRecord?.name || object.name || '');
+  if (isDgsSurface3D(object)) return String(object.__liaDgsSurface3DName || object.__liaSceneRecord?.name || object.name || '');
+  if (isDgsAnalytic3D(object)) return String(object.__liaDgsAnalytic3DName || object.__liaSceneRecord?.name || object.name || '');
   if (isDgsText(object)) return String(object.__liaDgsTextContent || '');
   if (isDgsSlider(object)) return String(object.__liaDgsSliderName || object.name || '');
   if (isDgsFunction(object)) return String(object.__liaDgsFunctionName || object.name || '');
+  if (isDgsTransformation3D(object)) return String(object.__liaDgsTransformation3DName || object.name || '');
+  if (isDgsPolygon3D(object)) return String(object.__liaDgsPolygon3DName || object.name || '');
+  if (isDgsSolid3D(object)) return String(object.__liaDgsSolid3DName || object.name || '');
   if (isDgsPoint(object)) return String(object.__liaDgsPointName || '');
+  if (isDgsCircle3D(object)) return String(object.__liaDgsCircle3DName || object.__liaDgsCircleName || object.name || '');
+  if (isDgsSphere3D(object)) return String(object.__liaDgsSphere3DName || object.__liaDgsSphereName || object.name || '');
+  if (isDgsPlane(object)) return String(object.__liaDgsPlaneName || object.name || '');
   if (isDgsRay(object)) return String(object.__liaDgsRayName || '');
   if (isDgsVector(object)) return String(object.__liaDgsVectorName || '');
   if (isDgsCompassArc(object)) return String(object.__liaDgsCompassArcName || '');
@@ -10228,28 +14887,63 @@ function getDgsObjectName(object: any): string {
   if (isDgsLine(object)) return String(object.__liaDgsLineName || '');
   if (isDgsPolygon(object)) return String(object.__liaDgsPolygonName || '');
   if (isDgsCircle(object)) return String(object.__liaDgsCircleName || '');
+  if (isDgsEllipse(object)) return String(object.__liaDgsEllipseName || '');
   if (isDgsSector(object)) return String(object.__liaDgsSectorName || '');
   if (isDgsAngle(object)) return String(object.__liaDgsAngleName || '');
+  if (isDgsLocus(object)) return String(object.__liaDgsLocusName || '');
   return String(object && object.__liaDgsSegmentName || '');
+}
+
+function isDgsSpatialSceneObject(object: any): boolean {
+  return !!object && (
+    object.__liaPoint3D === true || object.__liaLinear3D === true ||
+    object.__liaPlane3D === true || object.__liaCircle3D === true ||
+    object.__liaSphere3D === true || object.__liaPolygon3D === true ||
+    object.__liaSolid3D === true || object.__liaCurve3D === true ||
+    object.__liaSurface3D === true || object.__liaConicSection3D === true ||
+    object.__liaDgsAnalytic3D === true || object.__liaTransformation3D === true
+  );
 }
 
 function isDgsObjectListEntry(object: any): boolean {
   return (isDgsPoint(object) && !object.__liaDgsHelperPoint) ||
     isDgsFunction(object) || isDgsText(object) || isDgsSlider(object) ||
     isDgsLinearObject(object) || (isDgsCompassArc(object) && !object.__liaDgsCompassDraft) ||
-    isDgsArc(object) || isDgsPolygon(object) || isDgsCircle(object) ||
-    isDgsSector(object) || isDgsAngle(object);
+    isDgsArc(object) || isDgsPolygon(object) || isDgsCircle(object) || isDgsEllipse(object) ||
+    isDgsSector(object) || isDgsAngle(object) || isDgsLocus(object) || isDgsPlane(object) ||
+    isDgsCircle3D(object) || isDgsSphere3D(object) || isDgsPolygon3D(object) ||
+    isDgsSolid3D(object) || isDgsTransformation3D(object) || isDgsCurve3D(object) ||
+    isDgsSurface3D(object) || isDgsConic3D(object) || isDgsAnalytic3D(object);
 }
 
 function getDgsObjectTypeLabel(state: DgsState, object: any): string {
   const text = dgsText(state.language);
+  if (object?.__liaDgsAngle3D) return state.language === 'de' ? 'Raumwinkel' : 'Spatial angle';
   if (object && object.__liaDgsRootPoint) return text.root;
   if (object && object.__liaDgsExtremumPoint) return text.extremum;
   if (object && object.__liaDgsInflectionPoint) return text.inflection;
   if (object && object.__liaDgsYInterceptPoint) return text.yIntercept;
   if (object && object.__liaDgsIntersectionPoint) return text.intersection;
+  if (isDgsConic3D(object)) return state.language === 'de' ? 'Kegelschnitt im Raum' : 'Conic section in space';
+  if (isDgsCurve3D(object)) return object.__liaLocus3D ? (state.language === 'de' ? 'Ortskurve im Raum' : 'Spatial locus curve') : (state.language === 'de' ? 'Raumkurve' : 'Curve in space');
+  if (isDgsSurface3D(object)) return object.__liaLocusSurface3D ? (state.language === 'de' ? 'Ortsfläche im Raum' : 'Spatial locus surface') : (state.language === 'de' ? 'Parametrische Fläche' : 'Parametric surface');
+  if (isDgsAnalytic3D(object)) return state.language === 'de' ? '3D-Analyse' : '3D analysis';
+  if (isDgsPolygon3D(object)) return state.language === 'de' ? 'Raumvieleck' : 'Spatial polygon';
+  if (isDgsSolid3D(object)) {
+    const names: Record<string, [string, string]> = {
+      tetrahedron: ['Tetraeder', 'Tetrahedron'], pyramid: ['Pyramide', 'Pyramid'],
+      prism: ['Prisma', 'Prism'], parallelepiped: ['Spat', 'Parallelepiped'],
+      cuboid: ['Quader', 'Cuboid'], cylinder: ['Zylinder', 'Cylinder'], cone: ['Kegel', 'Cone']
+    };
+    return names[String(object.__liaSolid3DDefinition)]?.[state.language === 'de' ? 0 : 1] ||
+      (state.language === 'de' ? 'Körper' : 'Solid');
+  }
+  if (isDgsLocus(object)) return text.locus;
   if (object && object.__liaDgsMidpoint) return text.midpoint;
   if (isDgsPoint(object)) return text.point;
+  if (isDgsCircle3D(object)) return state.language === 'de' ? 'Raumkreis' : 'Circle in space';
+  if (isDgsSphere3D(object)) return state.language === 'de' ? 'Kugel' : 'Sphere';
+  if (isDgsPlane(object)) return state.language === 'de' ? 'Ebene' : 'Plane';
   if (isDgsFunction(object)) return text.function;
   if (isDgsSlider(object)) return text.slider;
   if (isDgsText(object)) return text.text;
@@ -10262,13 +14956,17 @@ function getDgsObjectTypeLabel(state: DgsState, object: any): string {
   if (isDgsLine(object)) return text.line;
   if (isDgsPolygon(object)) return text.polygon;
   if (isDgsCircle(object)) return text.circle;
+  if (isDgsEllipse(object)) return text.ellipse;
   if (isDgsSector(object)) return text.sector;
   if (isDgsAngle(object)) return text.angle;
   return text.segment;
 }
 
 function getDgsObjectListEntries(state: DgsState): any[] {
-  return getDgsBoardObjects(state.board).filter(isDgsObjectListEntry);
+  const spatialMode = state.board.__liaSceneMode === '3d';
+  return getDgsBoardObjects(state.board).filter(object =>
+    isDgsObjectListEntry(object) && isDgsSpatialSceneObject(object) === spatialMode
+  );
 }
 
 function openDgsObjectProperties(state: DgsState, object: any, evt: Event): boolean {
@@ -10449,17 +15147,24 @@ function isDgsExportVisibleElement(object: any): boolean {
   return true;
 }
 
-function getDgsExportPointCoordinates(point: any): { x: number; y: number } | null {
+function getDgsExportPointCoordinates(point: any): { x: number; y: number; z?: number } | null {
   try {
     const x = Number(point.X());
     const y = Number(point.Y());
-    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    const z = point.__liaPoint3D && typeof point.Z === 'function' ? Number(point.Z()) : NaN;
+    return Number.isFinite(x) && Number.isFinite(y)
+      ? { x, y, ...(Number.isFinite(z) ? { z } : {}) }
+      : null;
   } catch (e) {
     return null;
   }
 }
 
-function getDgsExportBoardSpec(state: DgsState, exportId: string): string {
+function getDgsExportBoardSpec(
+  state: DgsState,
+  exportId: string,
+  sceneModePolicy: DgsSceneModePolicy = state.exportSceneModePolicy
+): string {
   let bbox = [-5, 5, 5, -5];
   try {
     const canonical = state.board && state.board.__coordExportBBox;
@@ -10495,7 +15200,32 @@ function getDgsExportBoardSpec(state: DgsState, exportId: string): string {
   const exportWidth = boardSizeMode === 'auto'
     ? ''
     : 'width=' + String(boardSizeMode === 'capped' ? cappedWidth : renderedWidth);
-  const axes = (isDgsExportVisibleElement(state.xAxis) || isDgsExportVisibleElement(state.yAxis)) ? 1 : 0;
+  const scene = getDgsSceneSnapshot(state);
+  const hasSpatialScene = scene.mode === '3d';
+  const exportSpatialScene = hasSpatialScene || sceneModePolicy !== '2d';
+  const initialView = sceneModePolicy === '3d'
+    ? '3d'
+    : sceneModePolicy === '2d'
+      ? '2d'
+      : (scene.viewMode === '3d' ? '3d' : '2d');
+  const camera = scene.camera || { azimuth: 0.7, elevation: 0.45, bank: 0 };
+  const sceneOptions = exportSpatialScene ? [
+    'mode=3d',
+    'view=' + initialView,
+    'zmin=' + formatDgsExportNumber(Number(scene.zmin), -4),
+    'zmax=' + formatDgsExportNumber(Number(scene.zmax), 4),
+    'projection=' + (scene.projection === 'central' ? 'central' : 'parallel'),
+    'camera=' + [camera.azimuth, camera.elevation, camera.bank]
+      .map((value: number) => formatDgsExportNumber(value)).join('/')
+  ] : [];
+  if (exportSpatialScene && Array.isArray(scene.viewport3d) && scene.viewport3d.length === 3 &&
+      scene.viewport3d.every((range: any) => Array.isArray(range) && range.length === 2 &&
+        range.every(Number.isFinite) && range[1] > range[0])) {
+    sceneOptions.push('viewport3d=[' + scene.viewport3d.flat().map((value: number) => formatDgsExportNumber(value, 0)).join(';') + ']');
+  }
+  const view3d = getCoordinateView3D(state.board);
+  const axes = view3d?.viewMode === '3d' ? (view3d.config.axes ? 1 : 0)
+    : (isDgsExportVisibleElement(state.xAxis) || isDgsExportVisibleElement(state.yAxis)) ? 1 : 0;
   const grid = state.board && (state.board.__liaMajorGrid || state.board.__liaMinorGrid) ? 1 : 0;
   let border = 1;
   try { if (String(state.boardContainer.style.border || '').trim().toLowerCase() === 'none') border = 0; } catch (e) {}
@@ -10504,6 +15234,7 @@ function getDgsExportBoardSpec(state: DgsState, exportId: string): string {
     'xmax=' + formatDgsExportNumber(bbox[2]),
     'ymin=' + formatDgsExportNumber(bbox[3]),
     'ymax=' + formatDgsExportNumber(bbox[1]),
+    ...sceneOptions,
     exportWidth,
     'id=' + exportId,
     String(axes),
@@ -10533,7 +15264,8 @@ function getDgsIntersectionConstructionsForExport(state: DgsState): any[] {
 function buildDgsExportMacroBlock(
   state: DgsState,
   selectedToolIds: Iterable<number> = state.exportSelectedToolIds,
-  selectedRestrictionIds: Iterable<number> = state.exportSelectedRestrictionIds
+  selectedRestrictionIds: Iterable<number> = state.exportSelectedRestrictionIds,
+  sceneModePolicy: DgsSceneModePolicy = state.exportSceneModePolicy
 ): string {
   const exportId = randomDgsExportId();
   const useGerman = state.language === 'de';
@@ -10541,40 +15273,155 @@ function buildDgsExportMacroBlock(
     coordinate: useGerman ? 'Koordinatensystem' : 'CoordinateSystem',
     axisLabel: useGerman ? 'AchsenBeschriftung' : 'AxisLabel',
     point: useGerman ? 'Punkt' : 'Point',
+    point3d: useGerman ? 'Punkt3D' : 'Point3D',
     coordText: useGerman ? 'KoordText' : 'CoordText',
     segment: useGerman ? 'Strecke' : 'distance',
     line: useGerman ? 'Gerade' : 'Line',
     ray: useGerman ? 'Strahl' : 'Ray',
     vector: useGerman ? 'Vektor' : 'Vector',
+    segment3d: useGerman ? 'Strecke3D' : 'Segment3D',
+    line3d: useGerman ? 'Gerade3D' : 'Line3D',
+    ray3d: useGerman ? 'Strahl3D' : 'Ray3D',
+    vector3d: useGerman ? 'Vektor3D' : 'Vector3D',
     arc: useGerman ? 'Bogen' : 'Arc',
     perpendicular: useGerman ? 'Orthogonale' : 'Perpendicular',
     parallel: useGerman ? 'Parallele' : 'Parallel',
     midpoint: useGerman ? 'Mittelpunkt' : 'Midpoint',
+    transformPoint: useGerman ? 'Transformationspunkt' : 'TransformPoint',
     area: useGerman ? 'Flaeche' : 'Area',
     angle: useGerman ? 'Winkel' : 'angle',
     circle: useGerman ? 'Kreis' : 'Circle',
+    ellipse: 'Ellipse',
+    compassArc: useGerman ? 'Zirkelbogen' : 'CompassArc',
+    angleBisector: useGerman ? 'Winkelhalbierende' : 'AngleBisector',
     tangent: useGerman ? 'Tangente' : 'Tangent',
     sector: useGerman ? 'Kreissegment' : 'CircularSector',
     plotFunction: useGerman ? 'PlotFunktion' : 'PlotFunction',
     zeros: useGerman ? 'Nullstellen' : 'Zeros',
+    objectZeros: useGerman ? 'ObjektNullstellen' : 'ObjectZeros',
     extrema: useGerman ? 'Extrempunkte' : 'Extrema',
     inflections: useGerman ? 'Wendepunkte' : 'InflectionPoints',
     ordinateIntercept: useGerman ? 'Ordinatenabschnitt' : 'OrdinateIntercept',
     intersection: useGerman ? 'Schnittpunkt' : 'Intersection',
+    plane3d: useGerman ? 'Ebene3D' : 'Plane3D',
+    planePointNormal3d: useGerman ? 'PunktNormalenEbene3D' : 'PlanePointNormal3D',
+    planePointVectors3d: useGerman ? 'ParameterEbene3D' : 'PlanePointVectors3D',
+    circle3d: useGerman ? 'Kreis3D' : 'Circle3D',
+    circleCenterNormal3d: useGerman ? 'KreisMittelpunktNormal3D' : 'CircleCenterNormal3D',
+    circleCenterNormalPoint3d: useGerman ? 'KreisMittelpunktNormalPunkt3D' : 'CircleCenterNormalPoint3D',
+    sphere3d: useGerman ? 'Kugel3D' : 'Sphere3D',
+    sphereRadius3d: useGerman ? 'KugelRadius3D' : 'SphereRadius3D',
+    sphereFourPoints3d: useGerman ? 'KugelVierPunkte3D' : 'SphereFourPoints3D',
+    polygon3d: useGerman ? 'Vieleck3D' : 'Polygon3D',
+    tetrahedron3d: useGerman ? 'Tetraeder3D' : 'Tetrahedron3D',
+    pyramid3d: useGerman ? 'Pyramide3D' : 'Pyramid3D',
+    prism3d: useGerman ? 'Prisma3D' : 'Prism3D',
+    parallelepiped3d: useGerman ? 'Spat3D' : 'Parallelepiped3D',
+    cuboid3d: useGerman ? 'Quader3D' : 'Cuboid3D',
+    cylinder3d: useGerman ? 'Zylinder3D' : 'Cylinder3D',
+    cone3d: useGerman ? 'Kegel3D' : 'Cone3D',
+    translate3d: useGerman ? 'Verschiebung3D' : 'Translate3D',
+    reflectPoint3d: useGerman ? 'Punktspiegelung3D' : 'ReflectPoint3D',
+    reflectLine3d: useGerman ? 'Geradenspiegelung3D' : 'ReflectLine3D',
+    reflectPlane3d: useGerman ? 'Ebenenspiegelung3D' : 'ReflectPlane3D',
+    rotateAxis3d: useGerman ? 'Achsendrehung3D' : 'RotateAxis3D',
+    dilate3d: useGerman ? 'ZentrischeStreckung3D' : 'Dilate3D',
+    intersection3d: useGerman ? 'Schnitt3D' : 'Intersection3D',
+    locus: useGerman ? 'Ortslinie' : 'Locus',
     slider: useGerman ? 'Regler' : 'Slider',
+    objectFormat: useGerman ? 'ObjektFormat' : 'ObjectFormat',
     dgs: 'DGS'
   };
-  const lines: string[] = [macroDgsExportLine(macros.coordinate, getDgsExportBoardSpec(state, exportId))];
+  const lines: string[] = [macroDgsExportLine(
+    macros.coordinate,
+    getDgsExportBoardSpec(state, exportId, sceneModePolicy)
+  )];
   const pointLines: string[] = [];
   const midpointLines: string[] = [];
+  const transformPointLines: string[] = [];
   const sliderLines: string[] = [];
   const objectLines: string[] = [];
+  const segment6PrimaryLines: string[] = [];
+  const segment6DerivedLines: string[] = [];
+  const segment6LocusLines: string[] = [];
+  const locusLines: string[] = [];
+  const familyLines: string[] = [];
+  const formatLines: string[] = [];
   const unsupported: string[] = [];
   const exportedPoints = new Map<any, string>();
   const exportedObjectNames = new Map<any, string>();
   const usedPointNames = new Set<string>();
   const usedObjectNames = new Set<string>();
   const objects = getDgsBoardObjects(state.board);
+
+  const advancedExports: Array<{ entry: any; target: string[]; macro: string }> = [];
+  const advancedObjects = new Set<any>();
+  const appendSegment6Registry = (
+    registry: Record<string, any> | undefined,
+    target: string[],
+    macroName: string | ((entry: any) => string)
+  ) => {
+    Object.values(registry || {}).forEach((entry: any) => {
+      if (!entry || entry.board !== state.board || !entry.spec) return;
+      [entry.object, ...(entry.objects || [])].filter(Boolean).forEach(object => advancedObjects.add(object));
+    });
+    void target;
+    void macroName;
+  };
+  appendSegment6Registry(window.__curve3DEntries, segment6PrimaryLines, useGerman ? 'Raumkurve' : 'Curve3D');
+  appendSegment6Registry(window.__surface3DEntries, segment6PrimaryLines, entry =>
+    entry.functionGraph
+      ? (useGerman ? 'Funktionsflaeche3D' : 'FunctionSurface3D')
+      : (useGerman ? 'Flaeche3D' : 'Surface3D')
+  );
+  appendSegment6Registry(window.__analytic3DEntries, segment6DerivedLines, entry => {
+    const names: Record<string, [string, string]> = {
+      'vector-add': ['Vektorsumme3D', 'VectorSum3D'],
+      'vector-subtract': ['Vektordifferenz3D', 'VectorDifference3D'],
+      'vector-scale': ['Skalarmultiplikation3D', 'ScalarVector3D'],
+      'vector-negate': ['Gegenvektor3D', 'NegatedVector3D'],
+      'vector-unit': ['Einheitsvektor3D', 'UnitVector3D'],
+      'vector-connect': ['Verbindungsvektor3D', 'ConnectingVector3D'],
+      'vector-project': ['Vektorprojektion3D', 'VectorProjection3D'],
+      'vector-project-plane': ['Vektorebenenprojektion3D', 'VectorPlaneProjection3D'],
+      'vector-cross': ['Kreuzprodukt3D', 'CrossProduct3D'],
+      'plane-normal': ['Ebenennormale3D', 'PlaneNormal3D'],
+      magnitude: ['Vektorbetrag3D', 'VectorMagnitude3D'],
+      dot: ['Skalarprodukt3D', 'DotProduct3D'],
+      triple: ['Spatprodukt3D', 'TripleProduct3D'],
+      'distance-points': ['Punktabstand3D', 'PointDistance3D'],
+      'distance-point-line': ['AbstandPunktGerade3D', 'PointLineDistance3D'],
+      'distance-point-plane': ['AbstandPunktEbene3D', 'PointPlaneDistance3D'],
+      'distance-lines': ['AbstandGeraden3D', 'LineDistance3D'],
+      'distance-planes': ['AbstandEbenen3D', 'PlaneDistance3D'],
+      'angle-vectors': ['Vektorwinkel3D', 'VectorAngle3D'],
+      'angle-lines': ['Geradenwinkel3D', 'LineAngle3D'],
+      'angle-line-plane': ['WinkelGeradeEbene3D', 'LinePlaneAngle3D'],
+      'angle-planes': ['Ebenenwinkel3D', 'PlaneAngle3D'],
+      'relation-lines': ['LageGeraden3D', 'LineRelation3D'],
+      'relation-line-plane': ['LageGeradeEbene3D', 'LinePlaneRelation3D'],
+      'relation-planes': ['LageEbenen3D', 'PlaneRelation3D'],
+      'relation-point-object': ['LagePunktObjekt3D', 'PointObjectRelation3D'],
+      'project-point-line': ['LotfusspunktGerade3D', 'ProjectPointLine3D'],
+      'project-point-plane': ['LotfusspunktEbene3D', 'ProjectPointPlane3D'],
+      'perpendicular-line-plane': ['LotgeradeEbene3D', 'PerpendicularLinePlane3D'],
+      'common-perpendicular': ['GemeinsamesLot3D', 'CommonPerpendicular3D'],
+      'curve-tangent-vector': ['TangentenvektorRaumkurve', 'CurveTangentVector3D'],
+      'curve-velocity': ['Geschwindigkeitsvektor3D', 'CurveVelocity3D'],
+      'curve-tangent': ['TangenteRaumkurve', 'CurveTangent3D'],
+      'curve-normal-plane': ['NormalebeneRaumkurve', 'CurveNormalPlane3D'],
+      'curve-arc-length': ['BogenlaengeRaumkurve', 'CurveArcLength3D'],
+      'surface-tangent-plane': ['Tangentialebene3D', 'SurfaceTangentPlane3D'],
+      'surface-tangent-u': ['FlaechentangenteU3D', 'SurfaceTangentU3D'],
+      'surface-tangent-v': ['FlaechentangenteV3D', 'SurfaceTangentV3D'],
+      'surface-normal': ['Flaechennormale3D', 'SurfaceNormal3D']
+    };
+    const pair = names[String(entry.operation || '')] || ['Raumanalyse3D', 'Analytic3D'];
+    return useGerman ? pair[0] : pair[1];
+  });
+  appendSegment6Registry(window.__conic3DEntries, segment6DerivedLines, useGerman ? 'Kegelschnitt3D' : 'ConicSection3D');
+  appendSegment6Registry(window.__locus3DEntries, segment6LocusLines, useGerman ? 'Ortskurve3D' : 'Locus3D');
+  appendSegment6Registry(window.__locusSurface3DEntries, segment6LocusLines, useGerman ? 'Ortsflaeche3D' : 'LocusSurface3D');
 
   const exportFunctionExpression = (expression: unknown): string => {
     return String(expression == null ? '' : expression);
@@ -10608,9 +15455,62 @@ function buildDgsExportMacroBlock(
     return candidate;
   };
 
+  const pointBindingReference = (source: any): string => {
+    if (!source) return '';
+    if (source.__liaDgsPolygonBorder) {
+      const owner = source.__liaDgsPolygonBorderOwner;
+      const index = Number(source.__liaDgsPolygonBorderIndex);
+      if (!owner || !Number.isInteger(index) || index < 0) return '';
+      const ownerName = allocateObjectName(owner, getDgsObjectName(owner), 'P');
+      return ownerName ? 'side:' + ownerName + ':' + index : '';
+    }
+    let fallback = 'g';
+    if (isDgsPolygon3D(source)) fallback = 'P';
+    else if (isDgsSolid3D(source)) fallback = 'K';
+    else if (isDgsPlane(source)) fallback = 'E';
+    else if (isDgsCircle3D(source)) fallback = 'k';
+    else if (isDgsSphere3D(source)) fallback = 'S';
+    else if (isDgsFunctionTarget(source)) fallback = 'f';
+    else if (isDgsCircle(source)) fallback = 'k';
+    else if (isDgsEllipse(source)) fallback = 'e';
+    else if (isDgsCompassArc(source)) fallback = 'z';
+    else if (isDgsArc(source)) fallback = 'b';
+    else if (source.__liaDgsTangent) fallback = 't';
+    else if (source.__liaDgsAngleBisector) fallback = 'w';
+    else if (isDgsVector(source)) fallback = 'v';
+    else if (isDgsRay(source)) fallback = 'r';
+    else if (source.__liaDgsSegment) fallback = 's';
+    return allocateObjectName(source, getDgsObjectName(source), fallback);
+  };
+
   const ensurePoint = (point: any, preferred?: string): string | null => {
     if (!point || typeof point.X !== 'function' || typeof point.Y !== 'function') return null;
     if (exportedPoints.has(point)) return exportedPoints.get(point) || null;
+    if (point.__liaDgsTransformPoint) {
+      const name = allocatePointName(point, preferred);
+      exportedPoints.set(point, name);
+      const sourceName = ensurePoint(point.__liaDgsTransformSource);
+      const referenceName = ensurePoint(point.__liaDgsTransformReference);
+      const axisSecondName = point.__liaDgsTransformAxisSecond
+        ? ensurePoint(point.__liaDgsTransformAxisSecond)
+        : null;
+      if (!sourceName || !referenceName || (point.__liaDgsTransformAxisSecond && !axisSecondName)) return null;
+      const kind = String(point.__liaDgsTransformKind || 'rotate-point');
+      const reference = axisSecondName
+        ? '[' + cleanDgsExportToken(referenceName) + ';' + cleanDgsExportToken(axisSecondName) + ']'
+        : cleanDgsExportToken(referenceName);
+      transformPointLines.push(macroDgsExportLine(macros.transformPoint, [
+        exportId,
+        formatMacroName(cleanDgsExportToken(name), point.__liaDgsShowName !== false),
+        cleanDgsExportToken(sourceName),
+        kind,
+        reference,
+        formatDgsExportNumber(Number(point.__liaDgsTransformValue)),
+        normalizeHexColor(getDgsObjectColor(point, 'line')) || '#ff00ff',
+        formatDgsExportNumber(point.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(point), 1)
+      ].join(';')));
+      return name;
+    }
     if (point.__liaDgsMidpoint) {
       const name = allocatePointName(point, preferred);
       exportedPoints.set(point, name);
@@ -10627,17 +15527,58 @@ function buildDgsExportMacroBlock(
     const name = allocatePointName(point, preferred);
     exportedPoints.set(point, name);
     const color = normalizeHexColor(getDgsObjectColor(point, 'line')) || '#ff00ff';
-    const opacity = point.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(point);
+    const isPoint3D = Number.isFinite(coordinates.z);
+    const opacity = isPoint3D
+      ? getDgsObjectOpacity(point)
+      : (point.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(point));
     const parts = [
       exportId,
       formatMacroName(cleanDgsExportToken(name), point.__liaDgsShowName !== false),
       formatDgsExportNumber(coordinates.x),
       formatDgsExportNumber(coordinates.y),
+      ...(Number.isFinite(coordinates.z) ? [formatDgsExportNumber(Number(coordinates.z))] : []),
       color,
       formatDgsExportNumber(opacity, 1)
     ];
     if (getDgsObjectFixed(point)) parts.push('fix');
+    if (isPoint3D && point.__liaDgsShowValue) parts.push(useGerman ? 'wert=1' : 'value=1');
+    if (isPoint3D && point.__liaDgsShowObject === false) parts.push('visible=0');
+    if (isPoint3D) {
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(point, 'point3d')));
+    }
     if (point.__liaDgsHelperPoint) parts.push('helper=1');
+    const bindingReference = pointBindingReference(getDgsPointBindingSource(point));
+    if (bindingReference) {
+      parts.push((useGerman ? 'auf=' : 'on=') + quoteDgsExportField(bindingReference));
+      const bindingParameters = coordinatePoint3DBindingParameters(point);
+      if (bindingParameters?.kind === 'line') {
+        parts.push('t=' + formatDgsExportNumber(bindingParameters.t));
+      } else if (bindingParameters?.kind === 'plane') {
+        parts.push('u=' + formatDgsExportNumber(bindingParameters.u));
+        parts.push('v=' + formatDgsExportNumber(bindingParameters.v));
+      } else if (bindingParameters?.kind === 'circle') {
+        parts.push('angle=' + formatDgsExportNumber(bindingParameters.angle));
+      } else if (bindingParameters?.kind === 'sphere') {
+        parts.push('direction=[' + bindingParameters.direction
+          .map((value: number) => formatDgsExportNumber(value)).join(';') + ']');
+      } else if (bindingParameters?.kind === 'polygon') {
+        parts.push('u=' + formatDgsExportNumber(bindingParameters.u));
+        parts.push('v=' + formatDgsExportNumber(bindingParameters.v));
+      } else if (bindingParameters?.kind === 'curve') {
+        parts.push('t=' + formatDgsExportNumber(bindingParameters.t));
+      } else if (bindingParameters?.kind === 'surface') {
+        parts.push('u=' + formatDgsExportNumber(bindingParameters.u));
+        parts.push('v=' + formatDgsExportNumber(bindingParameters.v));
+      } else if (bindingParameters?.kind === 'solid') {
+        parts.push('surface=' + bindingParameters.surface);
+        if (Number.isFinite(bindingParameters.face)) parts.push('face=' + formatDgsExportNumber(Number(bindingParameters.face)));
+        if (Number.isFinite(bindingParameters.u)) parts.push('u=' + formatDgsExportNumber(Number(bindingParameters.u)));
+        if (Number.isFinite(bindingParameters.v)) parts.push('v=' + formatDgsExportNumber(Number(bindingParameters.v)));
+        if (Number.isFinite(bindingParameters.angle)) parts.push('angle=' + formatDgsExportNumber(Number(bindingParameters.angle)));
+        if (Number.isFinite(bindingParameters.height)) parts.push('height=' + formatDgsExportNumber(Number(bindingParameters.height)));
+        if (Number.isFinite(bindingParameters.radial)) parts.push('radial=' + formatDgsExportNumber(Number(bindingParameters.radial)));
+      }
+    }
     const expressions = point.__liaDgsCoordinateExpressions;
     if (expressions && String(expressions.x || '').trim() && String(expressions.y || '').trim()) {
       parts.push('xexpr=' + quoteDgsExportField(String(expressions.x)));
@@ -10647,17 +15588,28 @@ function buildDgsExportMacroBlock(
         parts.push('parameter=' + formatDgsExportNumber(coordinateParameter));
       }
     }
-    pointLines.push(macroDgsExportLine(macros.point, parts.join(';')));
+    pointLines.push(macroDgsExportLine(Number.isFinite(coordinates.z) ? macros.point3d : macros.point, parts.join(';')));
     return name;
   };
 
+  // Reserve the names of dependent analytic results before exporting any sources.
+  // They must remain constructions, never additional free points or free vectors.
+  advancedExports.forEach(({ entry }) => {
+    const object = entry.object;
+    if (!object) return;
+    const preferred = getDgsObjectName(object) || entry.config?.name || 'O';
+    if (isDgsPoint(object)) exportedPoints.set(object, allocatePointName(object, preferred));
+    else allocateObjectName(object, preferred, 'O');
+  });
+
   objects.forEach((object) => {
-    if (!object || object.__liaDgsPolygonBorder) return;
+    if (!object || advancedObjects.has(object) || object.__liaDgsPolygonBorder) return;
     if (object.__liaDgsTangentPoint || object.__liaDgsTangentHelper) return;
     // Coordinate-mode macro helpers are serialized only when an exported
     // owner actually references them through pointList(). This avoids
     // accumulating orphaned invisible points over repeated roundtrips.
-    if (isDgsPoint(object) && !object.__liaDgsHelperPoint) ensurePoint(object);
+    if (isDgsPoint(object) && !object.__liaDgsHelperPoint && !object.__liaDgsSpatialIntersection &&
+        !object.__liaDgsTransformation3D) ensurePoint(object);
   });
 
   const axisLabels = getDgsAxisLabels(state);
@@ -10678,8 +15630,9 @@ function buildDgsExportMacroBlock(
   };
 
   const pointPairReference = (object: any): string => {
-    if (!object || !object.point1 || !object.point2) return '';
-    return pointList([object.point1, object.point2]) || '';
+    const sourcePoints = getDgsLinearSourcePoints(object);
+    if (!sourcePoints) return '';
+    return pointList(sourcePoints) || '';
   };
 
   const constructionSourceObject = (source: any): any => {
@@ -10689,8 +15642,13 @@ function buildDgsExportMacroBlock(
   const analysisSourceReference = (sourceValue: any): string => {
     const source = constructionSourceObject(sourceValue);
     if (!source) return '';
-    if (source.__liaDgsAnalysisFunction === true && !isDgsFunction(source)) return '';
-    if (!source.__liaDgsPolygonBorder && !source.__liaDgsAngleBisector) {
+    if (source.__liaDgsAnalysisFunction === true && !isDgsFunction(source)) {
+      return exportedObjectNames.get(source) || '';
+    }
+    if (source.__liaDgsAngleBisector) {
+      return allocateObjectName(source, getDgsObjectName(source), 'w');
+    }
+    if (!source.__liaDgsPolygonBorder) {
       const exportedName = exportedObjectNames.get(source);
       if (exportedName) return exportedName;
     }
@@ -10767,6 +15725,8 @@ function buildDgsExportMacroBlock(
     if (position) options.push(position);
     if (object.__liaDgsSliderPositionLocked) options.push('lockposition=1');
     if (object.__liaDgsShowObject === false) options.push('visible=0');
+    options.push('animationspeed=' + formatDgsExportNumber(getDgsSliderAnimationSpeed(object), DGS_SLIDER_DEFAULT_ANIMATION_SPEED));
+    if (object.__liaDgsShowAnimationControl === false) options.push('animation=0');
     const fontSize = Number(object.__liaDgsFormatFontSize);
     if (Number.isFinite(fontSize) && Math.abs(fontSize - 18) > 1e-9) {
       options.push('fontsize=' + formatDgsExportNumber(fontSize, 18));
@@ -10782,19 +15742,290 @@ function buildDgsExportMacroBlock(
     ].concat(options).join(';')));
   });
 
+  const familyDefinitions = new Map<any, NonNullable<ReturnType<typeof getScharExportDefinition>>>();
   objects.forEach((object) => {
-    if (!object || isDgsPoint(object) || object.__liaDgsPolygonBorder) return;
+    const family = getScharExportDefinition(object);
+    if (!family) return;
+    familyDefinitions.set(object, family);
+    const name = allocateObjectName(object, family.name, 'f');
+    const options = [formatScharInitialValues(family.values)];
+    if (family.lineStyle !== 'solid') options.push('linestyle=' + family.lineStyle);
+    familyLines.push(macroDgsExportLine('Schar', [
+      formatMacroName(name, family.showName),
+      family.variable,
+      quoteDgsExportField(family.expression),
+      exportId,
+      'term=' + (family.showTerm ? '1' : '0'),
+      normalizeHexColor(family.color) || '#ff0000',
+      ...options
+    ].join(';')));
+  });
+
+  objects.forEach((object) => {
+    if (!object || advancedObjects.has(object) || object.__liaDgsSpatialIntersectionBranchHelper ||
+        (isDgsPoint(object) && !object.__liaDgsSpatialIntersection && !isDgsTransformation3D(object)) ||
+        isDgsLocus(object) || object.__liaDgsPolygonBorder) return;
     const name = cleanDgsExportToken(getDgsObjectName(object));
     const typeLabel = getDgsObjectTypeLabel(state, object);
 
-    if (object.__liaDgsAnalysisFunction === true && !isDgsFunction(object)) {
-      if (object.__liaDgsRootConstruction || object.__liaDgsExtremaConstruction ||
-          object.__liaDgsInflectionConstruction || object.__liaDgsYInterceptConstruction) {
-        const label = String(object.__liaRegressionEntry?.title ||
-          object.__liaRegressionAnalysisId || dgsText(state.language).analysis);
-        const message = label + ' - ' + dgsText(state.language).analysis;
-        if (!unsupported.includes(message)) unsupported.push(message);
+
+
+    if (isDgsTransformation3D(object) && !object.__liaDgsSpatialIntersection) {
+      const definition = String(object.__liaDgsTransformation3DDefinition || object.__liaTransformation3DDefinition || '');
+      const transformedName = allocateObjectName(object, name, 'T');
+      const source = object.__liaDgsTransformation3DSource || object.__liaTransformation3DSource;
+      const reference = object.__liaDgsTransformation3DReference ||
+        (object.__liaTransformation3DReferences || [])[0];
+      const spatialName = (value: any, fallback: string): string | null => {
+        if (value?.__liaPoint3D) return ensurePoint(value);
+        return value ? allocateObjectName(value, getDgsObjectName(value), fallback) : null;
+      };
+      const sourceName = spatialName(source, 'O');
+      const referenceName = spatialName(reference, 'R');
+      if (!sourceName || !referenceName) return;
+      const macroName = definition === 'translate' ? macros.translate3d
+        : definition === 'reflect-point' ? macros.reflectPoint3d
+        : definition === 'reflect-line' ? macros.reflectLine3d
+        : definition === 'reflect-plane' ? macros.reflectPlane3d
+        : definition === 'rotate-axis' ? macros.rotateAxis3d
+        : macros.dilate3d;
+      const parts = [
+        exportId,
+        formatMacroName(transformedName, object.__liaDgsShowName !== false),
+        cleanDgsExportToken(sourceName),
+        cleanDgsExportToken(referenceName)
+      ];
+      if (definition === 'rotate-axis' || definition === 'dilate') {
+        const parameter = object.__liaDgsTransformation3DValue ?? object.__liaTransformation3DValue;
+        const value = Number(typeof parameter === 'function' ? parameter() : parameter);
+        const registry = Object.values(window.__transformation3DEntries || {}).find((entry: any) => entry.object === object) as any;
+        const valueSource = String(registry?.config?.valueName || object.__liaSceneRecord?.valueSourceId || '');
+        parts.push(valueSource ? quoteDgsExportField(valueSource) : formatDgsExportNumber(value, definition === 'dilate' ? 1 : 0));
       }
+      parts.push('linecolor=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'));
+      parts.push('fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'));
+      parts.push('opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), object.__liaSolid3D ? 0.18 : 1));
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+      parts.push('layer=' + String(getDgsObjectLayer(object)));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'transformation3d')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      return;
+    }
+
+    if (isDgsPolygon3D(object) && !object.__liaDgsSpatialIntersection) {
+      const polygonName = allocateObjectName(object, name, 'P');
+      const pointNames = (object.__liaPolygon3DSourcePoints || []).map((point: any) => ensurePoint(point));
+      if (pointNames.length < 3 || pointNames.some((value: any) => !value)) return;
+      const parts = [
+        exportId,
+        formatMacroName(polygonName, object.__liaDgsShowName !== false),
+        ...pointNames.map(cleanDgsExportToken),
+        'linecolor=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'),
+        'fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'),
+        'opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 0.25)
+      ];
+      if (object.__liaDgsShowValue) parts.push(useGerman ? 'wert=1' : 'value=1');
+      parts.push('measure=' + String(object.__liaDgsValueMode || 'area'));
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+      parts.push('layer=' + String(getDgsObjectLayer(object)));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'polygon3d')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macros.polygon3d, parts.join(';')));
+      return;
+    }
+
+    if (isDgsSolid3D(object) && !object.__liaDgsSpatialIntersection) {
+      const definition = String(object.__liaSolid3DDefinition || 'tetrahedron') as Solid3DDefinition;
+      const solidName = allocateObjectName(object, name, 'K');
+      const pointNames = (object.__liaSolid3DSourcePoints || []).map((point: any) => ensurePoint(point));
+      const vectorNames = (object.__liaSolid3DSourceVectors || []).map((vector: any) =>
+        allocateObjectName(vector, getDgsObjectName(vector), 'v')
+      );
+      if (pointNames.some((value: any) => !value) || vectorNames.some((value: any) => !value)) return;
+      const polygonName = object.__liaSolid3DSourcePolygon
+        ? allocateObjectName(object.__liaSolid3DSourcePolygon, getDgsObjectName(object.__liaSolid3DSourcePolygon), 'P')
+        : '';
+      const sourceFields = definition === 'pyramid'
+        ? [polygonName, pointNames[0]]
+        : definition === 'prism'
+          ? [polygonName, vectorNames[0]]
+          : (definition === 'parallelepiped' || definition === 'cuboid')
+            ? [pointNames[0], ...vectorNames.slice(0, 3)]
+            : pointNames;
+      if (sourceFields.some(value => !value)) return;
+      const macroName = definition === 'tetrahedron' ? macros.tetrahedron3d
+        : definition === 'pyramid' ? macros.pyramid3d
+        : definition === 'prism' ? macros.prism3d
+        : definition === 'parallelepiped' ? macros.parallelepiped3d
+        : definition === 'cuboid' ? macros.cuboid3d
+        : definition === 'cylinder' ? macros.cylinder3d
+        : macros.cone3d;
+      const parts = [
+        exportId,
+        formatMacroName(solidName, object.__liaDgsShowName !== false),
+        ...sourceFields.map(cleanDgsExportToken)
+      ];
+      if ((definition === 'cylinder' || definition === 'cone') && pointNames.length < 3) {
+        const radius = Number(typeof object.__liaSolid3DRadiusSource === 'function'
+          ? object.__liaSolid3DRadiusSource()
+          : object.__liaSolid3DRadiusSource);
+        parts.push('radius=' + formatDgsExportNumber(radius, 1));
+      }
+      parts.push('linecolor=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'));
+      parts.push('fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'));
+      parts.push('opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 0.18));
+      if (object.__liaDgsShowValue) parts.push(useGerman ? 'wert=1' : 'value=1');
+      parts.push('measure=' + String(object.__liaDgsValueMode || 'volume'));
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+      parts.push('layer=' + String(getDgsObjectLayer(object)));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'solid3d')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      return;
+    }
+    if (isDgsCircle3D(object) && !object.__liaDgsSpatialIntersection) {
+      const definition = String(object.__liaCircle3DDefinition || 'three-points');
+      const sourceName = allocateObjectName(object, name, 'k');
+      const sourcePoints = object.__liaCircle3DSourcePoints || [];
+      const sourceVectors = object.__liaCircle3DSourceVectors || [];
+      const pointNames = sourcePoints.map((point: any) => ensurePoint(point));
+      const vectorNames = sourceVectors.map((vector: any) =>
+        allocateObjectName(vector, getDgsObjectName(vector), 'v')
+      );
+      if (pointNames.some((value: any) => !value) || vectorNames.some((value: any) => !value)) return;
+      const macroName = definition === 'center-normal-radius'
+        ? macros.circleCenterNormal3d
+        : (definition === 'center-normal-point' ? macros.circleCenterNormalPoint3d : macros.circle3d);
+      const sourceFields = definition === 'three-points'
+        ? pointNames
+        : (definition === 'center-normal-point'
+          ? [pointNames[0], vectorNames[0], pointNames[1]]
+          : [pointNames[0], vectorNames[0]]);
+      const parts = [
+        exportId,
+        formatMacroName(sourceName, object.__liaDgsShowName !== false),
+        ...sourceFields.map(cleanDgsExportToken),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ];
+      if (definition === 'center-normal-radius') {
+        const radius = Number(typeof object.__liaCircle3DRadiusSource === 'function'
+          ? object.__liaCircle3DRadiusSource() : object.__liaCircle3DRadiusSource);
+        parts.push('radius=' + formatDgsExportNumber(radius, 1));
+      }
+      if (object.__liaCircle3DConstrainRadiusPoint) parts.push('radiuspointinplane=1');
+      const circleFill = object.element2D?.visProp?.fillcolor;
+      if (circleFill && circleFill !== 'none' && circleFill !== 'transparent') {
+        parts.push('fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'));
+      }
+      if (object.__liaDgsShowValue) parts.push(useGerman ? 'wert=1' : 'value=1');
+      parts.push('measure=' + String(object.__liaDgsValueMode || 'radius'));
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 1));
+      parts.push('textcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff'));
+      parts.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+      parts.push('layer=' + String(getDgsObjectLayer(object)));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'circle3d')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      return;
+    }
+
+    if (isDgsSphere3D(object) && !object.__liaDgsSpatialIntersection) {
+      const definition = String(object.__liaSphere3DDefinition || 'center-point');
+      const sourceName = allocateObjectName(object, name, 'S');
+      const pointNames = (object.__liaSphere3DSourcePoints || []).map((point: any) => ensurePoint(point));
+      if (pointNames.some((value: any) => !value)) return;
+      const macroName = definition === 'center-radius'
+        ? macros.sphereRadius3d
+        : (definition === 'four-points' ? macros.sphereFourPoints3d : macros.sphere3d);
+      const parts = [
+        exportId,
+        formatMacroName(sourceName, object.__liaDgsShowName !== false),
+        ...pointNames.map(cleanDgsExportToken),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ];
+      if (definition === 'center-radius') {
+        const radius = Number(typeof object.__liaSphere3DRadiusSource === 'function'
+          ? object.__liaSphere3DRadiusSource() : object.__liaSphere3DRadiusSource);
+        parts.push('radius=' + formatDgsExportNumber(radius, 1));
+      }
+      if (object.__liaDgsShowValue) parts.push(useGerman ? 'wert=1' : 'value=1');
+      parts.push('measure=' + String(object.__liaDgsValueMode || 'radius'));
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 0.2));
+      parts.push('fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'));
+      parts.push('textcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff'));
+      parts.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+      parts.push('layer=' + String(getDgsObjectLayer(object)));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'sphere3d')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      return;
+    }
+  if (isDgsPlane(object)) {
+      const definition = String(object.__liaPlane3DDefinition || 'three-points');
+      const planeName = allocateObjectName(object, name, 'E');
+      const pointNames = (object.__liaPlane3DSourcePoints || []).map((point: any) => ensurePoint(point));
+      const vectorNames = (object.__liaPlane3DSourceVectors || []).map((vector: any) =>
+        allocateObjectName(vector, getDgsObjectName(vector), 'v')
+      );
+      if (pointNames.some((value: any) => !value) || vectorNames.some((value: any) => !value)) return;
+      const macroName = definition === 'point-normal'
+        ? macros.planePointNormal3d
+        : (definition === 'point-vectors' ? macros.planePointVectors3d : macros.plane3d);
+      const parts = [
+        exportId,
+        formatMacroName(planeName, object.__liaDgsShowName !== false),
+        ...pointNames.map(cleanDgsExportToken),
+        ...vectorNames.map(cleanDgsExportToken),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 0.22)
+      ];
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      if (object.__liaDgsShowEquation) parts.push('value=1');
+      parts.push('equation=' + String(object.__liaDgsPlaneEquationForm || 'parameter'));
+      parts.push('fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'));
+      parts.push('textcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff'));
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, isDgsPlane(object) ? 'plane' : 'spatial-intersection')));
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      return;
+    }
+
+    if (object.__liaDgsSpatialIntersection) {
+      const resultName = allocateObjectName(object, name, object.__liaDgsSpatialIntersectionKind === 'line' ? 's' : 'S');
+      const first = object.__liaDgsSpatialIntersectionSource;
+      const second = object.__liaDgsSpatialIntersectionSource2;
+      const sourceName = (source: any, fallback: string) =>
+        allocateObjectName(source, getDgsObjectName(source), fallback);
+      const spatialFallback = (source: any, secondary = false) =>
+        isDgsPlane(source) ? (secondary ? 'F' : 'E')
+          : (isDgsCircle3D(source) ? (secondary ? 'l' : 'k')
+            : (isDgsSphere3D(source) ? (secondary ? 'T' : 'S') : (secondary ? 'h' : 'g')));
+      const firstName = sourceName(first, spatialFallback(first));
+      const secondName = sourceName(second, spatialFallback(second, true));
+      const parts = [
+        exportId,
+        formatMacroName(resultName, object.__liaDgsShowName !== false),
+        cleanDgsExportToken(firstName),
+        cleanDgsExportToken(secondName),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 1)
+      ];
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      if (getDgsObjectFixed(object)) parts.push('fixed=1');
+      parts.push('objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, isDgsPlane(object) ? 'plane' : 'spatial-intersection')));
+      objectLines.push(macroDgsExportLine(macros.intersection3d, parts.join(';')));
       return;
     }
 
@@ -10807,22 +16038,42 @@ function buildDgsExportMacroBlock(
       );
     };
 
+    if (object.__liaDgsAnalysisFunction === true && !isDgsFunction(object)) {
+      if (familyDefinitions.has(object)) {
+        addFunctionAnalysisExport(macros.zeros, object.__liaDgsRootConstruction, useGerman ? 'N' : 'Z');
+        addFunctionAnalysisExport(macros.extrema, object.__liaDgsExtremaConstruction, 'E');
+        addFunctionAnalysisExport(macros.inflections, object.__liaDgsInflectionConstruction, useGerman ? 'W' : 'I');
+        addFunctionAnalysisExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, 'O');
+      } else {
+        const label = String(object.__liaRegressionEntry?.title ||
+          object.__liaRegressionAnalysisId || dgsText(state.language).analysis);
+        const message = label + ' - ' + dgsText(state.language).analysis;
+        if (!unsupported.includes(message)) unsupported.push(message);
+      }
+      return;
+    }
+
     if (isDgsText(object)) {
       const coordinates = getDgsExportPointCoordinates(object);
       if (!coordinates) return;
+      const textOptions: string[] = [];
+      const fontSize = getDgsFormatFontSize(object);
+      if (Number.isFinite(fontSize)) textOptions.push('fontsize=' + formatDgsExportNumber(fontSize, 18));
+      textOptions.push('fixed=' + (getDgsObjectFixed(object) ? '1' : '0'));
       objectLines.push(macroDgsExportLine(macros.coordText, [
         exportId,
         '[' + formatDgsExportNumber(coordinates.x) + ';' + formatDgsExportNumber(coordinates.y) + ']',
         quoteDgsExportField(object.__liaDgsTextContent || name),
         normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff',
         formatDgsExportNumber(object.__liaDgsShowObject === false ? 0 : getDgsObjectOpacity(object), 1)
-      ].join(';')));
+      ].concat(textOptions).join(';')));
       return;
     }
 
     if (isDgsFunction(object)) {
       const sourceName = allocateObjectName(object, name || object.__liaDgsFunctionName, 'f');
       const options = object.__liaDgsShowObject === false ? ['visible=0'] : [];
+      if (object.__liaDgsShowExpression) options.push(useGerman ? 'term=1' : 'expression=1');
       addDgsExportLineStyleOption(options, object);
       objectLines.push(macroDgsExportLine(macros.plotFunction, [
         exportId,
@@ -10839,13 +16090,16 @@ function buildDgsExportMacroBlock(
 
     if (object.__liaDgsTangent) {
       const source = object.__liaDgsTangentSource;
-      if (source && source.__liaDgsAnalysisFunction === true && !isDgsFunction(source)) {
+      if (source && source.__liaDgsAnalysisFunction === true && !isDgsFunction(source) &&
+          !familyDefinitions.has(source)) {
         unsupported.push((name ? name + ' - ' : '') + typeLabel);
         return;
       }
       let sourceReference = source ? (exportedObjectNames.get(source) || '') : '';
       if (!sourceReference && source) {
-        if (!isDgsFunction(source) && !isDgsCircle(source) && source.point1 && source.point2) {
+        if (source.__liaDgsAngleBisector) {
+          sourceReference = allocateObjectName(source, getDgsObjectName(source), 'w');
+        } else if (!isDgsFunction(source) && !isDgsCircle(source) && source.point1 && source.point2) {
           sourceReference = pointList([source.point1, source.point2]) || '';
         } else {
           sourceReference = allocateObjectName(source, getDgsObjectName(source), 'o');
@@ -10876,12 +16130,35 @@ function buildDgsExportMacroBlock(
       if (object.__liaDgsShowObject === false) parts.push('visible=0');
       addDgsExportLineStyleOption(parts, object);
       objectLines.push(macroDgsExportLine(macros.tangent, parts.join(';')));
+      addPointConstructionExport(macros.objectZeros, object.__liaDgsRootConstruction, [sourceName], useGerman ? 'N' : 'Z');
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
       return;
     }
 
     if (isDgsCompassArc(object)) {
-      unsupported.push((name ? name + ' - ' : '') + typeLabel);
+      const centerName = ensurePoint(object.__liaDgsCompassCenterPoint);
+      const radiusPointName = ensurePoint(object.__liaDgsCompassRadiusPoint);
+      if (!centerName || !radiusPointName) return;
+      const sourceName = allocateObjectName(object, name, 'z');
+      const geometry = getDgsCompassArcGeometry(object);
+      const parts = [
+        exportId,
+        formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false),
+        cleanDgsExportToken(centerName),
+        cleanDgsExportToken(radiusPointName),
+        formatDgsExportNumber(geometry.sweepAngle),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ];
+      if (object.__liaDgsCompassFixedRadius) {
+        parts.push('fixedradius=1');
+        const fixedDx = Number(object.__liaDgsCompassFixedDx);
+        const fixedDy = Number(object.__liaDgsCompassFixedDy);
+        if (Number.isFinite(fixedDx)) parts.push('fixeddx=' + formatDgsExportNumber(fixedDx));
+        if (Number.isFinite(fixedDy)) parts.push('fixeddy=' + formatDgsExportNumber(fixedDy));
+      }
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macros.compassArc, parts.join(';')));
       return;
     }
 
@@ -10910,6 +16187,45 @@ function buildDgsExportMacroBlock(
       return;
     }
 
+    if (isDgsSpatialLinearObject(object)) {
+      const sourcePoints = getDgsLinearSourcePoints(object);
+      if (!sourcePoints) return;
+      const firstName = ensurePoint(sourcePoints[0]);
+      const freeVector = isDgsVector(object) && object.__liaLinear3DFreeVector === true;
+      const secondName = freeVector ? '' : ensurePoint(sourcePoints[1]);
+      const components = freeVector ? coordinateVector3DComponents(object) : null;
+      if (!firstName || (!freeVector && !secondName) || (freeVector && !components)) return;
+      const fallback = isDgsVector(object) ? 'v' : (isDgsRay(object) ? 'r' : (isDgsLine(object) ? 'g' : 's'));
+      const sourceName = allocateObjectName(object, name, fallback);
+      const macroName = isDgsVector(object)
+        ? macros.vector3d
+        : (isDgsRay(object) ? macros.ray3d : (isDgsLine(object) ? macros.line3d : macros.segment3d));
+      const geometry = freeVector
+        ? '[' + components!.map(value => formatDgsExportNumber(value)).join(';') + ']'
+        : cleanDgsExportToken(secondName!);
+      const options = [
+        'textcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff'),
+        'opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 1),
+        'fixed=' + (getDgsObjectFixed(object) ? '1' : '0'),
+        'layer=' + String(getDgsObjectLayer(object)),
+        'width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 3),
+        'objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'linear3d'))
+      ];
+      if (object.__liaDgsShowObject === false) options.push('visible=0');
+      const showValue = isDgsVector(object) ? object.__liaDgsShowValue :
+        ((isDgsLine(object) || isDgsRay(object)) ? object.__liaDgsShowEquation : object.__liaDgsShowLength);
+      if (showValue) options.push(useGerman ? 'wert=1' : 'value=1');
+      addDgsExportLineStyleOption(options, object);
+      objectLines.push(macroDgsExportLine(macroName, [
+        exportId,
+        formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false),
+        cleanDgsExportToken(firstName),
+        geometry,
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
+      ].concat(options).join(';')));
+      return;
+    }
+
     if (object.__liaDgsSegment && !isDgsRay(object) && !isDgsVector(object) && !isDgsLine(object)) {
       const points = pointList([object.point1, object.point2]);
       if (!points) return;
@@ -10929,6 +16245,7 @@ function buildDgsExportMacroBlock(
         points,
         normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'
       ].concat(options.filter(Boolean)).join(';')));
+      addPointConstructionExport(macros.objectZeros, object.__liaDgsRootConstruction, [sourceName], useGerman ? 'N' : 'Z');
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
       return;
     }
@@ -10940,8 +16257,7 @@ function buildDgsExportMacroBlock(
       const baseRequiresPointPair = !!(baseLine && (
         !isDgsLinearObject(baseLine) ||
         baseLine.__liaDgsPolygonBorder ||
-        baseLine.__liaDgsTangent ||
-        baseLine.__liaDgsAngleBisector
+        baseLine.__liaDgsTangent
       ));
       const baseName = baseLine && !baseRequiresPointPair
         ? allocateObjectName(baseLine, getDgsObjectName(baseLine), 'g')
@@ -10967,6 +16283,7 @@ function buildDgsExportMacroBlock(
       if (object.__liaDgsShowObject === false) parts.push('visible=0');
       addDgsExportLineStyleOption(parts, object);
       objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      addPointConstructionExport(macros.objectZeros, object.__liaDgsRootConstruction, [sourceName], useGerman ? 'N' : 'Z');
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
       return;
     }
@@ -10990,24 +16307,55 @@ function buildDgsExportMacroBlock(
       if (object.__liaDgsShowObject === false) parts.push('visible=0');
       addDgsExportLineStyleOption(parts, object);
       objectLines.push(macroDgsExportLine(macroName, parts.join(';')));
+      addPointConstructionExport(macros.objectZeros, object.__liaDgsRootConstruction, [sourceName], useGerman ? 'N' : 'Z');
       addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
       return;
     }
 
     if (isDgsPolygon(object)) {
-      const points = pointList(Array.isArray(object.vertices) ? object.vertices : []);
+      const vertices = Array.isArray(object.vertices) ? object.vertices.slice() : [];
+      if (vertices.length > 1 && vertices[0] === vertices[vertices.length - 1]) vertices.pop();
+      const points = pointList(vertices);
       if (!points) return;
       const options: string[] = [];
       if (object.__liaDgsShowArea) options.push(useGerman ? 'inhalt=1' : 'area=1');
       if (object.__liaDgsShowPerimeter) options.push(useGerman ? 'umfang=1' : 'perimeter=1');
       if (object.__liaDgsShowObject === false) options.push('visible=0');
       addDgsExportLineStyleOption(options, object);
+      const sourceName = allocateObjectName(object, name || object.__liaDgsPolygonName, 'P');
+      options.push('name=' + formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false));
       objectLines.push(macroDgsExportLine(macros.area, [
         exportId,
         points,
         normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
         formatDgsExportNumber(getDgsObjectOpacity(object), 0.25)
       ].concat(options).join(';')));
+      return;
+    }
+
+    if (isDgsEllipse(object)) {
+      const focus1Name = ensurePoint(object.__liaDgsEllipseFocus1);
+      const focus2Name = ensurePoint(object.__liaDgsEllipseFocus2);
+      const curvePointName = ensurePoint(object.__liaDgsEllipsePoint);
+      if (!focus1Name || !focus2Name || !curvePointName) return;
+      const sourceName = allocateObjectName(object, name, 'e');
+      const options = [
+        'showname=' + (object.__liaDgsShowName === false ? '0' : '1'),
+        (useGerman ? 'inhalt=' : 'area=') + (object.__liaDgsShowArea ? '1' : '0'),
+        (useGerman ? 'umfang=' : 'perimeter=') + (object.__liaDgsShowPerimeter ? '1' : '0')
+      ];
+      if (object.__liaDgsShowObject === false) options.push('visible=0');
+      addDgsExportLineStyleOption(options, object);
+      objectLines.push(macroDgsExportLine(macros.ellipse, [
+        exportId,
+        formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false),
+        cleanDgsExportToken(focus1Name),
+        cleanDgsExportToken(focus2Name),
+        cleanDgsExportToken(curvePointName),
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatDgsExportNumber(getDgsObjectOpacity(object), 0.2),
+        ...options
+      ].join(';')));
       return;
     }
 
@@ -11059,15 +16407,47 @@ function buildDgsExportMacroBlock(
     }
 
     if (isDgsAngle(object)) {
+      if (object.__liaDgsAngle3D) {
+        const sources = Array.isArray(object.__liaDgsAngle3DSources)
+          ? object.__liaDgsAngle3DSources.map((source: any) => allocateObjectName(source, getDgsObjectName(source), 'g'))
+          : [];
+        if (sources.length !== 2 || sources.some((source: string) => !source)) return;
+        const definition = String(object.__liaDgsAngle3DDefinition || 'lines');
+        const macroName = definition === 'line-plane'
+          ? (useGerman ? 'WinkelGeradeEbene3D' : 'LinePlaneAngle3D')
+          : definition === 'planes'
+            ? (useGerman ? 'Ebenenwinkel3D' : 'PlaneAngle3D')
+            : (useGerman ? 'Geradenwinkel3D' : 'LineAngle3D');
+        const options = [
+          'visual=1',
+          'color=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'),
+          'showvalue=' + (object.__liaDgsShowAngle ? '1' : '0'),
+          'visible=' + (object.__liaDgsShowObject === false ? '0' : '1'),
+          'objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'angle3d'))
+        ];
+        const sourceName = allocateObjectName(object, name || object.__liaDgsAngleName, 'alpha');
+        objectLines.push(macroDgsExportLine(macroName, [
+          exportId,
+          formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false),
+          ...sources.map(cleanDgsExportToken),
+          ...options
+        ].join(';')));
+        return;
+      }
       const points = pointList(Array.isArray(object.__liaDgsAnglePoints) ? object.__liaDgsAnglePoints : []);
       if (!points) return;
       const options: string[] = [];
       if (object.__liaDgsShowAngle) options.push(useGerman ? 'wert=1' : 'value=1');
+      if (object.__liaDgsMeasuredConstruction && Number.isFinite(Number(object.__liaDgsTargetAngle))) {
+        options.push((useGerman ? 'zielwinkel=' : 'targetangle=') +
+          formatDgsExportNumber(Number(object.__liaDgsTargetAngle)));
+      }
       if (object.__liaDgsShowObject === false) options.push('visible=0');
       addDgsExportLineStyleOption(options, object);
+      const sourceName = allocateObjectName(object, name || object.__liaDgsAngleName, 'alpha');
       objectLines.push(macroDgsExportLine(macros.angle, [
         exportId,
-        formatMacroName(name || 'alpha', !!name && object.__liaDgsShowName !== false),
+        formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false),
         points,
         normalizeHexColor(getDgsObjectColor(object, 'fill')) || normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
         formatDgsExportNumber(getDgsObjectOpacity(object), 1)
@@ -11076,14 +16456,34 @@ function buildDgsExportMacroBlock(
     }
 
     if (object.__liaDgsAngleBisector) {
-      unsupported.push((name ? name + ' - ' : '') + typeLabel);
+      const points = pointList(Array.isArray(object.__liaDgsAngleBisectorPoints)
+        ? object.__liaDgsAngleBisectorPoints : []);
+      if (!points) return;
+      const sourceName = allocateObjectName(object, name, 'w');
+      const parts = [
+        exportId,
+        points,
+        normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff',
+        formatMacroName(sourceName, !!name && object.__liaDgsShowName !== false)
+      ];
+      if (object.__liaDgsShowObject === false) parts.push('visible=0');
+      addDgsExportLineStyleOption(parts, object);
+      objectLines.push(macroDgsExportLine(macros.angleBisector, parts.join(';')));
+      addPointConstructionExport(macros.objectZeros, object.__liaDgsRootConstruction, [sourceName], useGerman ? 'N' : 'Z');
+      addPointConstructionExport(macros.ordinateIntercept, object.__liaDgsYInterceptConstruction, [sourceName], 'O');
     }
   });
 
   objects.forEach((object) => {
-    if (!object || !object.__liaDgsPolygonBorder || !object.__liaDgsYInterceptConstruction) return;
+    if (!object || !object.__liaDgsPolygonBorder) return;
     const sourceReference = analysisSourceReference(object);
     if (!sourceReference) return;
+    addPointConstructionExport(
+      macros.objectZeros,
+      object.__liaDgsRootConstruction,
+      [sourceReference],
+      useGerman ? 'N' : 'Z'
+    );
     addPointConstructionExport(
       macros.ordinateIntercept,
       object.__liaDgsYInterceptConstruction,
@@ -11114,9 +16514,192 @@ function buildDgsExportMacroBlock(
       );
     });
 
+  objects.filter(isDgsLocus).forEach((locus) => {
+    const targetName = ensurePoint(locus.__liaDgsLocusTarget);
+    const driver = locus.__liaDgsLocusDriver;
+    const driverName = isDgsSlider(driver)
+      ? normalizeDgsParameterName(driver.__liaDgsSliderName || driver.name || '')
+      : ensurePoint(driver);
+    if (!targetName || !driverName) {
+      const message = getDgsObjectName(locus) + ' - ' + dgsText(state.language).locus;
+      if (!unsupported.includes(message)) unsupported.push(message);
+      return;
+    }
+    const locusName = allocateObjectName(locus, getDgsObjectName(locus), 'l');
+    const options = [
+      'name=' + quoteDgsExportField(locusName),
+      'showname=' + (locus.__liaDgsShowName === false ? '0' : '1'),
+      'samples=' + normalizeDgsLocusSampleCount(locus.__liaDgsLocusSampleCount),
+      'opacity=' + formatDgsExportNumber(getDgsObjectOpacity(locus), 1),
+      'width=' + formatDgsExportNumber(getDgsStrokeWidth(locus), 3)
+    ];
+    if (locus.__liaDgsShowObject === false) options.push('visible=0');
+    addDgsExportLineStyleOption(options, locus);
+    locusLines.push(macroDgsExportLine(macros.locus, [
+      exportId,
+      cleanDgsExportToken(targetName),
+      cleanDgsExportToken(driverName),
+      normalizeHexColor(getDgsObjectColor(locus, 'line')) || '#ff00ff',
+      ...options
+    ].join(';')));
+  });
+
+  const advancedSourceName = (source: any): string => {
+    if (!source) return '';
+    if (isDgsSlider(source)) return cleanDgsExportToken(source.__liaDgsSliderName || source.name);
+    if (isDgsPoint(source)) return ensurePoint(source) || '';
+    return allocateObjectName(source, getDgsObjectName(source), 'O');
+  };
+  advancedExports.forEach(({ entry, target, macro }) => {
+    const object = entry.object;
+    if (!object) return;
+    const parts = splitTopLevel(unquote(String(entry.spec)), ';');
+    parts[0] = exportId;
+    parts[1] = formatMacroName(exportedPoints.get(object) || exportedObjectNames.get(object) || entry.config.name, object.__liaDgsShowName !== false);
+    const sources: any[] | null = object.__liaDgsAnalytic3DSources ||
+      (entry.planeObject && entry.solidObject ? [entry.planeObject, entry.solidObject] : null);
+    if (object.__liaDgsAnalytic3DSources) {
+      const options = parts.slice(2).filter(part => /^[^=]+=/.test(part.trim()));
+      parts.splice(2, parts.length - 2, ...sources!.map(advancedSourceName), ...options);
+    } else if (sources) {
+      sources.forEach((source, index) => { parts[index + 2] = advancedSourceName(source); });
+    }
+    if (entry.trace) {
+      (entry.config.drivers || []).forEach((token: string, index: number) => {
+        const match = String(token).match(/^(.*?)(\.(?:u|v|t))?$/);
+        const originalName = match?.[1] || token;
+        const suffix = match?.[2] || '';
+        const adapterId = String((entry.drivers || [entry.driver])[index]?.id || '');
+        const driverPointId = adapterId.replace(/\.(?:u|v|t|angle)$/, '');
+        const source = (entry.drivers || [entry.driver])[index]?.source ||
+          window.__points?.[state.boardId]?.[originalName] ||
+          objects.find(object => object.__liaPoint3D && object.__liaDgsPersistentId === driverPointId) ||
+          objects.find(object => isDgsSlider(object) && (object.__liaDgsSliderName === originalName || object.name === originalName));
+        parts[index + 2] = source ? advancedSourceName(source) + suffix : token;
+      });
+      parts[entry.config.drivers.length + 2] = advancedSourceName(entry.trace);
+    }
+    const replaceOptions = /^(?:objectid|objektid|color|farbe|linecolor|linienfarbe|fillcolor|fuellfarbe|opacity|deckkraft|visible|sichtbar|fixed|fixiert|width|breite|showvalue|wertanzeige)\s*=/i;
+    const cleaned = parts.filter((part, index) => index < 2 ||
+      (!replaceOptions.test(part.trim()) && !/^(?:noname|hidden|fix|fixed)$/i.test(part.trim())));
+    cleaned.push(
+      'objectid=' + quoteDgsExportField(ensureDgsPersistentId(object, 'advanced3d')),
+      'color=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#00dfe8'),
+      'linecolor=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#00dfe8'),
+      'fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#00dfe8'),
+      'width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 3),
+      'opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 1),
+      'visible=' + (object.__liaDgsShowObject === false ? '0' : '1'),
+      'fixed=' + (getDgsObjectFixed(object) ? '1' : '0')
+    );
+    if (object.__liaDgsAnalytic3D && typeof object.__liaDgsShowValue === 'boolean') cleaned.push('showvalue=' + (object.__liaDgsShowValue ? '1' : '0'));
+    target.push(macroDgsExportLine(macro, cleaned.join(';')));
+  });
+
+  const formattedObjects = new Set<any>();
+  const addFormatLine = (object: any, reference: string) => {
+    if (!object || !reference || formattedObjects.has(object)) return;
+    formattedObjects.add(object);
+    const options = [
+      'textcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'text')) || '#ff00ff'),
+      'linecolor=' + (normalizeHexColor(getDgsObjectColor(object, 'line')) || '#ff00ff'),
+      'fillcolor=' + (normalizeHexColor(getDgsObjectColor(object, 'fill')) || '#ff00ff'),
+      'opacity=' + formatDgsExportNumber(getDgsObjectOpacity(object), 1),
+      'fixed=' + (getDgsObjectFixed(object) ? '1' : '0')
+    ];
+    options.push('visible=' + (object.__liaDgsShowObject === false ? '0' : '1'));
+    options.push('showname=' + (object.__liaDgsShowName === false ? '0' : '1'));
+    options.push('width=' + formatDgsExportNumber(getDgsStrokeWidth(object), 2));
+    options.push('linestyle=' + getDgsLineStyle(object));
+    options.push('design=' + getDgsStrokeDesign(object));
+    options.push('layer=' + getDgsObjectLayer(object));
+    options.push('scene=' + (isDgsSpatialSceneObject(object) || object.__liaDgsAngle3D ? '3d' : '2d'));
+    const persistentId = String(object.__liaDgsPersistentId || object.__liaSceneRecord?.id || '');
+    if (persistentId && isDgsSpatialSceneObject(object)) options.push('objectid=' + quoteDgsExportField(persistentId));
+    const flags: Array<[string, string]> = [
+      ['showvalue', '__liaDgsShowValue'], ['showangle', '__liaDgsShowAngle'],
+      ['area', '__liaDgsShowArea'], ['perimeter', '__liaDgsShowPerimeter'],
+      ['surface', '__liaDgsShowSurfaceArea'], ['volume', '__liaDgsShowVolume'],
+      ['coordinates', '__liaDgsShowCoordinates'], ['radius', '__liaDgsShowRadius']
+    ];
+    flags.forEach(([option, property]) => {
+      if (typeof object[property] === 'boolean') options.push(option + '=' + (object[property] ? '1' : '0'));
+    });
+    const fontSize = Number(object.__liaDgsFormatFontSize);
+    if (Number.isFinite(fontSize)) options.push('fontsize=' + formatDgsExportNumber(fontSize, 18));
+    if (typeof object.__liaDgsShowEquation === 'boolean') {
+      options.push((useGerman ? 'gleichung=' : 'equation=') + (object.__liaDgsShowEquation ? '1' : '0'));
+    }
+    if (typeof object.__liaDgsShowExpression === 'boolean') {
+      options.push((useGerman ? 'term=' : 'expression=') + (object.__liaDgsShowExpression ? '1' : '0'));
+    }
+    if (object.__liaDgsPolygonBorder) {
+      options.push('showname=' + (object.__liaDgsShowName === false ? '0' : '1'));
+      options.push((useGerman ? 'laenge=' : 'length=') + (object.__liaDgsShowLength ? '1' : '0'));
+      const sideName = cleanDgsExportToken(getDgsObjectName(object));
+      if (sideName) options.push('name=' + quoteDgsExportField(sideName));
+      const sideStyle = getDgsLineStyle(object);
+      if (sideStyle !== 'solid') options.push('linestyle=' + sideStyle);
+    }
+    formatLines.push(macroDgsExportLine(macros.objectFormat, [
+      exportId,
+      cleanDgsExportToken(reference),
+      ...options
+    ].join(';')));
+  };
+
+  objects.filter((object) => !object || !object.__liaDgsPolygonBorder).forEach((object) => {
+    if (!object || isDgsText(object)) return;
+    let reference = exportedObjectNames.get(object) || '';
+    if (!reference && isDgsPoint(object)) reference = exportedPoints.get(object) || '';
+    if (!reference && isDgsSlider(object)) reference = cleanDgsExportToken(object.__liaDgsSliderName);
+    if (object.__liaDgsPolygonBorder) {
+      const owner = object.__liaDgsPolygonBorderOwner;
+      const ownerName = owner && exportedObjectNames.get(owner);
+      const index = Number(object.__liaDgsPolygonBorderIndex);
+      reference = ownerName && Number.isInteger(index) ? 'side:' + ownerName + ':' + index : '';
+    }
+    addFormatLine(object, reference);
+  });
+  objects.filter((object) => !!object && !!object.__liaDgsPolygonBorder).forEach((object) => {
+    const owner = object.__liaDgsPolygonBorderOwner;
+    const ownerName = owner && exportedObjectNames.get(owner);
+    const index = Number(object.__liaDgsPolygonBorderIndex);
+    const reference = ownerName && Number.isInteger(index) ? 'side:' + ownerName + ':' + index : '';
+    addFormatLine(object, reference);
+  });
+
+  const exportedBoardObjects = new Set(objects);
+  Object.values(window.__solid3DEntries || {}).forEach((entry: any) => {
+    if (!entry || entry.board !== state.board || !entry.spec || exportedBoardObjects.has(entry.object)) return;
+    const definition = String(entry.definition || entry.config?.definition || '');
+    const macroName = definition === 'tetrahedron' ? macros.tetrahedron3d
+      : definition === 'pyramid' ? macros.pyramid3d
+      : definition === 'prism' ? macros.prism3d
+      : definition === 'parallelepiped' ? macros.parallelepiped3d
+      : definition === 'cuboid' ? macros.cuboid3d
+      : definition === 'cylinder' ? macros.cylinder3d
+      : definition === 'cone' ? macros.cone3d
+      : '';
+    if (!macroName) return;
+    const exportedSpec = String(entry.spec).replace(/^[^;]+(?=;)/, exportId);
+    objectLines.push(macroDgsExportLine(macroName, exportedSpec));
+  });
   const dgsProfileParts = [
     exportId,
-    'tools=' + formatDgsToolSelection(selectedToolIds)
+    'tools=' + formatDgsToolSelection(selectedToolIds),
+    'zoom=' + state.zoomMode,
+    'axisscale=' + state.axisScaleMode,
+    'viewmode=' + sceneModePolicy,
+    'setsquare=[' + [
+      state.setSquareVisible ? 1 : 0,
+      state.setSquareInitialized ? 1 : 0,
+      formatDgsExportNumber(state.setSquarePivotXRatio, 0.5),
+      formatDgsExportNumber(state.setSquarePivotYRatio, 0.22),
+      formatDgsExportNumber(state.setSquareAngle, 0),
+      formatDgsExportNumber(state.setSquareScale, 1)
+    ].join(',') + ']',
+    'compass=[' + state.compassMode + ',' + formatDgsExportNumber(state.compassPresetRadius, 1) + ']'
   ];
   const restrictions = canonicalDgsRestrictionIds(selectedRestrictionIds);
   if (restrictions.length) {
@@ -11126,8 +16709,15 @@ function buildDgsExportMacroBlock(
   lines.push(
     ...pointLines,
     ...midpointLines,
+    ...transformPointLines,
     ...sliderLines,
+    ...familyLines,
     ...objectLines,
+    ...segment6PrimaryLines,
+    ...segment6DerivedLines,
+    ...locusLines,
+    ...segment6LocusLines,
+    ...formatLines,
     macroDgsExportLine(
       macros.dgs,
       dgsProfileParts.join(';')
@@ -11191,6 +16781,45 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
     if (!normalized || !dgsParameterNameAvailable(state, normalized, object)) return false;
     object.__liaDgsSliderName = normalized;
     renameDgsParameterReferences(state, normalizeDgsParameterName(oldName), normalized);
+  } else if (isDgsConic3D(object)) {
+    object.__liaDgsConic3DName = name;
+    updateDgsSegment6EntryName(object, name);
+  } else if (object.__liaDgsAngle3D) {
+    object.__liaDgsAngleName = name;
+    object.__liaDgsAngleAutoName = false;
+  } else if (isDgsCurve3D(object)) {
+    object.__liaDgsCurve3DName = name;
+    updateDgsSegment6EntryName(object, name);
+  } else if (isDgsSurface3D(object)) {
+    object.__liaDgsSurface3DName = name;
+    updateDgsSegment6EntryName(object, name);
+  } else if (isDgsAnalytic3D(object)) {
+    object.__liaDgsAnalytic3DName = name;
+    updateDgsSegment6EntryName(object, name);
+  } else if (isDgsTransformation3D(object)) {
+    object.__liaDgsTransformation3DName = name;
+    if (object.__liaPoint3D) object.__liaDgsPointName = name;
+    else if (object.__liaLinear3DKind === 'vector') object.__liaDgsVectorName = name;
+    else if (object.__liaLinear3DKind === 'segment') object.__liaDgsSegmentName = name;
+    else if (object.__liaLinear3DKind === 'ray') object.__liaDgsRayName = name;
+    else if (object.__liaLinear3D) object.__liaDgsLineName = name;
+    else if (object.__liaPlane3D) object.__liaDgsPlaneName = name;
+    else if (object.__liaCircle3D) object.__liaDgsCircle3DName = name;
+    else if (object.__liaSphere3D) object.__liaDgsSphere3DName = name;
+    else if (object.__liaPolygon3D) object.__liaDgsPolygon3DName = name;
+    else if (object.__liaSolid3D) object.__liaDgsSolid3DName = name;
+  } else if (isDgsPolygon3D(object)) {
+    object.__liaDgsPolygon3DName = name;
+  } else if (isDgsSolid3D(object)) {
+    object.__liaDgsSolid3DName = name;
+  } else if (isDgsCircle3D(object)) {
+    object.__liaDgsCircle3DName = name;
+    object.__liaDgsCircleName = name;
+  } else if (isDgsSphere3D(object)) {
+    object.__liaDgsSphere3DName = name;
+    object.__liaDgsSphereName = name;
+  } else if (isDgsPlane(object)) {
+    object.__liaDgsPlaneName = name;
   } else if (isDgsPoint(object)) {
     const points = window.__points && window.__points[state.boardId];
     if (points && points[name] && points[name] !== object) return false;
@@ -11212,6 +16841,7 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
         const nextState = savedState || {
           x: Number(object.X()),
           y: Number(object.Y()),
+          ...(object.__liaPoint3D ? { z: Number(object.Z()) } : {}),
           fixed: getDgsObjectFixed(object)
         };
         pointStates[name] = nextState;
@@ -11250,12 +16880,14 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
       Object.keys(state.board.objects).forEach((key) => updateAngleName(state.board.objects[key]));
     }
     const updateVectorName = (candidate: any) => {
-      if (!isDgsVector(candidate) || !candidate.__liaDgsVectorAutoName ||
-          (candidate.point1 !== object && candidate.point2 !== object)) return;
-      const nextName = getAutomaticDgsVectorName(candidate.point1, candidate.point2);
+      const sourcePoints = getDgsLinearSourcePoints(candidate);
+      if (!isDgsVector(candidate) || !candidate.__liaDgsVectorAutoName || !sourcePoints ||
+          (sourcePoints[0] !== object && sourcePoints[1] !== object)) return;
+      const nextName = getAutomaticDgsVectorName(sourcePoints[0], sourcePoints[1]);
       if (!nextName) return;
       candidate.__liaDgsVectorName = nextName;
       try { candidate.setAttribute({ name: '\\(' + formatDgsVectorTexName(nextName) + '\\)' }); } catch (e) {}
+      try { candidate.element2D?.setAttribute?.({ name: '\\(' + formatDgsVectorTexName(nextName) + '\\)' }); } catch (e) {}
       refreshDgsObjectLabel(candidate);
     };
     if (state.board && Array.isArray(state.board.objectsList)) state.board.objectsList.forEach(updateVectorName);
@@ -11289,8 +16921,12 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
     object.__liaDgsAngleAutoName = false;
   } else if (isDgsCircle(object)) {
     object.__liaDgsCircleName = name;
+  } else if (isDgsEllipse(object)) {
+    object.__liaDgsEllipseName = name;
   } else if (isDgsSector(object)) {
     object.__liaDgsSectorName = name;
+  } else if (isDgsLocus(object)) {
+    object.__liaDgsLocusName = name;
   } else if (object.__liaDgsSegment) {
     object.__liaDgsSegmentName = name;
   } else {
@@ -11299,6 +16935,7 @@ function setDgsObjectName(state: DgsState, object: any, value: string): boolean 
 
   const texName = isDgsVector(object) ? formatDgsVectorTexName(name) : name;
   try { if (typeof object.setAttribute === 'function') object.setAttribute({ name: '\\(' + texName + '\\)' }); } catch (e) {}
+  try { object.element2D?.setAttribute?.({ name: '\\(' + texName + '\\)' }); } catch (e) {}
   if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
   else refreshDgsObjectLabel(object);
   try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
@@ -11324,10 +16961,11 @@ function dgsMeasurementRelation(value: number): string {
 function getDgsLineEquation(line: any): string {
   const language = getDgsGeometryLanguage(null, line && line.__liaDgsLanguage);
   const relationLine = isDgsPerpendicular(line) || isDgsParallel(line);
+  const linearPoints = getDgsLinearSourcePoints(line);
   const point1 = isDgsPerpendicular(line)
     ? line.__liaDgsPerpendicularPoint
-    : (isDgsParallel(line) ? line.__liaDgsParallelPoint : line && line.point1);
-  const point2 = line && line.point2;
+    : (isDgsParallel(line) ? line.__liaDgsParallelPoint : linearPoints?.[0]);
+  const point2 = linearPoints?.[1];
   if (!point1 || (!relationLine && !point2)) return '';
 
   let x1 = NaN;
@@ -11409,11 +17047,122 @@ function dgsObjectLabelText(object: any): string {
   const showName = object && object.__liaDgsShowName !== false;
   const mayDisplayValues = dgsMayDisplayObjectValues(object);
 
+
+  if (isDgsAnalytic3D(object)) {
+    const showValue = object.__liaDgsShowValue !== false;
+    let value: unknown = object.__liaDgsAnalytic3DEvaluator?.() ?? object.__liaDgsAnalytic3DValue;
+    if (typeof value === 'number') value = formatDgsMeasurement(value, object.__liaDgsLanguage || 'de');
+    const translated: Record<string, [string, string]> = {
+      identical: ['identisch', 'identical'], parallel: ['parallel', 'parallel'],
+      'strictly-parallel': ['echt parallel', 'strictly parallel'], intersecting: ['schneidend', 'intersecting'],
+      skew: ['windschief', 'skew'], orthogonal: ['orthogonal', 'orthogonal'],
+      contained: ['liegt auf dem Objekt', 'lies on the object'],
+      'not-contained': ['liegt nicht auf dem Objekt', 'does not lie on the object'], invalid: ['nicht definiert', 'undefined']
+    };
+    if (typeof value === 'string' && translated[value]) value = translated[value][object.__liaDgsLanguage === 'en' ? 1 : 0];
+    if (!showName && !showValue) return '';
+    return (showName && name ? name : '') + (showName && showValue ? ' = ' : '') + (showValue ? String(value ?? '') : '');
+  }
+  if ((isDgsCurve3D(object) && !object.__liaDgsAngle3D) ||
+      isDgsSurface3D(object) || isDgsConic3D(object)) {
+    return showName && name ? '\\(' + name + '\\)' : '';
+  }
+  if (isDgsPolygon3D(object)) {
+    const data = coordinatePolygon3DData(object);
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    if (!showValue || !data) return showName && name ? '\(' + name + '\)' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const mode = String(object.__liaDgsValueMode || 'area');
+    const value = mode === 'perimeter' ? data.perimeter : data.area;
+    const symbol = mode === 'perimeter' ? 'U' : 'A';
+    return '\(' + (showName && name ? name + ':\; ' : '') + symbol + '=' +
+      formatDgsMeasurement(value, language) + '\)';
+  }
+
+  if (isDgsSolid3D(object)) {
+    const data = coordinateSolid3DData(object);
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    if (!showValue || !data) return showName && name ? '\(' + name + '\)' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const mode = String(object.__liaDgsValueMode || 'volume');
+    const value = mode === 'surface' ? data.surfaceArea :
+      (mode === 'base' ? Number(data.baseArea) :
+      (mode === 'height' ? Number(data.height) : data.volume));
+    const symbol = mode === 'surface' ? (language === 'de' ? 'O' : 'S') :
+      (mode === 'base' ? 'G' : (mode === 'height' ? 'h' : 'V'));
+    return '\(' + (showName && name ? name + ':\; ' : '') + symbol + '=' +
+      formatDgsMeasurement(value, language) + '\)';
+  }
+
+  if (isDgsCircle3D(object)) {
+    const data = coordinateCircle3DData(object);
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    if (!showValue || !data) return showName && name ? '\(' + name + '\)' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const mode = String(object.__liaDgsValueMode || 'radius');
+    const value = mode === 'area' ? circleArea(data) :
+      (mode === 'circumference' ? circleCircumference(data) : data.radius);
+    const symbol = mode === 'area' ? 'A' : (mode === 'circumference' ? 'U' : 'r');
+    return '\(' + (showName && name ? name + ':\; ' : '') + symbol + '=' +
+      formatDgsMeasurement(value, language) + '\)';
+  }
+
+  if (isDgsSphere3D(object)) {
+    const data = coordinateSphere3DData(object);
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    if (!showValue || !data) return showName && name ? '\(' + name + '\)' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const mode = String(object.__liaDgsValueMode || 'radius');
+    const value = mode === 'surface' ? sphereSurfaceArea(data) :
+      (mode === 'volume' ? sphereVolume(data) : data.radius);
+    const symbol = mode === 'surface' ? 'A' : (mode === 'volume' ? 'V' : 'r');
+    return '\(' + (showName && name ? name + ':\; ' : '') + symbol + '=' +
+      formatDgsMeasurement(value, language) + '\)';
+  }
+
+  if (isDgsPlane(object)) {
+    if (!showName && !object.__liaDgsShowEquation) return '';
+    const data = coordinatePlane3DData(object);
+    if (!object.__liaDgsShowEquation || !data) return showName && name ? '\\(' + name + '\\)' : '';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const number = (value: number) => formatDgsMeasurement(value, language);
+    const tuple = (values: Vector3) => '\\begin{pmatrix}' +
+      values.map(number).join('\\\\') + '\\end{pmatrix}';
+    const prefix = showName && name ? name + ':\\; ' : '';
+    const form = String(object.__liaDgsPlaneEquationForm || 'parameter');
+    if (form === 'coordinate') {
+      const coefficients = data.coefficients;
+      return '\\(' + prefix + number(coefficients[0]) + 'x+' + number(coefficients[1]) +
+        'y+' + number(coefficients[2]) + 'z=' + number(-coefficients[3]) + '\\)';
+    }
+    if (form === 'normal') {
+      return '\\(' + prefix + '\\left(\\vec{x}-' + tuple(data.point) +
+        '\\right)\\cdot' + tuple(data.normal) + '=0\\)';
+    }
+    return '\\(' + prefix + '\\vec{x}=' + tuple(data.point) + '+r\\,' +
+      tuple(data.direction1) + '+s\\,' + tuple(data.direction2) + '\\)';
+  }
+
   if (isDgsSlider(object)) {
     return showName && name
       ? '\\(' + dgsSliderNameToTex(name) + ' = ' +
         formatDgsMeasurement(getDgsSliderValue(object), object.__liaDgsLanguage) + '\\)'
       : '';
+  }
+
+  if (object && object.__liaPoint3D) {
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    if (!showValue) return '\\(' + name + '\\)';
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const x = formatDgsMeasurement(Number(object.X()), language);
+    const y = formatDgsMeasurement(Number(object.Y()), language);
+    const z = formatDgsMeasurement(Number(object.Z()), language);
+    return '\\(' + (showName && name ? name + ':\\; ' : '') + '(' + x + '\\mid ' + y + '\\mid ' + z + ')\\)';
   }
 
   if (object && object.__liaDgsMidpoint) {
@@ -11458,7 +17207,21 @@ function dgsObjectLabelText(object: any): string {
   }
 
   if (isDgsVector(object)) {
-    return showName && name ? '\\(' + formatDgsVectorTexName(name) + '\\)' : '';
+    const showValue = mayDisplayValues && !!object.__liaDgsShowValue;
+    if (!showName && !showValue) return '';
+    const vectorName = name ? formatDgsVectorTexName(name) : '\\vec v';
+    if (showValue && isDgsSpatialLinearObject(object)) {
+      const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+      const components = coordinateVector3DComponents(object);
+      if (components) {
+        const norm = vector3Norm(components);
+        const column = components.map(value => formatDgsMeasurement(value, language)).join('\\\\');
+        return '\\(' + (showName && name ? vectorName + ' = ' : '') +
+          '\\begin{pmatrix}' + column + '\\end{pmatrix},\\;|' + vectorName + '| = ' +
+          formatDgsMeasurement(norm, language) + '\\)';
+      }
+    }
+    return showName && name ? '\\(' + vectorName + '\\)' : '';
   }
 
   if (isDgsSector(object)) {
@@ -11475,6 +17238,28 @@ function dgsObjectLabelText(object: any): string {
       lines.push('u ' + dgsMeasurementRelation(metrics.perimeter) + ' ' +
         formatDgsMeasurement(metrics.perimeter, language) + '\\,\\mathrm{' +
         (language === 'de' ? 'LE' : 'LU') + '}');
+    }
+    if (!lines.length) return '';
+    if (lines.length === 1) return '\\(' + lines[0] + '\\)';
+    return '\\(\\begin{gathered}' + lines.join('\\\\[2pt]') + '\\end{gathered}\\)';
+  }
+
+  if (isDgsEllipse(object)) {
+    const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+    const ellipse = getDgsEllipseData(object);
+    const lines: string[] = [];
+    if (showName && name) lines.push('\\mathrm{' + name + '}');
+    if (ellipse && mayDisplayValues && object.__liaDgsShowArea) {
+      const area = Math.PI * ellipse.a * ellipse.b;
+      lines.push('A ' + dgsMeasurementRelation(area) + ' ' + formatDgsMeasurement(area, language) +
+        '\\,\\mathrm{' + (language === 'de' ? 'FE' : 'AU') + '}');
+    }
+    if (ellipse && mayDisplayValues && object.__liaDgsShowPerimeter) {
+      const h = Math.pow(ellipse.a - ellipse.b, 2) / Math.pow(ellipse.a + ellipse.b, 2);
+      const perimeter = Math.PI * (ellipse.a + ellipse.b) *
+        (1 + 3 * h / (10 + Math.sqrt(Math.max(0, 4 - 3 * h))));
+      lines.push('u ' + dgsMeasurementRelation(perimeter) + ' ' + formatDgsMeasurement(perimeter, language) +
+        '\\,\\mathrm{' + (language === 'de' ? 'LE' : 'LU') + '}');
     }
     if (!lines.length) return '';
     if (lines.length === 1) return '\\(' + lines[0] + '\\)';
@@ -11507,6 +17292,24 @@ function dgsObjectLabelText(object: any): string {
     return '\\(\\begin{gathered}' + lines.join('\\\\[2pt]') + '\\end{gathered}\\)';
   }
 
+  if (mayDisplayValues && isDgsSpatialLinearObject(object) &&
+      (isDgsLine(object) || isDgsRay(object)) && object.__liaDgsShowEquation) {
+    const sourcePoints = getDgsLinearSourcePoints(object);
+    const first = sourcePoints && dgsPointCoordinates3D(sourcePoints[0]);
+    const second = sourcePoints && dgsPointCoordinates3D(sourcePoints[1]);
+    if (first && second) {
+      const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
+      const direction = vector3Components(first, second);
+      if (direction) {
+        const tuple = (values: Vector3) => '\\begin{pmatrix}' +
+          values.map(value => formatDgsMeasurement(value, language)).join('\\\\') + '\\end{pmatrix}';
+        const parameter = isDgsRay(object) ? 't\\geq 0' : 't\\in\\mathbb{R}';
+        return '\\(' + (showName && name ? name + ':\\; ' : '') +
+          '\\vec{x}=' + tuple(first) + '+t\\,' + tuple(direction) + ',\\; ' + parameter + '\\)';
+      }
+    }
+  }
+
   if (mayDisplayValues && isDgsLine(object) && object.__liaDgsShowEquation) {
     const equation = getDgsLineEquation(object);
     return '\\(' + (showName && name ? name + ': ' : '') + equation + '\\)';
@@ -11521,7 +17324,12 @@ function dgsObjectLabelText(object: any): string {
 
   if (mayDisplayValues && object && object.__liaDgsSegment && object.__liaDgsShowLength) {
     let length = NaN;
-    try { length = Math.hypot(object.point2.X() - object.point1.X(), object.point2.Y() - object.point1.Y()); } catch (e) {}
+    try {
+      const sourcePoints = getDgsLinearSourcePoints(object);
+      const first = sourcePoints && dgsPointCoordinates3D(sourcePoints[0]);
+      const second = sourcePoints && dgsPointCoordinates3D(sourcePoints[1]);
+      if (first && second) length = vector3Norm(vector3Components(first, second) || []);
+    } catch (e) {}
     const prefix = showName && name ? name + ' ' + dgsMeasurementRelation(length) + ' ' : '';
     const language = getDgsGeometryLanguage(null, object.__liaDgsLanguage);
     const unit = language === 'de' ? 'LE' : 'LU';
@@ -11537,32 +17345,49 @@ function refreshDgsObjectLabel(object: any): void {
   const measurementVisible = !!(
     mayDisplayValues && (
     (object.__liaDgsSegment && object.__liaDgsShowLength) ||
-    (object.__liaDgsLine && object.__liaDgsShowEquation) ||
+    ((object.__liaDgsLine || object.__liaDgsRay || object.__liaDgsPlane) && object.__liaDgsShowEquation) ||
+    (object.__liaDgsVector && object.__liaDgsShowValue) ||
     (object.__liaDgsAngle && object.__liaDgsShowAngle) ||
     (object.__liaDgsCircle && (object.__liaDgsShowArea || object.__liaDgsShowPerimeter)) ||
+    (object.__liaDgsEllipse && (object.__liaDgsShowArea || object.__liaDgsShowPerimeter)) ||
     (object.__liaDgsSector && (object.__liaDgsShowArea || object.__liaDgsShowPerimeter)) ||
+    ((object.__liaDgsCircle3D || object.__liaDgsSphere3D ||
+      object.__liaDgsPolygon3D || object.__liaDgsSolid3D ||
+      object.__liaDgsTransformation3D) && object.__liaDgsShowValue) ||
     (object.__liaDgsFunction && object.__liaDgsShowExpression) ||
     (object.__liaDgsMidpoint && object.__liaDgsShowValue) ||
     ((object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
       object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
       object.__liaDgsIntersectionPoint) && object.__liaDgsShowValue))
   );
-  const visible = object.__liaDgsShowName !== false || measurementVisible;
+  const authoredVisible = object.__liaDgsShowName !== false || measurementVisible;
+  const spatial = isDgsSpatialSceneObject(object);
+  const inactiveScene = spatial ? object.board?.__liaSceneMode === '2d' : object.board?.__liaSceneMode === '3d';
+  const visible = authoredVisible && !inactiveScene;
+  if (inactiveScene) {
+    // Keep the user's label setting for the next mode, even when initialization
+    // refreshes names after the spatial geometry has already been hidden.
+    object.label[spatial ? '__liaScene3DVisible' : '__liaScene2DVisible'] = authoredVisible;
+  }
 
   try {
     if (typeof object.label.setText === 'function') {
       object.label.setText(function() { return dgsObjectLabelText(object); });
     }
 
-    if (typeof object.label.setAttribute === 'function') object.label.setAttribute({ visible });
+    const guarded = object.label.__liaScene3DLabelGuard === true;
+    if (typeof object.label.setAttribute === 'function') {
+      object.label.setAttribute({ visible: guarded ? authoredVisible : visible });
+    }
     if (visible && typeof object.label.showElement === 'function') object.label.showElement();
-    if (!visible && typeof object.label.hideElement === 'function') object.label.hideElement();
+    if (!visible && !(guarded && inactiveScene) && typeof object.label.hideElement === 'function') object.label.hideElement();
     if (object.board && typeof object.board.update === 'function') object.board.update();
   } catch (e) {}
 }
 
 function getDgsObjectFixed(object: any): boolean {
   if (isDgsSlider(object)) return !!object.__liaDgsSliderPositionLocked;
+  if (typeof object?.__liaDgsFixed === 'boolean') return object.__liaDgsFixed;
   try {
     if (object && typeof object.getAttribute === 'function') return !!object.getAttribute('fixed');
   } catch (e) {}
@@ -11577,7 +17402,12 @@ function setDgsObjectFixed(object: any, fixed: boolean): void {
     });
     return;
   }
+  object.__liaDgsFixed = fixed;
   try { if (object && typeof object.setAttribute === 'function') object.setAttribute({ fixed }); } catch (e) {}
+  try { if ((object?.__liaPoint3D || object?.__liaLinear3D || object?.__liaPlane3D ||
+      object?.__liaCircle3D || object?.__liaSphere3D || object?.__liaPolygon3D ||
+      object?.__liaSolid3D || object?.__liaTransformation3D || object?.__liaCurve3D || object?.__liaSurface3D) &&
+      typeof object.element2D?.setAttribute === 'function') object.element2D.setAttribute({ fixed }); } catch (e) {}
 }
 
 function getDgsObjectLayer(object: any): number {
@@ -11629,12 +17459,17 @@ function clearDgsObjectLayerOverride(object: any): void {
     try { delete candidate.__liaDgsRenderedLayer; } catch (e) { candidate.__liaDgsRenderedLayer = undefined; }
   };
   clearRenderedLayer(object);
+  if (object?.__liaLinear3D || object?.__liaCircle3D || object?.__liaSphere3D || object?.__liaPlane3D ||
+      object?.__liaPolygon3D || object?.__liaSolid3D || object?.__liaTransformation3D || object?.__liaDgsAngle3D || object?.__liaConicSection3D) {
+    getDgsRenderedParts(object).forEach(clearRenderedLayer);
+  }
   clearRenderedLayer(object.label);
   clearRenderedLayer(object.arc);
   clearRenderedLayer(object.dot);
   clearRenderedLayer(object.__liaDgsMeasurementLabel);
   clearRenderedLayer(object.__liaDgsAngleLabel);
   clearRenderedLayer(object.__liaDgsCircleLabel);
+  clearRenderedLayer(object.__liaDgsEllipseLabel);
   if (isDgsSlider(object)) {
     clearRenderedLayer(object.baseline);
     clearRenderedLayer(object.highline);
@@ -11666,12 +17501,17 @@ function setDgsObjectLayer(object: any, value: number): number {
   object.__liaDgsLayer = layer;
   const apply = (candidate: any) => applyDgsRenderedLayer(candidate, layer, object.board);
   apply(object);
+  if (object?.__liaLinear3D || object?.__liaCircle3D || object?.__liaSphere3D || object?.__liaPlane3D ||
+      object?.__liaPolygon3D || object?.__liaSolid3D || object?.__liaTransformation3D || object?.__liaDgsAngle3D || object?.__liaConicSection3D) {
+    getDgsRenderedParts(object).forEach(apply);
+  }
   apply(object.label);
   apply(object.arc);
   apply(object.dot);
   apply(object.__liaDgsMeasurementLabel);
   apply(object.__liaDgsAngleLabel);
   apply(object.__liaDgsCircleLabel);
+  apply(object.__liaDgsEllipseLabel);
   if (isDgsSlider(object)) {
     apply(object.baseline);
     apply(object.highline);
@@ -11696,7 +17536,8 @@ function setDgsObjectNameVisible(object: any, visible: boolean): void {
 }
 
 function getDgsObjectOpacity(object: any): number {
-  const fallback = isDgsPolygon(object) ? 0.22 : ((isDgsCircle(object) || isDgsSector(object)) ? 0.2 : 1);
+  const fallback = isDgsPolygon(object) ? 0.22 :
+    ((isDgsCircle(object) || isDgsEllipse(object) || isDgsSector(object) || isDgsSphere3D(object)) ? 0.2 : 1);
   const value = Number(object && object.__liaDgsOpacity);
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 }
@@ -11725,20 +17566,33 @@ function applyDgsObjectOpacity(object: any): void {
     return;
   }
   const polygon = isDgsPolygon(object);
-  const outlinedShape = polygon || isDgsCircle(object) || isDgsSector(object);
+  const outlinedShape = polygon || isDgsCircle(object) || isDgsEllipse(object) || isDgsSector(object) ||
+    isDgsCircle3D(object) || isDgsSphere3D(object) || isDgsPolygon3D(object) ||
+    isDgsSolid3D(object) || isDgsTransformation3D(object) || isDgsCurve3D(object) ||
+    object?.__liaDgsAngle3D || isDgsSurface3D(object) || isDgsConic3D(object) || isDgsAnalytic3D(object);
 
-  try {
-    object.setAttribute({
-      strokeOpacity: outlinedShape && visible ? 1 : opacity,
+  // A conic is a curve, so opacity applies to its stroke as well as isolated points.
+  const opaqueOutline = outlinedShape && !isDgsConic3D(object);
+  const renderedObject = getDgsRenderedObject(object);
+  getDgsRenderedParts(object).forEach((part) => {
+    try {
+      part.setAttribute?.({
+      ...(object.__liaPoint3D ? { visible } : {}),
+      strokeOpacity: opaqueOutline && visible ? (isDgsSphere3D(object) ? Math.max(0.25, opacity) : 1) : opacity,
       fillOpacity: opacity,
-      highlightStrokeOpacity: outlinedShape && visible ? 1 : opacity,
+      highlightStrokeOpacity: opaqueOutline && visible ? (isDgsSphere3D(object) ? Math.max(0.25, opacity) : 1) : opacity,
       highlightFillOpacity: opacity
-    });
-  } catch (e) {}
+      });
+    } catch (e) {}
+  });
   try {
     if (object.label && typeof object.label.setAttribute === 'function') {
       const labelOpacity = outlinedShape && visible ? 1 : opacity;
-      object.label.setAttribute({ strokeOpacity: labelOpacity, fillOpacity: labelOpacity });
+      object.label.setAttribute({
+        ...(object.__liaPoint3D ? { visible: visible && (object.__liaDgsShowName !== false || object.__liaDgsShowValue === true) } : {}),
+        strokeOpacity: labelOpacity,
+        fillOpacity: labelOpacity
+      });
     }
   } catch (e) {}
   if (polygon && Array.isArray(object.borders)) {
@@ -11766,6 +17620,14 @@ function setDgsObjectOpacity(object: any, opacity: number): void {
 function setDgsObjectVisible(object: any, visible: boolean): void {
   if (!object) return;
   object.__liaDgsShowObject = visible;
+  if (object.__liaPoint3D) object.__liaPoint3DUserVisible = visible;
+  if (object.__liaLinear3D) object.__liaLinear3DUserVisible = visible;
+  if (object.__liaPlane3D) object.__liaPlane3DUserVisible = visible;
+  if (object.__liaCircle3D) object.__liaCircle3DUserVisible = visible;
+  if (object.__liaSphere3D) object.__liaSphere3DUserVisible = visible;
+  if (object.__liaPolygon3D) object.__liaPolygon3DUserVisible = visible;
+  if (object.__liaSolid3D) object.__liaSolid3DUserVisible = visible;
+  if (object.__liaDgsAngle3D) object.__liaDgsAngle3DUserVisible = visible;
   setDgsAnalysisPointEntryOption(object, 'explicitObjectVisibility', visible);
   applyDgsObjectOpacity(object);
 }
@@ -11776,6 +17638,24 @@ function normalizeHexColor(value: unknown): string | null {
     return '#' + raw.split('').map((char) => char + char).join('').toLowerCase();
   }
   return /^[0-9a-f]{6}$/i.test(raw) ? '#' + raw.toLowerCase() : null;
+}
+function getDgsConstructionColor(state: DgsState): string {
+  return state.board.__liaSceneMode === '3d'
+    ? (normalizeHexColor(state.construction3DColor) || '#ff00ff')
+    : '#ff00ff';
+}
+
+function applyDgsConstructionColor(state: DgsState, object: any, includeFill = false): any {
+  if (!object) return object;
+  if (state.board.__liaSceneMode === '3d') {
+    const color = getDgsConstructionColor(state);
+    object.__liaDgsColor = color;
+    setDgsObjectColor(object, 'line', color);
+    if (includeFill) setDgsObjectColor(object, 'fill', color);
+    setDgsObjectColor(object, 'text', color);
+  }
+  refreshDgsObjectLabel(object);
+  return object;
 }
 
 function hexToHsv(colorValue: unknown): { h: number; s: number; v: number } | null {
@@ -11859,8 +17739,13 @@ function getDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill' | 'trace'
 }
 
 function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill' | 'trace', colorValue: unknown): string | null {
-  const color = normalizeHexColor(colorValue);
+  let color = normalizeHexColor(colorValue);
   if (!object || !color) return null;
+  // Editor-created round and planar surfaces use one color, including restored/copied styles.
+  // An authored macro may still explicitly choose its own surface fill.
+  if (kind === 'fill' && (object.__liaSphere3D || object.__liaCircle3D || object.__liaPolygon3D) && !object.__liaDgsMacroKey) {
+    color = getDgsObjectColor(object, 'line');
+  }
   if (kind === 'trace') {
     if (!isDgsPoint(object)) return null;
     object.__liaDgsTraceColor = color;
@@ -11873,15 +17758,33 @@ function setDgsObjectColor(object: any, kind: 'text' | 'line' | 'fill' | 'trace'
   else if (kind === 'fill') object.__liaDgsFillColor = color;
   else object.__liaDgsLineColor = color;
 
+  const renderedObject = getDgsRenderedObject(object);
   if (kind === 'line') {
-    try { object.setAttribute({ strokeColor: color, highlightStrokeColor: color }); } catch (e) {}
+    // Transparent 3D surfaces follow their border color. Keep existing
+    // opacity and its separately configurable text color intact.
+    const tintSurface = object.__liaPlane3D === true || object.__liaSphere3D === true ||
+      (object.__liaCircle3D === true && dgsCircleHasFill(object)) || object.__liaPolygon3D === true;
+    if (tintSurface) object.__liaDgsFillColor = color;
+    getDgsRenderedParts(object).forEach((part) => {
+      if (tintSurface && part === object.label) return;
+      try {
+        part.setAttribute?.({
+          strokeColor: color, highlightStrokeColor: color,
+          ...(tintSurface && !part.__liaSphere3DGuide ? { fillColor: color, highlightFillColor: color } : {})
+        });
+      } catch (e) {}
+    });
     if (isDgsSlider(object)) {
       [object.baseline, object.highline, object.point1, object.point2].forEach((part: any) => {
         try { if (part) part.setAttribute({ strokeColor: color, highlightStrokeColor: color }); } catch (e) {}
       });
     }
   } else if (kind === 'fill') {
-    try { object.setAttribute({ fillColor: color, highlightFillColor: color }); } catch (e) {}
+    getDgsRenderedParts(object).forEach((part) => {
+      if (part.__liaSphere3DGuide ||
+          ((object.__liaPlane3D || object.__liaSphere3D || object.__liaCircle3D || object.__liaPolygon3D) && part === object.label)) return;
+      try { part.setAttribute?.({ fillColor: color, highlightFillColor: color }); } catch (e) {}
+    });
     if (isDgsSlider(object)) {
       [object, object.point1, object.point2].forEach((part: any) => {
         try { if (part) part.setAttribute({ fillColor: color, highlightFillColor: color }); } catch (e) {}
@@ -11945,6 +17848,7 @@ function getDgsFontCandidates(object: any): any[] {
     object && object.__liaDgsMeasurementLabel,
     object && object.__liaDgsAngleLabel,
     object && object.__liaDgsCircleLabel,
+    object && object.__liaDgsEllipseLabel,
     object && object.__liaDgsFunctionLabel
   ];
   return candidates.filter((candidate, index) =>
@@ -11998,7 +17902,7 @@ function setDgsFormatFontSize(state: DgsState, object: any, value: unknown): num
   return size;
 }
 
-function copyDgsObjectFormat(state: DgsState, source: any, target: any): boolean {
+function copyDgsObjectFormat(state: DgsState, source: any, target: any, persist = true): boolean {
   if (!isDgsObjectListEntry(source) || !isDgsObjectListEntry(target) || source === target) return false;
   setDgsObjectColor(target, 'line', getDgsObjectColor(source, 'line'));
   setDgsObjectColor(target, 'fill', getDgsObjectColor(source, 'fill'));
@@ -12013,9 +17917,123 @@ function copyDgsObjectFormat(state: DgsState, source: any, target: any): boolean
   refreshDgsObjectLabel(target);
   refreshSideMenusForObject(target);
   try { state.board?.update?.(); } catch (e) {}
-  persistDgsConstruction(state);
+  if (persist) persistDgsConstruction(state);
   return true;
 }
+
+window.__applyDgsObjectExportFormat = function(boardId: string, object: any, config: any): boolean {
+  if (!object) return false;
+  const state = getDgsStateForBoard(String(boardId || ''));
+  const board = object.board;
+  const suspend = board && !board.isSuspendedUpdate &&
+    typeof board.suspendUpdate === 'function' && typeof board.unsuspendUpdate === 'function';
+  if (suspend) board.suspendUpdate();
+  const spatial = isDgsSpatialSceneObject(object);
+  const inactiveScene = spatial ? board?.__liaSceneMode === '2d' : board?.__liaSceneMode === '3d';
+  const visibilityKey = spatial ? '__liaScene3DVisible' : '__liaScene2DVisible';
+  const sceneParts = (): any[] => Array.from(new Set<any>([
+    ...getDgsRenderedParts(object), object.arc, object.dot,
+    object.__liaDgsMeasurementLabel, object.__liaDgsAngleLabel,
+    object.__liaDgsCircleLabel, object.__liaDgsEllipseLabel,
+    ...(isDgsPolygon(object) && Array.isArray(object.borders) ? object.borders : []),
+    ...(isDgsSlider(object) ? [object.baseline, object.highline, object.point1, object.point2] : [])
+  ].filter(Boolean)));
+  try {
+    if (inactiveScene) {
+      // Format the saved authored visibility while updates are suspended. The
+      // inactive dimension is hidden again before this batch reaches the screen.
+      sceneParts().forEach(part => {
+        if (Object.prototype.hasOwnProperty.call(part, visibilityKey)) {
+          try { part.setAttribute?.({ visible: part[visibilityKey] }); } catch (e) {}
+        }
+      });
+      // ObjectFormat's fallback already ran before this hook. Restore its new
+      // requested visibility after unmasking the old per-dimension state.
+      if (config?.visible != null) {
+        try { object.setAttribute?.({ visible: !!config.visible }); } catch (e) {}
+      }
+    }
+    if (config && config.lineColor) setDgsObjectColor(object, 'line', config.lineColor);
+    if (config && config.fillColor) setDgsObjectColor(object, 'fill', config.fillColor);
+    if (config && config.textColor) setDgsObjectColor(object, 'text', config.textColor);
+    if (config && config.opacity != null) {
+      object.__liaDgsOpacity = Math.max(0, Math.min(1, Number(config.opacity)));
+      applyDgsObjectOpacity(object);
+    }
+    if (config && config.fixed != null) setDgsObjectFixed(object, !!config.fixed);
+    if (config && config.fontSize != null) {
+      if (state) setDgsFormatFontSize(state, object, config.fontSize);
+      else {
+        object.__liaDgsFormatFontSize = Number(config.fontSize);
+        getDgsFontCandidates(object).forEach((candidate) => {
+          try { candidate.setAttribute?.({ fontSize: Number(config.fontSize) }); } catch (e) {}
+        });
+      }
+    }
+    if (config && config.showEquation != null) object.__liaDgsShowEquation = !!config.showEquation;
+    if (config && config.showExpression != null) object.__liaDgsShowExpression = !!config.showExpression;
+    if (config && config.showName != null) object.__liaDgsShowName = !!config.showName;
+    if (config && config.showLength != null) object.__liaDgsShowLength = !!config.showLength;
+    if (config?.flags) Object.assign(object, config.flags);
+    if (config?.visible != null) setDgsObjectVisible(object, !!config.visible);
+    if (config?.showName != null) setDgsObjectNameVisible(object, !!config.showName);
+    if (config?.layer != null) setDgsObjectLayer(object, config.layer);
+    if (state && config?.lineStyle) applyDgsLineStyle(state, object, config.lineStyle, false);
+    if (state && object.__liaDgsPolygonBorder && !object.label &&
+        (object.__liaDgsShowName !== false || object.__liaDgsShowLength)) {
+      try {
+        const label = state.board.create('text', [
+          function() { return (Number(object.point1.X()) + Number(object.point2.X())) / 2; },
+          function() { return (Number(object.point1.Y()) + Number(object.point2.Y())) / 2; },
+          function() { return dgsObjectLabelText(object); }
+        ], {
+          fixed: true,
+          visible: true,
+          highlight: false,
+          parse: false,
+          useMathJax: true,
+          display: 'html',
+          anchorX: 'middle',
+          anchorY: 'middle',
+          strokeColor: getDgsObjectColor(object, 'text'),
+          fillColor: getDgsObjectColor(object, 'text'),
+          fontSize: Number(object.__liaDgsFormatFontSize) || 20
+        });
+        object.label = label;
+        object.__liaDgsPolygonBorderLabel = label;
+      } catch (e) {}
+    }
+    if (state && config && (config.design || config.strokeWidth != null) && isDgsStrokeStyleTarget(object)) {
+      applyDgsStrokeStyle(
+        state,
+        object,
+        config.design || getDgsStrokeDesign(object),
+        config.strokeWidth == null ? getDgsStrokeWidth(object) : config.strokeWidth,
+        false
+      );
+    }
+    if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
+    else refreshDgsObjectLabel(object);
+    try { object.board?.update?.(); } catch (e) {}
+    return true;
+  } finally {
+    if (inactiveScene) {
+      const parts = sceneParts();
+      // Capture all parts before hiding the first wrapper: JSXGraph can forward
+      // its visibility to projected children in the same setAttribute call.
+      parts.forEach(part => {
+        // refreshDgsObjectLabel already saved authored visibility before hiding
+        // this label; do not replace that setting with its inactive-mode mask.
+        if (part === object.label && Object.prototype.hasOwnProperty.call(part, visibilityKey)) return;
+        part[visibilityKey] = part.visProp?.visible ?? true;
+      });
+      parts.forEach(part => {
+        try { part.setAttribute?.({ visible: false }); } catch (e) {}
+      });
+    }
+    if (suspend) board.unsuspendUpdate();
+  }
+};
 
 function formatCoordinate(value: number): string {
   if (!Number.isFinite(value)) return '';
@@ -12194,13 +18212,31 @@ function refreshSideMenuCoordinates(state: DgsState): void {
   if (document.activeElement !== state.yCoordinateInput) {
     state.yCoordinateInput.value = expressions ? String(expressions.y || '') : formatCoordinate(y);
   }
+  if (document.activeElement !== state.zCoordinateInput) {
+    let z = NaN;
+    try { if (point.__liaPoint3D) z = Number(point.Z()); } catch (e) {}
+    state.zCoordinateInput.value = Number.isFinite(z) ? formatCoordinate(z) : '';
+  }
+}
+
+function refreshSideMenuVectorComponents(state: DgsState): void {
+  const vector = state.contextObject;
+  if (!isDgsVector(vector) || !isDgsSpatialLinearObject(vector)) return;
+  const components = coordinateVector3DComponents(vector);
+  [state.vectorXInput, state.vectorYInput, state.vectorZInput].forEach((input, index) => {
+    if (document.activeElement !== input) input.value = components ? formatCoordinate(components[index]) : '';
+    input.setAttribute('aria-invalid', components ? 'false' : 'true');
+  });
 }
 
 function refreshSideMenusForObject(object: any): void {
   Object.keys(states).forEach((uid) => {
     const state = states[uid];
     if (!state) return;
-    if (state.contextObject === object) refreshSideMenuCoordinates(state);
+    if (state.contextObject === object) {
+      refreshSideMenuCoordinates(state);
+      refreshSideMenuVectorComponents(state);
+    }
     refreshDgsObjectList(state);
   });
 }
@@ -12238,6 +18274,7 @@ function updateDgsCoordinatePointState(state: DgsState, point: any): void {
     window.__pointStates[state.boardId][String(point.__liaDgsPointName || '')] = {
       x: Number(point.X()),
       y: Number(point.Y()),
+      ...(point.__liaPoint3D ? { z: Number(point.Z()) } : {}),
       fixed: getDgsObjectFixed(point)
     };
   } catch (e) {}
@@ -12327,6 +18364,23 @@ function applyCoordinateInputs(state: DgsState): boolean {
   if (!isDgsPoint(point)) return false;
   const numericX = parseNumericCoordinateInput(state.xCoordinateInput);
   const numericY = parseNumericCoordinateInput(state.yCoordinateInput);
+  if (point.__liaPoint3D) {
+    const numericZ = parseNumericCoordinateInput(state.zCoordinateInput);
+    const valid = numericX != null && numericY != null && numericZ != null;
+    state.xCoordinateInput.setAttribute('aria-invalid', numericX != null ? 'false' : 'true');
+    state.yCoordinateInput.setAttribute('aria-invalid', numericY != null ? 'false' : 'true');
+    state.zCoordinateInput.setAttribute('aria-invalid', numericZ != null ? 'false' : 'true');
+    if (!valid) return false;
+    delete point.__liaDgsCoordinateExpressions;
+    delete point.__liaDgsCoordinateCompiled;
+    delete point.__liaDgsCoordinateParameter;
+    if (!setCoordinatePoint3D(point, [numericX!, numericY!, numericZ!])) return false;
+    updateDgsCoordinatePointState(state, point);
+    try { state.board?.fullUpdate?.(); } catch (e) { try { state.board?.update?.(); } catch (e2) {} }
+    refreshSideMenuCoordinates(state);
+    persistDgsConstruction(state);
+    return true;
+  }
   const expressionsX = compileDgsCoordinateInput(state, state.xCoordinateInput);
   const expressionsY = compileDgsCoordinateInput(state, state.yCoordinateInput);
   if (!expressionsX || !expressionsY) return false;
@@ -12388,8 +18442,19 @@ function resetDeleteButton(state: DgsState): void {
 
 function deleteDgsObject(state: DgsState, object: any, recordHistory = true): void {
   if (!state.board || !object) return;
+  if (recordHistory && !state.restoring) {
+    if (dgsPendingHistoryBefore[state.boardId]) persistDgsConstruction(state, true);
+    persistDgsConstruction(state, false);
+    delete dgsPendingHistoryBefore[state.boardId];
+  }
   if (object.__liaDgsPolygonBorder && object.__liaDgsPolygonBorderOwner) {
     object = object.__liaDgsPolygonBorderOwner;
+  }
+  if (state.multiSelectedObjects.includes(object)) {
+    setDgsMultiSelection(
+      state,
+      state.multiSelectedObjects.filter((selected) => selected !== object)
+    );
   }
   const tangent = object.__liaDgsTangent ? object : object.__liaDgsTangentLine;
   if (tangent) {
@@ -12404,6 +18469,14 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   }
 
   const toRemove = new Set<any>();
+  const addSpatialIntersectionGroup = (candidate: any) => {
+    const owner = candidate?.__liaDgsSpatialIntersectionOwner || candidate;
+    const members = owner?.__liaDgsSpatialIntersectionObjects ||
+      candidate?.__liaDgsSpatialIntersectionObjects || [candidate];
+    if (Array.isArray(members)) members.forEach((member: any) => {
+      if (member) toRemove.add(member);
+    });
+  };
   const addPolygonParts = (polygon: any) => {
     if (!polygon) return;
     toRemove.add(polygon);
@@ -12421,6 +18494,9 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       toRemove.add(polygon.__liaDgsMeasurementLabel);
     }
   };
+  if (object.__liaDgsSpatialIntersection || object.__liaDgsSpatialIntersectionOwner) {
+    addSpatialIntersectionGroup(object);
+  }
   if (Array.isArray(object.__liaDgsIntersectionConstructions)) {
     object.__liaDgsIntersectionConstructions.slice().forEach((construction: any) => {
       removeDgsRootConstruction(state, construction, false);
@@ -12434,8 +18510,9 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   if (isDgsPoint(object)) {
     const collectDependent = (candidate: any) => {
       if (!candidate) return;
+      const linearPoints = getDgsLinearSourcePoints(candidate);
       if ((candidate.__liaDgsSegment || candidate.__liaDgsRay || candidate.__liaDgsVector || candidate.__liaDgsLine) &&
-          (candidate.point1 === object || candidate.point2 === object ||
+          ((linearPoints && (linearPoints[0] === object || linearPoints[1] === object)) ||
            candidate.__liaDgsPerpendicularPoint === object || candidate.__liaDgsParallelPoint === object)) {
         toRemove.add(candidate);
       }
@@ -12459,6 +18536,12 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
           (candidate.__liaDgsCircleCenter === object || candidate.__liaDgsCircleRadiusPoint === object)) {
         toRemove.add(candidate);
       }
+      if (candidate.__liaDgsEllipse &&
+          (candidate.__liaDgsEllipseFocus1 === object ||
+           candidate.__liaDgsEllipseFocus2 === object ||
+           candidate.__liaDgsEllipsePoint === object)) {
+        toRemove.add(candidate);
+      }
       if (candidate.__liaDgsSector &&
           (candidate.__liaDgsSectorCenter === object ||
            candidate.__liaDgsSectorRadiusPoint === object ||
@@ -12467,6 +18550,12 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       }
       if (candidate.__liaDgsMidpoint &&
           (candidate.__liaDgsMidpointFirst === object || candidate.__liaDgsMidpointSecond === object)) {
+        toRemove.add(candidate);
+      }
+      if (candidate.__liaDgsTransformPoint &&
+          (candidate.__liaDgsTransformSource === object ||
+           candidate.__liaDgsTransformReference === object ||
+           candidate.__liaDgsTransformAxisSecond === object)) {
         toRemove.add(candidate);
       }
       if (candidate.__liaDgsAngleBisector &&
@@ -12501,9 +18590,23 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
     addedDependent = false;
     boardObjects.forEach((candidate) => {
       if (!candidate || toRemove.has(candidate)) return;
+      if (candidate.__liaDgsLocus &&
+          (toRemove.has(candidate.__liaDgsLocusTarget) || toRemove.has(candidate.__liaDgsLocusDriver))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
       if (candidate.__liaDgsMidpoint &&
           (toRemove.has(candidate.__liaDgsMidpointFirst) ||
            toRemove.has(candidate.__liaDgsMidpointSecond))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
+      if (candidate.__liaDgsTransformPoint &&
+          (toRemove.has(candidate.__liaDgsTransformSource) ||
+           toRemove.has(candidate.__liaDgsTransformReference) ||
+           toRemove.has(candidate.__liaDgsTransformAxisSecond))) {
         toRemove.add(candidate);
         addedDependent = true;
         return;
@@ -12515,9 +18618,10 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
         addedDependent = true;
         return;
       }
+      const linearPoints = getDgsLinearSourcePoints(candidate);
       if ((candidate.__liaDgsSegment || candidate.__liaDgsRay ||
            candidate.__liaDgsVector || candidate.__liaDgsLine) &&
-          (toRemove.has(candidate.point1) || toRemove.has(candidate.point2) ||
+          ((linearPoints && (toRemove.has(linearPoints[0]) || toRemove.has(linearPoints[1]))) ||
            toRemove.has(candidate.__liaDgsPerpendicularPoint) ||
            toRemove.has(candidate.__liaDgsParallelPoint))) {
         toRemove.add(candidate);
@@ -12557,10 +18661,100 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
         addedDependent = true;
         return;
       }
+      if (candidate.__liaDgsEllipse &&
+          (toRemove.has(candidate.__liaDgsEllipseFocus1) ||
+           toRemove.has(candidate.__liaDgsEllipseFocus2) ||
+           toRemove.has(candidate.__liaDgsEllipsePoint))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
       if (candidate.__liaDgsSector &&
           (toRemove.has(candidate.__liaDgsSectorCenter) ||
            toRemove.has(candidate.__liaDgsSectorRadiusPoint) ||
            toRemove.has(candidate.__liaDgsSectorAnglePoint))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
+      if (isDgsCircle3D(candidate)) {
+        const circleSources = ([] as any[]).concat(
+          candidate.__liaCircle3DSourcePoints || [],
+          candidate.__liaCircle3DSourceVectors || []
+        );
+        if (circleSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (isDgsSphere3D(candidate)) {
+        const sphereSources = candidate.__liaSphere3DSourcePoints || [];
+        if (sphereSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (isDgsPlane(candidate)) {
+        const planeSources = ([] as any[]).concat(
+          candidate.__liaPlane3DSourcePoints || [],
+          candidate.__liaPlane3DSourceVectors || []
+        );
+        if (planeSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (isDgsPolygon3D(candidate)) {
+        const polygonSources = candidate.__liaPolygon3DSourcePoints || [];
+        if (polygonSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (isDgsSolid3D(candidate)) {
+        const solidSources = ([] as any[]).concat(
+          candidate.__liaSolid3DSourcePoints || [],
+          candidate.__liaSolid3DSourceVectors || [],
+          candidate.__liaSolid3DSourcePolygon ? [candidate.__liaSolid3DSourcePolygon] : []
+        );
+        if (solidSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (isDgsTransformation3D(candidate)) {
+        const transformSources = ([] as any[]).concat(
+          candidate.__liaDgsTransformation3DSource || candidate.__liaTransformation3DSource || [],
+          candidate.__liaDgsTransformation3DReference ||
+            candidate.__liaTransformation3DReferences || []
+        );
+        if (transformSources.some((source: any) => toRemove.has(source))) {
+          toRemove.add(candidate);
+          addedDependent = true;
+          return;
+        }
+      }
+      if (candidate.__liaDgsAngle3D &&
+          Array.isArray(candidate.__liaDgsAngle3DSources) &&
+          candidate.__liaDgsAngle3DSources.some((source: any) => toRemove.has(source))) {
+        toRemove.add(candidate);
+        addedDependent = true;
+        return;
+      }
+      if (candidate.__liaDgsSpatialIntersection &&
+          (toRemove.has(candidate.__liaDgsSpatialIntersectionSource) ||
+           toRemove.has(candidate.__liaDgsSpatialIntersectionSource2))) {
+        addSpatialIntersectionGroup(candidate);
+        addedDependent = true;
+        return;
+      }
+      const bindingSource = isDgsPoint(candidate) ? getDgsPointBindingSource(candidate) : null;
+      if (bindingSource && toRemove.has(bindingSource)) {
         toRemove.add(candidate);
         addedDependent = true;
         return;
@@ -12578,6 +18772,7 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
       }
     });
   }
+  collectDgsSegment6EntriesForRemoval(state.board, toRemove);
   Array.from(toRemove).forEach((candidate) => {
     if (isDgsStrokeStyleTarget(candidate)) removeDgsStrokeCaps(candidate);
     if (candidate && candidate.__liaDgsAngleBisector && candidate.__liaDgsAngleBisectorHelper) {
@@ -12630,6 +18825,9 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
     if (candidate && candidate.__liaDgsCircle && candidate.__liaDgsCircleLabel) {
       toRemove.add(candidate.__liaDgsCircleLabel);
     }
+    if (candidate && candidate.__liaDgsEllipse && candidate.__liaDgsEllipseLabel) {
+      toRemove.add(candidate.__liaDgsEllipseLabel);
+    }
     if (candidate && candidate.__liaDgsRay && candidate.__liaDgsRayLabel) {
       toRemove.add(candidate.__liaDgsRayLabel);
     }
@@ -12644,6 +18842,7 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
     }
     if (isDgsSlider(candidate)) {
       candidate.__liaDgsSliderDeleted = true;
+      removeDgsSliderAnimationControl(state, candidate);
       [candidate.baseline, candidate.highline, candidate.point1, candidate.point2, candidate.label]
         .forEach((part: any) => { if (part) toRemove.add(part); });
     }
@@ -12652,6 +18851,9 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   Object.keys(states).forEach((uid) => {
     const current = states[uid];
     if (!current) return;
+    if (current.multiSelectedObjects.some(selected => toRemove.has(selected))) {
+      setDgsMultiSelection(current, current.multiSelectedObjects.filter(selected => !toRemove.has(selected)));
+    }
     if (current.selectedSegmentPoint === object) setSelectedSegmentPoint(current, null);
     if ((current.selectedRelationLine && toRemove.has(current.selectedRelationLine)) ||
         (current.selectedRelationPoint && toRemove.has(current.selectedRelationPoint))) {
@@ -12668,8 +18870,21 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
     }
     if (current.selectedPolygonPoints.includes(object)) setSelectedPolygonPoints(current, []);
     if (current.selectedAnglePoints.includes(object)) setSelectedAnglePoints(current, []);
+    if (current.selectedAngle3DObjects.some((source) => toRemove.has(source))) {
+      setSelectedAngle3DObjects(current, []);
+    }
     if (current.selectedSectorPoints.includes(object)) setSelectedSectorPoints(current, []);
+    if (current.selectedEllipsePoints.includes(object)) setSelectedEllipsePoints(current, []);
+    if (current.selectedRoundPoints.some((point) => toRemove.has(point)) ||
+        current.selectedRoundVectors.some((vector) => toRemove.has(vector))) {
+      current.selectedRoundPoints = [];
+      current.selectedRoundVectors = [];
+    }
     if (current.selectedCircleCenter === object) clearDgsCirclePreview(current);
+    if (current.pendingLocusTarget && toRemove.has(current.pendingLocusTarget)) {
+      current.pendingLocusTarget = null;
+      current.locusCheckbox.indeterminate = false;
+    }
     if ((current.selectedCompassCenter && toRemove.has(current.selectedCompassCenter)) ||
         (current.selectedCompassPoint && toRemove.has(current.selectedCompassPoint)) ||
         (current.compassPreview && toRemove.has(current.compassPreview))) {
@@ -12679,6 +18894,25 @@ function deleteDgsObject(state: DgsState, object: any, recordHistory = true): vo
   });
 
   toRemove.forEach((candidate) => {
+    try { candidate?.__liaLinear3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaPlane3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaCircle3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaSphere3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaPolygon3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaSolid3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaDgsAngle3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaCurve3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaSurface3DCleanup?.(); } catch (e) {}
+    try { candidate?.__liaPoint3DCleanup?.(); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.linearObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.planeObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.circleObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.sphereObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.polygonObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.solidObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.curveObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.surfaceObjects?.delete(candidate); } catch (e) {}
+    try { window.__coordinateViews3d?.[state.boardId]?.points?.delete(candidate); } catch (e) {}
     try { state.board.removeObject(candidate); } catch (e) {}
   });
   try { if (typeof state.board.update === 'function') state.board.update(); } catch (e) {}
@@ -12742,6 +18976,284 @@ function getDgsStateForBoard(boardId: string): DgsState | null {
   return Object.keys(states)
     .map((uid) => states[uid])
     .find((state) => !!state && state.boardId === boardId && state.board === board) || null;
+}
+
+function parseDgsLocusMacroSpec(spec: string): DgsLocusMacroConfig {
+  const parts = splitTopLevel(unquote(String(spec || '').trim()), ';')
+    .map((part) => unquote(String(part || '').trim()));
+  const options: Record<string, string> = {};
+  parts.slice(4).forEach((part) => {
+    const match = String(part || '').match(/^([^=]+)=(.*)$/);
+    if (!match) return;
+    options[String(match[1] || '').trim().toLowerCase()] = unquote(String(match[2] || '').trim());
+  });
+  const numberOption = (keys: string[], fallback: number) => {
+    const key = keys.find((candidate) => Object.prototype.hasOwnProperty.call(options, candidate));
+    const value = key ? Number(String(options[key]).replace(',', '.')) : NaN;
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const flagOption = (keys: string[], fallback: boolean) => {
+    const key = keys.find((candidate) => Object.prototype.hasOwnProperty.call(options, candidate));
+    if (!key) return fallback;
+    return !/^(?:0|false|nein|no|off)$/i.test(String(options[key]).trim());
+  };
+  return {
+    boardId: String(parts[0] || '').trim(),
+    targetName: String(parts[1] || '').trim(),
+    driverName: String(parts[2] || '').trim(),
+    color: normalizeHexColor(parts[3]) || '#ff00ff',
+    name: String(options.name || '').trim(),
+    showName: flagOption(['showname', 'namensichtbar'], false),
+    sampleCount: normalizeDgsLocusSampleCount(numberOption(['samples', 'abtastpunkte'], DGS_LOCUS_DEFAULT_SAMPLES)),
+    opacity: Math.max(0, Math.min(1, numberOption(['opacity', 'deckkraft'], 1))),
+    visible: flagOption(['visible', 'sichtbar'], true),
+    lineStyle: normalizeDgsLineStyle(options.linestyle || options.linienart || 'solid'),
+    strokeWidth: parseDgsStrokeWidth(numberOption(['width', 'breite', 'stroke'], 3)) ?? 3
+  };
+}
+
+function findDgsNamedLocusPoint(state: DgsState, name: string): any | null {
+  const wanted = String(name || '').trim();
+  if (!wanted) return null;
+  const registered = window.__points && window.__points[state.boardId] && window.__points[state.boardId][wanted];
+  try { if (registered && registered.board === state.board && isDgsPoint(registered)) return registered; } catch (e) {}
+  return getDgsBoardObjects(state.board).find((object) =>
+    isDgsPoint(object) && String(object.__liaDgsPointName || object.name || '').trim() === wanted
+  ) || null;
+}
+
+function findDgsNamedLocusDriver(state: DgsState, name: string): any | null {
+  const point = findDgsNamedLocusPoint(state, name);
+  if (point && getDgsPointBindingSource(point)) return point;
+  const wanted = normalizeDgsParameterName(name);
+  if (!wanted) return null;
+  return getDgsBoardObjects(state.board).find((object) =>
+    isDgsSlider(object) && normalizeDgsParameterName(object.__liaDgsSliderName || object.name || '') === wanted
+  ) || null;
+}
+
+function removeDgsLocusMacroEntry(uid: string): void {
+  const entry = dgsLocusEntries[uid];
+  if (entry) {
+    try { entry.board?.removeObject?.(entry.locus); } catch (e) {}
+    delete dgsLocusEntries[uid];
+  }
+  delete dgsLocusRequests[uid];
+}
+
+function tryRenderDgsLocusRequest(request: DgsLocusMacroRequest): boolean {
+  const state = getDgsStateForBoard(request.boardId);
+  if (!state) return false;
+  const config = parseDgsLocusMacroSpec(request.spec);
+  const target = findDgsNamedLocusPoint(state, config.targetName);
+  const driver = findDgsNamedLocusDriver(state, config.driverName);
+  if (!target || !driver || target === driver) return false;
+  const signature = JSON.stringify(config);
+  const old = dgsLocusEntries[request.uid];
+  if (old && old.board === state.board && isDgsLocus(old.locus) &&
+      old.locus.__liaDgsLocusTarget === target && old.locus.__liaDgsLocusDriver === driver) {
+    if (old.signature !== signature) {
+      old.signature = signature;
+      old.locus.__liaDgsLocusName = String(config.name || old.locus.__liaDgsLocusName || 'l');
+      old.locus.__liaDgsLocusSampleCount = normalizeDgsLocusSampleCount(config.sampleCount);
+      old.locus.__liaDgsShowName = config.showName === true;
+      old.locus.__liaDgsShowObject = config.visible !== false;
+      setDgsObjectColor(old.locus, 'line', config.color || '#ff00ff');
+      setDgsObjectOpacity(old.locus, Number(config.opacity));
+      applyDgsLineStyle(state, old.locus, config.lineStyle || 'solid', false);
+      applyDgsStrokeStyle(state, old.locus, '-', config.strokeWidth || 3, false);
+      setDgsObjectNameVisible(old.locus, config.showName === true);
+      scheduleDgsLocusUpdate(state, 0);
+    }
+    return true;
+  }
+  if (old) {
+    try { old.board?.removeObject?.(old.locus); } catch (e) {}
+    delete dgsLocusEntries[request.uid];
+  }
+  const locus = createDgsLocus(state, target, driver, config);
+  if (!locus) return false;
+  locus.__liaDgsMacroManaged = true;
+  locus.__liaDgsMacroKey = 'macro:locus:' + request.uid;
+  locus.__liaDgsPersistentId = locus.__liaDgsMacroKey;
+  dgsLocusEntries[request.uid] = { board: state.board, locus, signature };
+  captureDgsInitialConstruction(state);
+  if (dgsConstructionStates[state.boardId]) restoreDgsConstruction(state);
+  persistDgsConstruction(state, false);
+  return true;
+}
+
+function renderPendingDgsLociForBoard(boardId: string): void {
+  Object.keys(dgsLocusRequests).forEach((uid) => {
+    const request = dgsLocusRequests[uid];
+    if (request && request.boardId === boardId) {
+      hasPendingDgsLoci = !tryRenderDgsLocusRequest(request) || hasPendingDgsLoci;
+    }
+  });
+}
+
+function bootstrapDgsLoci(): void {
+  const active = new Set<string>();
+  let pending = false;
+  document.querySelectorAll<HTMLElement>('[id^="dgs-locus-spec-"][data-spec]:not([data-lia-static-claimed])')
+    .forEach((node) => {
+      const uid = String(node.id || '').replace(/^dgs-locus-spec-/, '');
+      if (!uid) return;
+      active.add(uid);
+      const spec = String(node.dataset.spec || '');
+      const config = parseDgsLocusMacroSpec(spec);
+      const request: DgsLocusMacroRequest = {
+        uid,
+        spec,
+        boardId: config.boardId,
+        language: String(node.dataset.language || '').toLowerCase() === 'en' ? 'en' : 'de'
+      };
+      dgsLocusRequests[uid] = request;
+      if (!tryRenderDgsLocusRequest(request)) pending = true;
+    });
+  Object.keys(dgsLocusRequests).forEach((uid) => {
+    if (!active.has(uid)) removeDgsLocusMacroEntry(uid);
+  });
+  hasPendingDgsLoci = pending;
+}
+
+function parseDgsEllipseMacroSpec(spec: string): DgsEllipseMacroConfig {
+  const parts = splitTopLevel(unquote(String(spec || '').trim()), ';')
+    .map((part) => unquote(String(part || '').trim()));
+  const options: Record<string, string> = {};
+  parts.slice(7).forEach((part) => {
+    const match = String(part || '').match(/^([^=]+)=(.*)$/);
+    if (!match) return;
+    options[String(match[1] || '').trim().toLowerCase()] = unquote(String(match[2] || '').trim());
+  });
+  const flagOption = (keys: string[], fallback: boolean) => {
+    const key = keys.find((candidate) => Object.prototype.hasOwnProperty.call(options, candidate));
+    if (!key) return fallback;
+    return !/^(?:0|false|nein|no|off)$/i.test(String(options[key]).trim());
+  };
+  const rawName = String(parts[1] || '').trim();
+  const decoratedName = /^\$[\s\S]*\$$/.test(rawName) || /^\\\([\s\S]*\\\)$/.test(rawName);
+  const name = rawName
+    .replace(/^\$|\$$/g, '')
+    .replace(/^\\\(|\\\)$/g, '')
+    .trim();
+  const opacity = Number(String(parts[6] || '').replace(',', '.'));
+  return {
+    boardId: String(parts[0] || '').trim(),
+    name,
+    focus1Name: String(parts[2] || '').trim(),
+    focus2Name: String(parts[3] || '').trim(),
+    pointName: String(parts[4] || '').trim(),
+    color: normalizeHexColor(parts[5]) || '#ff00ff',
+    opacity: Number.isFinite(opacity) ? Math.max(0, Math.min(1, opacity)) : 0.2,
+    showName: flagOption(['showname', 'namensichtbar'], decoratedName),
+    showArea: flagOption(['area', 'inhalt'], false),
+    showPerimeter: flagOption(['perimeter', 'umfang'], false),
+    visible: flagOption(['visible', 'sichtbar'], true),
+    lineStyle: normalizeDgsLineStyle(options.linestyle || options.linienart || 'solid')
+  };
+}
+
+function removeDgsEllipseMacroEntry(uid: string): void {
+  const entry = dgsEllipseEntries[uid];
+  if (entry) {
+    try { if (entry.ellipse?.__liaDgsEllipseLabel) entry.board?.removeObject?.(entry.ellipse.__liaDgsEllipseLabel); } catch (e) {}
+    try { entry.board?.removeObject?.(entry.ellipse); } catch (e) {}
+    delete dgsEllipseEntries[uid];
+  }
+  delete dgsEllipseRequests[uid];
+}
+
+function tryRenderDgsEllipseRequest(request: DgsEllipseMacroRequest): boolean {
+  const state = getDgsStateForBoard(request.boardId);
+  if (!state) return false;
+  const config = parseDgsEllipseMacroSpec(request.spec);
+  const focus1 = findDgsNamedLocusPoint(state, config.focus1Name);
+  const focus2 = findDgsNamedLocusPoint(state, config.focus2Name);
+  const point = findDgsNamedLocusPoint(state, config.pointName);
+  if (!focus1 || !focus2 || !point) return false;
+  const signature = JSON.stringify(config);
+  const old = dgsEllipseEntries[request.uid];
+  if (old && old.board === state.board && isDgsEllipse(old.ellipse) &&
+      old.ellipse.__liaDgsEllipseFocus1 === focus1 &&
+      old.ellipse.__liaDgsEllipseFocus2 === focus2 &&
+      old.ellipse.__liaDgsEllipsePoint === point) {
+    if (old.signature !== signature) {
+      old.signature = signature;
+      old.ellipse.__liaDgsEllipseName = config.name || old.ellipse.__liaDgsEllipseName || 'e';
+      old.ellipse.__liaDgsShowName = config.showName;
+      old.ellipse.__liaDgsShowArea = config.showArea;
+      old.ellipse.__liaDgsShowPerimeter = config.showPerimeter;
+      old.ellipse.__liaDgsShowObject = config.visible;
+      setDgsObjectColor(old.ellipse, 'line', config.color);
+      setDgsObjectColor(old.ellipse, 'fill', config.color);
+      setDgsObjectColor(old.ellipse, 'text', config.color);
+      setDgsObjectOpacity(old.ellipse, config.opacity);
+      applyDgsLineStyle(state, old.ellipse, config.lineStyle, false);
+      refreshDgsObjectLabel(old.ellipse);
+    }
+    return true;
+  }
+  if (old) {
+    try { if (old.ellipse?.__liaDgsEllipseLabel) old.board?.removeObject?.(old.ellipse.__liaDgsEllipseLabel); } catch (e) {}
+    try { old.board?.removeObject?.(old.ellipse); } catch (e) {}
+    delete dgsEllipseEntries[request.uid];
+  }
+  const ellipse = createDgsEllipse(state, focus1, focus2, point);
+  if (!ellipse) return false;
+  ellipse.__liaDgsEllipseName = config.name || ellipse.__liaDgsEllipseName;
+  ellipse.__liaDgsShowName = config.showName;
+  ellipse.__liaDgsShowArea = config.showArea;
+  ellipse.__liaDgsShowPerimeter = config.showPerimeter;
+  ellipse.__liaDgsShowObject = config.visible;
+  ellipse.__liaDgsMacroManaged = true;
+  ellipse.__liaDgsMacroKey = 'macro:ellipse:' + request.uid;
+  ellipse.__liaDgsPersistentId = ellipse.__liaDgsMacroKey;
+  setDgsObjectColor(ellipse, 'line', config.color);
+  setDgsObjectColor(ellipse, 'fill', config.color);
+  setDgsObjectColor(ellipse, 'text', config.color);
+  setDgsObjectOpacity(ellipse, config.opacity);
+  applyDgsLineStyle(state, ellipse, config.lineStyle, false);
+  refreshDgsObjectLabel(ellipse);
+  dgsEllipseEntries[request.uid] = { board: state.board, ellipse, signature };
+  captureDgsInitialConstruction(state);
+  if (dgsConstructionStates[state.boardId]) restoreDgsConstruction(state);
+  persistDgsConstruction(state, false);
+  return true;
+}
+
+function renderPendingDgsEllipsesForBoard(boardId: string): void {
+  Object.keys(dgsEllipseRequests).forEach((uid) => {
+    const request = dgsEllipseRequests[uid];
+    if (request && request.boardId === boardId) {
+      hasPendingDgsEllipses = !tryRenderDgsEllipseRequest(request) || hasPendingDgsEllipses;
+    }
+  });
+}
+
+function bootstrapDgsEllipses(): void {
+  const active = new Set<string>();
+  let pending = false;
+  document.querySelectorAll<HTMLElement>('[id^="dgs-ellipse-spec-"][data-spec]:not([data-lia-static-claimed])')
+    .forEach((node) => {
+      const uid = String(node.id || '').replace(/^dgs-ellipse-spec-/, '');
+      if (!uid) return;
+      active.add(uid);
+      const spec = String(node.dataset.spec || '');
+      const config = parseDgsEllipseMacroSpec(spec);
+      const request: DgsEllipseMacroRequest = {
+        uid,
+        spec,
+        boardId: config.boardId,
+        language: String(node.dataset.language || '').toLowerCase() === 'en' ? 'en' : 'de'
+      };
+      dgsEllipseRequests[uid] = request;
+      if (!tryRenderDgsEllipseRequest(request)) pending = true;
+    });
+  Object.keys(dgsEllipseRequests).forEach((uid) => {
+    if (!active.has(uid)) removeDgsEllipseMacroEntry(uid);
+  });
+  hasPendingDgsEllipses = pending;
 }
 
 function normalizeDgsInstrumentKind(value: unknown): DgsInstrumentKind | null {
@@ -12811,12 +19323,22 @@ function pruneDgsInstrumentRequests(): void {
   });
 }
 
+function getDgsScharAnalysisOwner(boardId: string): any | null {
+  const board = window.__boards && window.__boards[boardId];
+  return Object.values(window.__scharEntries || {}).find((entry: any) =>
+    entry.boardId === boardId && entry.board === board &&
+    entry.marker?.isConnected && !entry.marker.hasAttribute('data-lia-static-claimed') &&
+    entry.graph && board?.objects?.[entry.graph.id] === entry.graph
+  ) || null;
+}
+
 function syncDgsInstrumentProfile(boardId: string): void {
   const boardContainer = getBoardContainer(boardId);
   if (!boardContainer) return;
 
   pruneDgsInstrumentRequests();
-  const hasRegressionDgs = getDgsRegressionRequestsForBoard(boardId).length > 0;
+  const hasRegressionDgs = getDgsRegressionRequestsForBoard(boardId).length > 0 ||
+    !!getDgsScharAnalysisOwner(boardId);
   const hasFullDgs = !!findDgsMacroAnchorForBoard(boardId);
   const requestedToolIds = new Set<number>();
   if (!hasFullDgs) {
@@ -12862,16 +19384,21 @@ function getDgsRegressionControllerUid(boardId: string): string {
 
 function syncDgsRegressionController(boardId: string, fallbackLanguage?: string): boolean {
   const requests = getDgsRegressionRequestsForBoard(boardId);
-  if (!requests.length) return false;
+  const scharOwner = getDgsScharAnalysisOwner(boardId);
+  if (!requests.length && !scharOwner) return false;
 
   const dgsMacro = findDgsMacroAnchorForBoard(boardId);
-  const requestLanguage = requests[requests.length - 1]?.language || fallbackLanguage;
+  const requestLanguage = requests[requests.length - 1]?.language || scharOwner?.language || fallbackLanguage;
   const controller = resolveRegressionDgsController(
     boardId,
     getDgsRegressionControllerUid(boardId),
     requestLanguage,
     dgsMacro
   );
+
+  if (!controller.explicit && !requests.length) {
+    controller.spec = buildImplicitAnalysisDgsSpec(boardId);
+  }
 
   // The instrument profile is separate because set square and compass are
   // permanent in a normal DGS. In the implicit regression shell neither is
@@ -12916,7 +19443,8 @@ function canUseStandaloneSetSquare(boardId: string): boolean {
   return requests.length > 0 &&
     requests.every((request) => request.kind === 'set-square') &&
     !findDgsMacroAnchorForBoard(boardId) &&
-    getDgsRegressionRequestsForBoard(boardId).length === 0;
+    getDgsRegressionRequestsForBoard(boardId).length === 0 &&
+    !getDgsScharAnalysisOwner(boardId);
 }
 
 function setStandaloneSetSquareMenuOpen(
@@ -13239,6 +19767,90 @@ function setupDGSInstrument(
   applyDgsInstrumentRequests(boardId);
 }
 
+window.__captureDgsSceneSnapshot = function(boardId: string): any {
+  const state = getDgsStateForBoard(boardId);
+  if (!state || state.restoring || dgsHistoryApplying.has(boardId)) return null;
+  // Macro objects can arrive after DGS initialization. They belong to the
+  // baseline, not to the next operation that the learner creates or edits.
+  persistDgsConstruction(state, false);
+  delete dgsPendingHistoryBefore[boardId];
+  return cloneDgsSnapshot(dgsConstructionStates[boardId]);
+};
+window.__persistDgsSegment6 = function(boardId: string): void {
+  const state = getDgsStateForBoard(boardId);
+  if (!state) return;
+  persistDgsConstruction(state, true);
+  refreshDgsObjectList(state, true);
+};
+window.__createDgsDrawnSegment = function(
+  boardId: string,
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  color: string,
+  width: number
+): boolean {
+  const state = getDgsStateForBoard(boardId);
+  if (!state || state.restoring || !start || !end ||
+      ![start.x, start.y, end.x, end.y].every(Number.isFinite) ||
+      Math.hypot(end.x - start.x, end.y - start.y) <= 1e-12) return false;
+  if (dgsPendingHistoryBefore[boardId]) persistDgsConstruction(state, true);
+
+  // Include macro points that appeared after the last saved construction, so
+  // undoing the first drawn segment cannot remove pre-existing board objects.
+  persistDgsConstruction(state, false);
+  delete dgsPendingHistoryBefore[boardId];
+  const created: any[] = [];
+  let complete = false;
+  // Point creation normally persists immediately. Keep both endpoints and the
+  // segment together as one construction/history change, including its style.
+  state.restoring = true;
+  try {
+    const endpoint = (position: { x: number; y: number }): any => {
+      const existing = getSelectableBoardPoints(state).find((point) => {
+        const coordinates = readDgsPointPosition(point);
+        return coordinates && Math.hypot(
+          (coordinates.x - position.x) * state.board.unitX,
+          (coordinates.y - position.y) * state.board.unitY
+        ) < 1e-6;
+      });
+      if (existing) return existing;
+      const point = createDgsPoint(state, position.x, position.y);
+      if (!point) throw new Error('Cannot create drawn segment endpoint');
+      created.push(point);
+      point.__liaDgsColor = color;
+      setDgsObjectColor(point, 'line', color);
+      setDgsObjectColor(point, 'fill', color);
+      return point;
+    };
+    const point1 = endpoint(start);
+    const point2 = endpoint(end);
+    const segment = createDgsSegment(state, point1, point2);
+    if (!segment) throw new Error('Cannot create drawn segment');
+    created.push(segment);
+    segment.__liaDgsColor = color;
+    setDgsObjectColor(segment, 'line', color);
+    setDgsObjectColor(segment, 'text', color);
+    applyDgsStrokeStyle(state, segment, '-', width, false);
+    complete = true;
+  } catch (e) {
+    // Retain the freehand stroke if construction fails; leave no orphan points.
+    created.reverse().forEach((object) => {
+      const name = object.__liaDgsPointName;
+      if (name && window.__points?.[boardId]?.[name] === object) {
+        delete window.__points[boardId][name];
+        if (window.__pointStates?.[boardId]) delete window.__pointStates[boardId][name];
+      }
+      try { state.board.removeObject(object); } catch (e) {}
+    });
+  } finally {
+    state.restoring = false;
+  }
+  if (!complete) return false;
+  persistDgsConstruction(state, true);
+  refreshDgsObjectList(state, true);
+  return true;
+};
+
 window.__beginDgsErase = function(boardId: string): void {
   const state = getDgsStateForBoard(boardId);
   if (!state) return;
@@ -13278,16 +19890,23 @@ function updateAxisSideMenuControls(state: DgsState, axis: any, key: 'x' | 'y'):
   state.axisDescriptionInput.value = entry.description;
   state.axisDescriptionInput.setAttribute('aria-invalid', 'false');
   state.coordinateSection.hidden = true;
+  state.vectorComponentsSection.hidden = true;
+  state.roundGeometrySection.hidden = true;
   state.angleMeasureSection.hidden = true;
   state.arcSettingsSection.hidden = true;
   state.strokeStyleSection.hidden = true;
   state.functionExpressionSection.hidden = true;
   state.sliderSettingsSection.hidden = true;
+  state.locusSettingsSection.hidden = true;
   state.textFontSizeSection.hidden = true;
   state.fixedOption.hidden = true;
   state.fixedCheckbox.disabled = true;
+  state.bindingOption.hidden = true;
+  state.bindingCheckbox.disabled = true;
   state.traceOption.hidden = true;
   state.traceCheckbox.disabled = true;
+  state.locusOption.hidden = true;
+  state.locusCheckbox.disabled = true;
   state.clearTraceButton.hidden = true;
   state.nameOption.hidden = true;
   state.objectOption.hidden = true;
@@ -13322,25 +19941,32 @@ function applyDgsSideMenuRestrictions(state: DgsState, object: any): void {
   const point = isDgsPoint(object);
   state.sideMenuNameInput.hidden = true;
   state.coordinateSection.hidden = true;
+  state.vectorComponentsSection.hidden = true;
+  state.roundGeometrySection.hidden = true;
   state.angleMeasureSection.hidden = true;
   state.arcSettingsSection.hidden = true;
   state.strokeStyleSection.hidden = true;
   state.functionExpressionSection.hidden = true;
   state.sliderSettingsSection.hidden = true;
+  state.locusSettingsSection.hidden = true;
   state.textFontSizeSection.hidden = true;
   state.axisLabelSection.hidden = true;
   state.fixedOption.hidden = true;
   state.fixedCheckbox.disabled = true;
+  state.bindingOption.hidden = true;
+  state.bindingCheckbox.disabled = true;
   state.nameOption.hidden = true;
   state.nameCheckbox.disabled = true;
   state.objectOption.hidden = true;
   state.objectCheckbox.disabled = true;
   state.layerRow.hidden = true;
   state.deleteButton.hidden = true;
-  state.traceOption.hidden = !point;
-  state.traceCheckbox.disabled = !point;
-  state.traceColorButton.hidden = !point;
-  state.clearTraceButton.hidden = !point || getDgsPointTraceMarkers(object).length === 0;
+  state.traceOption.hidden = !point || !!object.__liaPoint3D;
+  state.traceCheckbox.disabled = !point || !!object.__liaPoint3D;
+  state.locusOption.hidden = true;
+  state.locusCheckbox.disabled = true;
+  state.traceColorButton.hidden = !point || !!object.__liaPoint3D;
+  state.clearTraceButton.hidden = !point || !!object.__liaPoint3D || getDgsPointTraceMarkers(object).length === 0;
   state.colorSection.hidden = false;
   resetDeleteButton(state);
 }
@@ -13371,17 +19997,33 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   const yInterceptPoint = point && !!object.__liaDgsYInterceptPoint;
   const intersectionPoint = point && !!object.__liaDgsIntersectionPoint;
   const analysisPoint = rootPoint || extremumPoint || inflectionPoint || yInterceptPoint || intersectionPoint;
-  const valuePoint = analysisPoint || midpointPoint;
+  const coordinatePoint = midpointPoint || (point && !!object.__liaPoint3D);
+  const valuePoint = analysisPoint || coordinatePoint;
   const ray = isDgsRay(object);
   const vector = isDgsVector(object);
+  const spatialVector = vector && isDgsSpatialLinearObject(object);
+  const freeVector = spatialVector && object.__liaLinear3DFreeVector === true;
   const compassArc = isDgsCompassArc(object);
   const arc = isDgsArc(object);
+  const locusObject = isDgsLocus(object);
   const lineStyleObject = isDgsLineStyleTarget(object);
-  const strokeStyleObject = isDgsSegmentStyleTarget(object) || arc;
+  const strokeStyleObject = isDgsStrokeStyleTarget(object);
   const line = isDgsLine(object);
   const polygon = isDgsPolygon(object);
+  const plane = isDgsPlane(object);
+  const circle3D = isDgsCircle3D(object);
+  const sphere3D = isDgsSphere3D(object);
+  const polygon3D = isDgsPolygon3D(object);
+  const solid3D = isDgsSolid3D(object);
+  const curve3D = isDgsCurve3D(object) && !object.__liaDgsAngle3D;
+  const surface3D = isDgsSurface3D(object);
+  const conic3D = isDgsConic3D(object);
+  const analytic3D = isDgsAnalytic3D(object);
+  const round3D = circle3D || sphere3D;
+  const measuredShape3D = round3D || polygon3D || solid3D;
   const angle = isDgsAngle(object);
   const circle = isDgsCircle(object);
+  const ellipse = isDgsEllipse(object);
   const sector = isDgsSector(object);
   const textObject = isDgsText(object);
   const functionObject = isDgsFunction(object);
@@ -13391,9 +20033,56 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   const name = getDgsObjectName(object);
   setColorPopupOpen(state, false);
   state.contextObject = object;
+  dgsSegment6PropertyObjects[state.boardId] = object;
   object.__liaDgsLanguage = state.language;
   if (angle) syncDgsRightAngleStyle(object);
   state.sideMenuObjectType.textContent = rootPoint ? text.root : (extremumPoint ? text.extremum : (inflectionPoint ? text.inflection : (yInterceptPoint ? text.yIntercept : (intersectionPoint ? text.intersection : (functionObject ? text.function : (sliderObject ? text.slider : (textObject ? text.text : (midpointPoint ? text.midpoint : (point ? text.point : (ray ? text.ray : (vector ? text.vector : (tangentObject ? text.tangent : (angleBisectorObject ? text.angleBisector : (line ? text.line : (polygon ? text.polygon : (circle ? text.circle : (sector ? text.sector : (angle ? text.angle : text.segment))))))))))))))))));
+  if (locusObject) state.sideMenuObjectType.textContent = text.locus;
+  if (ellipse) state.sideMenuObjectType.textContent = text.ellipse;
+  if (plane) state.sideMenuObjectType.textContent = state.language === 'de' ? 'Ebene' : 'Plane';
+  if (circle3D) state.sideMenuObjectType.textContent = state.language === 'de' ? 'Raumkreis' : 'Circle in space';
+  if (sphere3D) state.sideMenuObjectType.textContent = state.language === 'de' ? 'Kugel' : 'Sphere';
+  if (polygon3D) state.sideMenuObjectType.textContent = state.language === 'de' ? 'Raumvieleck' : 'Spatial polygon';
+  if (solid3D) state.sideMenuObjectType.textContent = getDgsObjectTypeLabel(state, object);
+  if (curve3D) {
+    const record = object.__liaSceneRecord;
+    const definition = record?.expressions?.join(', ') || '';
+    const range = record?.parameterRange;
+    state.sideMenuObjectType.textContent = (object.__liaLocus3D
+      ? (state.language === 'de' ? 'Ortskurve im Raum' : 'Spatial locus curve')
+      : (state.language === 'de' ? 'Raumkurve' : 'Curve in space')) +
+      (definition ? ' · (' + definition + ')' : '') +
+      (range ? ' · ' + (record.parameter || 't') + ' ∈ [' + range.join(', ') + ']' : '');
+  }
+  if (surface3D) {
+    const record = object.__liaSceneRecord;
+    const sources = record?.expressions?.join(', ') || '';
+    state.sideMenuObjectType.textContent = (object.__liaLocusSurface3D
+      ? (state.language === 'de' ? 'Ortsfläche im Raum' : 'Spatial locus surface')
+      : (state.language === 'de' ? 'Parametrische Fläche' : 'Parametric surface')) +
+      (sources ? ' · (' + sources + ')' : '');
+  }
+  if (conic3D) {
+    const entry = Object.values(window.__conic3DEntries || {}).find((candidate: any) => candidate.object === object) as any;
+    const kind = entry?.section?.()?.conicKind || object.__liaSceneRecord?.classification || '';
+    state.sideMenuObjectType.textContent = (state.language === 'de' ? 'Kegelschnitt im Raum' : 'Conic section in space') +
+      (kind ? ' · ' + kind : '');
+  }
+  if (analytic3D) {
+    const sources = (object.__liaDgsAnalytic3DSources || []).map((source: any) => getDgsObjectName(source)).filter(Boolean);
+    state.sideMenuObjectType.textContent = (state.language === 'de' ? '3D-Analyse' : '3D analysis') +
+      ' · ' + String(object.__liaDgsAnalytic3DOperation || '') +
+      (sources.length ? ' · ' + text.sources + ': ' + sources.join(', ') : '');
+  }
+  if (isDgsTransformation3D(object)) {
+    state.sideMenuObjectType.textContent += state.language === 'de' ? ' (transformiert)' : ' (transformed)';
+  }
+  if (object.__liaDgsSpatialIntersection) {
+    const firstSource = getDgsObjectName(object.__liaDgsSpatialIntersectionSource);
+    const secondSource = getDgsObjectName(object.__liaDgsSpatialIntersectionSource2);
+    const sourceNames = [firstSource, secondSource].filter(Boolean).join(', ');
+    if (sourceNames) state.sideMenuObjectType.textContent += ' · ' + text.sources + ': ' + sourceNames;
+  }
   if (compassArc) state.sideMenuObjectType.textContent = text.compassArc;
   else if (arc) state.sideMenuObjectType.textContent = text.arc;
   state.sideMenuNameInput.value = name;
@@ -13401,40 +20090,106 @@ function updateSideMenuControls(state: DgsState, object: any): void {
   state.sideMenuNameInput.setAttribute('aria-label', textObject ? text.textInput : (sliderObject ? text.parameterName : (state.language === 'de' ? 'Objektname' : 'Object name')));
   state.fixedCheckbox.checked = getDgsObjectFixed(object);
   state.fixedCheckboxText.textContent = sliderObject ? text.lockPosition : text.fixed;
-  state.fixedOption.hidden = functionObject || analysisPoint || midpointPoint || compassArc;
-  state.fixedCheckbox.disabled = functionObject || analysisPoint || midpointPoint || compassArc;
-  state.traceOption.hidden = !point;
-  state.traceCheckbox.disabled = !point;
+  state.fixedOption.hidden = functionObject || analysisPoint || midpointPoint || compassArc || locusObject;
+  state.fixedCheckbox.disabled = functionObject || analysisPoint || midpointPoint || compassArc || locusObject;
+  const bindablePoint = isDgsBindablePoint(object);
+  const bindingPending = bindablePoint && state.pendingPointBindingPoint === object;
+  state.bindingOption.hidden = !bindablePoint;
+  state.bindingCheckbox.disabled = !bindablePoint;
+  state.bindingCheckbox.checked = bindablePoint && !!getDgsPointBindingSource(object);
+  state.bindingCheckbox.indeterminate = bindingPending;
+  state.bindingOption.title = bindingPending ? text.selectBindingObject : '';
+  state.traceOption.hidden = !point || !!object.__liaPoint3D;
+  state.traceCheckbox.disabled = !point || !!object.__liaPoint3D;
   state.traceCheckbox.checked = point && !!object.__liaDgsTraceEnabled;
+  const targetLocus = point ? getDgsLocusForTarget(state, object) : null;
+  const locusPending = point && state.pendingLocusTarget === object;
+  state.locusOption.hidden = !point || !!object.__liaPoint3D || !!object.__liaDgsHelperPoint;
+  state.locusCheckbox.disabled = !point || !!object.__liaPoint3D || !!object.__liaDgsHelperPoint;
+  state.locusCheckbox.checked = !!targetLocus && targetLocus.__liaDgsShowObject !== false;
+  state.locusCheckbox.indeterminate = !!locusPending;
+  state.locusOption.title = locusPending ? text.selectLocusDriver : '';
   state.nameCheckbox.checked = object.__liaDgsShowName !== false;
   state.nameOption.hidden = textObject;
   state.objectCheckbox.checked = object.__liaDgsShowObject !== false;
   state.objectCheckboxText.textContent = functionObject ? text.showFunction : (sliderObject ? text.showSlider : (textObject ? text.showText : (point ? text.showPoint : (ray ? text.showRay : (vector ? text.showVector : (line ? text.showLine : (polygon ? text.showPolygon : (circle ? text.showCircle : (sector ? text.showSector : (angle ? text.showAngleObject : text.showSegment))))))))));
+  if (locusObject) state.objectCheckboxText.textContent = text.showLocus;
+  if (ellipse) state.objectCheckboxText.textContent = text.showEllipse;
+  if (plane) state.objectCheckboxText.textContent = state.language === 'de' ? 'Ebene anzeigen' : 'Show plane';
+  if (circle3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Raumkreis anzeigen' : 'Show circle in space';
+  if (sphere3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Kugel anzeigen' : 'Show sphere';
+  if (polygon3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Raumvieleck anzeigen' : 'Show spatial polygon';
+  if (solid3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Körper anzeigen' : 'Show solid';
+  if (curve3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Raumkurve anzeigen' : 'Show curve in space';
+  if (surface3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Fläche anzeigen' : 'Show surface';
+  if (conic3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Kegelschnitt anzeigen' : 'Show conic section';
+  if (analytic3D) state.objectCheckboxText.textContent = state.language === 'de' ? 'Analyse anzeigen' : 'Show analysis';
   if (compassArc) state.objectCheckboxText.textContent = text.showCompassArc;
   else if (arc) state.objectCheckboxText.textContent = text.showArc;
-  state.measurementOption.hidden = textObject || sliderObject || (point && !valuePoint) || ray || vector || compassArc || arc || polygon || circle || sector;
-  state.measurementCheckbox.checked = valuePoint
+  state.measurementOption.hidden = textObject || sliderObject || locusObject || (point && !valuePoint) ||
+    (ray && !isDgsSpatialLinearObject(object)) || (vector && !spatialVector) || compassArc || arc ||
+    polygon || circle || ellipse || sector || measuredShape3D;
+  state.measurementCheckbox.checked = analytic3D
+    ? object.__liaDgsShowValue !== false
+    : valuePoint
     ? !!object.__liaDgsShowValue
-    : (functionObject
-      ? !!object.__liaDgsShowExpression
-      : (line ? !!object.__liaDgsShowEquation : (angle ? !!object.__liaDgsShowAngle : !!object.__liaDgsShowLength)));
-  state.measurementCheckboxText.textContent = valuePoint
-    ? (midpointPoint ? text.showCoordinates : text.showValue)
-    : (functionObject
-      ? text.showTerm
-      : (line ? text.showEquation : (angle ? text.showAngle : text.showDistance)));
-  state.areaOption.hidden = !polygon && !circle && !sector;
-  state.areaCheckbox.checked = (polygon || circle || sector) && !!object.__liaDgsShowArea;
-  state.perimeterOption.hidden = !polygon && !circle && !sector;
-  state.perimeterCheckbox.checked = (polygon || circle || sector) && !!object.__liaDgsShowPerimeter;
+    : (spatialVector
+      ? !!object.__liaDgsShowValue
+      : (functionObject
+        ? !!object.__liaDgsShowExpression
+        : (round3D
+          ? !!object.__liaDgsShowValue
+          : (plane
+          ? !!object.__liaDgsShowEquation
+          : ((line || (ray && isDgsSpatialLinearObject(object)))
+          ? !!object.__liaDgsShowEquation
+          : (angle ? !!object.__liaDgsShowAngle : !!object.__liaDgsShowLength))))));
+  state.measurementCheckboxText.textContent = analytic3D
+    ? text.showValue
+    : valuePoint
+    ? (coordinatePoint ? text.showCoordinates : text.showValue)
+    : (spatialVector
+      ? (state.language === 'de' ? 'Komponenten und Betrag anzeigen' : 'Show components and magnitude')
+      : (functionObject
+        ? text.showTerm
+        : (round3D
+          ? text.showValue
+          : (plane
+          ? text.showEquation
+          : ((line || (ray && isDgsSpatialLinearObject(object)))
+          ? text.showEquation
+          : (angle ? text.showAngle : text.showDistance))))));
+  state.areaOption.hidden = !polygon && !circle && !ellipse && !sector && !measuredShape3D;
+  state.areaCheckbox.checked = measuredShape3D
+    ? (circle3D ? object.__liaDgsValueMode === 'area' :
+      (polygon3D ? object.__liaDgsValueMode === 'area' : object.__liaDgsValueMode === 'surface'))
+    : (polygon || circle || ellipse || sector) && !!object.__liaDgsShowArea;
+  state.perimeterOption.hidden = !polygon && !circle && !ellipse && !sector && !measuredShape3D;
+  state.perimeterCheckbox.checked = measuredShape3D
+    ? (circle3D ? object.__liaDgsValueMode === 'circumference' :
+      (polygon3D ? object.__liaDgsValueMode === 'perimeter' : object.__liaDgsValueMode === 'volume'))
+    : (polygon || circle || ellipse || sector) && !!object.__liaDgsShowPerimeter;
+  state.areaCheckboxText.textContent = sphere3D || solid3D
+    ? (state.language === 'de' ? 'Oberfläche anzeigen' : 'Show surface area')
+    : text.showArea;
+  state.perimeterCheckboxText.textContent = sphere3D || solid3D
+    ? (state.language === 'de' ? 'Volumen anzeigen' : 'Show volume')
+    : text.showPerimeter;
   state.coordinateSection.hidden = !point || analysisPoint || midpointPoint;
+  if (state.zCoordinateInput.parentElement) state.zCoordinateInput.parentElement.hidden = !object?.__liaPoint3D;
+  state.vectorComponentsSection.hidden = !spatialVector;
+  state.roundGeometrySection.hidden = !round3D;
+  [state.vectorXInput, state.vectorYInput, state.vectorZInput].forEach((input) => { input.disabled = !freeVector; });
   state.angleMeasureSection.hidden = !(angle && object.__liaDgsMeasuredConstruction);
   state.arcSettingsSection.hidden = !arc;
   state.strokeStyleSection.hidden = !lineStyleObject;
-  state.strokeDesignField.hidden = !strokeStyleObject;
+  state.strokeDesignField.hidden = !strokeStyleObject || locusObject ||
+    (isDgsSpatialLinearObject(object) && !isDgsSegmentStyleTarget(object));
   state.strokeWidthField.hidden = !strokeStyleObject;
+  state.planeEquationField.hidden = !plane;
   state.functionExpressionSection.hidden = !functionObject;
   state.sliderSettingsSection.hidden = !sliderObject;
+  state.locusSettingsSection.hidden = !locusObject;
   state.textFontSizeSection.hidden = !textObject;
   if (!state.angleMeasureSection.hidden) {
     const degrees = Number.isFinite(Number(object.__liaDgsTargetAngle))
@@ -13449,8 +20204,35 @@ function updateSideMenuControls(state: DgsState, object: any): void {
     state.arcExitAngleInput.setAttribute('aria-invalid', 'false');
     state.arcEntryAngleInput.setAttribute('aria-invalid', 'false');
   }
+  if (round3D) {
+    const data = circle3D ? coordinateCircle3DData(object) : coordinateSphere3DData(object);
+    const center = data?.center;
+    state.roundCenterValue.textContent = center
+      ? '(' + center.map((value: number) => formatCoordinate(value)).join(' | ') + ')'
+      : '\u2013';
+    const sources = [
+      ...(object.__liaCircle3DSourcePoints || object.__liaSphere3DSourcePoints || []),
+      ...(object.__liaCircle3DSourceVectors || [])
+    ].map((source: any) => getDgsObjectName(source)).filter(Boolean);
+    state.roundSourceValue.textContent = sources.length ? sources.join(', ') : '\u2013';
+    state.roundRadiusInput.value = data ? formatCoordinate(data.radius) : '';
+    const editableRadius = (circle3D && object.__liaCircle3DDefinition === 'center-normal-radius') ||
+      (sphere3D && object.__liaSphere3DDefinition === 'center-radius');
+    state.roundRadiusInput.disabled = !editableRadius;
+    state.roundRadiusInput.setAttribute('aria-invalid', data ? 'false' : 'true');
+  }
+  if (spatialVector) {
+    const components = coordinateVector3DComponents(object);
+    [state.vectorXInput, state.vectorYInput, state.vectorZInput].forEach((input, index) => {
+      if (document.activeElement !== input) input.value = components ? formatCoordinate(components[index]) : '';
+      input.setAttribute('aria-invalid', components ? 'false' : 'true');
+    });
+  }
   if (lineStyleObject) {
     state.lineStyleSelect.value = getDgsLineStyle(object);
+  }
+  if (plane) {
+    state.planeEquationSelect.value = String(object.__liaDgsPlaneEquationForm || 'parameter');
   }
   if (strokeStyleObject) {
     state.strokeDesignSelect.value = getDgsStrokeDesign(object);
@@ -13467,16 +20249,24 @@ function updateSideMenuControls(state: DgsState, object: any): void {
     state.sliderMinInput.value = formatCoordinate(Number(object.__liaDgsSliderMinimum));
     state.sliderMaxInput.value = formatCoordinate(Number(object.__liaDgsSliderMaximum));
     state.sliderStepInput.value = formatCoordinate(Number(object.__liaDgsSliderStep));
+    state.sliderAnimationSpeedInput.value = String(getDgsSliderAnimationSpeed(object));
+    state.sliderAnimationSpeedValue.textContent = formatDgsSliderAnimationSpeed(state, object);
+    state.sliderAnimationControlCheckbox.checked = object.__liaDgsShowAnimationControl !== false;
     [state.sliderValueInput, state.sliderMinInput, state.sliderMaxInput, state.sliderStepInput]
       .forEach((input) => input.setAttribute('aria-invalid', 'false'));
+  }
+  if (locusObject) {
+    state.locusSamplesInput.value = String(normalizeDgsLocusSampleCount(object.__liaDgsLocusSampleCount));
+    state.locusSamplesInput.setAttribute('aria-invalid', 'false');
   }
   if (textObject) state.textFontSizeInput.value = String(clampDgsTextFontSize(object.__liaDgsTextFontSize));
   resetDeleteButton(state);
   if (point) refreshSideMenuCoordinates(state);
-  state.fillColorButton.hidden = !polygon && !circle && !sector && !angle;
+  if (spatialVector) refreshSideMenuVectorComponents(state);
+  state.fillColorButton.hidden = !polygon && !circle && !ellipse && !sector && !(angle && !object.__liaDgsAngle3D);
   state.lineColorButton.hidden = textObject;
-  state.traceColorButton.hidden = !point;
-  state.clearTraceButton.hidden = !point || getDgsPointTraceMarkers(object).length === 0;
+  state.traceColorButton.hidden = !point || !!object.__liaPoint3D;
+  state.clearTraceButton.hidden = !point || !!object.__liaPoint3D || getDgsPointTraceMarkers(object).length === 0;
   state.colorButtons.forEach((button, index) => {
     const kind = button.dataset.colorKind as 'text' | 'line' | 'fill' | 'trace';
     state.colorPreviews[index].style.background = getDgsObjectColor(object, kind);
@@ -13491,7 +20281,7 @@ function updateSideMenuControls(state: DgsState, object: any): void {
     const kind = state.colorButtons[index].dataset.colorKind;
     preview.style.opacity = kind === 'trace'
       ? '1'
-      : (polygon || circle || sector
+      : (polygon || circle || ellipse || sector || sphere3D
       ? (kind === 'fill' ? String(opacityPercent / 100) : '1')
       : String(opacityPercent / 100));
   });
@@ -13531,10 +20321,23 @@ function renderToolState(state: DgsState): void {
   const parallelActive = state.activeTool === 'parallel';
   const midpointActive = state.activeTool === 'midpoint';
   const angleBisectorActive = state.activeTool === 'angle-bisector';
+  const reflectLineActive = state.activeTool === 'reflect-line';
+  const reflectPointActive = state.activeTool === 'reflect-point';
+  const rotatePointActive = state.activeTool === 'rotate-point';
+  const dilatePointActive = state.activeTool === 'dilate-point';
   const polygonActive = state.activeTool === 'polygon';
   const circleActive = state.activeTool === 'circle';
   const sectorActive = state.activeTool === 'sector';
-  const angleActive = state.activeTool === 'angle';
+  const ellipseActive = state.activeTool === 'ellipse';
+  const planeThreePointsActive = state.activeTool === 'plane-three-points';
+  const planePointNormalActive = state.activeTool === 'plane-point-normal';
+  const planePointVectorsActive = state.activeTool === 'plane-point-vectors';
+  const circle3DThreePointsActive = state.activeTool === 'circle3d-three-points';
+  const circle3DCenterNormalPointActive = state.activeTool === 'circle3d-center-normal-point';
+  const sphere3DCenterPointActive = state.activeTool === 'sphere3d-center-point';
+  const sphere3DFourPointsActive = state.activeTool === 'sphere3d-four-points';
+  const sphere3DCenterRadiusActive = state.activeTool === 'sphere3d-center-radius';
+  const angleActive = state.activeTool === 'angle' || state.activeTool === 'angle3d';
   const measuredAngleActive = state.activeTool === 'angle-measured';
   const rootsActive = state.activeTool === 'roots';
   const extremaActive = state.activeTool === 'extrema';
@@ -13579,8 +20382,10 @@ function renderToolState(state: DgsState): void {
     state.arcToolButton.classList.toggle('is-active', arcActive);
     state.arcToolButton.setAttribute('aria-pressed', arcActive ? 'true' : 'false');
   }
-  state.orthogonalButton.classList.toggle('is-active', orthogonalActive || parallelActive || midpointActive || angleBisectorActive);
-  state.orthogonalButton.setAttribute('aria-pressed', orthogonalActive || parallelActive || midpointActive || angleBisectorActive ? 'true' : 'false');
+  const relationActive = orthogonalActive || parallelActive || midpointActive || angleBisectorActive ||
+    reflectLineActive || reflectPointActive || rotatePointActive || dilatePointActive;
+  state.orthogonalButton.classList.toggle('is-active', relationActive);
+  state.orthogonalButton.setAttribute('aria-pressed', relationActive ? 'true' : 'false');
   state.orthogonalToolButton.classList.toggle('is-active', orthogonalActive);
   state.orthogonalToolButton.setAttribute('aria-pressed', orthogonalActive ? 'true' : 'false');
   state.parallelToolButton.classList.toggle('is-active', parallelActive);
@@ -13589,14 +20394,67 @@ function renderToolState(state: DgsState): void {
   state.midpointToolButton.setAttribute('aria-pressed', midpointActive ? 'true' : 'false');
   state.angleBisectorToolButton.classList.toggle('is-active', angleBisectorActive);
   state.angleBisectorToolButton.setAttribute('aria-pressed', angleBisectorActive ? 'true' : 'false');
-  state.polygonButton.classList.toggle('is-active', polygonActive || circleActive || sectorActive);
-  state.polygonButton.setAttribute('aria-pressed', polygonActive || circleActive || sectorActive ? 'true' : 'false');
+  state.reflectLineToolButton.classList.toggle('is-active', reflectLineActive);
+  state.reflectLineToolButton.setAttribute('aria-pressed', reflectLineActive ? 'true' : 'false');
+  state.reflectPointToolButton.classList.toggle('is-active', reflectPointActive);
+  state.reflectPointToolButton.setAttribute('aria-pressed', reflectPointActive ? 'true' : 'false');
+  state.rotatePointToolButton.classList.toggle('is-active', rotatePointActive);
+  state.rotatePointToolButton.setAttribute('aria-pressed', rotatePointActive ? 'true' : 'false');
+  state.dilatePointToolButton.classList.toggle('is-active', dilatePointActive);
+  state.dilatePointToolButton.setAttribute('aria-pressed', dilatePointActive ? 'true' : 'false');
+  state.spatialTransformToolButtons.forEach(entry => {
+    const active = state.activeTool === entry.tool;
+    entry.button.classList.toggle('is-active', active);
+    entry.button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  const circle3DActive = circle3DThreePointsActive || circle3DCenterNormalPointActive;
+  const sphere3DActive = sphere3DCenterPointActive || sphere3DFourPointsActive || sphere3DCenterRadiusActive;
+  const round2DActive = circleActive || sectorActive || ellipseActive;
+  const plane3DActive = planeThreePointsActive || planePointNormalActive || planePointVectorsActive;
+  const surface3DActive = state.spatialBodyToolButtons.some(entry => entry.group === 'surface' && state.activeTool === entry.tool);
+  const prismBodyActive = state.spatialBodyToolButtons.some(entry => entry.group === 'prism' && state.activeTool === entry.tool);
+  const pointedBodyActive = state.spatialBodyToolButtons.some(entry => entry.group === 'pointed' && state.activeTool === entry.tool);
+  state.polygonButton.classList.toggle('is-active', polygonActive || plane3DActive || surface3DActive);
+  state.polygonButton.setAttribute('aria-pressed', polygonActive || plane3DActive || surface3DActive ? 'true' : 'false');
+  state.round2DButton.classList.toggle('is-active', round2DActive || circle3DActive);
+  state.round2DButton.setAttribute('aria-pressed', round2DActive || circle3DActive ? 'true' : 'false');
+  state.plane3DButton.classList.toggle('is-active', prismBodyActive);
+  state.plane3DButton.setAttribute('aria-pressed', prismBodyActive ? 'true' : 'false');
+  state.round3DButton.classList.toggle('is-active', sphere3DActive);
+  state.round3DButton.setAttribute('aria-pressed', sphere3DActive ? 'true' : 'false');
   state.polygonToolButton.classList.toggle('is-active', polygonActive);
   state.polygonToolButton.setAttribute('aria-pressed', polygonActive ? 'true' : 'false');
   state.circleToolButton.classList.toggle('is-active', circleActive);
   state.circleToolButton.setAttribute('aria-pressed', circleActive ? 'true' : 'false');
   state.sectorToolButton.classList.toggle('is-active', sectorActive);
   state.sectorToolButton.setAttribute('aria-pressed', sectorActive ? 'true' : 'false');
+  state.ellipseToolButton.classList.toggle('is-active', ellipseActive);
+  state.ellipseToolButton.setAttribute('aria-pressed', ellipseActive ? 'true' : 'false');
+  state.planeThreePointsToolButton.classList.toggle('is-active', planeThreePointsActive);
+  state.planeThreePointsToolButton.setAttribute('aria-pressed', planeThreePointsActive ? 'true' : 'false');
+  state.planePointNormalToolButton.classList.toggle('is-active', planePointNormalActive);
+  state.planePointNormalToolButton.setAttribute('aria-pressed', planePointNormalActive ? 'true' : 'false');
+  state.planePointVectorsToolButton.classList.toggle('is-active', planePointVectorsActive);
+  state.planePointVectorsToolButton.setAttribute('aria-pressed', planePointVectorsActive ? 'true' : 'false');
+  state.circle3DThreePointsToolButton.classList.toggle('is-active', circle3DThreePointsActive);
+  state.circle3DThreePointsToolButton.setAttribute('aria-pressed', circle3DThreePointsActive ? 'true' : 'false');
+  state.circle3DCenterNormalPointToolButton.classList.toggle('is-active', circle3DCenterNormalPointActive);
+  state.circle3DCenterNormalPointToolButton.setAttribute('aria-pressed', circle3DCenterNormalPointActive ? 'true' : 'false');
+  state.sphere3DCenterPointToolButton.classList.toggle('is-active', sphere3DCenterPointActive);
+  state.sphere3DCenterPointToolButton.setAttribute('aria-pressed', sphere3DCenterPointActive ? 'true' : 'false');
+  state.sphere3DFourPointsToolButton.classList.toggle('is-active', sphere3DFourPointsActive);
+  state.sphere3DFourPointsToolButton.setAttribute('aria-pressed', sphere3DFourPointsActive ? 'true' : 'false');
+  state.sphere3DCenterRadiusToolButton.classList.toggle('is-active', sphere3DCenterRadiusActive);
+  state.sphere3DCenterRadiusToolButton.setAttribute('aria-pressed', sphere3DCenterRadiusActive ? 'true' : 'false');
+  state.spatialBodyToolButtons.forEach(entry => {
+    const active = state.activeTool === entry.tool;
+    entry.button.classList.toggle('is-active', active);
+    entry.button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  const spatialTransformActive = state.spatialTransformToolButtons.some(entry => state.activeTool === entry.tool);
+  state.solid3DButton.classList.toggle('is-active', pointedBodyActive);
+  state.solid3DButton.setAttribute('aria-pressed', pointedBodyActive ? 'true' : 'false');
+  state.orthogonalButton.classList.toggle('is-active', state.orthogonalButton.classList.contains('is-active') || spatialTransformActive);
   state.angleButton.classList.toggle('is-active', angleActive || measuredAngleActive);
   state.angleButton.setAttribute('aria-pressed', angleActive || measuredAngleActive ? 'true' : 'false');
   state.angleToolButton.classList.toggle('is-active', angleActive);
@@ -13650,10 +20508,38 @@ function getDgsActiveToolId(tool: DgsState['activeTool']): number | null {
     case 'parallel': return DGS_TOOL_IDS.parallel;
     case 'midpoint': return DGS_TOOL_IDS.midpoint;
     case 'angle-bisector': return DGS_TOOL_IDS.angleBisector;
+    case 'reflect-line': return DGS_TOOL_IDS.reflectLine;
+    case 'reflect-point': return DGS_TOOL_IDS.reflectPoint;
+    case 'rotate-point': return DGS_TOOL_IDS.rotatePoint;
+    case 'dilate-point': return DGS_TOOL_IDS.dilatePoint;
+    case 'translate3d': return DGS_TOOL_IDS.translate3D;
+    case 'reflect-point3d': return DGS_TOOL_IDS.reflectPoint3D;
+    case 'reflect-line3d': return DGS_TOOL_IDS.reflectLine3D;
+    case 'reflect-plane3d': return DGS_TOOL_IDS.reflectPlane3D;
+    case 'rotate-axis3d': return DGS_TOOL_IDS.rotateAxis3D;
+    case 'dilate3d': return DGS_TOOL_IDS.dilate3D;
+    case 'polygon3d': return DGS_TOOL_IDS.polygon3D;
+    case 'tetrahedron3d': return DGS_TOOL_IDS.tetrahedron3D;
+    case 'pyramid3d': return DGS_TOOL_IDS.pyramid3D;
+    case 'prism3d': return DGS_TOOL_IDS.prism3D;
+    case 'parallelepiped3d': return DGS_TOOL_IDS.parallelepiped3D;
+    case 'cuboid3d': return DGS_TOOL_IDS.cuboid3D;
+    case 'cylinder3d': return DGS_TOOL_IDS.cylinder3D;
+    case 'cone3d': return DGS_TOOL_IDS.cone3D;
     case 'polygon': return DGS_TOOL_IDS.polygon;
     case 'circle': return DGS_TOOL_IDS.circle;
     case 'sector': return DGS_TOOL_IDS.sector;
-    case 'angle': return DGS_TOOL_IDS.angle;
+    case 'ellipse': return DGS_TOOL_IDS.ellipse;
+    case 'plane-three-points': return DGS_TOOL_IDS.planeThreePoints;
+    case 'plane-point-normal': return DGS_TOOL_IDS.planePointNormal;
+    case 'plane-point-vectors': return DGS_TOOL_IDS.planePointVectors;
+    case 'circle3d-three-points': return DGS_TOOL_IDS.circle3DThreePoints;
+    case 'circle3d-center-normal-point': return DGS_TOOL_IDS.circle3DCenterNormalPoint;
+    case 'sphere3d-center-point': return DGS_TOOL_IDS.sphere3DCenterPoint;
+    case 'sphere3d-four-points': return DGS_TOOL_IDS.sphere3DFourPoints;
+    case 'sphere3d-center-radius': return DGS_TOOL_IDS.sphere3DCenterRadius;
+    case 'angle':
+    case 'angle3d': return DGS_TOOL_IDS.angle;
     case 'angle-measured': return DGS_TOOL_IDS.measuredAngle;
     case 'roots': return DGS_TOOL_IDS.roots;
     case 'extrema': return DGS_TOOL_IDS.extrema;
@@ -13666,12 +20552,32 @@ function getDgsActiveToolId(tool: DgsState['activeTool']): number | null {
   }
 }
 
+function rollbackPendingLinearPoints(state: DgsState): void {
+  if (!state.pendingLinearCreatedPoints.length) return;
+  const points = state.pendingLinearCreatedPoints.splice(0).reverse();
+  points.forEach(point => { delete point.__liaDgsPendingLinearPoint; });
+  const previousRestoring = state.restoring;
+  state.restoring = true;
+  try {
+    points.forEach(point => deleteDgsObject(state, point, false));
+  } finally {
+    state.restoring = previousRestoring;
+  }
+}
+
 function setActiveTool(
   state: DgsState,
-  tool: '' | 'compass' | 'format-copy' | 'point' | 'segment' | 'ray' | 'line' | 'vector' | 'arc' | 'orthogonal' | 'parallel' | 'midpoint' | 'angle-bisector' | 'polygon' | 'circle' | 'sector' | 'angle' | 'angle-measured' | 'roots' | 'extrema' | 'inflections' | 'ordinate-intercept' | 'tangent' | 'intersection' | 'text',
+  tool: DgsState['activeTool'],
   deactivateRegression = true
 ): void {
+  if (tool !== state.activeTool) state.solidDraw3D?.cancel();
+  if (tool) {
+    if (state.equationDialogOpen) setDgsEquationDialogOpen(state, null, false);
+    finishDgsMultiSelectDrag(state, null, true);
+    setDgsMultiSelection(state, []);
+  }
   if (state.compassSubmenuOpen) setCompassSubmenuOpen(state, false);
+  if (state.pointSubmenuOpen) setPointSubmenuOpen(state, false);
   const requestedToolId = getDgsActiveToolId(tool);
   if (requestedToolId != null && !isDgsToolAvailable(state, requestedToolId)) tool = '';
   if (tool !== 'compass' && state.compassRadiusDialogOpen) {
@@ -13688,15 +20594,18 @@ function setActiveTool(
       setSelectedRelationInputs(other, null, null);
       setSelectedMidpointPoint(other, null);
       setSelectedBisectorPoints(other, []);
+      setSelectedTransformInputs(other, null, null);
       setSelectedIntersectionObject(other, null);
       setSelectedFormatSource(other, null);
       setSelectedPolygonPoints(other, []);
       setSelectedAnglePoints(other, []);
+      setSelectedAngle3DObjects(other, []);
       setSelectedSectorPoints(other, []);
       setAngleDialogOpen(other, false);
       setArcDialogOpen(other, false);
       setTextDialogOpen(other, false);
       clearDgsCirclePreview(other);
+      other.solidDraw3D?.cancel();
       other.activeTool = '';
       renderToolState(other);
     });
@@ -13705,6 +20614,7 @@ function setActiveTool(
 
   if ((state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector' || state.activeTool === 'arc') &&
       tool !== state.activeTool) {
+    if (state.activeTool !== 'arc') rollbackPendingLinearPoints(state);
     setSelectedSegmentPoint(state, null);
   }
   if (state.activeTool === 'compass' && tool !== 'compass') {
@@ -13720,6 +20630,15 @@ function setActiveTool(
   if (state.activeTool === 'angle-bisector' && tool !== 'angle-bisector') {
     setSelectedBisectorPoints(state, []);
   }
+  if ((state.activeTool === 'reflect-line' || state.activeTool === 'reflect-point' ||
+       state.activeTool === 'rotate-point' || state.activeTool === 'dilate-point' ||
+       state.activeTool === 'translate3d' || state.activeTool === 'reflect-point3d' ||
+       state.activeTool === 'reflect-line3d' || state.activeTool === 'reflect-plane3d' ||
+       state.activeTool === 'rotate-axis3d' || state.activeTool === 'dilate3d') &&
+      tool !== state.activeTool) {
+    setSelectedTransformInputs(state, null, null);
+    setAngleDialogOpen(state, false);
+  }
   if (state.activeTool === 'intersection' && tool !== 'intersection') {
     setSelectedIntersectionObject(state, null);
   }
@@ -13728,8 +20647,34 @@ function setActiveTool(
   }
   if (state.activeTool === 'polygon' && tool !== 'polygon') setSelectedPolygonPoints(state, []);
   if (state.activeTool === 'sector' && tool !== 'sector') setSelectedSectorPoints(state, []);
+  if (state.activeTool === 'ellipse' && tool !== 'ellipse') setSelectedEllipsePoints(state, []);
+  if ((state.activeTool === 'plane-three-points' || state.activeTool === 'plane-point-normal' ||
+       state.activeTool === 'plane-point-vectors') && tool !== state.activeTool) {
+    rollbackPendingLinearPoints(state);
+    state.selectedPlanePoints = [];
+    state.selectedPlaneVectors = [];
+  }
+  if ((state.activeTool === 'polygon3d' || state.activeTool === 'tetrahedron3d' ||
+       state.activeTool === 'pyramid3d' || state.activeTool === 'prism3d' ||
+       state.activeTool === 'parallelepiped3d' || state.activeTool === 'cuboid3d' ||
+       state.activeTool === 'cylinder3d' || state.activeTool === 'cone3d' ||
+       state.activeTool === 'circle3d-three-points' ||
+       state.activeTool === 'circle3d-center-normal-point' ||
+       state.activeTool === 'sphere3d-center-point' ||
+       state.activeTool === 'sphere3d-four-points' ||
+       state.activeTool === 'sphere3d-center-radius') && tool !== state.activeTool) {
+    rollbackPendingLinearPoints(state);
+    state.selectedRoundPoints = [];
+    state.selectedRoundVectors = [];
+    if (state.activeTool === 'pyramid3d' || state.activeTool === 'prism3d') {
+      setSelectedTransformInputs(state, null, null);
+    }
+  }
   if ((state.activeTool === 'angle' || state.activeTool === 'angle-measured') && tool !== state.activeTool) {
     setSelectedAnglePoints(state, []);
+  }
+  if (state.activeTool === 'angle3d' && tool !== 'angle3d') {
+    setSelectedAngle3DObjects(state, []);
   }
   if (state.activeTool === 'angle-measured' && tool !== 'angle-measured') setAngleDialogOpen(state, false);
   if (state.activeTool === 'circle' && tool !== 'circle') clearDgsCirclePreview(state);
@@ -13737,6 +20682,7 @@ function setActiveTool(
   if (tool) setExportDialogOpen(state, false);
   state.activeTool = tool;
   renderToolState(state);
+  updateDgsSolidConstructionStatus(state);
 }
 
 window.__setDgsExternalToolActive = function(boardId: string, active: boolean): void {
@@ -13744,6 +20690,10 @@ window.__setDgsExternalToolActive = function(boardId: string, active: boolean): 
     const state = states[uid];
     if (!state || state.boardId !== boardId) return;
     if (active && state.activeTool === 'format-copy') setActiveTool(state, '', false);
+    if (active) {
+      finishDgsMultiSelectDrag(state, null, true);
+      setDgsMultiSelection(state, []);
+    }
     state.externalToolActive = active;
     renderToolState(state);
   });
@@ -13755,7 +20705,137 @@ function releaseRegressionControls(state: DgsState): void {
     .forEach((button) => state.boardContainer.appendChild(button));
 }
 
+function installDgs3DSceneHooks(state: DgsState): void {
+  if (!state.board) return;
+  state.board.__liaDgs3DHookState = state;
+  state.onSceneChange = () => {
+    const requiredMode = state.sceneModePolicy === '2d' || state.sceneModePolicy === '3d'
+      ? state.sceneModePolicy
+      : null;
+    if (requiredMode && state.board.__liaSceneMode !== requiredMode) {
+      applyDgsSceneModePolicy(state, requiredMode);
+      return;
+    }
+    if (state.board.__liaSceneMode !== '3d') {
+      setDgsMultiSelection(state, []);
+      setDgsConstructionColorMenuOpen(state, false);
+    }
+    const spatialTools = new Set([
+      '', 'point', 'segment', 'line', 'ray', 'vector',
+      'plane-three-points', 'plane-point-normal', 'plane-point-vectors',
+      'circle3d-three-points', 'circle3d-center-normal-point',
+      'sphere3d-center-point', 'sphere3d-four-points', 'sphere3d-center-radius',
+      'translate3d', 'reflect-point3d', 'reflect-line3d', 'reflect-plane3d', 'rotate-axis3d', 'dilate3d',
+      'polygon3d', 'tetrahedron3d', 'pyramid3d', 'prism3d', 'parallelepiped3d',
+      'cuboid3d', 'cylinder3d', 'cone3d', 'angle3d', 'intersection'
+    ]);
+    const exclusivelySpatialTools = new Set([
+      'plane-three-points', 'plane-point-normal', 'plane-point-vectors',
+      'circle3d-three-points', 'circle3d-center-normal-point',
+      'sphere3d-center-point', 'sphere3d-four-points', 'sphere3d-center-radius',
+      'translate3d', 'reflect-point3d', 'reflect-line3d', 'reflect-plane3d', 'rotate-axis3d', 'dilate3d',
+      'polygon3d', 'tetrahedron3d', 'pyramid3d', 'prism3d', 'parallelepiped3d',
+      'cuboid3d', 'cylinder3d', 'cone3d', 'angle3d'
+    ]);
+    if ((state.board.__liaSceneMode === '3d' && !spatialTools.has(state.activeTool)) ||
+        (state.board.__liaSceneMode !== '3d' && exclusivelySpatialTools.has(state.activeTool))) {
+      setActiveTool(state, '', false);
+    }
+    applyDgsToolAvailability(state);
+    refreshDgsObjectList(state);
+    persistDgsConstruction(state);
+  };
+  state.onScenePointerUp = event => {
+    if (state.board.__liaSceneMode !== '3d' || state.pendingLinearCreatedPoints.length ||
+        eventTargetsBoardUi(event)) return;
+    window.setTimeout(() => persistDgsConstruction(state), 0);
+  };
+  state.onFlyoutOpen = (event: Event) => {
+    const owner = (event as CustomEvent).detail?.owner;
+    const ownFlyouts = [
+      state.compassSubmenu, state.pointSubmenu, state.geometrySubmenu, state.relationSubmenu,
+      state.shapeSubmenu, state.angleSubmenu, state.rootSubmenu, state.axisScaleSubmenu,
+      state.constructionColorMenu
+    ];
+    if (owner === state.constructionColorMenu) return;
+    if (ownFlyouts.includes(owner)) {
+      setDgsConstructionColorMenuOpen(state, false);
+      return;
+    }
+    setDgsConstructionColorMenuOpen(state, false);
+    setCompassSubmenuOpen(state, false);
+    setPointSubmenuOpen(state, false);
+    setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
+  };
+  state.boardContainer.addEventListener('lia-dgs-flyout-open', state.onFlyoutOpen);
+  state.boardContainer.addEventListener('lia-coordinate-scene-change', state.onSceneChange);
+  state.boardContainer.addEventListener('pointerup', state.onScenePointerUp, true);
+}
 function isDgsToolAvailable(state: DgsState, toolId: number): boolean {
+  const spatialOnlyToolIds: number[] = [
+    DGS_TOOL_IDS.translate3D,
+    DGS_TOOL_IDS.reflectPoint3D,
+    DGS_TOOL_IDS.reflectLine3D,
+    DGS_TOOL_IDS.reflectPlane3D,
+    DGS_TOOL_IDS.rotateAxis3D,
+    DGS_TOOL_IDS.dilate3D,
+    DGS_TOOL_IDS.polygon3D,
+    DGS_TOOL_IDS.tetrahedron3D,
+    DGS_TOOL_IDS.pyramid3D,
+    DGS_TOOL_IDS.prism3D,
+    DGS_TOOL_IDS.parallelepiped3D,
+    DGS_TOOL_IDS.cuboid3D,
+    DGS_TOOL_IDS.cylinder3D,
+    DGS_TOOL_IDS.cone3D,
+    DGS_TOOL_IDS.planeThreePoints,
+    DGS_TOOL_IDS.planePointNormal,
+    DGS_TOOL_IDS.planePointVectors,
+    DGS_TOOL_IDS.circle3DThreePoints,
+    DGS_TOOL_IDS.circle3DCenterNormalPoint,
+    DGS_TOOL_IDS.sphere3DCenterPoint,
+    DGS_TOOL_IDS.sphere3DFourPoints,
+    DGS_TOOL_IDS.sphere3DCenterRadius
+  ];
+  if (state.board && state.board.__liaSceneMode === '3d') {
+    const spatialToolIds: number[] = [
+      DGS_TOOL_IDS.point,
+      DGS_TOOL_IDS.translate3D,
+      DGS_TOOL_IDS.reflectPoint3D,
+      DGS_TOOL_IDS.reflectLine3D,
+      DGS_TOOL_IDS.reflectPlane3D,
+      DGS_TOOL_IDS.rotateAxis3D,
+      DGS_TOOL_IDS.dilate3D,
+      DGS_TOOL_IDS.polygon3D,
+      DGS_TOOL_IDS.tetrahedron3D,
+      DGS_TOOL_IDS.pyramid3D,
+      DGS_TOOL_IDS.prism3D,
+      DGS_TOOL_IDS.parallelepiped3D,
+      DGS_TOOL_IDS.cuboid3D,
+      DGS_TOOL_IDS.cylinder3D,
+      DGS_TOOL_IDS.cone3D,
+      DGS_TOOL_IDS.segment,
+      DGS_TOOL_IDS.line,
+      DGS_TOOL_IDS.ray,
+      DGS_TOOL_IDS.vector,
+      DGS_TOOL_IDS.planeThreePoints,
+      DGS_TOOL_IDS.planePointNormal,
+      DGS_TOOL_IDS.planePointVectors,
+      DGS_TOOL_IDS.circle3DThreePoints,
+      DGS_TOOL_IDS.circle3DCenterNormalPoint,
+      DGS_TOOL_IDS.sphere3DCenterPoint,
+      DGS_TOOL_IDS.sphere3DFourPoints,
+      DGS_TOOL_IDS.sphere3DCenterRadius,
+      DGS_TOOL_IDS.angle,
+      DGS_TOOL_IDS.intersection
+    ];
+    return spatialToolIds.includes(toolId) && (state.availableToolIds == null || state.availableToolIds.has(toolId));
+  }
+  if (spatialOnlyToolIds.includes(toolId)) return false;
   if (DGS_ALWAYS_AVAILABLE_TOOL_IDS.has(toolId)) {
     const instrumentProfile = String(
       state.boardContainer.dataset.liaDgsInstrumentTools || ''
@@ -13770,6 +20850,14 @@ function setDgsButtonTabIndex(button: HTMLButtonElement, enabled: boolean): void
 }
 
 function applyDgsToolAvailability(state: DgsState): void {
+  if (state.board.__liaSceneMode !== '3d' &&
+      state.equationDialogOpen && state.equationDialogKind === 'plane') {
+    setDgsEquationDialogOpen(state, null, false);
+  }
+  const capabilityKey = state.availableToolIds == null ? '*' : [...state.availableToolIds].sort((a, b) => a - b).join(',');
+  const capabilityChanged = state.board.__liaDgsAvailableToolKey !== capabilityKey;
+  state.board.__liaDgsAvailableToolIds = state.availableToolIds;
+  state.board.__liaDgsAvailableToolKey = capabilityKey;
   const setLeaf = (button: HTMLButtonElement, toolId: number): boolean => {
     const enabled = isDgsToolAvailable(state, toolId);
     button.dataset.dgsToolId = String(toolId);
@@ -13787,13 +20875,23 @@ function applyDgsToolAvailability(state: DgsState): void {
     parent.hidden = !enabled;
     parent.disabled = !enabled;
     parent.dataset.dgsToolGroup = entries.map(([, id]) => String(id)).join(',');
+    parent.dataset.dgsEnabledToolCount = String(enabledEntries.length);
+    parent.dataset.dgsSingleToolId = enabledEntries.length === 1
+      ? String(enabledEntries[0][1])
+      : '';
+    parent.setAttribute('aria-haspopup', enabledEntries.length > 1 ? 'menu' : 'false');
+    if (enabledEntries.length <= 1) parent.setAttribute('aria-expanded', 'false');
     if (enabled) {
       const currentToolId = Number(parent.dataset.dgsCurrentToolId);
       if (!enabledEntries.some(([, id]) => id === currentToolId)) {
-        const [firstButton, firstId] = enabledEntries[0];
-        const icon = firstButton.firstElementChild;
+        const preferredToolId = Number(parent.dataset.dgsPreferredToolId);
+        const preferredEntry = entries.find(([, id]) => id === preferredToolId);
+        const [nextButton, nextId] = enabledEntries.length > 1 && preferredEntry
+          ? preferredEntry
+          : enabledEntries[0];
+        const icon = nextButton.firstElementChild;
         if (icon) parent.innerHTML = icon.outerHTML;
-        parent.dataset.dgsCurrentToolId = String(firstId);
+        parent.dataset.dgsCurrentToolId = String(nextId);
       }
     }
     if (!enabled) parent.tabIndex = -1;
@@ -13805,11 +20903,15 @@ function applyDgsToolAvailability(state: DgsState): void {
   setLeaf(state.compassToolButton, DGS_TOOL_IDS.compass);
   setLeaf(state.fixedRadiusCompassToolButton, DGS_TOOL_IDS.compass);
   const formatVisible = setLeaf(state.formatButton, DGS_TOOL_IDS.formatCopy);
-  const pointVisible = setLeaf(state.pointButton, DGS_TOOL_IDS.point);
+  const pointVisible = setGroup(state.pointButton, [
+    [state.pointToolButton, DGS_TOOL_IDS.point],
+    [state.pointCoordinatesToolButton, DGS_TOOL_IDS.point]
+  ]);
   const lineGroupVisible = setGroup(state.segmentButton, [
     [state.segmentToolButton, DGS_TOOL_IDS.segment],
     [state.rayToolButton, DGS_TOOL_IDS.ray],
     [state.lineToolButton, DGS_TOOL_IDS.line],
+    [state.lineEquationToolButton, DGS_TOOL_IDS.line],
     [state.vectorToolButton, DGS_TOOL_IDS.vector],
     [state.arcToolButton, DGS_TOOL_IDS.arc]
   ]);
@@ -13817,13 +20919,94 @@ function applyDgsToolAvailability(state: DgsState): void {
     [state.orthogonalToolButton, DGS_TOOL_IDS.orthogonal],
     [state.parallelToolButton, DGS_TOOL_IDS.parallel],
     [state.midpointToolButton, DGS_TOOL_IDS.midpoint],
-    [state.angleBisectorToolButton, DGS_TOOL_IDS.angleBisector]
+    [state.angleBisectorToolButton, DGS_TOOL_IDS.angleBisector],
+    [state.reflectLineToolButton, DGS_TOOL_IDS.reflectLine],
+    [state.reflectPointToolButton, DGS_TOOL_IDS.reflectPoint],
+    [state.rotatePointToolButton, DGS_TOOL_IDS.rotatePoint],
+    [state.dilatePointToolButton, DGS_TOOL_IDS.dilatePoint],
+    ...state.spatialTransformToolButtons.map(entry => [entry.button, entry.id] as [HTMLButtonElement, number])
   ]);
-  const shapeGroupVisible = setGroup(state.polygonButton, [
-    [state.polygonToolButton, DGS_TOOL_IDS.polygon],
-    [state.circleToolButton, DGS_TOOL_IDS.circle],
-    [state.sectorToolButton, DGS_TOOL_IDS.sector]
-  ]);
+  const spatialShapeMode = state.board.__liaSceneMode === '3d';
+  state.polygonButton.dataset.dgsPreferredToolId = String(spatialShapeMode
+    ? DGS_TOOL_IDS.planeThreePoints
+    : DGS_TOOL_IDS.polygon);
+  state.round2DButton.dataset.dgsPreferredToolId = String(spatialShapeMode
+    ? DGS_TOOL_IDS.circle3DThreePoints
+    : DGS_TOOL_IDS.circle);
+  const surfaceBodyEntries = state.spatialBodyToolButtons
+    .filter(entry => entry.group === 'surface')
+    .map(entry => [entry.button, entry.id] as [HTMLButtonElement, number]);
+  const prismBodyEntries = state.spatialBodyToolButtons
+    .filter(entry => entry.group === 'prism')
+    .map(entry => [entry.button, entry.id] as [HTMLButtonElement, number]);
+  const pointedBodyEntries = state.spatialBodyToolButtons
+    .filter(entry => entry.group === 'pointed')
+    .map(entry => [entry.button, entry.id] as [HTMLButtonElement, number]);
+  const surface3DEntries: Array<[HTMLButtonElement, number]> = [
+    [state.planeThreePointsToolButton, DGS_TOOL_IDS.planeThreePoints],
+    [state.planePointNormalToolButton, DGS_TOOL_IDS.planePointNormal],
+    [state.planePointVectorsToolButton, DGS_TOOL_IDS.planePointVectors],
+    [state.planeEquationToolButton, DGS_TOOL_IDS.planePointVectors],
+    ...surfaceBodyEntries
+  ];
+  const circle3DEntries: Array<[HTMLButtonElement, number]> = [
+    [state.circle3DThreePointsToolButton, DGS_TOOL_IDS.circle3DThreePoints],
+    [state.circle3DCenterNormalPointToolButton, DGS_TOOL_IDS.circle3DCenterNormalPoint]
+  ];
+  const sphere3DEntries: Array<[HTMLButtonElement, number]> = [
+    [state.sphere3DCenterPointToolButton, DGS_TOOL_IDS.sphere3DCenterPoint],
+    [state.sphere3DFourPointsToolButton, DGS_TOOL_IDS.sphere3DFourPoints],
+    [state.sphere3DCenterRadiusToolButton, DGS_TOOL_IDS.sphere3DCenterRadius]
+  ];
+  const polygonShapeVisible = setGroup(state.polygonButton, spatialShapeMode
+    ? surface3DEntries
+    : [[state.polygonToolButton, DGS_TOOL_IDS.polygon]]);
+  const round2DVisible = setGroup(state.round2DButton, spatialShapeMode
+    ? circle3DEntries
+    : [
+        [state.circleToolButton, DGS_TOOL_IDS.circle],
+        [state.sectorToolButton, DGS_TOOL_IDS.sector],
+        [state.ellipseToolButton, DGS_TOOL_IDS.ellipse]
+      ]);
+  const plane3DVisible = setGroup(state.plane3DButton, prismBodyEntries);
+  const round3DVisible = setGroup(state.round3DButton, sphere3DEntries);
+  const solid3DVisible = setGroup(state.solid3DButton, pointedBodyEntries);
+  const surfaceLabel = spatialShapeMode
+    ? (state.language === 'de' ? 'Ebenen und Flächen' : 'Planes and surfaces')
+    : (state.language === 'de' ? '2D-Eckig' : '2D angular shapes');
+  state.polygonButton.setAttribute('aria-label', surfaceLabel);
+  state.polygonButton.title = surfaceLabel;
+  const circleLabel = spatialShapeMode
+    ? (state.language === 'de' ? 'Kreise im Raum' : 'Circles in space')
+    : (state.language === 'de' ? '2D-Rund' : '2D round shapes');
+  state.round2DButton.setAttribute('aria-label', circleLabel);
+  state.round2DButton.title = circleLabel;
+  const planarShapeVisible = polygonShapeVisible || round2DVisible;
+  const shapeGroupVisible = planarShapeVisible || plane3DVisible || round3DVisible || solid3DVisible;
+  const syncToolSections = (submenu: HTMLElement) => {
+    const activeGroup = String(submenu.dataset.dgsActiveGroup || '');
+    let visibleSections = 0;
+    submenu.querySelectorAll<HTMLElement>('.lia-dgs-tool-section').forEach(section => {
+      const tools = Array.from(section.querySelectorAll<HTMLButtonElement>('.lia-dgs-geometry-tool'));
+      const available = tools.some(button => !button.hidden && !button.disabled);
+      section.dataset.dgsAvailable = available ? '1' : '0';
+      const groupMatches = !activeGroup || !section.dataset.dgsShapeGroup ||
+        section.dataset.dgsShapeGroup === activeGroup;
+      section.hidden = !available || !groupMatches;
+      if (!section.hidden) visibleSections += 1;
+    });
+    submenu.style.setProperty('--lia-dgs-visible-sections', String(Math.max(1, visibleSections)));
+  };
+  syncToolSections(state.relationSubmenu);
+  syncToolSections(state.shapeSubmenu);
+  const spatialAngleMode = state.board.__liaSceneMode === '3d';
+  const angleToolLabel = spatialAngleMode
+    ? (state.language === 'de' ? 'Winkel zwischen Objekten' : 'Angle between objects')
+    : dgsText(state.language).createAngle;
+  const angleToolLabelNode = state.angleToolButton.querySelector('span');
+  if (angleToolLabelNode) angleToolLabelNode.textContent = angleToolLabel;
+  state.angleToolButton.setAttribute('aria-label', angleToolLabel);
+  state.angleToolButton.title = angleToolLabel;
   const angleGroupVisible = setGroup(state.angleButton, [
     [state.angleToolButton, DGS_TOOL_IDS.angle],
     [state.measuredAngleToolButton, DGS_TOOL_IDS.measuredAngle]
@@ -13875,7 +21058,7 @@ function applyDgsToolAvailability(state: DgsState): void {
   const viewVisible = zoomVisible || axisScaleVisible;
 
   let left = 52;
-  const placeButton = (button: HTMLButtonElement, visible: boolean) => {
+  const placeButton = (button: HTMLElement, visible: boolean) => {
     if (!visible) return;
     button.style.left = left + 'px';
     button.style.top = '7.5px';
@@ -13888,7 +21071,12 @@ function applyDgsToolAvailability(state: DgsState): void {
     left += 9;
   };
 
+  const constructionColorVisible = state.board.__liaSceneMode === '3d';
+  state.constructionColorButton.hidden = !constructionColorVisible;
+  state.constructionColorButton.disabled = !constructionColorVisible;
+  if (!constructionColorVisible) setDgsConstructionColorMenuOpen(state, false);
   placeButton(state.selectButton, true);
+  placeButton(state.constructionColorButton, constructionColorVisible);
   placeButton(state.setSquareButton, setSquareVisible);
   placeButton(state.compassButton, compassVisible);
   placeButton(state.formatButton, formatVisible);
@@ -13896,11 +21084,17 @@ function applyDgsToolAvailability(state: DgsState): void {
   placeButton(state.pointButton, pointVisible);
   placeButton(state.segmentButton, lineGroupVisible);
   placeButton(state.orthogonalButton, relationGroupVisible);
-  placeButton(state.polygonButton, shapeGroupVisible);
+  placeDivider(state.shapeDivider, (pointVisible || lineGroupVisible || relationGroupVisible) && shapeGroupVisible);
+  placeButton(state.polygonButton, polygonShapeVisible);
+  placeButton(state.round2DButton, round2DVisible);
+  placeButton(state.plane3DButton, plane3DVisible);
+  placeButton(state.solid3DButton, solid3DVisible);
+  placeButton(state.round3DButton, round3DVisible);
+  placeDivider(state.angleIntersectionDivider, shapeGroupVisible && (angleGroupVisible || analysisGroupVisible));
   placeButton(state.angleButton, angleGroupVisible);
-  placeDivider(state.functionDivider, functionsVisible);
-  placeButton(state.functionButton, functionVisible);
   placeButton(state.rootButton, analysisGroupVisible);
+  placeDivider(state.functionDivider, functionsVisible && (angleGroupVisible || analysisGroupVisible));
+  placeButton(state.functionButton, functionVisible);
 
   const regressionVisible = visibleRegressionButtons.length > 0;
   state.regressionDivider.dataset.visible = regressionVisible ? '1' : '0';
@@ -13913,9 +21107,33 @@ function applyDgsToolAvailability(state: DgsState): void {
   placeDivider(state.zoomDivider, viewVisible);
   placeButton(state.zoomModeButton, zoomVisible);
   placeButton(state.axisScaleButton, axisScaleVisible);
-  state.menuScrollSpacer.style.left = (left + 97) + 'px';
+  const segment6Button = state.menuBar.querySelector<HTMLButtonElement>('.lia-dgs-segment6-button');
+  if (segment6Button) {
+    const visible = state.board.__liaSceneMode === '3d' && DGS_3D_ADVANCED_TOOLS.some(tool =>
+      state.availableToolIds == null || state.availableToolIds.has(tool.id));
+    segment6Button.hidden = !visible;
+    segment6Button.disabled = !visible;
+    placeButton(segment6Button, visible);
+    setDgsButtonTabIndex(segment6Button, state.open && visible);
+  }
+  const sceneModeControls = state.boardContainer.querySelector<HTMLElement>('.lia-coordinate-3d-controls');
+  if (sceneModeControls) {
+    const switchable = state.sceneModePolicy === 'switchable';
+    sceneModeControls.hidden = !switchable;
+    state.sceneModeDivider.hidden = true;
+    if (switchable && sceneModeControls.parentElement !== state.menuEndGroup) {
+      state.menuEndGroup.insertBefore(sceneModeControls, state.menuEndGroup.firstChild);
+    }
+    sceneModeControls.querySelectorAll<HTMLButtonElement>('.lia-coordinate-scene-mode-button').forEach(button => {
+      button.hidden = !switchable;
+      button.disabled = !switchable;
+      setDgsButtonTabIndex(button, state.open && switchable);
+    });
+  }
+  state.menuScrollSpacer.style.left = (left + 144) + 'px';
 
   setDgsButtonTabIndex(state.selectButton, state.open);
+  setDgsButtonTabIndex(state.constructionColorButton, state.open && constructionColorVisible);
   [
     state.setSquareButton,
     state.compassButton,
@@ -13924,6 +21142,10 @@ function applyDgsToolAvailability(state: DgsState): void {
     state.segmentButton,
     state.orthogonalButton,
     state.polygonButton,
+    state.round2DButton,
+    state.plane3DButton,
+    state.round3DButton,
+    state.solid3DButton,
     state.angleButton,
     state.functionButton,
     state.rootButton,
@@ -13936,6 +21158,10 @@ function applyDgsToolAvailability(state: DgsState): void {
   setDgsButtonTabIndex(state.objectListButton, state.open);
 
   [
+    state.pointToolButton,
+    state.pointCoordinatesToolButton
+  ].forEach((button) => setDgsButtonTabIndex(button, state.pointSubmenuOpen));
+  [
     state.compassToolButton,
     state.fixedRadiusCompassToolButton
   ].forEach((button) => setDgsButtonTabIndex(button, state.compassSubmenuOpen));
@@ -13943,6 +21169,7 @@ function applyDgsToolAvailability(state: DgsState): void {
     state.segmentToolButton,
     state.rayToolButton,
     state.lineToolButton,
+    state.lineEquationToolButton,
     state.vectorToolButton,
     state.arcToolButton
   ].forEach((button) => setDgsButtonTabIndex(button, state.geometrySubmenuOpen));
@@ -13950,9 +21177,20 @@ function applyDgsToolAvailability(state: DgsState): void {
     state.orthogonalToolButton,
     state.parallelToolButton,
     state.midpointToolButton,
-    state.angleBisectorToolButton
+    state.angleBisectorToolButton,
+    state.reflectLineToolButton,
+    state.reflectPointToolButton,
+    state.rotatePointToolButton,
+    state.dilatePointToolButton,
+    ...state.spatialTransformToolButtons.map(entry => entry.button)
   ].forEach((button) => setDgsButtonTabIndex(button, state.relationSubmenuOpen));
-  [state.polygonToolButton, state.circleToolButton, state.sectorToolButton]
+  [state.polygonToolButton, state.circleToolButton, state.sectorToolButton, state.ellipseToolButton,
+   state.planeThreePointsToolButton, state.planePointNormalToolButton, state.planePointVectorsToolButton,
+   state.planeEquationToolButton,
+   state.circle3DThreePointsToolButton, state.circle3DCenterNormalPointToolButton,
+   state.sphere3DCenterPointToolButton, state.sphere3DFourPointsToolButton,
+   state.sphere3DCenterRadiusToolButton,
+   ...state.spatialBodyToolButtons.map(entry => entry.button)]
     .forEach((button) => setDgsButtonTabIndex(button, state.shapeSubmenuOpen));
   [state.angleToolButton, state.measuredAngleToolButton]
     .forEach((button) => setDgsButtonTabIndex(button, state.angleSubmenuOpen));
@@ -13984,6 +21222,7 @@ function applyDgsToolAvailability(state: DgsState): void {
     regressionMenu.style.left = Math.min(parseFloat(toolsButton.style.left) || 0, popupMaxLeft) + 'px';
   }
   positionOpenDgsSubmenu(state);
+  if (capabilityChanged) state.boardContainer.dispatchEvent(new CustomEvent('lia-dgs-tool-availability-change'));
 }
 
 window.__refreshDgsToolAvailabilityForBoard = function(boardId: string): void {
@@ -14006,6 +21245,7 @@ function applyLayout(state: DgsState): void {
   state.angleDialog.style.color = tone;
   state.compassRadiusDialog.style.color = tone;
   state.arcDialog.style.color = tone;
+  state.equationDialog.style.color = tone;
   state.functionDialog.style.color = tone;
   state.textDialog.style.color = tone;
   state.exportDialog.style.color = tone;
@@ -14024,6 +21264,8 @@ function applyLayout(state: DgsState): void {
   state.compassRadiusDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.arcDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.arcDialog.style.setProperty('--lia-dgs-theme-color', accent);
+  state.equationDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
+  state.equationDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.functionDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
   state.functionDialog.style.setProperty('--lia-dgs-theme-color', accent);
   state.textDialog.style.setProperty('--lia-dgs-menu-bg', menuBackground);
@@ -14306,6 +21548,7 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   state.sideMenuOpen = open;
   state.sideMenu.dataset.open = open ? '1' : '0';
   state.sideMenu.classList.toggle('is-open', open);
+  state.boardContainer.style.setProperty('--lia-dgs-right-panels', targetRightPanelInset(state) + 'px');
   state.sideMenu.dataset.objectListOpen = state.objectListOpen ? '1' : '0';
   state.sideMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.sideMenuCloseButton.tabIndex = open ? 0 : -1;
@@ -14313,10 +21556,18 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   const coordinatesAvailable = open && !state.coordinateSection.hidden;
   state.xCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
   state.yCoordinateInput.tabIndex = coordinatesAvailable ? 0 : -1;
+  state.zCoordinateInput.tabIndex = coordinatesAvailable && !!state.contextObject?.__liaPoint3D ? 0 : -1;
+  const vectorComponentsAvailable = open && !state.vectorComponentsSection.hidden;
+  [state.vectorXInput, state.vectorYInput, state.vectorZInput].forEach((input) => {
+    input.tabIndex = vectorComponentsAvailable && !input.disabled ? 0 : -1;
+  });
   state.angleMeasureInput.tabIndex = open && !state.angleMeasureSection.hidden ? 0 : -1;
   state.arcExitAngleInput.tabIndex = open && !state.arcSettingsSection.hidden ? 0 : -1;
   state.arcEntryAngleInput.tabIndex = open && !state.arcSettingsSection.hidden ? 0 : -1;
+  state.roundRadiusInput.tabIndex = open && !state.roundGeometrySection.hidden && !state.roundRadiusInput.disabled ? 0 : -1;
   state.lineStyleSelect.tabIndex = open && !state.strokeStyleSection.hidden ? 0 : -1;
+  state.planeEquationSelect.tabIndex = open && !state.strokeStyleSection.hidden &&
+    !state.planeEquationField.hidden ? 0 : -1;
   state.strokeDesignSelect.tabIndex = open && !state.strokeStyleSection.hidden &&
     !state.strokeDesignField.hidden ? 0 : -1;
   state.strokeWidthInput.tabIndex = open && !state.strokeStyleSection.hidden &&
@@ -14325,12 +21576,17 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   state.textFontSizeInput.tabIndex = open && !state.textFontSizeSection.hidden ? 0 : -1;
   [state.sliderValueInput, state.sliderMinInput, state.sliderMaxInput, state.sliderStepInput]
     .forEach((input) => { input.tabIndex = open && !state.sliderSettingsSection.hidden ? 0 : -1; });
+  state.sliderAnimationSpeedInput.tabIndex = open && !state.sliderSettingsSection.hidden ? 0 : -1;
+  state.sliderAnimationControlCheckbox.tabIndex = open && !state.sliderSettingsSection.hidden ? 0 : -1;
+  state.locusSamplesInput.tabIndex = open && !state.locusSettingsSection.hidden ? 0 : -1;
   state.axisVariableInput.tabIndex = open && !state.axisLabelSection.hidden ? 0 : -1;
   state.axisDescriptionInput.tabIndex = open && !state.axisLabelSection.hidden ? 0 : -1;
   state.fixedCheckbox.tabIndex = open && !state.fixedOption.hidden ? 0 : -1;
+  state.bindingCheckbox.tabIndex = open && !state.bindingOption.hidden ? 0 : -1;
   state.nameCheckbox.tabIndex = open && !state.nameOption.hidden ? 0 : -1;
   state.objectCheckbox.tabIndex = open && !state.objectOption.hidden ? 0 : -1;
   state.traceCheckbox.tabIndex = open && !state.traceOption.hidden ? 0 : -1;
+  state.locusCheckbox.tabIndex = open && !state.locusOption.hidden ? 0 : -1;
   state.measurementCheckbox.tabIndex = open && !state.measurementOption.hidden ? 0 : -1;
   state.areaCheckbox.tabIndex = open && !state.areaOption.hidden ? 0 : -1;
   state.perimeterCheckbox.tabIndex = open && !state.perimeterOption.hidden ? 0 : -1;
@@ -14342,6 +21598,10 @@ function setSideMenuOpen(state: DgsState, open: boolean): void {
   state.deleteButton.tabIndex = open && !state.deleteButton.hidden ? 0 : -1;
   if (!open) {
     setColorPopupOpen(state, false);
+    state.pendingPointBindingPoint = null;
+    state.bindingCheckbox.indeterminate = false;
+    state.pendingLocusTarget = null;
+    state.locusCheckbox.indeterminate = false;
     state.contextObject = null;
     resetDeleteButton(state);
   }
@@ -14358,6 +21618,7 @@ function setObjectListOpen(state: DgsState, open: boolean): void {
   state.objectListOpen = open;
   state.objectListPanel.dataset.open = open ? '1' : '0';
   state.objectListPanel.classList.toggle('is-open', open);
+  state.boardContainer.style.setProperty('--lia-dgs-right-panels', targetRightPanelInset(state) + 'px');
   state.objectListPanel.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.objectListButton.classList.toggle('is-active', open);
   state.objectListButton.setAttribute('aria-pressed', open ? 'true' : 'false');
@@ -14435,7 +21696,11 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.pointButton.tabIndex = open ? 0 : -1;
   state.segmentButton.tabIndex = open ? 0 : -1;
   state.orthogonalButton.tabIndex = open ? 0 : -1;
-  state.polygonButton.tabIndex = open ? 0 : -1;
+  state.polygonButton.tabIndex = open && !state.polygonButton.hidden ? 0 : -1;
+  state.round2DButton.tabIndex = open && !state.round2DButton.hidden ? 0 : -1;
+  state.plane3DButton.tabIndex = open && !state.plane3DButton.hidden ? 0 : -1;
+  state.round3DButton.tabIndex = open && !state.round3DButton.hidden ? 0 : -1;
+  state.solid3DButton.tabIndex = open && !state.solid3DButton.hidden ? 0 : -1;
   state.angleButton.tabIndex = open ? 0 : -1;
   state.functionButton.tabIndex = open ? 0 : -1;
   state.rootButton.tabIndex = open ? 0 : -1;
@@ -14447,6 +21712,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   state.objectListButton.tabIndex = open ? 0 : -1;
   if (state.colorPopupOpen) setColorPopupOpen(state, true);
   if (!open) setCompassSubmenuOpen(state, false);
+  if (!open) setPointSubmenuOpen(state, false);
   if (!open) setGeometrySubmenuOpen(state, false);
   if (!open) setRelationSubmenuOpen(state, false);
   if (!open) setShapeSubmenuOpen(state, false);
@@ -14454,6 +21720,7 @@ function setMenuOpen(state: DgsState, open: boolean): void {
   if (!open) setRootSubmenuOpen(state, false);
   if (!open) setAxisScaleSubmenuOpen(state, false);
   if (!open) setFunctionDialogOpen(state, false);
+  if (!open) setDgsEquationDialogOpen(state, null, false);
   if (!open) setCompassRadiusDialogOpen(state, false);
   if (!open) setTextDialogOpen(state, false);
   if (!open) setExportDialogOpen(state, false);
@@ -14488,9 +21755,50 @@ function positionDgsSubmenu(
   submenu.style.left = `${Math.round(left)}px`;
 }
 
+function renderDgsConstructionColorMenu(state: DgsState): void {
+  const selected = normalizeHexColor(state.construction3DColor) || '#ff00ff';
+  state.construction3DColor = selected;
+  state.constructionColorButton.style.setProperty('--lia-dgs-construction-color', selected);
+  state.constructionColorMenu.querySelectorAll<HTMLButtonElement>('.lia-dgs-construction-color-item')
+    .forEach((item) => {
+      const active = normalizeHexColor(item.dataset.color) === selected;
+      item.dataset.active = active ? '1' : '0';
+      item.setAttribute('aria-pressed', active ? 'true' : 'false');
+      item.tabIndex = state.constructionColorMenuOpen ? 0 : -1;
+    });
+}
+
+function setDgsConstructionColorMenuOpen(state: DgsState, requestedOpen: boolean): void {
+  const open = requestedOpen && state.board.__liaSceneMode === '3d';
+  if (open) {
+    setPointSubmenuOpen(state, false);
+    setCompassSubmenuOpen(state, false);
+    setGeometrySubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setAxisScaleSubmenuOpen(state, false);
+    positionDgsSubmenu(state, state.constructionColorMenu, state.constructionColorButton);
+  }
+  state.constructionColorMenuOpen = open;
+  state.constructionColorMenu.dataset.open = open ? '1' : '0';
+  state.constructionColorMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.constructionColorButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  renderDgsConstructionColorMenu(state);
+  if (open) announceDgsFlyoutOpen(state, state.constructionColorMenu);
+}
 function positionOpenDgsSubmenu(state: DgsState): void {
+  if (state.constructionColorMenuOpen) {
+    positionDgsSubmenu(state, state.constructionColorMenu, state.constructionColorButton);
+    return;
+  }
   if (state.compassSubmenuOpen) {
     positionDgsSubmenu(state, state.compassSubmenu, state.compassButton);
+    return;
+  }
+  if (state.pointSubmenuOpen) {
+    positionDgsSubmenu(state, state.pointSubmenu, state.pointButton);
     return;
   }
   if (state.geometrySubmenuOpen) {
@@ -14502,7 +21810,7 @@ function positionOpenDgsSubmenu(state: DgsState): void {
     return;
   }
   if (state.shapeSubmenuOpen) {
-    positionDgsSubmenu(state, state.shapeSubmenu, state.polygonButton);
+    positionDgsSubmenu(state, state.shapeSubmenu, state.shapeSubmenuAnchor || state.polygonButton);
     return;
   }
   if (state.angleSubmenuOpen) {
@@ -14518,7 +21826,32 @@ function positionOpenDgsSubmenu(state: DgsState): void {
   }
 }
 
+function announceDgsFlyoutOpen(state: DgsState, owner: HTMLElement): void {
+  state.boardContainer.dispatchEvent(new CustomEvent('lia-dgs-flyout-open', {
+    detail: { owner }
+  }));
+}
+
+function setPointSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setCompassSubmenuOpen(state, false);
+  if (open) setGeometrySubmenuOpen(state, false);
+  if (open) setRelationSubmenuOpen(state, false);
+  if (open) setShapeSubmenuOpen(state, false);
+  if (open) setAngleSubmenuOpen(state, false);
+  if (open) setRootSubmenuOpen(state, false);
+  if (open) setAxisScaleSubmenuOpen(state, false);
+  if (open) positionDgsSubmenu(state, state.pointSubmenu, state.pointButton);
+  state.pointSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.pointSubmenu);
+  state.pointSubmenu.dataset.open = open ? '1' : '0';
+  state.pointSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.pointButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+  [state.pointToolButton, state.pointCoordinatesToolButton]
+    .forEach((button) => setDgsButtonTabIndex(button, open));
+}
+
 function setCompassSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setGeometrySubmenuOpen(state, false);
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
@@ -14527,6 +21860,7 @@ function setCompassSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAxisScaleSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.compassSubmenu, state.compassButton);
   state.compassSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.compassSubmenu);
   state.compassSubmenu.dataset.open = open ? '1' : '0';
   state.compassSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.compassButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14535,6 +21869,7 @@ function setCompassSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open) setRelationSubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
@@ -14543,6 +21878,7 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAxisScaleSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.geometrySubmenu, state.segmentButton);
   state.geometrySubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.geometrySubmenu);
   state.geometrySubmenu.dataset.open = open ? '1' : '0';
   state.geometrySubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.segmentButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14556,6 +21892,7 @@ function setGeometrySubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open) setGeometrySubmenuOpen(state, false);
   if (open) setShapeSubmenuOpen(state, false);
@@ -14564,6 +21901,7 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAxisScaleSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.relationSubmenu, state.orthogonalButton);
   state.relationSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.relationSubmenu);
   state.relationSubmenu.dataset.open = open ? '1' : '0';
   state.relationSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.orthogonalButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14571,11 +21909,16 @@ function setRelationSubmenuOpen(state: DgsState, open: boolean): void {
     state.orthogonalToolButton,
     state.parallelToolButton,
     state.midpointToolButton,
-    state.angleBisectorToolButton
+    state.angleBisectorToolButton,
+    state.reflectLineToolButton,
+    state.reflectPointToolButton,
+    state.rotatePointToolButton,
+    state.dilatePointToolButton
   ].forEach((button) => setDgsButtonTabIndex(button, open));
 }
 
 function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) {
     state.geometrySubmenuOpen = false;
@@ -14592,16 +21935,31 @@ function setShapeSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setAngleSubmenuOpen(state, false);
   if (open) setRootSubmenuOpen(state, false);
   if (open) setAxisScaleSubmenuOpen(state, false);
-  if (open) positionDgsSubmenu(state, state.shapeSubmenu, state.polygonButton);
+
+  const activeGroup = String(state.shapeSubmenu.dataset.dgsActiveGroup || 'angular2d');
+  let visibleSections = 0;
+  state.shapeSubmenu.querySelectorAll<HTMLElement>('.lia-dgs-tool-section').forEach(section => {
+    const available = section.dataset.dgsAvailable !== '0';
+    const matches = section.dataset.dgsShapeGroup === activeGroup;
+    section.hidden = !available || !matches;
+    if (!section.hidden) visibleSections += 1;
+  });
+  state.shapeSubmenu.style.setProperty('--lia-dgs-visible-sections', String(Math.max(1, visibleSections)));
+  if (open) positionDgsSubmenu(state, state.shapeSubmenu, state.shapeSubmenuAnchor || state.polygonButton);
   state.shapeSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.shapeSubmenu);
   state.shapeSubmenu.dataset.open = open ? '1' : '0';
   state.shapeSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
-  state.polygonButton.setAttribute('aria-expanded', open ? 'true' : 'false');
-  [state.polygonToolButton, state.circleToolButton, state.sectorToolButton]
-    .forEach((button) => setDgsButtonTabIndex(button, open));
+  [state.polygonButton, state.round2DButton, state.plane3DButton, state.round3DButton, state.solid3DButton]
+    .forEach(button => button.setAttribute('aria-expanded', 'false'));
+  if (open) state.shapeSubmenuAnchor.setAttribute('aria-expanded', 'true');
+  state.shapeSubmenu.querySelectorAll<HTMLButtonElement>('.lia-dgs-geometry-tool').forEach(button => {
+    const section = button.closest<HTMLElement>('.lia-dgs-tool-section');
+    setDgsButtonTabIndex(button, open && !!section && !section.hidden);
+  });
 }
-
 function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
@@ -14610,6 +21968,7 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.angleSubmenu, state.angleButton);
   state.angleSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.angleSubmenu);
   state.angleSubmenu.dataset.open = open ? '1' : '0';
   state.angleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.angleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14618,6 +21977,7 @@ function setAngleSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setRootSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open && state.geometrySubmenuOpen) setGeometrySubmenuOpen(state, false);
   if (open && state.relationSubmenuOpen) setRelationSubmenuOpen(state, false);
@@ -14626,6 +21986,7 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
   if (open && state.axisScaleSubmenuOpen) setAxisScaleSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.rootSubmenu, state.rootButton);
   state.rootSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.rootSubmenu);
   state.rootSubmenu.dataset.open = open ? '1' : '0';
   state.rootSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.rootButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14640,6 +22001,7 @@ function setRootSubmenuOpen(state: DgsState, open: boolean): void {
 }
 
 function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
+  if (open) setPointSubmenuOpen(state, false);
   if (open) setCompassSubmenuOpen(state, false);
   if (open) setGeometrySubmenuOpen(state, false);
   if (open) setRelationSubmenuOpen(state, false);
@@ -14648,6 +22010,7 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
   if (open) setRootSubmenuOpen(state, false);
   if (open) positionDgsSubmenu(state, state.axisScaleSubmenu, state.axisScaleButton);
   state.axisScaleSubmenuOpen = open;
+  if (open) announceDgsFlyoutOpen(state, state.axisScaleSubmenu);
   state.axisScaleSubmenu.dataset.open = open ? '1' : '0';
   state.axisScaleSubmenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   state.axisScaleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -14661,6 +22024,7 @@ function setAxisScaleSubmenuOpen(state: DgsState, open: boolean): void {
 
 function setCompassRadiusDialogOpen(state: DgsState, open: boolean): void {
   if (open) {
+    setDgsEquationDialogOpen(state, null, false);
     setExportDialogOpen(state, false);
     setCompassSubmenuOpen(state, false);
   }
@@ -14697,7 +22061,10 @@ function confirmDgsCompassRadius(state: DgsState): boolean {
 }
 
 function setAngleDialogOpen(state: DgsState, open: boolean): void {
-  if (open) setExportDialogOpen(state, false);
+  if (open) {
+    setDgsEquationDialogOpen(state, null, false);
+    setExportDialogOpen(state, false);
+  }
   state.angleDialogOpen = open;
   state.angleDialog.dataset.open = open ? '1' : '0';
   state.angleDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -14705,7 +22072,16 @@ function setAngleDialogOpen(state: DgsState, open: boolean): void {
   state.angleDialogConfirmButton.tabIndex = open ? 0 : -1;
   state.angleDialogCancelButton.tabIndex = open ? 0 : -1;
   if (open) {
-    state.angleDialogInput.value = '90';
+    const dilation = state.activeTool === 'dilate-point';
+    const rotation = state.activeTool === 'rotate-point';
+    state.angleDialogTitle.textContent = dilation
+      ? dgsText(state.language).dilationFactor
+      : (rotation ? dgsText(state.language).rotationAngle : dgsText(state.language).createMeasuredAngle);
+    state.angleDialogUnit.textContent = dilation ? '' : '°';
+    state.angleDialogInput.setAttribute('aria-label', dilation
+      ? dgsText(state.language).dilationFactor
+      : dgsText(state.language).angleMeasure);
+    state.angleDialogInput.value = dilation ? '2' : '90';
     state.angleDialogInput.setAttribute('aria-invalid', 'false');
     window.setTimeout(() => {
       try { state.angleDialogInput.focus(); state.angleDialogInput.select(); } catch (e) {}
@@ -14719,7 +22095,10 @@ function setArcDialogOpen(state: DgsState, open: boolean): void {
     state.pendingArcPoints = [];
     return;
   }
-  if (open) setExportDialogOpen(state, false);
+  if (open) {
+    setDgsEquationDialogOpen(state, null, false);
+    setExportDialogOpen(state, false);
+  }
   state.arcDialogOpen = open;
   state.arcDialog.dataset.open = open ? '1' : '0';
   state.arcDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -14763,8 +22142,278 @@ function createDgsArcFromDialog(state: DgsState): boolean {
   return true;
 }
 
+function renderDgsEquationDialog(state: DgsState): void {
+  const isGerman = state.language === 'de';
+  const kind = state.equationDialogKind;
+  const is3D = state.board.__liaSceneMode === '3d';
+  state.equationDialogInputs = {};
+  state.equationDialogFields.replaceChildren();
+  state.equationDialogFormSwitch.replaceChildren();
+  const titles = {
+    point: isGerman ? 'Punkt aus Koordinaten' : 'Point from coordinates',
+    line: isGerman ? 'Gerade aus Geradengleichung' : 'Line from equation',
+    plane: isGerman ? 'Ebene aus Ebenengleichung' : 'Plane from equation'
+  };
+  state.equationDialogTitle.textContent = kind ? titles[kind] : '';
+
+  if (kind === 'plane') {
+    state.equationDialogFormSwitch.setAttribute(
+      'aria-label',
+      isGerman ? 'Form der Ebenengleichung' : 'Plane equation form'
+    );
+    const forms: Array<{ form: DgsState['equationDialogPlaneForm']; label: string }> = [
+      { form: 'parameter', label: isGerman ? 'Parameterform' : 'Parametric form' },
+      { form: 'normal', label: isGerman ? 'Normalenform' : 'Normal form' },
+      { form: 'coordinate', label: isGerman ? 'Koordinatenform' : 'Coordinate form' }
+    ];
+    forms.forEach(({ form, label }) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'lia-dgs-equation-form-button';
+      button.textContent = label;
+      button.setAttribute('aria-pressed', state.equationDialogPlaneForm === form ? 'true' : 'false');
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.equationDialogPlaneForm = form;
+        renderDgsEquationDialog(state);
+        window.setTimeout(() => state.equationDialogInputs.px?.focus(), 0);
+      });
+      state.equationDialogFormSwitch.appendChild(button);
+    });
+  }
+  state.equationDialogFormSwitch.hidden = kind !== 'plane';
+
+  const makeInput = (key: string, label: string, value: number) => {
+    const wrapper = document.createElement('label');
+    wrapper.className = 'lia-dgs-equation-component';
+    const caption = document.createElement('span');
+    caption.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.className = 'lia-dgs-angle-dialog-input';
+    input.value = String(value);
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', label);
+    input.setAttribute('aria-invalid', 'false');
+    input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        confirmDgsEquationDialog(state);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setDgsEquationDialogOpen(state, null, false);
+      } else if (event.key.startsWith('Arrow')) {
+        event.stopPropagation();
+      }
+    });
+    wrapper.append(caption, input);
+    state.equationDialogInputs[key] = input;
+    return wrapper;
+  };
+
+  const makeVectorRow = (
+    captionText: string,
+    prefix: string,
+    values: [number, number, number]
+  ) => {
+    const row = document.createElement('div');
+    row.className = 'lia-dgs-equation-row';
+    const caption = document.createElement('div');
+    caption.className = 'lia-dgs-equation-row-caption';
+    caption.textContent = captionText;
+    row.appendChild(caption);
+    row.appendChild(makeInput(prefix + 'x', 'x', values[0]));
+    row.appendChild(makeInput(prefix + 'y', 'y', values[1]));
+    if (is3D) row.appendChild(makeInput(prefix + 'z', 'z', values[2]));
+    state.equationDialogFields.appendChild(row);
+  };
+  const makeHint = (value: string) => {
+    const hint = document.createElement('div');
+    hint.className = 'lia-dgs-equation-hint';
+    hint.textContent = value;
+    state.equationDialogFields.appendChild(hint);
+  };
+
+  if (kind === 'point') {
+    makeVectorRow(isGerman ? 'Koordinaten' : 'Coordinates', 'p', [0, 0, 0]);
+  } else if (kind === 'line') {
+    makeHint('g: X = P + t · v');
+    makeVectorRow(isGerman ? 'Aufpunkt P' : 'Support point P', 'p', [0, 0, 0]);
+    makeVectorRow(isGerman ? 'Richtungsvektor v' : 'Direction vector v', 'v', [1, 0, 0]);
+  } else if (kind === 'plane') {
+    if (state.equationDialogPlaneForm === 'parameter') {
+      makeHint('E: X = P + r · u + s · v');
+      makeVectorRow(isGerman ? 'Aufpunkt P' : 'Support point P', 'p', [0, 0, 0]);
+      makeVectorRow(isGerman ? 'Spannvektor u' : 'Span vector u', 'u', [1, 0, 0]);
+      makeVectorRow(isGerman ? 'Spannvektor v' : 'Span vector v', 'v', [0, 1, 0]);
+    } else if (state.equationDialogPlaneForm === 'normal') {
+      makeHint('E: n · (X − P) = 0');
+      makeVectorRow(isGerman ? 'Aufpunkt P' : 'Support point P', 'p', [0, 0, 0]);
+      makeVectorRow(isGerman ? 'Normalenvektor n' : 'Normal vector n', 'n', [0, 0, 1]);
+    } else {
+      makeHint('E: a · x + b · y + c · z = d');
+      makeVectorRow(isGerman ? 'Koeffizienten a, b, c' : 'Coefficients a, b, c', '', [0, 0, 1]);
+      const row = document.createElement('div');
+      row.className = 'lia-dgs-equation-row';
+      const caption = document.createElement('div');
+      caption.className = 'lia-dgs-equation-row-caption';
+      caption.textContent = isGerman ? 'Rechte Seite' : 'Right side';
+      row.appendChild(caption);
+      row.appendChild(makeInput('d', 'd', 0));
+      state.equationDialogFields.appendChild(row);
+    }
+  }
+}
+
+function setDgsEquationDialogOpen(
+  state: DgsState,
+  kind: DgsState['equationDialogKind'],
+  requestedOpen: boolean
+): void {
+  const open = requestedOpen && kind != null &&
+    (kind !== 'plane' || state.board.__liaSceneMode === '3d');
+  if (open) {
+    setExportDialogOpen(state, false);
+    setPointSubmenuOpen(state, false);
+    setGeometrySubmenuOpen(state, false);
+    setShapeSubmenuOpen(state, false);
+    setRelationSubmenuOpen(state, false);
+    setAngleSubmenuOpen(state, false);
+    setRootSubmenuOpen(state, false);
+    setActiveTool(state, '', false);
+    setAngleDialogOpen(state, false);
+    setCompassRadiusDialogOpen(state, false);
+    setArcDialogOpen(state, false);
+    setFunctionDialogOpen(state, false);
+    setTextDialogOpen(state, false);
+    state.equationDialogKind = kind;
+    renderDgsEquationDialog(state);
+  }
+  state.equationDialogOpen = open;
+  if (!open) state.equationDialogKind = null;
+  state.equationDialog.dataset.open = open ? '1' : '0';
+  state.equationDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
+  state.equationDialogConfirmButton.tabIndex = open ? 0 : -1;
+  state.equationDialogCancelButton.tabIndex = open ? 0 : -1;
+  Object.values(state.equationDialogInputs).forEach(input => { input.tabIndex = open ? 0 : -1; });
+  if (open) {
+    window.setTimeout(() => {
+      const firstInput = Object.values(state.equationDialogInputs)[0];
+      try { firstInput?.focus(); firstInput?.select(); } catch (error) {}
+    }, 0);
+  }
+}
+
+function confirmDgsEquationDialog(state: DgsState): boolean {
+  const inputs = state.equationDialogInputs;
+  let valid = true;
+  const read = (key: string, fallback = 0) => {
+    const input = inputs[key];
+    if (!input) return fallback;
+    const raw = String(input.value || '').trim().replace(',', '.');
+    const value = Number(raw);
+    const inputValid = raw !== '' && Number.isFinite(value);
+    input.setAttribute('aria-invalid', inputValid ? 'false' : 'true');
+    valid = valid && inputValid;
+    return inputValid ? value : fallback;
+  };
+  const point: Vector3 = [read('px'), read('py'), read('pz')];
+  const markInvalid = (keys: string[]) => {
+    keys.forEach(key => inputs[key]?.setAttribute('aria-invalid', 'true'));
+    valid = false;
+  };
+  const nonZero = (vector: Vector3) => Math.hypot(vector[0], vector[1], vector[2]) > 1e-10;
+  const kind = state.equationDialogKind;
+  let direction: Vector3 = [0, 0, 0];
+  let firstVector: Vector3 = [0, 0, 0];
+  let secondVector: Vector3 = [0, 0, 0];
+  let normal: Vector3 = [0, 0, 0];
+  let coordinateD = 0;
+
+  if (kind === 'line') {
+    direction = [read('vx'), read('vy'), read('vz')];
+    if (!nonZero(direction)) markInvalid(['vx', 'vy', 'vz']);
+  } else if (kind === 'plane' && state.equationDialogPlaneForm === 'parameter') {
+    firstVector = [read('ux'), read('uy'), read('uz')];
+    secondVector = [read('vx'), read('vy'), read('vz')];
+    const cross: Vector3 = [
+      firstVector[1] * secondVector[2] - firstVector[2] * secondVector[1],
+      firstVector[2] * secondVector[0] - firstVector[0] * secondVector[2],
+      firstVector[0] * secondVector[1] - firstVector[1] * secondVector[0]
+    ];
+    if (!nonZero(firstVector)) markInvalid(['ux', 'uy', 'uz']);
+    if (!nonZero(secondVector)) markInvalid(['vx', 'vy', 'vz']);
+    if (!nonZero(cross)) markInvalid(['ux', 'uy', 'uz', 'vx', 'vy', 'vz']);
+  } else if (kind === 'plane' && state.equationDialogPlaneForm === 'normal') {
+    normal = [read('nx'), read('ny'), read('nz')];
+    if (!nonZero(normal)) markInvalid(['nx', 'ny', 'nz']);
+  } else if (kind === 'plane' && state.equationDialogPlaneForm === 'coordinate') {
+    normal = [read('x'), read('y'), read('z')];
+    coordinateD = read('d');
+    if (!nonZero(normal)) markInvalid(['x', 'y', 'z']);
+  }
+  if (!valid || !kind) return false;
+
+  const previousRestoring = state.restoring;
+  state.restoring = true;
+  let result: any = null;
+  try {
+    if (kind === 'point') {
+      result = createDgsPoint(state, point[0], point[1], null, point[2]);
+    } else if (kind === 'line') {
+      const support = createDgsPoint(state, point[0], point[1], null, point[2]);
+      const second = createDgsPoint(
+        state,
+        point[0] + direction[0],
+        point[1] + direction[1],
+        null,
+        point[2] + direction[2]
+      );
+      result = support && second ? createDgsLine(state, support, second) : null;
+    } else if (state.equationDialogPlaneForm === 'parameter') {
+      const support = createDgsPoint(state, point[0], point[1], null, point[2]);
+      const first = support ? createDgsFreeVector3D(state, support, firstVector) : null;
+      const second = support ? createDgsFreeVector3D(state, support, secondVector) : null;
+      result = support && first && second
+        ? createDgsPlane(state, 'point-vectors', [support], [first, second])
+        : null;
+    } else {
+      let supportPoint = point;
+      if (state.equationDialogPlaneForm === 'coordinate') {
+        const axis = Math.abs(normal[0]) >= Math.abs(normal[1]) && Math.abs(normal[0]) >= Math.abs(normal[2])
+          ? 0
+          : (Math.abs(normal[1]) >= Math.abs(normal[2]) ? 1 : 2);
+        supportPoint = [0, 0, 0];
+        supportPoint[axis] = coordinateD / normal[axis];
+      }
+      const support = createDgsPoint(state, supportPoint[0], supportPoint[1], null, supportPoint[2]);
+      const normalVector = support ? createDgsFreeVector3D(state, support, normal) : null;
+      result = support && normalVector
+        ? createDgsPlane(state, 'point-normal', [support], [normalVector])
+        : null;
+    }
+    if (result && kind === 'plane') result.__liaDgsPlaneEquationForm = state.equationDialogPlaneForm;
+  } finally {
+    state.restoring = previousRestoring;
+  }
+  if (!result) return false;
+  persistDgsConstruction(state, true);
+  try { state.board.update?.(); } catch (error) {}
+  setDgsEquationDialogOpen(state, null, false);
+  return true;
+}
+
 function setFunctionDialogOpen(state: DgsState, open: boolean): void {
-  if (open) setExportDialogOpen(state, false);
+  if (open) {
+    setDgsEquationDialogOpen(state, null, false);
+    setExportDialogOpen(state, false);
+  }
   state.functionDialogOpen = open;
   state.functionDialog.dataset.open = open ? '1' : '0';
   state.functionDialog.setAttribute('aria-hidden', open ? 'false' : 'true');
@@ -14814,23 +22463,32 @@ function setTextDialogOpen(state: DgsState, open: boolean): void {
 
 function renderDgsExportToolSelection(state: DgsState): void {
   const text = dgsText(state.language);
-  state.exportToolButtons.forEach((button, id) => {
+  state.exportToolButtons.forEach((buttons, id) => {
     const enabled = state.exportSelectedToolIds.has(id);
-    button.dataset.enabled = enabled ? '1' : '0';
-    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-    button.setAttribute(
-      'aria-label',
-      String(button.title || '') + ': ' + (enabled ? text.toolAvailable : text.toolUnavailable)
-    );
-    const status = button.querySelector<HTMLElement>('.lia-dgs-export-tool-status');
-    if (status) status.textContent = enabled ? '\u2713' : '\u00d7';
-    button.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
+    buttons.forEach((button) => {
+      button.dataset.enabled = enabled ? '1' : '0';
+      button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      button.setAttribute(
+        'aria-label',
+        String(button.title || '') + ': ' + (enabled ? text.toolAvailable : text.toolUnavailable)
+      );
+      const status = button.querySelector<HTMLElement>('.lia-dgs-export-tool-status');
+      if (status) status.textContent = enabled ? '\u2713' : '\u00d7';
+      button.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
+    });
   });
 }
 
 function renderDgsExportRestrictionSelection(state: DgsState): void {
   state.exportRestrictionInputs.forEach((input, id) => {
     input.checked = state.exportSelectedRestrictionIds.has(id);
+    input.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
+  });
+}
+
+function renderDgsExportSceneModeSelection(state: DgsState): void {
+  state.exportSceneModeInputs.forEach((input, policy) => {
+    input.checked = state.exportSceneModePolicy === policy;
     input.tabIndex = state.exportDialogOpen && state.exportDialogStep === 'tools' ? 0 : -1;
   });
 }
@@ -14848,19 +22506,21 @@ function setDgsExportDialogStep(state: DgsState, step: 'tools' | 'macro'): void 
   state.exportBackButton.tabIndex = state.exportDialogOpen && !toolsStep ? 0 : -1;
   renderDgsExportToolSelection(state);
   renderDgsExportRestrictionSelection(state);
+  renderDgsExportSceneModeSelection(state);
 
   if (!state.exportDialogOpen) return;
   if (!toolsStep) {
     state.exportTextarea.value = buildDgsExportMacroBlock(
       state,
       state.exportSelectedToolIds,
-      state.exportSelectedRestrictionIds
+      state.exportSelectedRestrictionIds,
+      state.exportSceneModePolicy
     );
   }
   window.setTimeout(() => {
     try {
       if (toolsStep) {
-        const first = Array.from(state.exportToolButtons.values())[0];
+        const first = Array.from(state.exportToolButtons.values())[0]?.[0];
         first?.focus();
       } else {
         state.exportTextarea.focus();
@@ -14885,12 +22545,16 @@ function setExportDialogOpen(state: DgsState, open: boolean): void {
         : dgsExportSelectableToolIds(state.availableToolIds)
     );
     state.exportSelectedRestrictionIds = new Set<number>(state.restrictionIds);
+    state.exportSceneModePolicy = state.sceneModePolicy;
     setDgsExportDialogStep(state, 'tools');
   } else {
     state.exportTextarea.tabIndex = -1;
     state.exportBackButton.tabIndex = -1;
-    state.exportToolButtons.forEach((button) => { button.tabIndex = -1; });
+    state.exportToolButtons.forEach((buttons) => {
+      buttons.forEach((button) => { button.tabIndex = -1; });
+    });
     state.exportRestrictionInputs.forEach((input) => { input.tabIndex = -1; });
+    state.exportSceneModeInputs.forEach((input) => { input.tabIndex = -1; });
     if (wasOpen) {
       window.setTimeout(() => {
         try {
@@ -14980,19 +22644,40 @@ function createMeasuredDgsAngleFromDialog(state: DgsState): boolean {
   } catch (e) { return false; }
 }
 
-function getDgsGeometryLanguage(anchor: HTMLElement | null, explicitLanguage?: string): 'de' | 'en' {
-  const candidates: string[] = [];
-  candidates.push(String(explicitLanguage || ''));
-  try { candidates.push(anchor?.dataset.language || ''); } catch (e) {}
-  try { candidates.push(anchor?.closest('[lang]')?.getAttribute('lang') || ''); } catch (e) {}
-  try { candidates.push(document.documentElement.lang || ''); } catch (e) {}
-  try { candidates.push(window.parent?.document?.documentElement?.lang || ''); } catch (e) {}
+function createDgsTransformationFromDialog(state: DgsState): boolean {
+  const kind = state.activeTool;
+  const isPointTransform = kind === 'rotate-point' || kind === 'dilate-point';
+  const isSpatialTransform = kind === 'rotate-axis3d' || kind === 'dilate3d';
+  if (!isPointTransform && !isSpatialTransform) return false;
+  const value = Number(String(state.angleDialogInput.value || '').trim().replace(',', '.'));
+  const dilation = kind === 'dilate-point' || kind === 'dilate3d';
+  const valid = Number.isFinite(value) && (!dilation || Math.abs(value) > 1e-12);
+  state.angleDialogInput.setAttribute('aria-invalid', valid ? 'false' : 'true');
+  if (!valid || !state.selectedTransformObject || !state.selectedTransformReference) return false;
+  const result = isSpatialTransform
+    ? createDgsTransformation3D(
+        state,
+        state.selectedTransformObject,
+        state.selectedTransformReference,
+        kind === 'rotate-axis3d' ? 'rotate-axis' : 'dilate',
+        value
+      )
+    : createDgsTransformedObject(
+        state,
+        state.selectedTransformObject,
+        kind as 'rotate-point' | 'dilate-point',
+        state.selectedTransformReference,
+        value
+      );
+  if (!result) return false;
+  persistDgsConstruction(state);
+  setActiveTool(state, '', false);
+  updateSideMenuControls(state, result);
+  return true;
+}
 
-  for (const candidate of candidates) {
-    if (/^de(?:-|$)/i.test(candidate)) return 'de';
-    if (/^en(?:-|$)/i.test(candidate)) return 'en';
-  }
-  return 'en';
+function getDgsGeometryLanguage(anchor: HTMLElement | null, explicitLanguage?: string): 'de' | 'en' {
+  return resolveUiLanguage(anchor, explicitLanguage);
 }
 
 function ensureDgsRegression(uid: string, boardId: string, language: 'de' | 'en'): void {
@@ -15025,6 +22710,18 @@ function restoreDgsBoardModes(state: DgsState): void {
 }
 
 function disposeDgsState(existing: DgsState): void {
+  existing.solidDraw3D?.destroy();
+  existing.solidDraw3D = undefined;
+  existing.axisDrag3D?.destroy();
+  existing.axisDrag3D = undefined;
+  try { existing.board?.__liaDgsSegment6ToolsCleanup?.(); } catch (e) {}
+  finishDgsMultiSelectDrag(existing, null, true);
+  setDgsMultiSelection(existing, []);
+  const sliderAnimationWasRunning = Array.from(existing.sliderAnimationSliders || [])
+    .some((slider) => slider && slider.__liaDgsSliderAnimating === true);
+  Array.from(existing.sliderAnimationSliders || [])
+    .forEach((slider) => removeDgsSliderAnimationControl(existing, slider));
+  if (sliderAnimationWasRunning) persistDgsConstruction(existing, false);
   persistDgsSetSquarePose(existing);
   cancelDgsSetSquareInteraction(existing);
   setActiveTool(existing, '', false);
@@ -15034,6 +22731,7 @@ function disposeDgsState(existing: DgsState): void {
   existing.axisSyncRAF = 0;
   if (existing.rootUpdateRAF != null) cancelAnimationFrame(existing.rootUpdateRAF);
   if (existing.coordinateSyncRAF != null) cancelAnimationFrame(existing.coordinateSyncRAF);
+  if (existing.locusUpdateTimer != null) window.clearTimeout(existing.locusUpdateTimer);
   if (existing.fixedCompassSyncRAF != null) cancelAnimationFrame(existing.fixedCompassSyncRAF);
   if (existing.setSquareLayoutRAF != null) cancelAnimationFrame(existing.setSquareLayoutRAF);
   if (existing.setSquarePersistTimer != null) window.clearTimeout(existing.setSquarePersistTimer);
@@ -15048,6 +22746,21 @@ function disposeDgsState(existing: DgsState): void {
   restoreAxis(existing);
   restoreXAxis(existing);
   restoreDgsBoardModes(existing);
+  if (existing.onSceneChange) {
+    existing.boardContainer.removeEventListener('lia-coordinate-scene-change', existing.onSceneChange);
+  }
+  if (existing.onFlyoutOpen) {
+    existing.boardContainer.removeEventListener('lia-dgs-flyout-open', existing.onFlyoutOpen);
+  }
+  if (existing.onScenePointerUp) {
+    existing.boardContainer.removeEventListener('pointerup', existing.onScenePointerUp, true);
+  }
+  if (existing.board && existing.board.__liaDgs3DHookState === existing) {
+    delete existing.board.__liaDgs3DHookState;
+    delete existing.board.__liaCanEnter3D;
+    delete existing.board.__liaPromoteFreePointsTo3D;
+    delete existing.board.__liaDgsRestoreInitialState;
+  }
   if (existing.onBoardPointerDown) {
     existing.boardContainer.removeEventListener('pointerdown', existing.onBoardPointerDown, true);
   }
@@ -15062,6 +22775,9 @@ function disposeDgsState(existing: DgsState): void {
   }
   if (existing.onDocumentPointerDown) {
     document.removeEventListener('pointerdown', existing.onDocumentPointerDown, true);
+  }
+  if (existing.onDocumentKeyDown) {
+    document.removeEventListener('keydown', existing.onDocumentKeyDown);
   }
   if (existing.onDocumentPointerUp) {
     document.removeEventListener('pointerup', existing.onDocumentPointerUp, true);
@@ -15099,6 +22815,7 @@ function disposeDgsState(existing: DgsState): void {
     });
   }
   releaseRegressionControls(existing);
+  existing.boardContainer.style.removeProperty('--lia-dgs-right-panels');
   try { existing.setSquareOverlay.remove(); } catch (e) {}
   try { existing.button.remove(); } catch (e) {}
   try { existing.menuClip.remove(); } catch (e) {}
@@ -15150,7 +22867,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
         const implicitRegressionOwnerMissing =
           !anchor &&
           uid === getDgsRegressionControllerUid(boardId) &&
-          getDgsRegressionRequestsForBoard(boardId).length === 0;
+          getDgsRegressionRequestsForBoard(boardId).length === 0 &&
+          !getDgsScharAnalysisOwner(boardId);
         if (
           implicitInstrumentOwnerMissing ||
           implicitRegressionOwnerMissing ||
@@ -15244,6 +22962,11 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.sliderMinInput?.isConnected &&
     !!existing.sliderMaxInput?.isConnected &&
     !!existing.sliderStepInput?.isConnected &&
+    !!existing.sliderAnimationSpeedRow?.isConnected &&
+    !!existing.sliderAnimationSpeedInput?.isConnected &&
+    !!existing.sliderAnimationSpeedValue?.isConnected &&
+    !!existing.sliderAnimationControlOption?.isConnected &&
+    !!existing.sliderAnimationControlCheckbox?.isConnected &&
     !!existing.lineColorButton?.isConnected &&
     !!existing.colorSection?.isConnected &&
     !!existing.functionExpressionSection?.isConnected &&
@@ -15251,6 +22974,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.functionExpressionInput?.isConnected &&
     !!existing.fixedOption?.isConnected &&
     !!existing.fixedCheckboxText?.isConnected &&
+    !!existing.bindingOption?.isConnected &&
+    !!existing.bindingCheckbox?.isConnected &&
     !!existing.traceOption?.isConnected &&
     !!existing.traceCheckbox?.isConnected &&
     !!existing.toolsDivider?.isConnected &&
@@ -15275,7 +23000,15 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.parallelToolButton?.isConnected &&
     !!existing.midpointToolButton?.isConnected &&
     !!existing.angleBisectorToolButton?.isConnected &&
+    !!existing.reflectLineToolButton?.isConnected &&
+    !!existing.reflectPointToolButton?.isConnected &&
+    !!existing.rotatePointToolButton?.isConnected &&
+    !!existing.dilatePointToolButton?.isConnected &&
     !!existing.polygonButton?.isConnected &&
+    !!existing.round2DButton?.isConnected &&
+    !!existing.plane3DButton?.isConnected &&
+    !!existing.round3DButton?.isConnected &&
+    !!existing.solid3DButton?.isConnected &&
     !!existing.angleButton?.isConnected &&
     !!existing.angleSubmenu?.isConnected &&
     !!existing.angleToolButton?.isConnected &&
@@ -15287,6 +23020,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.arcEntryAngleInput?.isConnected &&
     !!existing.strokeStyleSection?.isConnected &&
     !!existing.lineStyleSelect?.isConnected &&
+    !!existing.planeEquationField?.isConnected &&
+    !!existing.planeEquationSelect?.isConnected &&
     !!existing.strokeDesignField?.isConnected &&
     !!existing.strokeDesignSelect?.isConnected &&
     !!existing.strokeWidthField?.isConnected &&
@@ -15306,6 +23041,15 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     !!existing.polygonToolButton?.isConnected &&
     !!existing.circleToolButton?.isConnected &&
     !!existing.sectorToolButton?.isConnected &&
+    !!existing.ellipseToolButton?.isConnected &&
+    !!existing.planeThreePointsToolButton?.isConnected &&
+    !!existing.planePointNormalToolButton?.isConnected &&
+    !!existing.planePointVectorsToolButton?.isConnected &&
+    !!existing.circle3DThreePointsToolButton?.isConnected &&
+    !!existing.circle3DCenterNormalPointToolButton?.isConnected &&
+    !!existing.sphere3DCenterPointToolButton?.isConnected &&
+    !!existing.sphere3DFourPointsToolButton?.isConnected &&
+    !!existing.sphere3DCenterRadiusToolButton?.isConnected &&
     !!existing.functionDivider?.isConnected &&
     !!existing.functionButton?.isConnected &&
     !!existing.rootButton?.isConnected &&
@@ -15342,6 +23086,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     existing.exportToolButtons.size === DGS_EXPORT_SELECTABLE_TOOL_IDS.length &&
     existing.exportRestrictionInputs instanceof Map &&
     existing.exportRestrictionInputs.size === DGS_KNOWN_RESTRICTION_IDS.length &&
+    existing.exportSceneModeInputs instanceof Map &&
+    existing.exportSceneModeInputs.size === 3 &&
     Array.from(existing.exportRestrictionInputs.values()).every((input) => input.isConnected) &&
     existing.restrictionIds instanceof Set &&
     !!existing.exportTextarea?.isConnected &&
@@ -15377,11 +23123,15 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     const toolSelectionChanged = existing.toolSelectionKey !== config.toolSelectionKey;
     const restrictionSelectionChanged =
       existing.restrictionSelectionKey !== config.restrictionSelectionKey;
+    const sceneModePolicyChanged = existing.sceneModePolicy !== config.sceneModePolicy;
     existing.availableToolIds = config.toolIds == null ? null : new Set<number>(config.toolIds);
     existing.macroSpecSignature = currentMacroSpecSignature;
     existing.toolSelectionKey = config.toolSelectionKey;
     existing.restrictionIds = new Set<number>(config.restrictionIds);
     existing.restrictionSelectionKey = config.restrictionSelectionKey;
+    existing.sceneModePolicy = config.sceneModePolicy;
+    existing.exportSceneModePolicy = config.sceneModePolicy;
+    applyDgsSceneModePolicy(existing, config.sceneModePolicy);
     if (toolSelectionChanged) {
       existing.exportSelectedToolIds = new Set<number>(
         config.toolIds == null
@@ -15392,7 +23142,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (restrictionSelectionChanged) {
       existing.exportSelectedRestrictionIds = new Set<number>(config.restrictionIds);
     }
-    if (toolSelectionChanged || restrictionSelectionChanged) {
+    if (toolSelectionChanged || restrictionSelectionChanged || sceneModePolicyChanged) {
       setCompassSubmenuOpen(existing, false);
       setGeometrySubmenuOpen(existing, false);
       setRelationSubmenuOpen(existing, false);
@@ -15422,13 +23172,14 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   if (existing) {
     disposeDgsState(existing);
   }
-
   const menuClip = document.createElement('div');
   menuClip.className = 'lia-dgs-menu-clip';
 
   const menuBar = document.createElement('div');
   menuBar.id = `dgs-menu-${uid}`;
   menuBar.className = 'lia-dgs-top-menu';
+  menuBar.dataset.dgsBoardId = boardId;
+  menuBar.dataset.dgsLanguage = geometryLanguage;
   menuBar.setAttribute('role', 'navigation');
   menuBar.setAttribute('aria-label', geometryLanguage === 'de' ? 'DGS-Menüleiste' : 'DGS toolbar');
 
@@ -15441,6 +23192,43 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   selectButton.innerHTML = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-select-pointer d=M5,3.5V20l4.2-4.1,2.6,5.2,3.3-1.65-2.55-5.1H18Z></path></svg>';
   selectButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(selectButton);
+
+  const construction3DColor = normalizeHexColor(dgsConstructionColors[boardId]) || '#ff00ff';
+  const constructionColorButton = document.createElement('button');
+  constructionColorButton.type = 'button';
+  constructionColorButton.className = 'lia-dgs-geometry-button lia-dgs-construction-color-button';
+  constructionColorButton.setAttribute('aria-label', geometryLanguage === 'de'
+    ? 'Farbe für neue 3D-Objekte'
+    : 'Color for new 3D objects');
+  constructionColorButton.setAttribute('aria-haspopup', 'menu');
+  constructionColorButton.setAttribute('aria-expanded', 'false');
+  constructionColorButton.title = constructionColorButton.getAttribute('aria-label') || '';
+  constructionColorButton.style.setProperty('--lia-dgs-construction-color', construction3DColor);
+  constructionColorButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<path class="lia-dgs-color-pen" d="M4 20l4.7-1.1L19 8.6 15.4 5 5.1 15.3zM13.9 6.5l3.6 3.6"></path>' +
+    '<circle class="lia-dgs-color-dot" cx="17" cy="17" r="4"></circle></svg>';
+  constructionColorButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  menuBar.appendChild(constructionColorButton);
+
+  const constructionColorMenu = document.createElement('div');
+  constructionColorMenu.id = 'dgs-construction-color-menu-' + uid;
+  constructionColorMenu.className = 'lia-dgs-geometry-submenu lia-dgs-construction-color-menu';
+  constructionColorMenu.setAttribute('role', 'menu');
+  constructionColorMenu.setAttribute('aria-label', constructionColorButton.title);
+  constructionColorMenu.setAttribute('aria-hidden', 'true');
+  constructionColorMenu.dataset.open = '0';
+  constructionColorButton.setAttribute('aria-controls', constructionColorMenu.id);
+  DGS_CONSTRUCTION_COLORS.forEach((color) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'lia-dgs-construction-color-item';
+    item.dataset.color = color;
+    item.style.setProperty('--lia-dgs-swatch-color', color);
+    item.setAttribute('role', 'menuitemradio');
+    item.setAttribute('aria-label', (geometryLanguage === 'de' ? 'Farbe ' : 'Color ') + color);
+    constructionColorMenu.appendChild(item);
+  });
+  menuBar.appendChild(constructionColorMenu);
 
   const setSquareButton = document.createElement('button');
   setSquareButton.type = 'button';
@@ -15516,13 +23304,30 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   toolsDivider.className = 'lia-dgs-tools-divider';
   toolsDivider.setAttribute('aria-hidden', 'true');
   menuBar.appendChild(toolsDivider);
+  const shapeDivider = document.createElement('span');
+  shapeDivider.className = 'lia-dgs-shape-divider';
+  shapeDivider.setAttribute('aria-hidden', 'true');
+  menuBar.appendChild(shapeDivider);
+  const angleIntersectionDivider = document.createElement('span');
+  angleIntersectionDivider.className = 'lia-dgs-angle-intersection-divider';
+  angleIntersectionDivider.setAttribute('aria-hidden', 'true');
+  menuBar.appendChild(angleIntersectionDivider);
+  const sceneModeDivider = document.createElement('span');
+  sceneModeDivider.className = 'lia-dgs-scene-mode-divider';
+  sceneModeDivider.setAttribute('aria-hidden', 'true');
+  menuBar.appendChild(sceneModeDivider);
 
+  const pointIcon = '<span class=lia-dgs-point-symbol aria-hidden=true><svg viewBox=0,0,8,8><path class=lia-dgs-cross d=M2,2l4,4M6,2L2,6></path></svg><span class=lia-dgs-point-label>\\(A\\)</span></span>';
+  const pointCoordinatesIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-cross d=M10.5,10.5l3,3M13.5,10.5l-3,3></path><path class=lia-dgs-reference d=M4,20H20M4,20V4></path><path d=M12,12L18,8></path><circle cx=18 cy=8 r=1.5></circle></svg>';
   const pointButton = document.createElement('button');
   pointButton.type = 'button';
   pointButton.className = 'lia-dgs-geometry-button lia-dgs-point-button';
   pointButton.setAttribute('aria-label', text.setPoint);
   pointButton.setAttribute('aria-pressed', 'false');
+  pointButton.setAttribute('aria-haspopup', 'menu');
+  pointButton.setAttribute('aria-expanded', 'false');
   pointButton.title = text.setPoint;
+  pointButton.innerHTML = pointIcon;
   pointButton.innerHTML = '<span class="lia-dgs-point-symbol" aria-hidden="true"><svg viewBox="0 0 8 8"><path class="lia-dgs-cross" d="M2 2l4 4M6 2L2 6"></path></svg><span class="lia-dgs-point-label">\\(A\\)</span></span>';
   pointButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(pointButton);
@@ -15542,10 +23347,16 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const polygonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-polygon-fill" d="M5 18L12 5L19 18Z"></path><path class="lia-dgs-cross" d="M3.5 16.5l3 3M6.5 16.5l-3 3M10.5 3.5l3 3M13.5 3.5l-3 3M17.5 16.5l3 3M20.5 16.5l-3 3"></path></svg>';
   const circleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"></circle><path class="lia-dgs-cross" d="M10.5 10.5l3 3M13.5 10.5l-3 3M17.8 10.5l3 3M20.8 10.5l-3 3"></path></svg>';
   const angleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="lia-dgs-angle-fill" d="M4 20L14 20A10 10 0 0 0 8.3 10.9Z"></path><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3M10.5 1.5l3 3M13.5 1.5l-3 3"></path></svg>';
-  const measuredAngleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3"></path><text class="lia-dgs-measure-mark" x="12.5" y="13">°</text></svg>';
+  const measuredAngleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20L20 20M4 20L12 3M14 20A10 10 0 0 0 8.3 10.9"></path><path class="lia-dgs-cross" d="M2.5 18.5l3 3M5.5 18.5l-3 3M18.5 18.5l3 3M21.5 18.5l-3 3"></path><text class="lia-dgs-measure-mark" x="12.5" y="13">\u00B0</text></svg>';
 
+  const lineEquationIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M3,19L21,5M13,10L18,6M15.8,5.8L18,6L17.4,8.2></path><path class=lia-dgs-cross d=M7.5,13.5l3,3M10.5,13.5l-3,3></path><circle class=lia-dgs-reference cx=9 cy=15 r=2.4></circle></svg>';
   const midpointIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-reference d=M2.5,17.5l3,3M5.5,17.5l-3,3M18.5,3.5l3,3M21.5,3.5l-3,3></path><path d=M10.5,10.5l3,3M13.5,10.5l-3,3></path></svg>';
   const angleBisectorIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-angle-fill d=M4,20L14,20A10,10,0,0,0,8.3,10.9Z></path><path class=lia-dgs-reference d=M4,20L20,20M4,20L12,3M14,20A10,10,0,0,0,8.3,10.9M2.5,18.5l3,3M5.5,18.5l-3,3M18.5,18.5l3,3M21.5,18.5l-3,3M10.5,1.5l3,3M13.5,1.5l-3,3></path><path d=M4,20L16.7,12></path></svg>';
+  const reflectLineIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-reference d=M12,2V22></path><path d=M3,17L8,7M21,17L16,7M5,12H9M19,12H15></path></svg>';
+  const reflectPlane3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M9,3L17,6L15,21L7,18Z></path><path class=lia-dgs-reference d=M9,3L17,6L15,21L7,18Z></path><path class=lia-dgs-reference stroke-dasharray=2,2 d=M3,8L21,16></path><circle cx=3.5 cy=8.2 r=1.8></circle><circle cx=20.5 cy=15.8 r=1.8></circle></svg>';
+  const reflectPointIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-reference d=M4,18L20,6 stroke-dasharray="2 2"></path><path d=M2.5,16.5l3,3M5.5,16.5l-3,3M18.5,4.5l3,3M21.5,4.5l-3,3></path><circle cx=12 cy=12 r=1.8></circle></svg>';
+  const rotatePointIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path d=M7,17A7,7,0,1,1,18,15M18,15L18,10M18,15L13,15></path><circle class=lia-dgs-reference cx=12 cy=12 r=1.6></circle></svg>';
+  const dilatePointIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-reference d=M12,12L4,19M12,12L21,4></path><circle cx=12 cy=12 r=1.6></circle><path d=M2.5,17.5l3,3M5.5,17.5l-3,3M19.5,2.5l3,3M22.5,2.5l-3,3></path></svg>';
 
   const segmentButton = document.createElement('button');
   segmentButton.type = 'button';
@@ -15575,6 +23386,34 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     parent.appendChild(toolButton);
     return toolButton;
   };
+  const makeGeometrySection = (parent: HTMLElement, label: string) => {
+    const section = document.createElement('section');
+    section.className = 'lia-dgs-tool-section';
+    const heading = document.createElement('h3');
+    heading.className = 'lia-dgs-tool-section-title';
+    heading.textContent = label;
+    const items = document.createElement('div');
+    items.className = 'lia-dgs-tool-section-items';
+    section.append(heading, items);
+    parent.appendChild(section);
+    return items;
+  };
+
+  const pointSubmenu = document.createElement('div');
+  pointSubmenu.id = `dgs-point-submenu-${uid}`;
+  pointSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-point-submenu';
+  pointSubmenu.setAttribute('role', 'menu');
+  pointSubmenu.setAttribute('aria-label', geometryLanguage === 'de' ? 'Punktwerkzeuge' : 'Point tools');
+  pointButton.setAttribute('aria-controls', pointSubmenu.id);
+  const pointToolButton = makeGeometryTool(pointSubmenu, text.setPoint, pointIcon);
+  pointToolButton.setAttribute('aria-pressed', 'false');
+  const pointCoordinatesToolButton = makeGeometryTool(
+    pointSubmenu,
+    geometryLanguage === 'de' ? 'Punkt aus Koordinaten' : 'Point from coordinates',
+    pointCoordinatesIcon
+  );
+  pointCoordinatesToolButton.setAttribute('aria-pressed', 'false');
+  menuBar.appendChild(pointSubmenu);
 
   const compassSubmenu = document.createElement('div');
   compassSubmenu.id = `dgs-compass-submenu-${uid}`;
@@ -15598,6 +23437,12 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   rayToolButton.setAttribute('aria-pressed', 'false');
   const lineToolButton = makeGeometryTool(geometrySubmenu, lineLabel, lineIcon);
   lineToolButton.setAttribute('aria-pressed', 'false');
+  const lineEquationToolButton = makeGeometryTool(
+    geometrySubmenu,
+    geometryLanguage === 'de' ? 'Gerade aus Geradengleichung' : 'Line from equation',
+    lineEquationIcon
+  );
+  lineEquationToolButton.setAttribute('aria-pressed', 'false');
   const vectorToolButton = makeGeometryTool(geometrySubmenu, vectorLabel, vectorIcon);
   vectorToolButton.setAttribute('aria-pressed', 'false');
   const arcToolButton = makeGeometryTool(geometrySubmenu, arcLabel, arcIcon);
@@ -15612,52 +23457,252 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   orthogonalButton.setAttribute('aria-haspopup', 'menu');
   orthogonalButton.setAttribute('aria-expanded', 'false');
   orthogonalButton.title = geometryLanguage === 'de' ? 'Lagebeziehungen' : 'Line relations';
-  orthogonalButton.innerHTML = orthogonalIcon;
+  orthogonalButton.innerHTML = reflectPlane3DIcon;
+  orthogonalButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.reflectPlane3D);
+  orthogonalButton.dataset.dgsPreferredToolId = String(DGS_TOOL_IDS.reflectPlane3D);
   orthogonalButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(orthogonalButton);
 
   const relationSubmenu = document.createElement('div');
   relationSubmenu.id = `dgs-relation-submenu-${uid}`;
-  relationSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-relation-submenu';
+  relationSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-relation-submenu lia-dgs-sectioned-submenu';
   relationSubmenu.setAttribute('role', 'menu');
   relationSubmenu.setAttribute('aria-label', geometryLanguage === 'de' ? 'Lagebeziehungen' : 'Line relations');
   orthogonalButton.setAttribute('aria-controls', relationSubmenu.id);
-  const orthogonalToolButton = makeGeometryTool(relationSubmenu, text.orthogonal, orthogonalIcon);
+  const relation2DItems = makeGeometrySection(
+    relationSubmenu,
+    geometryLanguage === 'de' ? 'Konstruktionen in der Ebene' : 'Planar constructions'
+  );
+  const orthogonalToolButton = makeGeometryTool(relation2DItems, text.orthogonal, orthogonalIcon);
   orthogonalToolButton.setAttribute('aria-pressed', 'false');
-  const parallelToolButton = makeGeometryTool(relationSubmenu, text.parallel, parallelIcon);
+  const parallelToolButton = makeGeometryTool(relation2DItems, text.parallel, parallelIcon);
   parallelToolButton.setAttribute('aria-pressed', 'false');
-  const midpointToolButton = makeGeometryTool(relationSubmenu, text.midpoint, midpointIcon);
+  const midpointToolButton = makeGeometryTool(relation2DItems, text.midpoint, midpointIcon);
   midpointToolButton.setAttribute('aria-pressed', 'false');
-  const angleBisectorToolButton = makeGeometryTool(relationSubmenu, text.angleBisector, angleBisectorIcon);
+  const angleBisectorToolButton = makeGeometryTool(relation2DItems, text.angleBisector, angleBisectorIcon);
   angleBisectorToolButton.setAttribute('aria-pressed', 'false');
+  const reflectLineToolButton = makeGeometryTool(relation2DItems, text.reflectLine, reflectLineIcon);
+  reflectLineToolButton.setAttribute('aria-pressed', 'false');
+  const reflectPointToolButton = makeGeometryTool(relation2DItems, text.reflectPoint, reflectPointIcon);
+  reflectPointToolButton.setAttribute('aria-pressed', 'false');
+  const rotatePointToolButton = makeGeometryTool(relation2DItems, text.rotatePoint, rotatePointIcon);
+  rotatePointToolButton.setAttribute('aria-pressed', 'false');
+  const dilatePointToolButton = makeGeometryTool(relation2DItems, text.dilatePoint, dilatePointIcon);
+  dilatePointToolButton.setAttribute('aria-pressed', 'false');
+  const spatialTransformDefinitions: Array<{
+    tool: DgsState['activeTool']; id: number; label: string; icon: string;
+  }> = [
+    { tool: 'translate3d', id: DGS_TOOL_IDS.translate3D, label: geometryLanguage === 'de' ? 'Verschiebung im Raum' : 'Translation in space', icon: vectorIcon },
+    { tool: 'reflect-point3d', id: DGS_TOOL_IDS.reflectPoint3D, label: geometryLanguage === 'de' ? 'Punktspiegelung im Raum' : 'Point reflection in space', icon: reflectPointIcon },
+    { tool: 'reflect-line3d', id: DGS_TOOL_IDS.reflectLine3D, label: geometryLanguage === 'de' ? 'Spiegelung an einer Geraden im Raum' : 'Line reflection in space', icon: reflectLineIcon },
+    { tool: 'reflect-plane3d', id: DGS_TOOL_IDS.reflectPlane3D, label: geometryLanguage === 'de' ? 'Spiegelung an einer Ebene' : 'Plane reflection', icon: reflectPlane3DIcon },
+    { tool: 'rotate-axis3d', id: DGS_TOOL_IDS.rotateAxis3D, label: geometryLanguage === 'de' ? 'Drehung um eine Achse' : 'Rotation about an axis', icon: rotatePointIcon },
+    { tool: 'dilate3d', id: DGS_TOOL_IDS.dilate3D, label: geometryLanguage === 'de' ? 'Zentrische Streckung im Raum' : 'Dilation in space', icon: dilatePointIcon }
+  ];
+  const spatialTransformItems = makeGeometrySection(
+    relationSubmenu,
+    geometryLanguage === 'de' ? 'Transformationen im Raum' : 'Transformations in space'
+  );
+  const spatialTransformToolButtons = spatialTransformDefinitions.map(definition => {
+    const button = makeGeometryTool(spatialTransformItems, definition.label, definition.icon);
+    button.setAttribute('aria-pressed', 'false');
+    return { ...definition, button };
+  });
+
   menuBar.appendChild(relationSubmenu);
 
   const sectorIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-sector-fill d=M5,19L18,19A13,13,0,0,0,10,6Z></path><path d=M5,19L18,19A13,13,0,0,0,10,6Z></path><path class=lia-dgs-cross d=M3.5,17.5l3,3M6.5,17.5l-3,3M16.5,17.5l3,3M19.5,17.5l-3,3M8.5,4.5l3,3M11.5,4.5l-3,3></path></svg>';
+  const ellipseIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><ellipse cx=12 cy=12 rx=8 ry=6></ellipse><path class=lia-dgs-cross d=M5.5,10.5l3,3M8.5,10.5l-3,3M15.5,10.5l3,3M18.5,10.5l-3,3M10.5,4.5l3,3M13.5,4.5l-3,3></path></svg>';
+  const planeThreePointsIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,17L8,5L21,8L16,19Z></path><path d=M3,17L8,5L21,8L16,19Z></path><path class=lia-dgs-cross d=M6.5,3.5l3,3M9.5,3.5l-3,3M19.5,6.5l3,3M22.5,6.5l-3,3M14.5,17.5l3,3M17.5,17.5l-3,3></path></svg>';
+  const planePointNormalIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,17L8,9L21,11L16,19Z></path><path d=M3,17L8,9L21,11L16,19ZM12,14V3M12,3L9,6M12,3L15,6></path><path class=lia-dgs-cross d=M10.5,12.5l3,3M13.5,12.5l-3,3></path></svg>';
+  const planePointVectorsIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,18L7,8L21,9L17,20Z></path><path d=M3,18L7,8L21,9L17,20Z></path><path class=lia-dgs-reference d=M7,17V8M7,8L5,11M7,8L9,11M7,17L18,12M18,12L14.5,11.5M18,12L16,15></path><path class=lia-dgs-cross d=M5.5,15.5l3,3M8.5,15.5l-3,3></path></svg>';
+  const planeThreePointsLabel = geometryLanguage === 'de' ? 'Ebene durch drei Punkte' : 'Plane through three points';
+  const planePointNormalLabel = geometryLanguage === 'de' ? 'Punkt-Normalen-Ebene' : 'Point-normal plane';
+  const planePointVectorsLabel = geometryLanguage === 'de' ? 'Parameter-Ebene' : 'Point-vector plane';
+  const circle3DThreePointsLabel = geometryLanguage === 'de' ? 'Raumkreis durch drei Punkte' : 'Circle through three points';
+  const circle3DCenterNormalPointLabel = geometryLanguage === 'de'
+    ? 'Raumkreis: Mittelpunkt, Normale und Radiuspunkt'
+    : 'Circle: center, normal and radius point';
+  const sphere3DCenterPointLabel = geometryLanguage === 'de'
+    ? 'Kugel durch Mittelpunkt und Oberfl\u00E4chenpunkt'
+    : 'Sphere through center and surface point';
+  const sphere3DFourPointsLabel = geometryLanguage === 'de' ? 'Kugel durch vier Punkte' : 'Sphere through four points';
+  const sphere3DCenterRadiusLabel = geometryLanguage === 'de'
+    ? 'Kugel mit festem Radius'
+    : 'Sphere with fixed radius';
+  const circleThreePoints3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><ellipse cx=12 cy=12 rx=8 ry=4.8></ellipse><path class=lia-dgs-cross d=M3.8,10.8l2.4,2.4M6.2,10.8l-2.4,2.4M10.8,6.6l2.4,2.4M13.2,6.6l-2.4,2.4M17.8,10.8l2.4,2.4M20.2,10.8l-2.4,2.4></path></svg>';
+  const circleCenterNormal3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><ellipse cx=12 cy=14 rx=8 ry=4.5></ellipse><path class=lia-dgs-reference d=M12,14L18.5,11.5M12,14V3M12,3L9.5,6M12,3L14.5,6></path><path class=lia-dgs-cross d=M10.8,12.8l2.4,2.4M13.2,12.8l-2.4,2.4M17.3,10.3l2.4,2.4M19.7,10.3l-2.4,2.4></path></svg>';
+  const sphereCenterPoint3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><circle cx=12 cy=12 r=8></circle><ellipse class=lia-dgs-reference cx=12 cy=12 rx=8 ry=3.2></ellipse><path class=lia-dgs-reference d=M12,12L17.7,6.3></path><path class=lia-dgs-cross d=M10.8,10.8l2.4,2.4M13.2,10.8l-2.4,2.4M16.5,5.1l2.4,2.4M18.9,5.1l-2.4,2.4></path></svg>';
+  const sphereFourPoints3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><circle cx=12 cy=12 r=8></circle><ellipse class=lia-dgs-reference cx=12 cy=12 rx=8 ry=3.2></ellipse><path class=lia-dgs-reference d=M12,4C8.8,7,8.8,17,12,20M12,4C15.2,7,15.2,17,12,20></path><path class=lia-dgs-cross d=M4.2,10.8l2.4,2.4M6.6,10.8l-2.4,2.4M10.8,2.8l2.4,2.4M13.2,2.8l-2.4,2.4M17.4,10.8l2.4,2.4M19.8,10.8l-2.4,2.4M10.8,18.8l2.4,2.4M13.2,18.8l-2.4,2.4></path></svg>';
+  const sphereCenterRadius3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><circle cx=12 cy=12 r=8></circle><ellipse class=lia-dgs-reference cx=12 cy=12 rx=3.2 ry=8></ellipse><path class=lia-dgs-reference d=M5,12H19M5,9.5V14.5M19,9.5V14.5></path><path class=lia-dgs-cross d=M10.8,10.8l2.4,2.4M13.2,10.8l-2.4,2.4></path></svg>';
+  const solid3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M4,7L12,3L20,7V17L12,21L4,17Z></path><path d=M4,7L12,11L20,7M12,11V21M4,7V17L12,21L20,17V7L12,3Z></path></svg>';
+  const spatialPolygon3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,16L8,5L20,8L17,19L7,20Z></path><path d=M3,16L8,5L20,8L17,19L7,20Z></path><path class=lia-dgs-cross d=M1.8,14.8l2.4,2.4M4.2,14.8l-2.4,2.4M6.8,3.8l2.4,2.4M9.2,3.8l-2.4,2.4M18.8,6.8l2.4,2.4M21.2,6.8l-2.4,2.4></path></svg>';
+  const tetrahedron3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M4,19L12,3L20,18Z></path><path d=M4,19L12,3L20,18ZM4,19L13,13L20,18M13,13L12,3></path><path class=lia-dgs-reference stroke-dasharray="2 2" d=M13,13L12,21></path></svg>';
+  const pyramid3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M4,16L12,20L20,16L12,13Z></path><path d=M4,16L12,3L20,16L12,20ZM12,3L12,13M4,16L12,13L20,16></path></svg>';
+  const prism3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,17L8,7L12,18ZM12,18L17,8L21,19Z></path><path d=M3,17L8,7L12,18ZM12,18L17,8L21,19ZM3,17L12,18M8,7L17,8></path><path class=lia-dgs-reference stroke-dasharray="2 2" d=M3,17L12,18M12,18L21,19></path></svg>';
+  const parallelepiped3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M3,8L11,4L20,8L12,12ZM3,8L12,12L12,20L3,16Z></path><path d=M3,8L11,4L20,8L12,12ZM3,8V16L12,20L20,16V8M12,12V20></path></svg>';
+  const cuboid3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M4,7L10,3L20,7L14,11ZM4,7L14,11V20L4,16Z></path><path d=M4,7L10,3L20,7L14,11ZM4,7V16L14,20L20,16V7M14,11V20></path></svg>';
+  const cylinder3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M5,6A7,3,0,0,0,19,6V18A7,3,0,0,1,5,18Z></path><ellipse cx=12 cy=6 rx=7 ry=3></ellipse><path d=M5,6V18M19,6V18M5,18A7,3,0,0,0,19,18></path><path class=lia-dgs-reference stroke-dasharray="2 2" d=M5,18A7,3,0,0,1,19,18></path></svg>';
+  const cone3DIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M12,3L4,18A8,3,0,0,0,20,18Z></path><path d=M12,3L4,18M12,3L20,18M4,18A8,3,0,0,0,20,18></path><path class=lia-dgs-reference stroke-dasharray="2 2" d=M4,18A8,3,0,0,1,20,18></path></svg>';
 
-  const polygonButton = document.createElement('button');
-  polygonButton.type = 'button';
-  polygonButton.className = 'lia-dgs-geometry-button lia-dgs-polygon-button';
-  polygonButton.setAttribute('aria-label', text.shapes);
-  polygonButton.setAttribute('aria-pressed', 'false');
-  polygonButton.title = text.shapes;
-  polygonButton.setAttribute('aria-haspopup', 'menu');
-  polygonButton.setAttribute('aria-expanded', 'false');
-  polygonButton.innerHTML = polygonIcon;
-  polygonButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
-  menuBar.appendChild(polygonButton);
-
+  const makeShapeParentButton = (
+    className: string,
+    label: string,
+    icon: string,
+    currentToolId: number
+  ): HTMLButtonElement => {
+    const parent = document.createElement('button');
+    parent.type = 'button';
+    parent.className = 'lia-dgs-geometry-button ' + className;
+    parent.setAttribute('aria-label', label);
+    parent.setAttribute('aria-pressed', 'false');
+    parent.setAttribute('aria-haspopup', 'menu');
+    parent.setAttribute('aria-expanded', 'false');
+    parent.title = label;
+    parent.innerHTML = icon;
+    parent.dataset.dgsCurrentToolId = String(currentToolId);
+    parent.dataset.dgsPreferredToolId = String(currentToolId);
+    parent.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+    menuBar.appendChild(parent);
+    return parent;
+  };
+  const polygonButton = makeShapeParentButton(
+    'lia-dgs-polygon-button', text.shapes, polygonIcon, DGS_TOOL_IDS.polygon
+  );
+  polygonButton.setAttribute('aria-label', geometryLanguage === 'de' ? '2D-Eckig' : '2D angular shapes');
+  polygonButton.title = geometryLanguage === 'de' ? '2D-Eckig' : '2D angular shapes';
+  const round2DButton = makeShapeParentButton(
+    'lia-dgs-round2d-button',
+    geometryLanguage === 'de' ? '2D-Rund' : '2D round shapes',
+    circleIcon,
+    DGS_TOOL_IDS.circle
+  );
+  const plane3DButton = makeShapeParentButton(
+    'lia-dgs-plane3d-button',
+    geometryLanguage === 'de' ? '3D-Prismen' : '3D prisms',
+    cuboid3DIcon,
+    DGS_TOOL_IDS.cuboid3D
+  );
+  const round3DButton = makeShapeParentButton(
+    'lia-dgs-round3d-button',
+    geometryLanguage === 'de' ? '3D-Kugeln' : '3D round objects',
+    sphereCenterPoint3DIcon,
+    DGS_TOOL_IDS.sphere3DCenterPoint
+  );
+  const solid3DButton = makeShapeParentButton(
+    'lia-dgs-solid3d-button',
+    geometryLanguage === 'de' ? 'Körper' : 'Solids',
+    pyramid3DIcon,
+    DGS_TOOL_IDS.pyramid3D
+  );
+  solid3DButton.setAttribute('aria-label', geometryLanguage === 'de' ? '3D-Spitzk\u00f6rper' : '3D pointed solids');
+  solid3DButton.title = geometryLanguage === 'de' ? '3D-Spitzk\u00f6rper' : '3D pointed solids';
   const shapeSubmenu = document.createElement('div');
   shapeSubmenu.id = `dgs-shape-submenu-${uid}`;
-  shapeSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-shape-submenu';
+  shapeSubmenu.className = 'lia-dgs-geometry-submenu lia-dgs-shape-submenu lia-dgs-sectioned-submenu';
   shapeSubmenu.setAttribute('role', 'menu');
   shapeSubmenu.setAttribute('aria-label', text.shapes);
-  polygonButton.setAttribute('aria-controls', shapeSubmenu.id);
-  const polygonToolButton = makeGeometryTool(shapeSubmenu, text.polygon, polygonIcon);
+  [polygonButton, round2DButton, plane3DButton, round3DButton, solid3DButton]
+    .forEach(parent => parent.setAttribute('aria-controls', shapeSubmenu.id));
+  const shape2DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? 'Flächen in der Ebene' : 'Planar shapes'
+  );
+  const round2DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? '2D-Rund' : '2D round shapes'
+  );
+  const plane3DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? 'Ebenen und Flächen' : 'Planes and surfaces'
+  );
+  const circle3DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? 'Kreise im Raum' : 'Circles in space'
+  );
+  const prism3DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? '3D-Prismen' : '3D prisms'
+  );
+  const round3DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? '3D-Kugeln' : '3D spheres'
+  );
+  const solid3DItems = makeGeometrySection(
+    shapeSubmenu,
+    geometryLanguage === 'de' ? 'Körper' : 'Solids'
+  );
+  (shape2DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'angular2d';
+  (round2DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'round2d';
+  (plane3DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'surfaces3d';
+  (circle3DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'circles3d';
+  (prism3DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'prisms';
+  (round3DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'spheres3d';
+  (solid3DItems.parentElement as HTMLElement).dataset.dgsShapeGroup = 'pointed';
+  const setShapeSectionTitle = (items: HTMLElement, label: string) => {
+    const heading = items.parentElement?.querySelector<HTMLElement>('.lia-dgs-tool-section-title');
+    if (heading) heading.textContent = label;
+  };
+  setShapeSectionTitle(shape2DItems, geometryLanguage === 'de' ? '2D-Eckig' : '2D angular shapes');
+  setShapeSectionTitle(round2DItems, geometryLanguage === 'de' ? '2D-Rund' : '2D round shapes');
+  setShapeSectionTitle(plane3DItems, geometryLanguage === 'de' ? 'Ebenen und Flächen' : 'Planes and surfaces');
+  setShapeSectionTitle(circle3DItems, geometryLanguage === 'de' ? 'Kreise im Raum' : 'Circles in space');
+  setShapeSectionTitle(prism3DItems, geometryLanguage === 'de' ? '3D-Prismen' : '3D prisms');
+  setShapeSectionTitle(solid3DItems, geometryLanguage === 'de' ? '3D-Spitzk\u00f6rper' : '3D pointed solids');
+  setShapeSectionTitle(round3DItems, geometryLanguage === 'de' ? '3D-Kugeln' : '3D spheres');
+  shapeSubmenu.dataset.dgsActiveGroup = 'angular2d';
+  const polygonToolButton = makeGeometryTool(shape2DItems, text.polygon, polygonIcon);
   polygonToolButton.setAttribute('aria-pressed', 'false');
-  const circleToolButton = makeGeometryTool(shapeSubmenu, text.circle, circleIcon);
+  const circleToolButton = makeGeometryTool(round2DItems, text.circle, circleIcon);
   circleToolButton.setAttribute('aria-pressed', 'false');
-  const sectorToolButton = makeGeometryTool(shapeSubmenu, text.sector, sectorIcon);
+  const sectorToolButton = makeGeometryTool(round2DItems, text.sector, sectorIcon);
   sectorToolButton.setAttribute('aria-pressed', 'false');
+  const ellipseToolButton = makeGeometryTool(round2DItems, text.ellipse, ellipseIcon);
+  ellipseToolButton.setAttribute('aria-pressed', 'false');
+  const planeThreePointsToolButton = makeGeometryTool(plane3DItems, planeThreePointsLabel, planeThreePointsIcon);
+  planeThreePointsToolButton.setAttribute('aria-pressed', 'false');
+  const planePointNormalToolButton = makeGeometryTool(plane3DItems, planePointNormalLabel, planePointNormalIcon);
+  planePointNormalToolButton.setAttribute('aria-pressed', 'false');
+  const planePointVectorsToolButton = makeGeometryTool(plane3DItems, planePointVectorsLabel, planePointVectorsIcon);
+  planePointVectorsToolButton.setAttribute('aria-pressed', 'false');
+  const planeEquationIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-plane-fill d=M4,8L15,4L21,14L10,20Z></path><path d=M4,8L15,4L21,14L10,20ZM12,12L18,8M15.4,8L18,8L17.2,10.5></path><circle class=lia-dgs-reference cx=12 cy=12 r=1.5></circle></svg>';
+  const planeEquationToolButton = makeGeometryTool(
+    plane3DItems,
+    geometryLanguage === 'de' ? 'Ebene aus Ebenengleichung' : 'Plane from equation',
+    planeEquationIcon
+  );
+  planeEquationToolButton.setAttribute('aria-pressed', 'false');
+  const circle3DThreePointsToolButton = makeGeometryTool(circle3DItems, circle3DThreePointsLabel, circleThreePoints3DIcon);
+  circle3DThreePointsToolButton.setAttribute('aria-pressed', 'false');
+  const circle3DCenterNormalPointToolButton = makeGeometryTool(circle3DItems, circle3DCenterNormalPointLabel, circleCenterNormal3DIcon);
+  circle3DCenterNormalPointToolButton.setAttribute('aria-pressed', 'false');
+  const sphere3DCenterPointToolButton = makeGeometryTool(round3DItems, sphere3DCenterPointLabel, sphereCenterPoint3DIcon);
+  sphere3DCenterPointToolButton.setAttribute('aria-pressed', 'false');
+  const sphere3DFourPointsToolButton = makeGeometryTool(round3DItems, sphere3DFourPointsLabel, sphereFourPoints3DIcon);
+  sphere3DFourPointsToolButton.setAttribute('aria-pressed', 'false');
+  const sphere3DCenterRadiusToolButton = makeGeometryTool(round3DItems, sphere3DCenterRadiusLabel, sphereCenterRadius3DIcon);
+  sphere3DCenterRadiusToolButton.setAttribute('aria-pressed', 'false');
+  const spatialBodyDefinitions: Array<{
+    tool: DgsState['activeTool']; id: number; label: string; icon: string; group: 'surface' | 'prism' | 'pointed';
+  }> = [
+    { tool: 'polygon3d', id: DGS_TOOL_IDS.polygon3D, label: geometryLanguage === 'de' ? 'Raumvieleck' : 'Spatial polygon', icon: spatialPolygon3DIcon, group: 'surface' },
+    { tool: 'tetrahedron3d', id: DGS_TOOL_IDS.tetrahedron3D, label: geometryLanguage === 'de' ? 'Tetraeder' : 'Tetrahedron', icon: tetrahedron3DIcon, group: 'pointed' },
+    { tool: 'pyramid3d', id: DGS_TOOL_IDS.pyramid3D, label: geometryLanguage === 'de' ? 'Pyramide' : 'Pyramid', icon: pyramid3DIcon, group: 'pointed' },
+    { tool: 'prism3d', id: DGS_TOOL_IDS.prism3D, label: geometryLanguage === 'de' ? 'Prisma' : 'Prism', icon: prism3DIcon, group: 'prism' },
+    { tool: 'parallelepiped3d', id: DGS_TOOL_IDS.parallelepiped3D, label: geometryLanguage === 'de' ? 'Spat' : 'Parallelepiped', icon: parallelepiped3DIcon, group: 'prism' },
+    { tool: 'cuboid3d', id: DGS_TOOL_IDS.cuboid3D, label: geometryLanguage === 'de' ? 'Quader' : 'Cuboid', icon: cuboid3DIcon, group: 'prism' },
+    { tool: 'cylinder3d', id: DGS_TOOL_IDS.cylinder3D, label: geometryLanguage === 'de' ? 'Zylinder' : 'Cylinder', icon: cylinder3DIcon, group: 'prism' },
+    { tool: 'cone3d', id: DGS_TOOL_IDS.cone3D, label: geometryLanguage === 'de' ? 'Kegel' : 'Cone', icon: cone3DIcon, group: 'pointed' }
+  ];
+  const spatialBodyToolButtons = spatialBodyDefinitions.map(definition => {
+    const parent = definition.group === 'surface'
+      ? plane3DItems
+      : (definition.group === 'pointed' ? solid3DItems : prism3DItems);
+    const button = makeGeometryTool(parent, definition.label, definition.icon);
+    button.setAttribute('aria-pressed', 'false');
+    return { ...definition, button };
+  });
+
   menuBar.appendChild(shapeSubmenu);
 
   const angleButton = document.createElement('button');
@@ -15866,6 +23911,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   // The toolbar scrolls horizontally and therefore clips its own descendants.
   // Keep flyout menus in the board-sized clip layer so they can extend below it.
   const flyoutSubmenus = [
+    constructionColorMenu,
     compassSubmenu,
     geometrySubmenu,
     relationSubmenu,
@@ -15928,7 +23974,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   objectListCloseButton.className = 'lia-dgs-side-menu-close';
   objectListCloseButton.setAttribute(
     'aria-label',
-    geometryLanguage === 'de' ? 'Objektliste schlieÃŸen' : 'Close object list'
+    geometryLanguage === 'de' ? 'Objektliste schließen' : 'Close object list'
   );
   objectListCloseButton.textContent = '\u00d7';
   objectListHeader.appendChild(objectListTitle);
@@ -16006,9 +24052,85 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   };
   const xCoordinateInput = makeCoordinateField('x');
   const yCoordinateInput = makeCoordinateField('y');
+  const zCoordinateInput = makeCoordinateField('z');
   coordinateSection.appendChild(coordinateTitle);
   coordinateSection.appendChild(coordinateRow);
   sideMenu.appendChild(coordinateSection);
+
+  const vectorComponentsSection = document.createElement('div');
+  vectorComponentsSection.className = 'lia-dgs-coordinate-section lia-dgs-vector-components-section';
+  vectorComponentsSection.hidden = true;
+  const vectorComponentsTitle = document.createElement('div');
+  vectorComponentsTitle.className = 'lia-dgs-context-section-title';
+  vectorComponentsTitle.textContent = geometryLanguage === 'de' ? 'Vektorkomponenten' : 'Vector components';
+  const vectorComponentsRow = document.createElement('div');
+  vectorComponentsRow.className = 'lia-dgs-coordinate-row';
+  const makeVectorComponentField = (axis: string) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-coordinate-field';
+    const caption = document.createElement('span');
+    caption.textContent = axis + ':';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.className = 'lia-dgs-coordinate-input';
+    input.setAttribute('aria-label', geometryLanguage === 'de'
+      ? 'Vektorkomponente ' + axis
+      : 'Vector component ' + axis);
+    input.setAttribute('aria-invalid', 'false');
+    label.appendChild(caption);
+    label.appendChild(input);
+    vectorComponentsRow.appendChild(label);
+    return input;
+  };
+  const vectorXInput = makeVectorComponentField('x');
+  const vectorYInput = makeVectorComponentField('y');
+  const vectorZInput = makeVectorComponentField('z');
+  vectorComponentsSection.appendChild(vectorComponentsTitle);
+  vectorComponentsSection.appendChild(vectorComponentsRow);
+  sideMenu.appendChild(vectorComponentsSection);
+
+  const roundGeometrySection = document.createElement('div');
+  roundGeometrySection.className = 'lia-dgs-slider-settings-section lia-dgs-round-geometry-section';
+  roundGeometrySection.hidden = true;
+  const roundGeometryTitle = document.createElement('div');
+  roundGeometryTitle.className = 'lia-dgs-context-section-title';
+  roundGeometryTitle.textContent = geometryLanguage === 'de' ? 'Geometrie' : 'Geometry';
+  const roundGeometryGrid = document.createElement('div');
+  roundGeometryGrid.className = 'lia-dgs-slider-settings-grid';
+  const makeRoundReadout = (captionText: string) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-slider-field';
+    label.dataset.wide = '1';
+    const caption = document.createElement('span');
+    caption.textContent = captionText;
+    const value = document.createElement('span');
+    value.className = 'lia-dgs-round-readout';
+    label.appendChild(caption);
+    label.appendChild(value);
+    roundGeometryGrid.appendChild(label);
+    return value;
+  };
+  const roundCenterValue = makeRoundReadout(geometryLanguage === 'de' ? 'Mittelpunkt' : 'Center');
+  const roundSourceValue = makeRoundReadout(text.sources);
+  const roundRadiusField = document.createElement('label');
+  roundRadiusField.className = 'lia-dgs-slider-field';
+  roundRadiusField.dataset.wide = '1';
+  const roundRadiusCaption = document.createElement('span');
+  roundRadiusCaption.textContent = text.radius;
+  const roundRadiusInput = document.createElement('input');
+  roundRadiusInput.type = 'text';
+  roundRadiusInput.inputMode = 'decimal';
+  roundRadiusInput.autocomplete = 'off';
+  roundRadiusInput.spellcheck = false;
+  roundRadiusInput.setAttribute('aria-label', text.radius);
+  roundRadiusInput.setAttribute('aria-invalid', 'false');
+  roundRadiusField.appendChild(roundRadiusCaption);
+  roundRadiusField.appendChild(roundRadiusInput);
+  roundGeometryGrid.appendChild(roundRadiusField);
+  roundGeometrySection.appendChild(roundGeometryTitle);
+  roundGeometrySection.appendChild(roundGeometryGrid);
+  sideMenu.appendChild(roundGeometrySection);
 
   const angleMeasureSection = document.createElement('div');
   angleMeasureSection.className = 'lia-dgs-angle-measure-section';
@@ -16122,7 +24244,30 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   strokeWidthInput.setAttribute('aria-invalid', 'false');
   strokeWidthField.appendChild(strokeWidthCaption);
   strokeWidthField.appendChild(strokeWidthInput);
+  const planeEquationField = document.createElement('label');
+  planeEquationField.className = 'lia-dgs-slider-field';
+  planeEquationField.dataset.wide = '1';
+  planeEquationField.hidden = true;
+  const planeEquationCaption = document.createElement('span');
+  planeEquationCaption.textContent = text.equationForm;
+  const planeEquationSelect = document.createElement('select');
+  planeEquationSelect.className = 'lia-dgs-line-style-select';
+  planeEquationSelect.setAttribute('aria-label', text.equationForm);
+  planeEquationSelect.title = text.equationForm;
+  ([
+    ['parameter', text.parameterForm],
+    ['normal', text.normalForm],
+    ['coordinate', text.coordinateForm]
+  ] as const).forEach(([value, caption]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = caption;
+    planeEquationSelect.appendChild(option);
+  });
+  planeEquationField.appendChild(planeEquationCaption);
+  planeEquationField.appendChild(planeEquationSelect);
   strokeStyleGrid.appendChild(lineStyleField);
+  strokeStyleGrid.appendChild(planeEquationField);
   strokeStyleGrid.appendChild(strokeDesignField);
   strokeStyleGrid.appendChild(strokeWidthField);
   strokeStyleSection.appendChild(strokeStyleTitle);
@@ -16179,8 +24324,34 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const sliderMinInput = makeSliderField(text.minimum);
   const sliderMaxInput = makeSliderField(text.maximum);
   const sliderStepInput = makeSliderField(text.stepWidth, true);
+  const sliderAnimationSpeedRow = document.createElement('label');
+  sliderAnimationSpeedRow.className = 'lia-dgs-slider-animation-speed';
+  const sliderAnimationSpeedCaption = document.createElement('span');
+  sliderAnimationSpeedCaption.textContent = text.animationSpeed;
+  const sliderAnimationSpeedValue = document.createElement('span');
+  sliderAnimationSpeedValue.className = 'lia-dgs-slider-animation-speed-output';
+  const sliderAnimationSpeedInput = document.createElement('input');
+  sliderAnimationSpeedInput.type = 'range';
+  sliderAnimationSpeedInput.min = String(DGS_SLIDER_MIN_ANIMATION_SPEED);
+  sliderAnimationSpeedInput.max = String(DGS_SLIDER_MAX_ANIMATION_SPEED);
+  sliderAnimationSpeedInput.step = String(DGS_SLIDER_ANIMATION_SPEED_STEP);
+  sliderAnimationSpeedInput.value = String(DGS_SLIDER_DEFAULT_ANIMATION_SPEED);
+  sliderAnimationSpeedInput.setAttribute('aria-label', text.animationSpeed);
+  sliderAnimationSpeedRow.appendChild(sliderAnimationSpeedCaption);
+  sliderAnimationSpeedRow.appendChild(sliderAnimationSpeedValue);
+  sliderAnimationSpeedRow.appendChild(sliderAnimationSpeedInput);
+  const sliderAnimationControlOption = document.createElement('label');
+  sliderAnimationControlOption.className = 'lia-dgs-context-option lia-dgs-slider-animation-option';
+  const sliderAnimationControlCheckbox = document.createElement('input');
+  sliderAnimationControlCheckbox.type = 'checkbox';
+  const sliderAnimationControlCheckboxText = document.createElement('span');
+  sliderAnimationControlCheckboxText.textContent = text.showAnimationControl;
+  sliderAnimationControlOption.appendChild(sliderAnimationControlCheckbox);
+  sliderAnimationControlOption.appendChild(sliderAnimationControlCheckboxText);
   sliderSettingsSection.appendChild(sliderSettingsTitle);
   sliderSettingsSection.appendChild(sliderSettingsGrid);
+  sliderSettingsSection.appendChild(sliderAnimationSpeedRow);
+  sliderSettingsSection.appendChild(sliderAnimationControlOption);
   sideMenu.appendChild(sliderSettingsSection);
 
   const textFontSizeSection = document.createElement('label');
@@ -16224,6 +24395,26 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const axisDescriptionInput = makeAxisLabelField(text.axisDescription);
   sideMenu.appendChild(axisLabelSection);
 
+  const locusSettingsSection = document.createElement('div');
+  locusSettingsSection.className = 'lia-dgs-stroke-style-section';
+  locusSettingsSection.hidden = true;
+  const locusSamplesRow = document.createElement('label');
+  locusSamplesRow.className = 'lia-dgs-stroke-style-field';
+  const locusSamplesCaption = document.createElement('span');
+  locusSamplesCaption.textContent = text.locusSamples;
+  const locusSamplesInput = document.createElement('input');
+  locusSamplesInput.type = 'number';
+  locusSamplesInput.min = String(DGS_LOCUS_MIN_SAMPLES);
+  locusSamplesInput.max = String(DGS_LOCUS_MAX_SAMPLES);
+  locusSamplesInput.step = '16';
+  locusSamplesInput.value = String(DGS_LOCUS_DEFAULT_SAMPLES);
+  locusSamplesInput.className = 'lia-dgs-stroke-width-input';
+  locusSamplesInput.setAttribute('aria-label', text.locusSamples);
+  locusSamplesRow.appendChild(locusSamplesCaption);
+  locusSamplesRow.appendChild(locusSamplesInput);
+  locusSettingsSection.appendChild(locusSamplesRow);
+  sideMenu.appendChild(locusSettingsSection);
+
   const makeContextOption = (text: string) => {
     const label = document.createElement('label');
     label.className = 'lia-dgs-context-option';
@@ -16237,8 +24428,12 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     return { label, input, caption };
   };
   const fixedOption = makeContextOption(text.fixed);
+  const bindingOption = makeContextOption(text.boundToObject);
+  bindingOption.label.hidden = true;
   const traceOption = makeContextOption(text.trace);
   traceOption.label.hidden = true;
+  const locusOption = makeContextOption(text.showLocus);
+  locusOption.label.hidden = true;
   const nameOption = makeContextOption(text.showName);
   const objectOption = makeContextOption(text.showPoint);
   const measurementOption = makeContextOption(text.showDistance);
@@ -16493,6 +24688,37 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   arcDialog.appendChild(arcDialogFields);
   arcDialog.appendChild(arcDialogActions);
 
+  const equationDialog = document.createElement('div');
+  equationDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog lia-dgs-equation-dialog';
+  equationDialog.setAttribute('role', 'dialog');
+  equationDialog.setAttribute('aria-modal', 'true');
+  equationDialog.setAttribute('aria-hidden', 'true');
+  equationDialog.dataset.open = '0';
+  const equationDialogTitle = document.createElement('div');
+  equationDialogTitle.className = 'lia-dgs-angle-dialog-title';
+  const equationDialogFormSwitch = document.createElement('div');
+  equationDialogFormSwitch.className = 'lia-dgs-equation-form-switch';
+  equationDialogFormSwitch.setAttribute('role', 'group');
+  const equationDialogFields = document.createElement('div');
+  equationDialogFields.className = 'lia-dgs-equation-fields';
+  const equationDialogActions = document.createElement('div');
+  equationDialogActions.className = 'lia-dgs-angle-dialog-actions';
+  const equationDialogCancelButton = document.createElement('button');
+  equationDialogCancelButton.type = 'button';
+  equationDialogCancelButton.className = 'lia-dgs-angle-dialog-button';
+  equationDialogCancelButton.textContent = text.cancel;
+  const equationDialogConfirmButton = document.createElement('button');
+  equationDialogConfirmButton.type = 'button';
+  equationDialogConfirmButton.className = 'lia-dgs-angle-dialog-button';
+  equationDialogConfirmButton.dataset.primary = '1';
+  equationDialogConfirmButton.textContent = text.create;
+  equationDialogActions.appendChild(equationDialogCancelButton);
+  equationDialogActions.appendChild(equationDialogConfirmButton);
+  equationDialog.appendChild(equationDialogTitle);
+  equationDialog.appendChild(equationDialogFormSwitch);
+  equationDialog.appendChild(equationDialogFields);
+  equationDialog.appendChild(equationDialogActions);
+
   const functionDialog = document.createElement('div');
   functionDialog.className = 'lia-dgs-angle-dialog lia-dgs-function-dialog';
   functionDialog.setAttribute('role', 'dialog');
@@ -16586,18 +24812,37 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const exportToolsHint = document.createElement('div');
   exportToolsHint.className = 'lia-dgs-export-tools-hint';
   exportToolsHint.textContent = text.exportToolsHint;
-  const exportToolGroups = document.createElement('div');
-  exportToolGroups.className = 'lia-dgs-export-tool-groups';
-  exportToolGroups.setAttribute('role', 'group');
-  exportToolGroups.setAttribute('aria-label', text.exportToolsTitle);
-  const exportToolButtons = new Map<number, HTMLButtonElement>();
+  const exportToolSections = document.createElement('div');
+  exportToolSections.className = 'lia-dgs-export-tool-sections';
+  exportToolSections.setAttribute('role', 'group');
+  exportToolSections.setAttribute('aria-label', text.exportToolsTitle);
+  const exportToolButtons = new Map<number, HTMLButtonElement[]>();
   type ExportToolDefinition = {
     id: number;
     label: string;
     icon: string;
     className?: string;
   };
+  const createExportDimensionSection = (label: string) => {
+    const section = document.createElement('section');
+    section.className = 'lia-dgs-export-dimension-section';
+    const title = document.createElement('div');
+    title.className = 'lia-dgs-export-dimension-title';
+    title.textContent = label;
+    const groups = document.createElement('div');
+    groups.className = 'lia-dgs-export-tool-groups';
+    groups.setAttribute('role', 'group');
+    groups.setAttribute('aria-label', label);
+    section.appendChild(title);
+    section.appendChild(groups);
+    exportToolSections.appendChild(section);
+    return groups;
+  };
+  const generalExportGroups = createExportDimensionSection(text.exportToolsGeneral);
+  const planarExportGroups = createExportDimensionSection(text.exportTools2D);
+  const spatialExportGroups = createExportDimensionSection(text.exportTools3D);
   const appendExportToolGroup = (
+    target: HTMLElement,
     label: string,
     columns: ExportToolDefinition[][]
   ) => {
@@ -16605,6 +24850,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     group.className = 'lia-dgs-export-tool-group';
     group.setAttribute('role', 'group');
     group.setAttribute('aria-label', label);
+    const groupTitle = document.createElement('div');
+    groupTitle.className = 'lia-dgs-export-tool-group-title';
+    groupTitle.textContent = label;
+    group.appendChild(groupTitle);
     columns.forEach((definitions) => {
       const column = document.createElement('div');
       column.className = 'lia-dgs-export-tool-column';
@@ -16623,11 +24872,13 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
           definition.icon +
           '</span><span class="lia-dgs-export-tool-status" aria-hidden="true">\u2713</span>';
         column.appendChild(toolButton);
-        exportToolButtons.set(definition.id, toolButton);
+        const linkedButtons = exportToolButtons.get(definition.id) || [];
+        linkedButtons.push(toolButton);
+        exportToolButtons.set(definition.id, linkedButtons);
       });
       group.appendChild(column);
     });
-    exportToolGroups.appendChild(group);
+    target.appendChild(group);
   };
   const regressionDrawIcon = boardContainer
     .querySelector<HTMLButtonElement>('.lia-plot-draw-btn')?.innerHTML ||
@@ -16638,58 +24889,125 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const regressionToolsIcon = boardContainer
     .querySelector<HTMLButtonElement>('.lia-plot-regression-toggle')?.innerHTML ||
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h4M7 16v4M12.8 4.5l1.7 3.5 3.9.5-2.8 2.7.7 3.8-3.5-1.8-3.5 1.8.7-3.8-2.8-2.7 3.9-.5z"></path></svg>';
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Format' : 'Formatting', [[
+
+  appendExportToolGroup(generalExportGroups, geometryLanguage === 'de' ? 'Format' : 'Formatting', [[
     { id: DGS_TOOL_IDS.formatCopy, label: text.copyFormat, icon: formatButton.innerHTML, className: 'lia-dgs-format-button' }
   ]]);
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Geometrie' : 'Geometry', [
+  appendExportToolGroup(generalExportGroups, geometryLanguage === 'de' ? 'Grundgeometrie' : 'Basic geometry', [
     [{ id: DGS_TOOL_IDS.point, label: text.point, icon: pointButton.innerHTML, className: 'lia-dgs-point-button' }],
     [
       { id: DGS_TOOL_IDS.segment, label: text.segment, icon: segmentIcon, className: 'lia-dgs-segment-button' },
       { id: DGS_TOOL_IDS.ray, label: text.ray, icon: rayIcon, className: 'lia-dgs-segment-button' },
       { id: DGS_TOOL_IDS.line, label: text.line, icon: lineIcon, className: 'lia-dgs-segment-button' },
-      { id: DGS_TOOL_IDS.vector, label: text.vector, icon: vectorIcon, className: 'lia-dgs-segment-button' },
-      { id: DGS_TOOL_IDS.arc, label: text.arc, icon: arcIcon, className: 'lia-dgs-segment-button' }
+      { id: DGS_TOOL_IDS.vector, label: text.vector, icon: vectorIcon, className: 'lia-dgs-segment-button' }
     ],
+    [{ id: DGS_TOOL_IDS.angle, label: text.angle, icon: angleIcon, className: 'lia-dgs-angle-button' }],
+    [{ id: DGS_TOOL_IDS.intersection, label: text.intersection, icon: intersectionIcon, className: 'lia-dgs-root-button' }]
+  ]);
+  appendExportToolGroup(generalExportGroups, geometryLanguage === 'de' ? 'Inhalte' : 'Content', [
+    [{ id: DGS_TOOL_IDS.slider, label: text.slider, icon: sliderButton.innerHTML, className: 'lia-dgs-slider-button' }],
+    [{ id: DGS_TOOL_IDS.text, label: text.text, icon: textButton.innerHTML, className: 'lia-dgs-text-button' }]
+  ]);
+  appendExportToolGroup(generalExportGroups, geometryLanguage === 'de' ? 'Ansicht' : 'View', [
+    [{ id: DGS_TOOL_IDS.zoom, label: text.zoomBoth, icon: zoomModeButton.innerHTML, className: 'lia-dgs-zoom-mode-button' }],
+    [{ id: DGS_TOOL_IDS.axisScale, label: text.axisScale, icon: axisScaleButton.innerHTML, className: 'lia-dgs-axis-scale-button' }]
+  ]);
+
+  appendExportToolGroup(planarExportGroups, geometryLanguage === 'de' ? '2D-Geometrie' : '2D geometry', [
+    [{ id: DGS_TOOL_IDS.arc, label: text.arc, icon: arcIcon, className: 'lia-dgs-segment-button' }],
     [
       { id: DGS_TOOL_IDS.orthogonal, label: text.orthogonal, icon: orthogonalIcon, className: 'lia-dgs-orthogonal-button' },
       { id: DGS_TOOL_IDS.parallel, label: text.parallel, icon: parallelIcon, className: 'lia-dgs-orthogonal-button' },
       { id: DGS_TOOL_IDS.midpoint, label: text.midpoint, icon: midpointIcon, className: 'lia-dgs-orthogonal-button' },
-      { id: DGS_TOOL_IDS.angleBisector, label: text.angleBisector, icon: angleBisectorIcon, className: 'lia-dgs-orthogonal-button' }
+      { id: DGS_TOOL_IDS.angleBisector, label: text.angleBisector, icon: angleBisectorIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.reflectLine, label: text.reflectLine, icon: reflectLineIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.reflectPoint, label: text.reflectPoint, icon: reflectPointIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.rotatePoint, label: text.rotatePoint, icon: rotatePointIcon, className: 'lia-dgs-orthogonal-button' },
+      { id: DGS_TOOL_IDS.dilatePoint, label: text.dilatePoint, icon: dilatePointIcon, className: 'lia-dgs-orthogonal-button' }
     ],
     [
       { id: DGS_TOOL_IDS.polygon, label: text.polygon, icon: polygonIcon, className: 'lia-dgs-polygon-button' },
       { id: DGS_TOOL_IDS.circle, label: text.circle, icon: circleIcon, className: 'lia-dgs-polygon-button' },
-      { id: DGS_TOOL_IDS.sector, label: text.sector, icon: sectorIcon, className: 'lia-dgs-polygon-button' }
+      { id: DGS_TOOL_IDS.sector, label: text.sector, icon: sectorIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.ellipse, label: text.ellipse, icon: ellipseIcon, className: 'lia-dgs-polygon-button' }
     ],
-    [
-      { id: DGS_TOOL_IDS.angle, label: text.angle, icon: angleIcon, className: 'lia-dgs-angle-button' },
-      { id: DGS_TOOL_IDS.measuredAngle, label: text.createMeasuredAngle, icon: measuredAngleIcon, className: 'lia-dgs-angle-button' }
-    ]
+    [{ id: DGS_TOOL_IDS.measuredAngle, label: text.createMeasuredAngle, icon: measuredAngleIcon, className: 'lia-dgs-angle-button' }]
   ]);
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Funktionen' : 'Functions', [
+  appendExportToolGroup(planarExportGroups, geometryLanguage === 'de' ? 'Funktionen' : 'Functions', [
     [{ id: DGS_TOOL_IDS.function, label: text.function, icon: functionButton.innerHTML, className: 'lia-dgs-function-button' }],
     [
       { id: DGS_TOOL_IDS.roots, label: text.root, icon: rootIcon, className: 'lia-dgs-root-button' },
       { id: DGS_TOOL_IDS.extrema, label: text.extremum, icon: extremaIcon, className: 'lia-dgs-root-button' },
       { id: DGS_TOOL_IDS.inflections, label: text.inflection, icon: inflectionIcon, className: 'lia-dgs-root-button' },
       { id: DGS_TOOL_IDS.ordinateIntercept, label: text.yIntercept, icon: yInterceptIcon, className: 'lia-dgs-root-button' },
-      { id: DGS_TOOL_IDS.tangent, label: text.tangent, icon: tangentIcon, className: 'lia-dgs-root-button' },
-      { id: DGS_TOOL_IDS.intersection, label: text.intersection, icon: intersectionIcon, className: 'lia-dgs-root-button' }
+      { id: DGS_TOOL_IDS.tangent, label: text.tangent, icon: tangentIcon, className: 'lia-dgs-root-button' }
     ]
   ]);
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Zeichnen und Regression' : 'Drawing and regression', [
+  appendExportToolGroup(planarExportGroups, geometryLanguage === 'de' ? 'Zeichnen und Regression' : 'Drawing and regression', [
     [{ id: DGS_TOOL_IDS.regressionDraw, label: geometryLanguage === 'de' ? 'Freihandzeichnen' : 'Freehand drawing', icon: regressionDrawIcon, className: 'lia-dgs-export-regression-tool' }],
     [{ id: DGS_TOOL_IDS.regressionErase, label: geometryLanguage === 'de' ? 'Radierer' : 'Eraser', icon: regressionEraseIcon, className: 'lia-dgs-export-regression-tool' }],
-    [{ id: DGS_TOOL_IDS.regressionTools, label: geometryLanguage === 'de' ? 'Regression' : 'Regression', icon: regressionToolsIcon, className: 'lia-dgs-export-regression-tool' }]
+    [{ id: DGS_TOOL_IDS.regressionTools, label: 'Regression', icon: regressionToolsIcon, className: 'lia-dgs-export-regression-tool' }]
   ]);
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Inhalte' : 'Content', [
-    [{ id: DGS_TOOL_IDS.slider, label: text.slider, icon: sliderButton.innerHTML, className: 'lia-dgs-slider-button' }],
-    [{ id: DGS_TOOL_IDS.text, label: text.text, icon: textButton.innerHTML, className: 'lia-dgs-text-button' }]
+
+  appendExportToolGroup(spatialExportGroups, geometryLanguage === 'de' ? '3D-Grundgeometrie' : '3D basic geometry', [
+    [{ id: DGS_TOOL_IDS.point, label: text.point, icon: pointButton.innerHTML, className: 'lia-dgs-point-button' }],
+    [
+      { id: DGS_TOOL_IDS.segment, label: text.segment, icon: segmentIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.ray, label: text.ray, icon: rayIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.line, label: text.line, icon: lineIcon, className: 'lia-dgs-segment-button' },
+      { id: DGS_TOOL_IDS.vector, label: text.vector, icon: vectorIcon, className: 'lia-dgs-segment-button' }
+    ],
+    [{ id: DGS_TOOL_IDS.angle, label: text.angle, icon: angleIcon, className: 'lia-dgs-angle-button' }],
+    [{ id: DGS_TOOL_IDS.intersection, label: text.intersection, icon: intersectionIcon, className: 'lia-dgs-root-button' }]
   ]);
-  appendExportToolGroup(geometryLanguage === 'de' ? 'Ansicht' : 'View', [
-    [{ id: DGS_TOOL_IDS.zoom, label: text.zoomBoth, icon: zoomModeButton.innerHTML, className: 'lia-dgs-zoom-mode-button' }],
-    [{ id: DGS_TOOL_IDS.axisScale, label: text.axisScale, icon: axisScaleButton.innerHTML, className: 'lia-dgs-axis-scale-button' }]
+  appendExportToolGroup(spatialExportGroups, geometryLanguage === 'de' ? 'Transformationen' : 'Transformations', [
+    spatialTransformDefinitions.map(({ tool, ...definition }) => ({ ...definition, className: 'lia-dgs-orthogonal-button' }))
   ]);
+  appendExportToolGroup(spatialExportGroups, geometryLanguage === 'de' ? 'Ebenen, Rundkörper und Körper' : 'Planes, round objects and solids', [
+    [
+      { id: DGS_TOOL_IDS.planeThreePoints, label: planeThreePointsLabel, icon: planeThreePointsIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.planePointNormal, label: planePointNormalLabel, icon: planePointNormalIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.planePointVectors, label: planePointVectorsLabel, icon: planePointVectorsIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.polygon3D, label: geometryLanguage === 'de' ? 'Raumvieleck' : 'Spatial polygon', icon: spatialPolygon3DIcon, className: 'lia-dgs-polygon-button' }
+    ],
+    [
+      { id: DGS_TOOL_IDS.circle3DThreePoints, label: circle3DThreePointsLabel, icon: circleThreePoints3DIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.circle3DCenterNormalPoint, label: circle3DCenterNormalPointLabel, icon: circleCenterNormal3DIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.sphere3DCenterPoint, label: sphere3DCenterPointLabel, icon: sphereCenterPoint3DIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.sphere3DFourPoints, label: sphere3DFourPointsLabel, icon: sphereFourPoints3DIcon, className: 'lia-dgs-polygon-button' },
+      { id: DGS_TOOL_IDS.sphere3DCenterRadius, label: sphere3DCenterRadiusLabel, icon: sphereCenterRadius3DIcon, className: 'lia-dgs-polygon-button' }
+    ],
+    spatialBodyDefinitions.filter(definition => definition.group !== 'surface')
+      .map(({ tool, group, ...definition }) => ({ ...definition, className: 'lia-dgs-polygon-button' }))
+  ]);
+  const exportSceneMode = document.createElement('div');
+  exportSceneMode.className = 'lia-dgs-export-mode';
+  exportSceneMode.setAttribute('role', 'radiogroup');
+  const exportSceneModeTitle = document.createElement('div');
+  exportSceneModeTitle.className = 'lia-dgs-export-mode-title';
+  exportSceneModeTitle.textContent = text.exportModeTitle;
+  exportSceneMode.appendChild(exportSceneModeTitle);
+  const exportSceneModeInputs = new Map<DgsSceneModePolicy, HTMLInputElement>();
+  const exportSceneModeChoices: Array<[DgsSceneModePolicy, string]> = [
+    ['switchable', text.exportModeSwitchable],
+    ['2d', text.exportModeFixed2D],
+    ['3d', text.exportModeFixed3D]
+  ];
+  exportSceneModeChoices.forEach(([policy, captionText]) => {
+    const label = document.createElement('label');
+    label.className = 'lia-dgs-export-mode-option';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'dgs-export-mode-' + uid;
+    input.value = policy;
+    input.tabIndex = -1;
+    const caption = document.createElement('span');
+    caption.textContent = captionText;
+    label.appendChild(input);
+    label.appendChild(caption);
+    exportSceneMode.appendChild(label);
+    exportSceneModeInputs.set(policy, input);
+  });
   const exportRestrictions = document.createElement('div');
   exportRestrictions.className = 'lia-dgs-export-restrictions';
   exportRestrictions.setAttribute('role', 'group');
@@ -16721,7 +25039,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     exportRestrictionInputs.set(restrictionId, input);
   });
   exportToolsStep.appendChild(exportToolsHint);
-  exportToolsStep.appendChild(exportToolGroups);
+  exportToolsStep.appendChild(exportToolSections);
+  exportToolsStep.appendChild(exportSceneMode);
   exportToolsStep.appendChild(exportRestrictions);
   const exportMacroStep = document.createElement('div');
   exportMacroStep.className = 'lia-dgs-export-step lia-dgs-export-macro-step';
@@ -16791,6 +25110,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   angleDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   compassRadiusDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   arcDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
+  equationDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   functionDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   textDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   exportDialog.addEventListener('pointerdown', (evt) => evt.stopPropagation());
@@ -16811,26 +25131,28 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   boardContainer.appendChild(angleDialog);
   boardContainer.appendChild(compassRadiusDialog);
   boardContainer.appendChild(arcDialog);
+  boardContainer.appendChild(equationDialog);
   boardContainer.appendChild(functionDialog);
   boardContainer.appendChild(textDialog);
   boardContainer.appendChild(exportDialog);
   boardContainer.appendChild(button);
   boardContainer.classList.add('lia-dgs-fullscreen-host');
   typesetDgsMath(pointButton);
-  typesetDgsMath(exportToolGroups);
+  typesetDgsMath(pointSubmenu);
+  typesetDgsMath(exportToolSections);
 
   const board = window.__boards && window.__boards[boardId];
-  const storedZoomMode = normalizeDgsZoomMode(
+  const storedZoomMode = config.zoomMode || normalizeDgsZoomMode(
     board && board.__liaDgsZoomMode ||
     window.__coordBoardStates && window.__coordBoardStates[boardId] &&
       (window.__coordBoardStates[boardId].zoomMode || window.__coordBoardStates[boardId].panMode)
   );
-  const storedAxisScaleMode = normalizeDgsAxisScaleMode(
+  const storedAxisScaleMode = config.axisScaleMode || normalizeDgsAxisScaleMode(
     board && board.__liaDgsAxisScaleMode ||
     window.__coordBoardStates && window.__coordBoardStates[boardId] &&
       window.__coordBoardStates[boardId].axisScaleMode
   );
-  const storedSetSquarePose = readDgsSetSquarePose(boardId);
+  const storedSetSquarePose = config.setSquarePose || readDgsSetSquarePose(boardId);
   const xAxis = board && board.defaultAxes && board.defaultAxes.x;
   const yAxis = board && board.defaultAxes && board.defaultAxes.y;
   const state: DgsState = {
@@ -16870,6 +25192,9 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     ),
     exportRestrictionInputs,
     exportSelectedRestrictionIds: new Set<number>(config.restrictionIds),
+    exportSceneModeInputs,
+    exportSceneModePolicy: config.sceneModePolicy,
+    sceneModePolicy: config.sceneModePolicy,
     exportDialogStep: 'tools',
     exportTextarea,
     exportCopyButton,
@@ -16879,6 +25204,15 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     coordinateSection,
     xCoordinateInput,
     yCoordinateInput,
+    zCoordinateInput,
+    vectorComponentsSection,
+    vectorXInput,
+    vectorYInput,
+    vectorZInput,
+    roundGeometrySection,
+    roundCenterValue,
+    roundSourceValue,
+    roundRadiusInput,
     angleMeasureSection,
     angleMeasureInput,
     arcSettingsSection,
@@ -16886,6 +25220,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     arcEntryAngleInput,
     strokeStyleSection,
     lineStyleSelect,
+    planeEquationField,
+    planeEquationSelect,
     strokeDesignField,
     strokeDesignSelect,
     strokeWidthField,
@@ -16900,14 +25236,28 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     sliderMinInput,
     sliderMaxInput,
     sliderStepInput,
+    sliderAnimationSpeedRow,
+    sliderAnimationSpeedInput,
+    sliderAnimationSpeedValue,
+    sliderAnimationControlOption,
+    sliderAnimationControlCheckbox,
+    sliderAnimationControlCheckboxText,
+    locusSettingsSection,
+    locusSamplesInput,
     axisLabelSection,
     axisVariableInput,
     axisDescriptionInput,
     fixedOption: fixedOption.label,
     fixedCheckbox: fixedOption.input,
     fixedCheckboxText: fixedOption.caption,
+    bindingOption: bindingOption.label,
+    bindingCheckbox: bindingOption.input,
+    bindingCheckboxText: bindingOption.caption,
     traceOption: traceOption.label,
     traceCheckbox: traceOption.input,
+    locusOption: locusOption.label,
+    locusCheckbox: locusOption.input,
+    locusCheckboxText: locusOption.caption,
     nameCheckbox: nameOption.input,
     objectOption: objectOption.label,
     objectCheckbox: objectOption.input,
@@ -16917,8 +25267,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     measurementCheckboxText: measurementOption.caption,
     areaOption: areaOption.label,
     areaCheckbox: areaOption.input,
+    areaCheckboxText: areaOption.caption,
     perimeterOption: perimeterOption.label,
     perimeterCheckbox: perimeterOption.input,
+    perimeterCheckboxText: perimeterOption.caption,
     colorButton,
     lineColorButton,
     traceColorButton,
@@ -16946,6 +25298,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     colorSaturation: 1,
     colorValue: 1,
     selectButton,
+    constructionColorButton,
+    constructionColorMenu,
+    constructionColorMenuOpen: false,
+    construction3DColor,
     setSquareButton,
     setSquareOverlay,
     setSquareVisible: storedSetSquarePose.visible,
@@ -16990,7 +25346,13 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     compassRadiusDialogCancelButton,
     formatButton,
     toolsDivider,
+    shapeDivider,
+    angleIntersectionDivider,
+    sceneModeDivider,
     pointButton,
+    pointSubmenu,
+    pointToolButton,
+    pointCoordinatesToolButton,
     segmentButton,
     orthogonalButton,
     relationSubmenu,
@@ -16998,13 +25360,23 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     parallelToolButton,
     midpointToolButton,
     angleBisectorToolButton,
+    reflectLineToolButton,
+    reflectPointToolButton,
+    rotatePointToolButton,
+    dilatePointToolButton,
     polygonButton,
+    round2DButton,
+    plane3DButton,
+    round3DButton,
+    solid3DButton,
     angleButton,
     angleSubmenu,
     angleToolButton,
     measuredAngleToolButton,
     angleDialog,
+    angleDialogTitle,
     angleDialogInput,
+    angleDialogUnit,
     angleDialogConfirmButton,
     angleDialogCancelButton,
     arcDialog,
@@ -17012,16 +25384,37 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     arcDialogEntryInput,
     arcDialogConfirmButton,
     arcDialogCancelButton,
+    equationDialog,
+    equationDialogTitle,
+    equationDialogFormSwitch,
+    equationDialogFields,
+    equationDialogInputs: {},
+    equationDialogConfirmButton,
+    equationDialogCancelButton,
     geometrySubmenu,
     segmentToolButton,
     rayToolButton,
     lineToolButton,
+    lineEquationToolButton,
     vectorToolButton,
     arcToolButton,
+    planeThreePointsToolButton,
+    planePointNormalToolButton,
+    planePointVectorsToolButton,
+    planeEquationToolButton,
+    circle3DThreePointsToolButton,
+    circle3DCenterNormalPointToolButton,
+    sphere3DCenterPointToolButton,
+    sphere3DFourPointsToolButton,
+    sphere3DCenterRadiusToolButton,
+    spatialBodyToolButtons,
+    spatialTransformToolButtons,
     shapeSubmenu,
+    shapeSubmenuAnchor: polygonButton,
     polygonToolButton,
     circleToolButton,
     sectorToolButton,
+    ellipseToolButton,
     functionDivider,
     functionButton,
     rootButton,
@@ -17066,6 +25459,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     axisSyncing: false,
     open: false,
     compassSubmenuOpen: false,
+    pointSubmenuOpen: false,
     geometrySubmenuOpen: false,
     relationSubmenuOpen: false,
     shapeSubmenuOpen: false,
@@ -17075,6 +25469,9 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     angleDialogOpen: false,
     compassRadiusDialogOpen: false,
     arcDialogOpen: false,
+    equationDialogOpen: false,
+    equationDialogKind: null,
+    equationDialogPlaneForm: 'parameter',
     functionDialogOpen: false,
     textDialogOpen: false,
     exportDialogOpen: false,
@@ -17090,12 +25487,19 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     fullscreenRenderWidth: 0,
     fullscreenRenderHeight: 0,
     contextObject: null,
+    pendingPointBindingPoint: null,
+    pendingLocusTarget: null,
     activeTool: '',
     externalToolActive: false,
     pendingTextPosition: null,
     zoomMode: storedZoomMode,
     axisScaleMode: storedAxisScaleMode,
     selectedSegmentPoint: null,
+    pendingLinearCreatedPoints: [],
+    selectedPlanePoints: [],
+    selectedPlaneVectors: [],
+    selectedRoundPoints: [],
+    selectedRoundVectors: [],
     selectedCompassCenter: null,
     selectedCompassPoint: null,
     compassPreview: null,
@@ -17105,19 +25509,34 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     compassSweep: 0,
     compassRadius: 0,
     compassMoved: false,
-    compassMode: 'free',
-    compassPresetRadius: 1,
+    compassMode: config.compassMode || 'free',
+    compassPresetRadius: config.compassRadius || 1,
     pendingArcPoints: [],
     selectedRelationLine: null,
     selectedRelationPoint: null,
     selectedMidpointPoint: null,
     selectedBisectorPoints: [],
+    selectedTransformObject: null,
+    selectedTransformReference: null,
     selectedPolygonPoints: [],
     selectedAnglePoints: [],
+    selectedAngle3DObjects: [],
     selectedCircleCenter: null,
     selectedSectorPoints: [],
+    selectedEllipsePoints: [],
     selectedIntersectionObject: null,
     selectedFormatSource: null,
+    multiSelectedObjects: [],
+    multiSelectPointerId: null,
+    multiSelectDragObject: null,
+    multiSelectDragWasSelected: false,
+    multiSelectMoved: false,
+    multiSelectStartClientX: 0,
+    multiSelectStartClientY: 0,
+    multiSelectStartUserX: 0,
+    multiSelectStartUserY: 0,
+    multiSelectSpatialAnchor: null,
+    multiSelectPointStarts: [],
     circlePreview: null,
     circlePreviewPosition: null,
     restoring: false,
@@ -17126,18 +25545,35 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     coordinateSyncing: false,
     fixedCompassSyncing: false,
     fixedCompassPersistPending: false,
-    fixedCompassPersistHistory: false
+    fixedCompassPersistHistory: false,
+    sliderAnimationSliders: new Set<any>()
   };
   states[uid] = state;
+  state.board.__liaDgsRestoreInitialState = () => restoreDgsInitialConstruction(state);
+  try { window.__mountDgsSegment6Tools?.(menuBar); } catch (error) { console.warn('DGS Segment 6 tools bootstrap failed', error); }
+  mountCoordinateView3DControls(state.board, state.boardContainer, state.language);
+  installDgs3DSceneHooks(state);
+  applyDgsSceneModePolicy(state, config.sceneModePolicy);
+  try { window.__refreshDgsToolAvailabilityForBoard?.(state.boardId); } catch (e) {}
   bindDgsSetSquareInteraction(state);
   layoutDgsSetSquare(state, 'screen');
-  exportToolButtons.forEach((toolButton, toolId) => {
-    toolButton.addEventListener('click', (evt) => {
-      evt.preventDefault();
+  exportToolButtons.forEach((toolButtons, toolId) => {
+    toolButtons.forEach((toolButton) => {
+      toolButton.addEventListener('click', (evt) => {
+        evt.preventDefault();
+        evt.stopPropagation();
+        if (state.exportSelectedToolIds.has(toolId)) state.exportSelectedToolIds.delete(toolId);
+        else state.exportSelectedToolIds.add(toolId);
+        renderDgsExportToolSelection(state);
+      });
+    });
+  });
+  exportSceneModeInputs.forEach((input, policy) => {
+    input.addEventListener('change', (evt) => {
       evt.stopPropagation();
-      if (state.exportSelectedToolIds.has(toolId)) state.exportSelectedToolIds.delete(toolId);
-      else state.exportSelectedToolIds.add(toolId);
-      renderDgsExportToolSelection(state);
+      if (!input.checked) return;
+      state.exportSceneModePolicy = policy;
+      renderDgsExportSceneModeSelection(state);
     });
   });
   exportRestrictionInputs.forEach((input, restrictionId) => {
@@ -17161,14 +25597,18 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   menuBar.addEventListener('scroll', () => positionOpenDgsSubmenu(state), { passive: true });
   setDgsZoomMode(state, storedZoomMode, false);
   setDgsAxisScaleMode(state, storedAxisScaleMode, false);
+  setDgsSetSquareVisible(state, storedSetSquarePose.visible);
   captureDgsInitialConstruction(state);
   restoreDgsConstruction(state);
+  refreshDgsSliderAnimationControls(state);
   // Several legacy macros finish their own restore in a zero/120 ms timeout.
   // One settling pass therefore always runs after them; further passes happen
   // only while dependencies are still unresolved.
   scheduleDgsConstructionRestore(state);
   setMenuOpen(state, false);
+  setDgsConstructionColorMenuOpen(state, false);
   setCompassSubmenuOpen(state, false);
+  setPointSubmenuOpen(state, false);
   setGeometrySubmenuOpen(state, false);
   setRelationSubmenuOpen(state, false);
   setShapeSubmenuOpen(state, false);
@@ -17178,6 +25618,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   setAngleDialogOpen(state, false);
   setCompassRadiusDialogOpen(state, false);
   setArcDialogOpen(state, false);
+  setDgsEquationDialogOpen(state, null, false);
   setFunctionDialogOpen(state, false);
   setTextDialogOpen(state, false);
   setExportDialogOpen(state, false);
@@ -17188,9 +25629,27 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   renderToolState(state);
   renderDgsFullscreenButton(state);
 
+  constructionColorButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setDgsConstructionColorMenuOpen(state, !state.constructionColorMenuOpen);
+  });
+  constructionColorMenu.querySelectorAll<HTMLButtonElement>('.lia-dgs-construction-color-item')
+    .forEach((item) => item.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      const color = normalizeHexColor(item.dataset.color);
+      if (!color) return;
+      state.construction3DColor = color;
+      dgsConstructionColors[state.boardId] = color;
+      renderDgsConstructionColorMenu(state);
+    }));
+  renderDgsConstructionColorMenu(state);
+
   selectButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    setDgsConstructionColorMenuOpen(state, false);
     setGeometrySubmenuOpen(state, false);
     setRelationSubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
@@ -17198,8 +25657,11 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setRootSubmenuOpen(state, false);
     setAxisScaleSubmenuOpen(state, false);
     setAngleDialogOpen(state, false);
+    setDgsEquationDialogOpen(state, null, false);
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
+    finishDgsMultiSelectDrag(state, null, true);
+    setDgsMultiSelection(state, []);
     setActiveTool(state, '', false);
     notifyRegressionLayout(state, false);
   });
@@ -17265,17 +25727,44 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   pointButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
-    setGeometrySubmenuOpen(state, false);
-    setRelationSubmenuOpen(state, false);
-    setShapeSubmenuOpen(state, false);
-    setAngleSubmenuOpen(state, false);
-    setRootSubmenuOpen(state, false);
+    setPointSubmenuOpen(state, !state.pointSubmenuOpen);
+  });
+
+  pointToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    pointButton.innerHTML = pointIcon;
+    setPointSubmenuOpen(state, false);
+    setDgsEquationDialogOpen(state, null, false);
     setActiveTool(state, state.activeTool === 'point' ? '' : 'point');
   });
+
+  pointCoordinatesToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    pointButton.innerHTML = pointCoordinatesIcon;
+    setPointSubmenuOpen(state, false);
+    setDgsEquationDialogOpen(state, 'point', true);
+  });
+
+  const activateSingleAvailableTool = (
+    parent: HTMLButtonElement,
+    buttons: HTMLButtonElement[]
+  ): boolean => {
+    const toolId = parent.dataset.dgsSingleToolId;
+    if (!toolId) return false;
+    const button = buttons.find(candidate => candidate.dataset.dgsToolId === toolId);
+    if (!button || button.hidden || button.disabled) return false;
+    button.click();
+    return true;
+  };
 
   segmentButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (activateSingleAvailableTool(segmentButton, [
+      segmentToolButton, rayToolButton, lineToolButton, lineEquationToolButton, vectorToolButton, arcToolButton
+    ])) return;
     setGeometrySubmenuOpen(state, !state.geometrySubmenuOpen);
   });
 
@@ -17306,6 +25795,15 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setActiveTool(state, state.activeTool === 'line' ? '' : 'line');
   });
 
+  lineEquationToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    segmentButton.innerHTML = lineEquationIcon;
+    segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.line);
+    setGeometrySubmenuOpen(state, false);
+    setDgsEquationDialogOpen(state, 'line', true);
+  });
+
   vectorToolButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
@@ -17327,6 +25825,11 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   orthogonalButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (activateSingleAvailableTool(orthogonalButton, [
+      orthogonalToolButton, parallelToolButton, midpointToolButton, angleBisectorToolButton,
+      reflectLineToolButton, reflectPointToolButton, rotatePointToolButton, dilatePointToolButton,
+      ...spatialTransformToolButtons.map(entry => entry.button)
+    ])) return;
     setRelationSubmenuOpen(state, !state.relationSubmenuOpen);
   });
 
@@ -17366,12 +25869,80 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setActiveTool(state, state.activeTool === 'angle-bisector' ? '' : 'angle-bisector');
   });
 
-  polygonButton.addEventListener('click', (evt) => {
+  const activateTransformTool = (
+    evt: MouseEvent,
+    tool: 'reflect-line' | 'reflect-point' | 'rotate-point' | 'dilate-point',
+    icon: string,
+    toolId: number
+  ) => {
     evt.preventDefault();
     evt.stopPropagation();
-    setGeometrySubmenuOpen(state, false);
-    setShapeSubmenuOpen(state, !state.shapeSubmenuOpen);
+    orthogonalButton.innerHTML = icon;
+    orthogonalButton.dataset.dgsCurrentToolId = String(toolId);
+    setRelationSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === tool ? '' : tool);
+  };
+  reflectLineToolButton.addEventListener('click', (evt) =>
+    activateTransformTool(evt, 'reflect-line', reflectLineIcon, DGS_TOOL_IDS.reflectLine));
+  reflectPointToolButton.addEventListener('click', (evt) =>
+    activateTransformTool(evt, 'reflect-point', reflectPointIcon, DGS_TOOL_IDS.reflectPoint));
+  rotatePointToolButton.addEventListener('click', (evt) =>
+    activateTransformTool(evt, 'rotate-point', rotatePointIcon, DGS_TOOL_IDS.rotatePoint));
+  dilatePointToolButton.addEventListener('click', (evt) =>
+    activateTransformTool(evt, 'dilate-point', dilatePointIcon, DGS_TOOL_IDS.dilatePoint));
+
+
+  spatialTransformToolButtons.forEach(entry => {
+    entry.button.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      orthogonalButton.innerHTML = entry.icon;
+      orthogonalButton.dataset.dgsCurrentToolId = String(entry.id);
+      setRelationSubmenuOpen(state, false);
+      setActiveTool(state, state.activeTool === entry.tool ? '' : entry.tool);
+    });
   });
+
+  const toggleShapeGroup = (
+    evt: Event,
+    group: 'angular2d' | 'round2d' | 'surfaces3d' | 'circles3d' | 'prisms' | 'spheres3d' | 'pointed',
+    anchor: HTMLButtonElement,
+    buttons: HTMLButtonElement[]
+  ) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    if (activateSingleAvailableTool(anchor, buttons)) return;
+    setGeometrySubmenuOpen(state, false);
+    const close = state.shapeSubmenuOpen && state.shapeSubmenuAnchor === anchor;
+    state.shapeSubmenuAnchor = anchor;
+    state.shapeSubmenu.dataset.dgsActiveGroup = group;
+    applyDgsToolAvailability(state);
+    setShapeSubmenuOpen(state, !close);
+  };
+  polygonButton.addEventListener('click', evt => {
+    const spatial = state.board.__liaSceneMode === '3d';
+    toggleShapeGroup(evt, spatial ? 'surfaces3d' : 'angular2d', polygonButton, spatial
+      ? [
+          planeThreePointsToolButton, planePointNormalToolButton,
+          planePointVectorsToolButton, planeEquationToolButton,
+          ...spatialBodyToolButtons.filter(entry => entry.group === 'surface').map(entry => entry.button)
+        ]
+      : [polygonToolButton]);
+  });
+  round2DButton.addEventListener('click', evt => {
+    const spatial = state.board.__liaSceneMode === '3d';
+    toggleShapeGroup(evt, spatial ? 'circles3d' : 'round2d', round2DButton, spatial
+      ? [circle3DThreePointsToolButton, circle3DCenterNormalPointToolButton]
+      : [circleToolButton, sectorToolButton, ellipseToolButton]);
+  });
+  plane3DButton.addEventListener('click', evt => toggleShapeGroup(evt, 'prisms', plane3DButton, [
+    ...spatialBodyToolButtons.filter(entry => entry.group === 'prism').map(entry => entry.button)
+  ]));
+  solid3DButton.addEventListener('click', evt => toggleShapeGroup(evt, 'pointed', solid3DButton,
+    spatialBodyToolButtons.filter(entry => entry.group === 'pointed').map(entry => entry.button)));
+  round3DButton.addEventListener('click', evt => toggleShapeGroup(evt, 'spheres3d', round3DButton, [
+    sphere3DCenterPointToolButton, sphere3DFourPointsToolButton, sphere3DCenterRadiusToolButton
+  ]));
 
   polygonToolButton.addEventListener('click', (evt) => {
     evt.preventDefault();
@@ -17385,8 +25956,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   circleToolButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
-    polygonButton.innerHTML = circleIcon;
-    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.circle);
+    round2DButton.innerHTML = circleIcon;
+    round2DButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.circle);
     setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'circle' ? '' : 'circle');
   });
@@ -17394,15 +25965,91 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   sectorToolButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
-    polygonButton.innerHTML = sectorIcon;
-    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.sector);
+    round2DButton.innerHTML = sectorIcon;
+    round2DButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.sector);
     setShapeSubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'sector' ? '' : 'sector');
+  });
+
+  ellipseToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    round2DButton.innerHTML = ellipseIcon;
+    round2DButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.ellipse);
+    setShapeSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === 'ellipse' ? '' : 'ellipse');
+  });
+
+  const activatePlaneTool = (tool: 'plane-three-points' | 'plane-point-normal' | 'plane-point-vectors', id: number, icon: string) => {
+    polygonButton.innerHTML = icon;
+    polygonButton.dataset.dgsCurrentToolId = String(id);
+    setShapeSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === tool ? '' : tool);
+  };
+  planeThreePointsToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault(); evt.stopPropagation(); activatePlaneTool('plane-three-points', DGS_TOOL_IDS.planeThreePoints, planeThreePointsIcon);
+  });
+  planePointNormalToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault(); evt.stopPropagation(); activatePlaneTool('plane-point-normal', DGS_TOOL_IDS.planePointNormal, planePointNormalIcon);
+  });
+  planePointVectorsToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault(); evt.stopPropagation(); activatePlaneTool('plane-point-vectors', DGS_TOOL_IDS.planePointVectors, planePointVectorsIcon);
+  });
+  planeEquationToolButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    polygonButton.innerHTML = planeEquationIcon;
+    polygonButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.planePointVectors);
+    setShapeSubmenuOpen(state, false);
+    setDgsEquationDialogOpen(state, 'plane', true);
+  });
+
+  const activateRound3DTool = (
+    evt: Event,
+    tool: 'circle3d-three-points' | 'circle3d-center-normal-point' |
+      'sphere3d-center-point' | 'sphere3d-four-points' | 'sphere3d-center-radius',
+    id: number,
+    icon: string
+  ) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    const circleTool = tool === 'circle3d-three-points' || tool === 'circle3d-center-normal-point';
+    const parent = circleTool ? round2DButton : round3DButton;
+    parent.innerHTML = icon;
+    parent.dataset.dgsCurrentToolId = String(id);
+    setShapeSubmenuOpen(state, false);
+    setActiveTool(state, state.activeTool === tool ? '' : tool);
+  };
+  circle3DThreePointsToolButton.addEventListener('click', (evt) =>
+    activateRound3DTool(evt, 'circle3d-three-points', DGS_TOOL_IDS.circle3DThreePoints, circleThreePoints3DIcon));
+  circle3DCenterNormalPointToolButton.addEventListener('click', (evt) =>
+    activateRound3DTool(evt, 'circle3d-center-normal-point', DGS_TOOL_IDS.circle3DCenterNormalPoint, circleCenterNormal3DIcon));
+  sphere3DCenterPointToolButton.addEventListener('click', (evt) =>
+    activateRound3DTool(evt, 'sphere3d-center-point', DGS_TOOL_IDS.sphere3DCenterPoint, sphereCenterPoint3DIcon));
+  sphere3DFourPointsToolButton.addEventListener('click', (evt) =>
+    activateRound3DTool(evt, 'sphere3d-four-points', DGS_TOOL_IDS.sphere3DFourPoints, sphereFourPoints3DIcon));
+  sphere3DCenterRadiusToolButton.addEventListener('click', (evt) =>
+    activateRound3DTool(evt, 'sphere3d-center-radius', DGS_TOOL_IDS.sphere3DCenterRadius, sphereCenterRadius3DIcon));
+
+
+  spatialBodyToolButtons.forEach(entry => {
+    entry.button.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      const parent = entry.group === 'surface'
+        ? polygonButton
+        : (entry.group === 'pointed' ? solid3DButton : plane3DButton);
+      parent.innerHTML = entry.icon;
+      parent.dataset.dgsCurrentToolId = String(entry.id);
+      setShapeSubmenuOpen(state, false);
+      setActiveTool(state, state.activeTool === entry.tool ? '' : entry.tool);
+    });
   });
 
   angleButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (activateSingleAvailableTool(angleButton, [angleToolButton, measuredAngleToolButton])) return;
     setGeometrySubmenuOpen(state, false);
     setShapeSubmenuOpen(state, false);
     setAngleSubmenuOpen(state, !state.angleSubmenuOpen);
@@ -17414,7 +26061,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     angleButton.innerHTML = angleIcon;
     angleButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.angle);
     setAngleSubmenuOpen(state, false);
-    setActiveTool(state, state.activeTool === 'angle' ? '' : 'angle');
+    const tool: DgsState['activeTool'] = state.board.__liaSceneMode === '3d' ? 'angle3d' : 'angle';
+    setActiveTool(state, state.activeTool === tool ? '' : tool);
   });
 
   measuredAngleToolButton.addEventListener('click', (evt) => {
@@ -17539,6 +26187,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   rootButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (activateSingleAvailableTool(rootButton, [
+      rootToolButton, extremaToolButton, inflectionToolButton,
+      yInterceptToolButton, tangentToolButton, intersectionToolButton
+    ])) return;
     setFunctionDialogOpen(state, false);
     setRootSubmenuOpen(state, !state.rootSubmenuOpen);
   });
@@ -17651,6 +26303,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     setAngleSubmenuOpen(state, false);
     setRootSubmenuOpen(state, false);
     setAxisScaleSubmenuOpen(state, false);
+    setDgsEquationDialogOpen(state, null, false);
     setFunctionDialogOpen(state, false);
     setTextDialogOpen(state, false);
     setActiveTool(state, '', false);
@@ -17689,7 +26342,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
   });
 
-  [xCoordinateInput, yCoordinateInput].forEach((input) => {
+  [xCoordinateInput, yCoordinateInput, zCoordinateInput].forEach((input) => {
     input.addEventListener('blur', () => applyCoordinateInputs(state));
     input.addEventListener('keydown', (evt) => {
       if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
@@ -17702,6 +26355,75 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       evt.stopPropagation();
       applyCoordinateInputs(state);
     });
+  });
+
+  const applyVectorComponentsInputs = () => {
+    const vector = state.contextObject;
+    const inputs = [vectorXInput, vectorYInput, vectorZInput];
+    const components = inputs.map(parseNumericCoordinateInput) as Array<number | null>;
+    const valid = !!vector?.__liaLinear3DFreeVector && components.every(value => value != null) &&
+      vector3Norm(components as number[]) > 1e-12;
+    inputs.forEach((input, index) => input.setAttribute('aria-invalid',
+      components[index] != null && (valid || vector3Norm(components.filter(value => value != null) as number[]) > 1e-12)
+        ? 'false'
+        : 'true'));
+    if (!valid) return false;
+    if (!setCoordinateFreeVector3DComponents(vector, components as Vector3)) return false;
+    refreshDgsObjectLabel(vector);
+    refreshSideMenuVectorComponents(state);
+    persistDgsConstruction(state);
+    return true;
+  };
+  [vectorXInput, vectorYInput, vectorZInput].forEach((input) => {
+    input.addEventListener('input', () => input.setAttribute('aria-invalid', 'false'));
+    input.addEventListener('blur', applyVectorComponentsInputs);
+    input.addEventListener('keydown', (evt) => {
+      if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+          evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+        evt.stopPropagation();
+        return;
+      }
+      if (evt.key !== 'Enter') return;
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (applyVectorComponentsInputs()) input.blur();
+    });
+  });
+
+  const applyRoundRadiusInput = () => {
+    const object = state.contextObject;
+    const radius = parseNumericCoordinateInput(roundRadiusInput);
+    const applied = radius != null && radius > 0 && (
+      (isDgsCircle3D(object) && object.__liaCircle3DDefinition === 'center-normal-radius' &&
+        object.__liaCircle3DSetRadius?.(radius) === true) ||
+      (isDgsSphere3D(object) && object.__liaSphere3DDefinition === 'center-radius' &&
+        object.__liaSphere3DSetRadius?.(radius) === true)
+    );
+    roundRadiusInput.setAttribute('aria-invalid', applied ? 'false' : 'true');
+    if (!applied) return false;
+    refreshDgsObjectLabel(object);
+    updateSideMenuControls(state, object);
+    persistDgsConstruction(state);
+    return true;
+  };
+  roundRadiusInput.addEventListener('input', () => roundRadiusInput.setAttribute('aria-invalid', 'false'));
+  roundRadiusInput.addEventListener('blur', applyRoundRadiusInput);
+  roundRadiusInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'ArrowLeft' || evt.key === 'ArrowRight' ||
+        evt.key === 'ArrowUp' || evt.key === 'ArrowDown') {
+      evt.stopPropagation();
+      return;
+    }
+    if (evt.key === 'Enter') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (applyRoundRadiusInput()) roundRadiusInput.blur();
+    } else if (evt.key === 'Escape') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (state.contextObject) updateSideMenuControls(state, state.contextObject);
+      roundRadiusInput.blur();
+    }
   });
 
   const applyAngleMeasureInput = () => {
@@ -17816,6 +26538,19 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     }
   });
   lineStyleSelect.addEventListener('keydown', (evt) => {
+    evt.stopPropagation();
+  });
+  planeEquationSelect.addEventListener('change', () => {
+    const object = state.contextObject;
+    if (!isDgsPlane(object)) return;
+    const form = planeEquationSelect.value;
+    if (form !== 'parameter' && form !== 'normal' && form !== 'coordinate') return;
+    object.__liaDgsPlaneEquationForm = form;
+    refreshDgsObjectLabel(object);
+    try { state.board?.update?.(); } catch (e) {}
+    persistDgsConstruction(state);
+  });
+  planeEquationSelect.addEventListener('keydown', (evt) => {
     evt.stopPropagation();
   });
 
@@ -17961,7 +26696,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   angleDialogConfirmButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
-    createMeasuredDgsAngleFromDialog(state);
+    if (state.activeTool === 'rotate-point' || state.activeTool === 'dilate-point' ||
+        state.activeTool === 'rotate-axis3d' || state.activeTool === 'dilate3d') {
+      createDgsTransformationFromDialog(state);
+    } else createMeasuredDgsAngleFromDialog(state);
   });
   angleDialogCancelButton.addEventListener('click', (evt) => {
     evt.preventDefault();
@@ -17977,7 +26715,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     if (evt.key === 'Enter') {
       evt.preventDefault();
       evt.stopPropagation();
-      createMeasuredDgsAngleFromDialog(state);
+      if (state.activeTool === 'rotate-point' || state.activeTool === 'dilate-point' ||
+        state.activeTool === 'rotate-axis3d' || state.activeTool === 'dilate3d') {
+        createDgsTransformationFromDialog(state);
+      } else createMeasuredDgsAngleFromDialog(state);
     } else if (evt.key === 'Escape') {
       evt.preventDefault();
       evt.stopPropagation();
@@ -18013,6 +26754,17 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
         setActiveTool(state, '', false);
       }
     });
+  });
+
+  equationDialogConfirmButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    confirmDgsEquationDialog(state);
+  });
+  equationDialogCancelButton.addEventListener('click', (evt) => {
+    evt.preventDefault();
+    evt.stopPropagation();
+    setDgsEquationDialogOpen(state, null, false);
   });
 
   functionDialogConfirmButton.addEventListener('click', (evt) => {
@@ -18133,6 +26885,28 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     });
   });
 
+  const applySliderAnimationSpeedInput = (recordHistory: boolean) => {
+    const slider = state.contextObject;
+    if (!isDgsSlider(slider)) return;
+    const speed = normalizeDgsSliderAnimationSpeed(sliderAnimationSpeedInput.value);
+    slider.__liaDgsSliderAnimationSpeed = speed;
+    sliderAnimationSpeedInput.value = String(speed);
+    sliderAnimationSpeedValue.textContent = formatDgsSliderAnimationSpeed(state, slider);
+    if (recordHistory) persistDgsConstruction(state, true);
+  };
+  sliderAnimationSpeedInput.addEventListener('input', () => applySliderAnimationSpeedInput(false));
+  sliderAnimationSpeedInput.addEventListener('change', () => applySliderAnimationSpeedInput(true));
+  sliderAnimationSpeedInput.addEventListener('keydown', (evt) => evt.stopPropagation());
+  sliderAnimationControlCheckbox.addEventListener('change', () => {
+    const slider = state.contextObject;
+    if (!isDgsSlider(slider)) return;
+    slider.__liaDgsShowAnimationControl = sliderAnimationControlCheckbox.checked;
+    if (!sliderAnimationControlCheckbox.checked) stopDgsSliderAnimation(state, slider, false);
+    ensureDgsSliderAnimationControl(state, slider);
+    positionDgsSliderAnimationButton(state, slider);
+    persistDgsConstruction(state, true);
+  });
+
   const applyAxisLabelInputs = () => {
     const key = getDgsAxisKey(state, state.contextObject);
     if (!key) return false;
@@ -18190,12 +26964,89 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     persistDgsConstruction(state);
   });
 
+  bindingOption.input.addEventListener('change', () => {
+    const point = state.contextObject;
+    if (!isDgsBindablePoint(point)) return;
+    if (!bindingOption.input.checked) {
+      state.pendingPointBindingPoint = null;
+      bindingOption.input.indeterminate = false;
+      unbindDgsPoint(state, point);
+      updateSideMenuControls(state, point);
+      persistDgsConstruction(state);
+      return;
+    }
+    const source = findDgsPointBindingTargetAtPoint(state, point);
+    if (source && bindDgsPointToObject(state, point, source)) {
+      state.pendingPointBindingPoint = null;
+      updateSideMenuControls(state, point);
+      persistDgsConstruction(state);
+      return;
+    }
+    state.pendingPointBindingPoint = point;
+    bindingOption.input.checked = false;
+    bindingOption.input.indeterminate = true;
+    bindingOption.label.title = dgsText(state.language).selectBindingObject;
+  });
+
   traceOption.input.addEventListener('change', () => {
     const point = state.contextObject;
     if (!isDgsPoint(point)) return;
     setDgsPointTraceEnabled(state, point, traceOption.input.checked);
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     persistDgsConstruction(state);
+  });
+
+  locusOption.input.addEventListener('change', () => {
+    const target = state.contextObject;
+    if (!isDgsPoint(target) || target.__liaDgsHelperPoint) return;
+    const existing = getDgsLocusForTarget(state, target);
+    if (!locusOption.input.checked) {
+      state.pendingLocusTarget = null;
+      locusOption.input.indeterminate = false;
+      if (existing) {
+        setDgsObjectVisible(existing, false);
+        try { state.board?.update?.(); } catch (e) {}
+        persistDgsConstruction(state);
+      }
+      updateSideMenuControls(state, target);
+      return;
+    }
+    if (existing) {
+      setDgsObjectVisible(existing, true);
+      state.pendingLocusTarget = null;
+      scheduleDgsLocusUpdate(state, 0);
+      try { state.board?.update?.(); } catch (e) {}
+      persistDgsConstruction(state);
+      updateSideMenuControls(state, target);
+      return;
+    }
+    state.pendingLocusTarget = target;
+    locusOption.input.checked = false;
+    locusOption.input.indeterminate = true;
+    locusOption.label.title = dgsText(state.language).selectLocusDriver;
+  });
+
+  const applyLocusSamplesInput = () => {
+    const locus = state.contextObject;
+    if (!isDgsLocus(locus)) return;
+    const raw = Number(locusSamplesInput.value);
+    const valid = Number.isFinite(raw) && raw >= DGS_LOCUS_MIN_SAMPLES && raw <= DGS_LOCUS_MAX_SAMPLES;
+    locusSamplesInput.setAttribute('aria-invalid', valid ? 'false' : 'true');
+    if (!valid) return;
+    locus.__liaDgsLocusSampleCount = normalizeDgsLocusSampleCount(raw);
+    locusSamplesInput.value = String(locus.__liaDgsLocusSampleCount);
+    scheduleDgsLocusUpdate(state, 0);
+    persistDgsConstruction(state);
+  };
+  locusSamplesInput.addEventListener('change', applyLocusSamplesInput);
+  locusSamplesInput.addEventListener('blur', applyLocusSamplesInput);
+  locusSamplesInput.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Enter') {
+      evt.preventDefault();
+      evt.stopPropagation();
+      applyLocusSamplesInput();
+      locusSamplesInput.blur();
+    }
   });
 
   clearTraceButton.addEventListener('click', (evt) => {
@@ -18241,6 +27092,11 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   objectOption.input.addEventListener('change', () => {
     if (!state.contextObject) return;
     setDgsObjectVisible(state.contextObject, objectOption.input.checked);
+    if (isDgsSlider(state.contextObject)) {
+      if (!objectOption.input.checked) stopDgsSliderAnimation(state, state.contextObject, false);
+      ensureDgsSliderAnimationControl(state, state.contextObject);
+      positionDgsSliderAnimationButton(state, state.contextObject);
+    }
     try { if (state.board && typeof state.board.update === 'function') state.board.update(); } catch (e) {}
     persistDgsConstruction(state);
   });
@@ -18280,14 +27136,30 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     const analysisPoint = object && (object.__liaDgsRootPoint || object.__liaDgsExtremumPoint ||
       object.__liaDgsInflectionPoint || object.__liaDgsYInterceptPoint ||
       object.__liaDgsIntersectionPoint);
-    const valuePoint = analysisPoint || !!(object && object.__liaDgsMidpoint);
-    if (!object || (isDgsPoint(object) && !valuePoint) || isDgsRay(object) || isDgsVector(object) || isDgsPolygon(object) || isDgsCircle(object) || isDgsSector(object)) return;
-    if (valuePoint) {
+    const valuePoint = analysisPoint || !!(object && (object.__liaDgsMidpoint || object.__liaPoint3D));
+    const spatialRay = isDgsRay(object) && isDgsSpatialLinearObject(object);
+    const spatialVector = isDgsVector(object) && isDgsSpatialLinearObject(object);
+    if (!object || (isDgsPoint(object) && !valuePoint) || (isDgsRay(object) && !spatialRay) ||
+        (isDgsVector(object) && !spatialVector) || isDgsPolygon(object) || isDgsCircle(object) ||
+        isDgsEllipse(object) || isDgsSector(object)) return;
+    if (isDgsAnalytic3D(object)) {
+      object.__liaDgsShowValue = measurementOption.input.checked;
+    } else if (valuePoint) {
       object.__liaDgsShowValue = measurementOption.input.checked;
       setDgsAnalysisPointEntryOption(object, 'explicitValueVisibility', measurementOption.input.checked);
     }
+    else if (isDgsCircle3D(object) || isDgsSphere3D(object) ||
+        isDgsPolygon3D(object) || isDgsSolid3D(object)) {
+      object.__liaDgsShowValue = measurementOption.input.checked;
+      if (!object.__liaDgsValueMode) {
+        object.__liaDgsValueMode = isDgsPolygon3D(object) ? 'area' :
+          (isDgsSolid3D(object) ? 'volume' : 'radius');
+      }
+    }
+    else if (spatialVector) object.__liaDgsShowValue = measurementOption.input.checked;
     else if (isDgsFunction(object)) object.__liaDgsShowExpression = measurementOption.input.checked;
-    else if (isDgsLine(object)) object.__liaDgsShowEquation = measurementOption.input.checked;
+    else if (isDgsPlane(object)) object.__liaDgsShowEquation = measurementOption.input.checked;
+    else if (isDgsLine(object) || spatialRay) object.__liaDgsShowEquation = measurementOption.input.checked;
     else if (isDgsAngle(object)) {
       object.__liaDgsShowAngle = measurementOption.input.checked;
       syncDgsRightAngleStyle(object);
@@ -18300,7 +27172,17 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   areaOption.input.addEventListener('change', () => {
     if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.valueControlsLocked)) return;
     const object = state.contextObject;
-    if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsSector(object)) return;
+    if (isDgsCircle3D(object) || isDgsSphere3D(object) ||
+        isDgsPolygon3D(object) || isDgsSolid3D(object)) {
+      object.__liaDgsValueMode = isDgsPolygon3D(object) ? 'area' :
+        (isDgsCircle3D(object) ? 'area' : 'surface');
+      object.__liaDgsShowValue = areaOption.input.checked;
+      refreshDgsObjectLabel(object);
+      updateSideMenuControls(state, object);
+      persistDgsConstruction(state);
+      return;
+    }
+    if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsEllipse(object) && !isDgsSector(object)) return;
     object.__liaDgsShowArea = areaOption.input.checked;
     if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
     else refreshDgsObjectLabel(object);
@@ -18310,7 +27192,17 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   perimeterOption.input.addEventListener('change', () => {
     if (hasDgsRestriction(state, DGS_RESTRICTION_IDS.valueControlsLocked)) return;
     const object = state.contextObject;
-    if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsSector(object)) return;
+    if (isDgsCircle3D(object) || isDgsSphere3D(object) ||
+        isDgsPolygon3D(object) || isDgsSolid3D(object)) {
+      object.__liaDgsValueMode = isDgsPolygon3D(object) ? 'perimeter' :
+        (isDgsCircle3D(object) ? 'circumference' : 'volume');
+      object.__liaDgsShowValue = perimeterOption.input.checked;
+      refreshDgsObjectLabel(object);
+      updateSideMenuControls(state, object);
+      persistDgsConstruction(state);
+      return;
+    }
+    if (!isDgsPolygon(object) && !isDgsCircle(object) && !isDgsEllipse(object) && !isDgsSector(object)) return;
     object.__liaDgsShowPerimeter = perimeterOption.input.checked;
     if (isDgsPolygon(object)) refreshDgsPolygonMeasurementLabel(object);
     else refreshDgsObjectLabel(object);
@@ -18413,7 +27305,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       const kind = colorButtons[index].dataset.colorKind;
       preview.style.opacity = kind === 'trace'
         ? '1'
-        : (isDgsPolygon(object) || isDgsCircle(object) || isDgsSector(object)
+        : (isDgsPolygon(object) || isDgsCircle(object) || isDgsEllipse(object) || isDgsSector(object)
         ? (kind === 'fill' ? String(percent / 100) : '1')
         : String(percent / 100));
     });
@@ -18426,8 +27318,17 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
 
   state.onDocumentPointerDown = (evt: PointerEvent) => {
     const path = typeof evt.composedPath === 'function' ? evt.composedPath() : [];
+    if (evt.button === 0 && state.board.__liaSceneMode === '3d' &&
+        !state.activeTool && !state.externalToolActive && path.includes(boardContainer) &&
+        !eventTargetsBoardUi(evt) && !findDgsContextObject(state, evt as any)) {
+      setDgsMultiSelection(state, []);
+    }
     if (state.exportDialogOpen && !path.includes(exportDialog) && !path.includes(objectListExportButton)) {
       setExportDialogOpen(state, false);
+    }
+    if (state.constructionColorMenuOpen &&
+        !path.includes(constructionColorButton) && !path.includes(constructionColorMenu)) {
+      setDgsConstructionColorMenuOpen(state, false);
     }
     if (!state.colorPopupOpen) return;
     if (colorButtons.some((button) => path.includes(button)) || path.includes(colorPopup)) return;
@@ -18435,12 +27336,30 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   };
   document.addEventListener('pointerdown', state.onDocumentPointerDown, true);
 
+  state.onDocumentKeyDown = (evt: KeyboardEvent) => {
+    if (evt.key === 'Escape' && state.constructionColorMenuOpen) {
+      setDgsConstructionColorMenuOpen(state, false);
+      evt.preventDefault();
+      return;
+    }
+    if (evt.key === 'Escape' && state.board.__liaSceneMode === '3d') {
+      state.axisDrag3D?.clear();
+      setDgsMultiSelection(state, []);
+    }
+    if (evt.key !== 'Escape' || !state.activeTool) return;
+    evt.preventDefault();
+    setActiveTool(state, '', false);
+  };
+  document.addEventListener('keydown', state.onDocumentKeyDown);
+
   state.onDocumentPointerUp = (evt: PointerEvent) => {
+    finishDgsMultiSelectDrag(state, evt, false);
     finishDgsCompassDrag(state, evt, false);
   };
   document.addEventListener('pointerup', state.onDocumentPointerUp, true);
 
   state.onDocumentPointerCancel = (evt: PointerEvent) => {
+    finishDgsMultiSelectDrag(state, evt, true);
     finishDgsCompassDrag(state, evt, true);
   };
   document.addEventListener('pointercancel', state.onDocumentPointerCancel, true);
@@ -18466,8 +27385,56 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   boardContainer.addEventListener('contextmenu', state.onBoardContextMenu, true);
 
   state.onBoardPointerDown = (evt: PointerEvent) => {
+    if (state.pendingPointBindingPoint) {
+      if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+      const point = state.pendingPointBindingPoint;
+      const source = findDgsPointBindingTarget(state, evt, point);
+      if (!source) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      if (bindDgsPointToObject(state, point, source)) {
+        state.pendingPointBindingPoint = null;
+        updateSideMenuControls(state, point);
+        persistDgsConstruction(state);
+      }
+      return;
+    }
+    if (state.pendingLocusTarget) {
+      if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+      const target = state.pendingLocusTarget;
+      const candidate = findDgsContextObject(state, evt as any);
+      const driver = isDgsSlider(candidate) ||
+        (isDgsPoint(candidate) && !!getDgsPointBindingSource(candidate))
+        ? candidate
+        : null;
+      if (!driver || driver === target) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      const locus = createDgsLocus(state, target, driver, {
+        color: getDgsObjectColor(target, 'line'),
+        sampleCount: DGS_LOCUS_DEFAULT_SAMPLES
+      });
+      if (locus) {
+        state.pendingLocusTarget = null;
+        updateSideMenuControls(state, target);
+        refreshDgsObjectList(state, true);
+        persistDgsConstruction(state);
+      }
+      return;
+    }
+    if (!state.activeTool && !state.externalToolActive) {
+      if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+      const object = findDgsContextObject(state, evt as any);
+      if (!object) {
+        setDgsMultiSelection(state, []);
+        return;
+      }
+      if (startDgsMultiSelectDrag(state, evt, object)) return;
+    }
     if (!state.activeTool) return;
     if (evt.button !== 0 || evt.isPrimary === false || eventTargetsBoardUi(evt)) return;
+
+    if (state.solidDraw3D?.handlePointerDown(evt)) return;
 
     if (state.activeTool === 'format-copy') {
       const object = findDgsContextObject(state, evt as any);
@@ -18563,6 +27530,92 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       evt.stopImmediatePropagation();
       state.pendingTextPosition = coordinates;
       setTextDialogOpen(state, true);
+      return;
+    }
+
+
+    if (state.activeTool === 'translate3d' || state.activeTool === 'reflect-point3d' ||
+        state.activeTool === 'reflect-line3d' || state.activeTool === 'reflect-plane3d' ||
+        state.activeTool === 'rotate-axis3d' || state.activeTool === 'dilate3d') {
+      if (state.board.__liaSceneMode !== '3d') return;
+      const tool = state.activeTool;
+      if (!state.selectedTransformObject) {
+        const source = findDgsTransformSource(state, evt);
+        if (!source || (!source.__liaPoint3D && !source.__liaLinear3D && !source.__liaPlane3D &&
+            !source.__liaCircle3D && !source.__liaSphere3D && !source.__liaPolygon3D && !source.__liaSolid3D)) return;
+        evt.preventDefault();
+        evt.stopImmediatePropagation();
+        setSelectedTransformInputs(state, source, null);
+        return;
+      }
+      let reference: any | null = null;
+      if (tool === 'translate3d') {
+        const candidate = findNearestDgsLinearObject(state, evt);
+        if (candidate?.__liaLinear3DKind === 'vector') reference = candidate;
+      } else if (tool === 'reflect-point3d' || tool === 'dilate3d') {
+        const candidate = findNearestBoardPoint(state, evt);
+        if (candidate?.__liaPoint3D) reference = candidate;
+      } else if (tool === 'reflect-plane3d') {
+        reference = findDgsSpatialObjectAt(state, evt, isDgsPlane);
+      } else {
+        const candidate = findNearestDgsLinearObject(state, evt);
+        if (candidate?.__liaLinear3D) reference = candidate;
+      }
+      if (!reference || reference === state.selectedTransformObject) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      setSelectedTransformInputs(state, state.selectedTransformObject, reference);
+      if (tool === 'rotate-axis3d' || tool === 'dilate3d') {
+        setAngleDialogOpen(state, true);
+        return;
+      }
+      const definition: Transformation3DDefinition = tool === 'translate3d' ? 'translate'
+        : tool === 'reflect-point3d' ? 'reflect-point'
+        : tool === 'reflect-line3d' ? 'reflect-line'
+        : 'reflect-plane';
+      const result = createDgsTransformation3D(
+        state, state.selectedTransformObject, reference, definition
+      );
+      if (result) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+        updateSideMenuControls(state, result);
+      }
+      return;
+    }
+    if (state.activeTool === 'reflect-line' || state.activeTool === 'reflect-point' ||
+        state.activeTool === 'rotate-point' || state.activeTool === 'dilate-point') {
+      const transformKind = state.activeTool;
+      if (!state.selectedTransformObject) {
+        const source = findDgsTransformSource(state, evt);
+        if (!isDgsTransformableObject(source)) return;
+        evt.preventDefault();
+        evt.stopImmediatePropagation();
+        setSelectedTransformInputs(state, source, null);
+        return;
+      }
+      const reference = transformKind === 'reflect-line'
+        ? findNearestDgsLinearObject(state, evt)
+        : findNearestBoardPoint(state, evt);
+      if (!reference) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      setSelectedTransformInputs(state, state.selectedTransformObject, reference);
+      if (transformKind === 'rotate-point' || transformKind === 'dilate-point') {
+        setAngleDialogOpen(state, true);
+        return;
+      }
+      const result = createDgsTransformedObject(
+        state,
+        state.selectedTransformObject,
+        transformKind,
+        reference,
+        transformKind === 'reflect-point' ? -1 : 1
+      );
+      if (result) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
       return;
     }
 
@@ -18733,6 +27786,350 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       return;
     }
 
+
+
+    if (state.activeTool === 'polygon3d' || state.activeTool === 'tetrahedron3d' ||
+        state.activeTool === 'pyramid3d' || state.activeTool === 'prism3d' ||
+        state.activeTool === 'parallelepiped3d' || state.activeTool === 'cuboid3d' ||
+        state.activeTool === 'cylinder3d' || state.activeTool === 'cone3d') {
+      if (state.board.__liaSceneMode !== '3d') return;
+      const tool = state.activeTool;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+
+      const de = state.language === 'de';
+      const chooseVector = () => findNearestDgsLinearObject(state, evt, 12, null,
+        object => isDgsSpatialLinearObject(object) && object.__liaLinear3DKind === 'vector');
+      if ((tool === 'pyramid3d' || tool === 'prism3d') && !state.selectedTransformObject) {
+        const polygon = findDgsSpatialObjectAt(state, evt, isDgsPolygon3D);
+        if (!polygon) {
+          updateDgsSolidConstructionStatus(state);
+          return;
+        }
+        setSelectedTransformInputs(state, polygon, null);
+        updateDgsSolidConstructionStatus(state);
+        return;
+      }
+      if (tool === 'prism3d') {
+        const vector = chooseVector();
+        if (!vector) return;
+        const object = createDgsSolid3D(state, 'prism', [], [vector], state.selectedTransformObject);
+        if (object) {
+          persistDgsConstruction(state);
+          setActiveTool(state, '', false);
+          updateSideMenuControls(state, object);
+        } else updateDgsSolidConstructionStatus(state, de
+          ? 'Der Vektor muss aus der Grundebene herausführen. Wähle einen anderen Vektor.'
+          : 'The vector must lead out of the base plane. Choose another vector.');
+        return;
+      }
+      if ((tool === 'parallelepiped3d' || tool === 'cuboid3d') &&
+          state.selectedRoundPoints.length >= 1) {
+        const vector = chooseVector();
+        if (!vector || state.selectedRoundVectors.includes(vector)) return;
+        const components = coordinateVector3DComponents(vector);
+        const previous = state.selectedRoundVectors.map(coordinateVector3DComponents);
+        const length = components ? vector3Norm(components) : 0;
+        const compatible = components && length > 1e-10 && previous.every(value => {
+          if (!value) return false;
+          const otherLength = vector3Norm(value);
+          const dot = components.reduce((sum, component, axis) => sum + component * value[axis], 0);
+          return tool === 'cuboid3d'
+            ? Math.abs(dot) <= 1e-8 * length * otherLength
+            : Math.abs(dot) < (1 - 1e-10) * length * otherLength;
+        });
+        if (!compatible) {
+          updateDgsSolidConstructionStatus(state, de
+            ? tool === 'cuboid3d'
+              ? 'Die Kantenvektoren müssen senkrecht aufeinander stehen. Wähle einen anderen Vektor.'
+              : 'Die Kantenvektoren dürfen nicht parallel sein. Wähle einen anderen Vektor.'
+            : tool === 'cuboid3d'
+              ? 'The edge vectors must be mutually perpendicular. Choose another vector.'
+              : 'The edge vectors must not be parallel. Choose another vector.');
+          return;
+        }
+        state.selectedRoundVectors.push(vector);
+        if (state.selectedRoundVectors.length < 3) {
+          updateDgsSolidConstructionStatus(state);
+          return;
+        }
+        const object = createDgsSolid3D(
+          state, tool === 'cuboid3d' ? 'cuboid' : 'parallelepiped',
+          state.selectedRoundPoints.slice(0, 1), state.selectedRoundVectors.slice(0, 3)
+        );
+        if (object) {
+          state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+          state.pendingLinearCreatedPoints = [];
+          persistDgsConstruction(state);
+          setActiveTool(state, '', false);
+          updateSideMenuControls(state, object);
+        } else {
+          state.selectedRoundVectors.pop();
+          updateDgsSolidConstructionStatus(state, de
+            ? 'Die drei Kantenvektoren müssen einen räumlichen Körper aufspannen. Wähle einen anderen dritten Vektor.'
+            : 'The three edge vectors must span a spatial solid. Choose another third vector.');
+        }
+        return;
+      }
+
+      const createdPoints: any[] = [];
+      const previousRestoring = state.restoring;
+      state.restoring = true;
+      let point: any | null = null;
+      try { point = findOrCreateDgsPoint(state, evt, createdPoints); } finally { state.restoring = previousRestoring; }
+      if (!point?.__liaPoint3D) return;
+      createdPoints.forEach(candidate => { candidate.__liaDgsPendingLinearPoint = true; });
+      state.pendingLinearCreatedPoints.push(...createdPoints);
+
+      if (tool === 'polygon3d' && state.selectedRoundPoints.length &&
+          point === state.selectedRoundPoints[0]) {
+        if (state.selectedRoundPoints.length < 3) return;
+        const polygon = createDgsPolygon3D(state, state.selectedRoundPoints.slice());
+        if (polygon) {
+          state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+          state.pendingLinearCreatedPoints = [];
+          persistDgsConstruction(state);
+          setActiveTool(state, '', false);
+          updateSideMenuControls(state, polygon);
+        } else updateDgsSolidConstructionStatus(state, de
+          ? 'Die Eckpunkte müssen ein Vieleck in einer Ebene bilden.'
+          : 'The vertices must form a polygon in a single plane.');
+        return;
+      }
+      if (state.selectedRoundPoints.includes(point)) return;
+      if (state.selectedRoundPoints.length > 0 &&
+          ((tool === 'tetrahedron3d' && state.selectedRoundPoints.length < 3) ||
+           ((tool === 'cylinder3d' || tool === 'cone3d') && state.selectedRoundPoints.length === 1))) {
+        const first = point3DCoordinates(state.selectedRoundPoints[0]);
+        const candidate = point3DCoordinates(point);
+        const delta = first && candidate ? vector3Components(first, candidate) : null;
+        let invalid = !delta || vector3Norm(delta) <= 1e-10;
+        if (!invalid && tool === 'tetrahedron3d' && state.selectedRoundPoints.length === 2) {
+          const second = point3DCoordinates(state.selectedRoundPoints[1]);
+          const edge = first && second ? vector3Components(first, second) : null;
+          const cross = edge && delta ? [
+            edge[1] * delta[2] - edge[2] * delta[1],
+            edge[2] * delta[0] - edge[0] * delta[2],
+            edge[0] * delta[1] - edge[1] * delta[0]
+          ] : null;
+          invalid = !cross || vector3Norm(cross) <= 1e-10 * vector3Norm(edge!) * vector3Norm(delta!);
+        }
+        if (invalid) {
+          updateDgsSolidConstructionStatus(state, de
+            ? tool === 'tetrahedron3d'
+              ? 'Die ersten drei Punkte müssen ein Dreieck bilden. Wähle einen anderen Punkt.'
+              : 'Die beiden Achsenpunkte müssen verschieden sein. Wähle einen anderen zweiten Punkt.'
+            : tool === 'tetrahedron3d'
+              ? 'The first three points must form a triangle. Choose another point.'
+              : 'The two axis points must be distinct. Choose another second point.');
+          return;
+        }
+      }
+      state.selectedRoundPoints.push(point);
+
+      let object: any | null = null;
+      let complete = false;
+      if (tool === 'tetrahedron3d' && state.selectedRoundPoints.length >= 4) {
+        complete = true;
+        object = createDgsSolid3D(state, 'tetrahedron', state.selectedRoundPoints.slice(0, 4));
+      } else if (tool === 'pyramid3d' && state.selectedRoundPoints.length >= 1) {
+        complete = true;
+        object = createDgsSolid3D(state, 'pyramid', state.selectedRoundPoints.slice(0, 1), [], state.selectedTransformObject);
+      } else if ((tool === 'cylinder3d' || tool === 'cone3d') && state.selectedRoundPoints.length >= 3) {
+        complete = true;
+        object = createDgsSolid3D(
+          state, tool === 'cylinder3d' ? 'cylinder' : 'cone',
+          state.selectedRoundPoints.slice(0, 3)
+        );
+      }
+      if (object) {
+        state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+        state.pendingLinearCreatedPoints = [];
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+        updateSideMenuControls(state, object);
+      } else if (complete) {
+        // Keep the valid prefix so an invalid last choice can be replaced immediately.
+        state.selectedRoundPoints.pop();
+        const error = tool === 'tetrahedron3d'
+          ? de ? 'Die vier Punkte liegen in einer Ebene. Wähle einen anderen vierten Punkt oder verschiebe ihn aus der Grundebene.'
+            : 'The four points are coplanar. Choose another fourth point or move it out of the base plane.'
+          : tool === 'pyramid3d'
+            ? de ? 'Die Spitze liegt in der Grundebene. Wähle einen anderen Punkt oder verschiebe ihn aus der Grundebene.'
+              : 'The apex lies in the base plane. Choose another point or move it out of the base plane.'
+            : de ? 'Der Radiuspunkt muss außerhalb der Körperachse liegen. Wähle einen anderen Punkt.'
+              : 'The radius point must lie outside the solid axis. Choose another point.';
+        updateDgsSolidConstructionStatus(state, error);
+      } else updateDgsSolidConstructionStatus(state);
+      return;
+    }
+    if (state.activeTool === 'circle3d-three-points' ||
+        state.activeTool === 'circle3d-center-normal-point' ||
+        state.activeTool === 'sphere3d-center-point' ||
+        state.activeTool === 'sphere3d-four-points' ||
+        state.activeTool === 'sphere3d-center-radius') {
+      if (state.board.__liaSceneMode !== '3d') return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+
+      if (state.activeTool === 'circle3d-center-normal-point' &&
+          state.selectedRoundPoints.length === 1 && !state.selectedRoundVectors.length) {
+        const vector = findNearestDgsLinearObject(state, evt);
+        if (!vector || !isDgsSpatialLinearObject(vector) || !isDgsVector(vector)) return;
+        state.selectedRoundVectors = [vector];
+        return;
+      }
+
+      const createdPoints: any[] = [];
+      const previousRestoring = state.restoring;
+      state.restoring = true;
+      let point: any | null = null;
+      try { point = findOrCreateDgsPoint(state, evt, createdPoints); } finally { state.restoring = previousRestoring; }
+      if (!point?.__liaPoint3D || state.selectedRoundPoints.includes(point)) return;
+      createdPoints.forEach(candidate => { candidate.__liaDgsPendingLinearPoint = true; });
+      state.pendingLinearCreatedPoints.push(...createdPoints);
+      state.selectedRoundPoints.push(point);
+
+      let complete = false;
+      let object: any | null = null;
+      if (state.activeTool === 'circle3d-three-points') {
+        complete = state.selectedRoundPoints.length >= 3;
+        if (complete) object = createDgsCircle3D(state, 'three-points', state.selectedRoundPoints.slice(0, 3));
+      } else if (state.activeTool === 'circle3d-center-normal-point') {
+        complete = state.selectedRoundPoints.length >= 2 && state.selectedRoundVectors.length >= 1;
+        if (complete) {
+          object = createDgsCircle3D(
+            state, 'center-normal-point',
+            state.selectedRoundPoints.slice(0, 2),
+            state.selectedRoundVectors.slice(0, 1)
+          );
+        }
+      } else if (state.activeTool === 'sphere3d-center-point') {
+        complete = state.selectedRoundPoints.length >= 2;
+        if (complete) object = createDgsSphere3D(state, 'center-point', state.selectedRoundPoints.slice(0, 2));
+      } else if (state.activeTool === 'sphere3d-four-points') {
+        complete = state.selectedRoundPoints.length >= 4;
+        if (complete) object = createDgsSphere3D(state, 'four-points', state.selectedRoundPoints.slice(0, 4));
+      } else {
+        complete = state.selectedRoundPoints.length >= 1;
+        if (complete) object = createDgsSphere3D(state, 'center-radius', [state.selectedRoundPoints[0]], 1);
+      }
+      if (!complete) return;
+      if (object) {
+        state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+        state.pendingLinearCreatedPoints = [];
+        state.selectedRoundPoints = [];
+        state.selectedRoundVectors = [];
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+        updateSideMenuControls(state, object);
+        return;
+      }
+      rollbackPendingLinearPoints(state);
+      state.selectedRoundPoints = [];
+      state.selectedRoundVectors = [];
+      return;
+    }
+    if (state.activeTool === 'plane-three-points' || state.activeTool === 'plane-point-normal' ||
+        state.activeTool === 'plane-point-vectors') {
+      if (state.board.__liaSceneMode !== '3d') return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      if (!state.selectedPlanePoints.length) {
+        const createdPoints: any[] = [];
+        const previousRestoring = state.restoring;
+        state.restoring = true;
+        let point: any | null = null;
+        try { point = findOrCreateDgsPoint(state, evt, createdPoints); } finally { state.restoring = previousRestoring; }
+        if (!point?.__liaPoint3D) return;
+        createdPoints.forEach(candidate => { candidate.__liaDgsPendingLinearPoint = true; });
+        state.pendingLinearCreatedPoints.push(...createdPoints);
+        state.selectedPlanePoints = [point];
+        return;
+      }
+      if (state.activeTool === 'plane-three-points') {
+        const createdPoints: any[] = [];
+        const previousRestoring = state.restoring;
+        state.restoring = true;
+        let point: any | null = null;
+        try { point = findOrCreateDgsPoint(state, evt, createdPoints); } finally { state.restoring = previousRestoring; }
+        if (!point?.__liaPoint3D || state.selectedPlanePoints.includes(point)) return;
+        createdPoints.forEach(candidate => { candidate.__liaDgsPendingLinearPoint = true; });
+        state.pendingLinearCreatedPoints.push(...createdPoints);
+        state.selectedPlanePoints.push(point);
+        if (state.selectedPlanePoints.length < 3) return;
+      } else {
+        const vector = findNearestDgsLinearObject(state, evt);
+        if (!vector || !isDgsSpatialLinearObject(vector) || !isDgsVector(vector) ||
+            state.selectedPlaneVectors.includes(vector)) return;
+        state.selectedPlaneVectors.push(vector);
+        if (state.activeTool === 'plane-point-vectors' && state.selectedPlaneVectors.length < 2) return;
+      }
+      const definition = state.activeTool === 'plane-three-points'
+        ? 'three-points'
+        : (state.activeTool === 'plane-point-normal' ? 'point-normal' : 'point-vectors');
+      const plane = createDgsPlane(state, definition, state.selectedPlanePoints, state.selectedPlaneVectors);
+      if (plane) {
+        state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+        state.pendingLinearCreatedPoints = [];
+        state.selectedPlanePoints = [];
+        state.selectedPlaneVectors = [];
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
+
+    if (state.activeTool === 'ellipse') {
+      const point = findOrCreateDgsPoint(state, evt);
+      if (!point || state.selectedEllipsePoints.includes(point)) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      const selected = state.selectedEllipsePoints.concat(point);
+      if (selected.length < 3) {
+        setSelectedEllipsePoints(state, selected);
+        return;
+      }
+      const ellipse = createDgsEllipse(state, selected[0], selected[1], selected[2]);
+      if (ellipse) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
+
+    if (state.activeTool === 'angle3d') {
+      if (state.board.__liaSceneMode !== '3d') return;
+      const source = findDgsSpatialObjectAt(
+        state,
+        evt,
+        candidate => isDgsSpatialLinearObject(candidate) || isDgsPlane(candidate)
+      );
+      if (!source || state.selectedAngle3DObjects.includes(source)) return;
+      evt.preventDefault();
+      evt.stopImmediatePropagation();
+      if (!state.selectedAngle3DObjects.length) {
+        setSelectedAngle3DObjects(state, [source]);
+        return;
+      }
+      const first = state.selectedAngle3DObjects[0];
+      const definition = inferDgsAngle3DDefinition(first, source);
+      if (!definition) {
+        updateDgsSolidConstructionStatus(
+          state,
+          state.language === 'de' ? 'Diese beiden Objekte bilden keinen unterstützten Raumwinkel.' :
+            'These two objects do not define a supported spatial angle.'
+        );
+        return;
+      }
+      const angle = createDgsAngle3D(state, first, source, definition);
+      if (angle) {
+        persistDgsConstruction(state);
+        setActiveTool(state, '', false);
+      }
+      return;
+    }
+
     if (state.activeTool === 'angle-measured') {
       if (state.angleDialogOpen) return;
       const point = findOrCreateDgsPoint(state, evt);
@@ -18794,8 +28191,21 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
 
     if (state.activeTool === 'segment' || state.activeTool === 'ray' || state.activeTool === 'line' || state.activeTool === 'vector' || state.activeTool === 'arc') {
       if (state.activeTool === 'arc' && state.arcDialogOpen) return;
-      const point = findOrCreateDgsPoint(state, evt);
+      const createdPoints: any[] = [];
+      const spatialLinear = state.board.__liaSceneMode === '3d' && state.activeTool !== 'arc';
+      const previousRestoring = state.restoring;
+      if (spatialLinear) state.restoring = true;
+      let point: any | null = null;
+      try {
+        point = findOrCreateDgsPoint(state, evt, createdPoints);
+      } finally {
+        state.restoring = previousRestoring;
+      }
       if (!point) return;
+      if (spatialLinear && createdPoints.length) {
+        createdPoints.forEach(candidate => { candidate.__liaDgsPendingLinearPoint = true; });
+        state.pendingLinearCreatedPoints.push(...createdPoints);
+      }
 
       evt.preventDefault();
       evt.stopImmediatePropagation();
@@ -18820,6 +28230,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
             ? createDgsVector(state, state.selectedSegmentPoint, point)
             : createDgsSegment(state, state.selectedSegmentPoint, point)));
       if (geometry) {
+        state.pendingLinearCreatedPoints.forEach(candidate => { delete candidate.__liaDgsPendingLinearPoint; });
+        state.pendingLinearCreatedPoints = [];
         persistDgsConstruction(state);
         setActiveTool(state, '', false);
       }
@@ -18831,12 +28243,23 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
 
     evt.preventDefault();
     evt.stopImmediatePropagation();
-    const point = createDgsPoint(state, coordinates.x, coordinates.y);
+    const spatialCoordinates = state.board.__liaSceneMode === '3d'
+      ? projectBoardCoordinatesToXYPlane(state.board, coordinates.x, coordinates.y)
+      : [coordinates.x, coordinates.y, 0] as [number, number, number];
+    const point = createDgsPoint(
+      state,
+      spatialCoordinates[0],
+      spatialCoordinates[1],
+      state.board.__liaSceneMode === '3d' ? null : findDgsPointBindingTarget(state, evt),
+      spatialCoordinates[2]
+    );
     if (point) persistDgsConstruction(state);
   };
+  state.solidDraw3D = mountDgsRegularSolidDrawing(state);
   boardContainer.addEventListener('pointerdown', state.onBoardPointerDown, true);
 
   state.onBoardPointerMove = (evt: PointerEvent) => {
+    if (updateDgsMultiSelectDrag(state, evt)) return;
     if (state.activeTool === 'compass' && state.compassPointerId != null) {
       if (eventTargetsBoardUi(evt)) return;
       evt.preventDefault();
@@ -18853,12 +28276,14 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   boardContainer.addEventListener('pointermove', state.onBoardPointerMove, true);
 
   state.onBoardLostPointerCapture = (evt: PointerEvent) => {
+    if (finishDgsMultiSelectDrag(state, evt, true)) return;
     if (state.compassPointerId == null || evt.pointerId !== state.compassPointerId) return;
     finishDgsCompassDrag(state, evt, true);
   };
   boardContainer.addEventListener('lostpointercapture', state.onBoardLostPointerCapture);
 
   state.onBoardViewportChange = () => {
+    if (state.locusUpdating) return;
     applyDgsLogTickGenerator(state, state.xAxis, 'x', dgsAxisUsesLogX(state.axisScaleMode));
     applyDgsLogTickGenerator(state, state.yAxis, 'y', dgsAxisUsesLogY(state.axisScaleMode));
     if (!state.axisSyncing) {
@@ -18866,10 +28291,13 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       scheduleXAxisSync(state);
     }
     scheduleDgsRootUpdate(state);
+    scheduleDgsLocusUpdate(state);
     refreshDgsSliderTypography(state);
+    positionDgsSliderAnimationControls(state);
     scheduleDgsSetSquareLayout(state, 'board');
   };
   state.onBoardRootUpdate = () => {
+    if (state.locusUpdating) return;
     syncDgsFixedCompassConstructions(state);
     if (!state.axisSyncing) {
       scheduleAxisSync(state);
@@ -18878,6 +28306,8 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     scheduleDgsRootUpdate(state);
     scheduleDgsCoordinateSync(state);
     recordAllDgsPointTraces(state);
+    scheduleDgsLocusUpdate(state);
+    positionDgsSliderAnimationControls(state);
     refreshDgsObjectList(state);
   };
   if (board && typeof board.on === 'function') {
@@ -18897,18 +28327,23 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
       scheduleAxisSync(state);
       scheduleXAxisSync(state);
       scheduleDgsRootUpdate(state);
+      scheduleDgsLocusUpdate(state);
       refreshDgsSliderTypography(state);
+      positionDgsSliderAnimationControls(state);
     });
     state.resizeObserver.observe(boardContainer);
   }
 
   scheduleDgsCoordinateSync(state);
+  scheduleDgsLocusUpdate(state, 0);
 
   button.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
     setMenuOpen(state, !state.open);
   });
+  renderPendingDgsLociForBoard(boardId);
+  renderPendingDgsEllipsesForBoard(boardId);
   applyDgsInstrumentRequests(boardId);
 }
 
@@ -19031,6 +28466,8 @@ export function bootstrapDGS(): void {
     const spec = String((el as HTMLElement).dataset.spec || '').trim();
     setupDGS(uid, spec, (el as HTMLElement).dataset.language);
   });
+  bootstrapDgsLoci();
+  bootstrapDgsEllipses();
 
   pruneDgsRegressionRequests();
   const regressionAnchors = document.querySelectorAll(
@@ -19070,6 +28507,7 @@ export function bootstrapDGS(): void {
       .concat(Object.keys(dgsRegressionRequests).map((uid) => dgsRegressionRequests[uid].boardId))
       .concat(Object.keys(dgsInstrumentRequests).map((uid) => dgsInstrumentRequests[uid].boardId))
       .concat(Object.keys(standaloneSetSquares))
+      .concat(Object.values(window.__scharEntries || {}).map((entry: any) => entry.boardId))
   )).forEach((boardId) => {
     syncDgsInstrumentProfile(boardId);
     if (canUseStandaloneSetSquare(boardId)) {
@@ -19120,7 +28558,43 @@ export function init(): void {
 
   window.__dgsReady = true;
   window.__bootstrapDGS = bootstrapDGS;
+  window.__dgsLocusEntries = dgsLocusEntries;
+  window.__bootstrapDgsLoci = bootstrapDgsLoci;
+  window.__dgsEllipseEntries = dgsEllipseEntries;
+  window.__bootstrapDgsEllipses = bootstrapDgsEllipses;
+  window.renderDgsLocusFromSpec = function(uid: string, spec: string, language?: string): boolean {
+    const config = parseDgsLocusMacroSpec(spec);
+    const request: DgsLocusMacroRequest = {
+      uid: String(uid || ''),
+      spec: String(spec || ''),
+      boardId: config.boardId,
+      language: resolveUiLanguage(null, language)
+    };
+    if (!request.uid || !request.boardId) return false;
+    dgsLocusRequests[request.uid] = request;
+    const rendered = tryRenderDgsLocusRequest(request);
+    hasPendingDgsLoci = !rendered || hasPendingDgsLoci;
+    return rendered;
+  };
+  window.renderDgsEllipseFromSpec = function(uid: string, spec: string, language?: string): boolean {
+    const config = parseDgsEllipseMacroSpec(spec);
+    const request: DgsEllipseMacroRequest = {
+      uid: String(uid || ''),
+      spec: String(spec || ''),
+      boardId: config.boardId,
+      language: resolveUiLanguage(null, language)
+    };
+    if (!request.uid || !request.boardId) return false;
+    dgsEllipseRequests[request.uid] = request;
+    const rendered = tryRenderDgsEllipseRequest(request);
+    hasPendingDgsEllipses = !rendered || hasPendingDgsEllipses;
+    return rendered;
+  };
   initThemeSync();
+
+  onCourseLanguageChange(() => {
+    if (window.__bootstrapDGS) window.__bootstrapDGS();
+  });
 
   if (window.__registerLiaThemeListener) {
     window.__registerLiaThemeListener(function () {
@@ -19135,5 +28609,9 @@ export function init(): void {
     });
   }
 
+  window.__dgsLocusRetryInterval = window.setInterval(() => {
+    if (hasPendingDgsLoci) bootstrapDgsLoci();
+    if (hasPendingDgsEllipses) bootstrapDgsEllipses();
+  }, 300);
   scheduleBootstrap(() => bootstrapDGS());
 }

@@ -2,11 +2,16 @@
 // Provides a parameterized function family with sliders.
 
 import { parseMacroName, splitTopLevel, unquote } from '../shared/parser';
+import { parseScharInitialValues } from '../shared/scharExport';
 import { getNeutralColor } from '../shared/theme';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { setAttributeIfChanged } from '../shared/domUpdates';
 import { boardPanelsStartTop, relayoutBoardPanels, observeBoardPanelLayout } from '../shared/boardPanelLayout';
+import {
+  keepFunctionGraphLabelOnOneLine,
+  positionFunctionGraphLabel
+} from '../shared/functionGraphLabel';
 import {
   applyLineStyle,
   lineStyleAttributes,
@@ -40,6 +45,7 @@ type ScharCfg = {
   showTerm: boolean;
   color: string;
   lineStyle: LineStyle;
+  initialValues: Record<string, number>;
 };
 
 type ScharEntry = {
@@ -399,7 +405,8 @@ function parseScharSpec(spec: string): ScharCfg {
     boardId: parts[3] ? unquote(parts[3]) : '',
     showTerm: true,
     color: '#0b5fff',
-    lineStyle: parseLineStyleOptions(parts.slice(4))
+    lineStyle: parseLineStyleOptions(parts.slice(4)),
+    initialValues: parseScharInitialValues(parts.slice(4))
   };
 
   if (parts[4] && looksLikeColor(unquote(parts[4]))) {
@@ -848,56 +855,6 @@ function buildExpandedShiftedPolyTex(entry: ScharEntry): string | null {
   return toTexExpr(parts.join(''));
 }
 
-function getSafeBoundingBox(board: any): [number, number, number, number] {
-  try {
-    const bb = board && typeof board.getBoundingBox === 'function' ? board.getBoundingBox() : null;
-    if (
-      Array.isArray(bb) &&
-      bb.length === 4 &&
-      bb.every((v: any) => Number.isFinite(v)) &&
-      bb[2] > bb[0] &&
-      bb[1] > bb[3]
-    ) {
-      return [bb[0], bb[1], bb[2], bb[3]];
-    }
-  } catch (e) {}
-  return [-5, 5, 5, -5];
-}
-
-function chooseVisibleAnchorX(board: any, fn: (x: number) => number): number {
-  const bb = getSafeBoundingBox(board);
-  const xmin = bb[0];
-  const ymax = bb[1];
-  const xmax = bb[2];
-  const ymin = bb[3];
-
-  const xspan = xmax - xmin;
-  const yspan = ymax - ymin;
-
-  const xStart = xmax - 0.10 * xspan;
-  const xEnd = xmin + 0.18 * xspan;
-
-  const yPadTop = 0.14 * yspan;
-  const yPadBottom = 0.12 * yspan;
-
-  const steps = 120;
-
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const x = xStart - t * (xStart - xEnd);
-
-    let y = NaN;
-    try {
-      y = fn(x);
-    } catch (e) {}
-
-    if (!Number.isFinite(y)) continue;
-    if (y <= ymax - yPadTop && y >= ymin + yPadBottom) return x;
-  }
-
-  return xmin + 0.60 * xspan;
-}
-
 function createPinnedGraphLabel(entry: ScharEntry): any {
   if (!entry.cfg.showName) return null;
   const board = entry.board;
@@ -911,21 +868,27 @@ function createPinnedGraphLabel(entry: ScharEntry): any {
       return NaN;
     }
   };
+  const labelText = toTexName(entry.cfg.name || 'f');
+  let label: any = null;
+  const placement = function() {
+    return positionFunctionGraphLabel(board, fn, {
+      label,
+      text: labelText,
+      fontSize: 24,
+      horizontalGapUser: 0.18,
+      verticalOffsetUser: 0.18
+    });
+  };
 
-  return board.create('text', [
+  label = board.create('text', [
     function () {
-      return chooseVisibleAnchorX(board, fn) + 0.18;
+      return placement().x;
     },
     function () {
-      const x = chooseVisibleAnchorX(board, fn);
-      const y = fn(x);
-      if (Number.isFinite(y)) return y + 0.18;
-
-      const bb = getSafeBoundingBox(board);
-      return (bb[1] + bb[3]) / 2;
+      return placement().y;
     },
     function () {
-      return toTexName(entry.cfg.name || 'f');
+      return labelText;
     }
   ], {
     fixed: true,
@@ -937,8 +900,11 @@ function createPinnedGraphLabel(entry: ScharEntry): any {
     fillColor: entry.cfg.color,
     fontSize: 24,
     anchorX: 'left',
-    anchorY: 'top'
+    anchorY: 'middle',
+    cssStyle: 'white-space:nowrap;overflow:visible;'
   });
+  keepFunctionGraphLabelOnOneLine(label);
+  return label;
 }
 
 function substituteParamInTerm(rawExpr: string, paramName: string, variableName: string, valueText: string): string {
@@ -1172,6 +1138,13 @@ function removeExisting(uid: string): void {
     prev.stopDrag = null;
   }
 
+  // On a board replacement the DGS snapshot must survive for the new graph.
+  // Removing a family on the live board also removes its dependent analyses.
+  if (prev.graph && prev.board === window.__boards?.[prev.boardId] &&
+      prev.board.containerObj?.isConnected) {
+    try { window.__detachDgsAnalysisFunctionTarget?.(prev.boardId, prev.graph); } catch (e) {}
+  }
+
   try {
     if (prev.graph && prev.board) prev.board.removeObject(prev.graph);
   } catch (e) {}
@@ -1189,6 +1162,7 @@ function removeExisting(uid: string): void {
   } catch (e) {}
 
   delete window.__scharEntries[key];
+  scheduleBootstrap(() => window.__bootstrapDGS?.());
 
   try {
     relayoutPanelsForBoard(prev.boardId, prev.board);
@@ -1374,6 +1348,10 @@ function refreshEntry(entry: ScharEntry): void {
       }
     } catch (e) {}
   }
+  entry.graph.__liaScharEntry = entry;
+  entry.graph.__liaDgsFunctionName = entry.cfg.name;
+  entry.graph.__liaDgsAnalysisFunction = true;
+  entry.graph.__liaDgsPersistentId = 'schar:' + entry.boardId + ':' + entry.uid;
   applyLineStyle(entry.graph, entry.cfg.lineStyle);
 
   if (entry.linearMN || entry.shiftBC || entry.shiftCD || entry.polyCoeffDrag) {
@@ -1421,6 +1399,9 @@ function refreshEntry(entry: ScharEntry): void {
     } catch (e) {}
     entry.dragGraph = null;
   }
+
+  // The wider hit area belongs to the same curve, including for intersections.
+  if (entry.dragGraph) entry.dragGraph.__liaDgsAnalysisTarget = entry.graph;
 
   if (!entry.cfg.showName && entry.graphLabel) {
     try { entry.board.removeObject(entry.graphLabel); } catch (e) {}
@@ -1887,6 +1868,47 @@ function createPanel(entry: ScharEntry): HTMLElement {
     ensureSliderRangeForValue(slider, Number(entry.values[name]));
     updateSliderFill(slider);
 
+    // Chromium can suppress the native range action for emulated or embedded
+    // touch streams. Keep touch dragging deterministic without replacing the
+    // input element or its regular mouse/keyboard behavior.
+    let activeSliderTouch: number | null = null;
+    const setSliderFromTouch = (clientX: number): void => {
+      const rect = slider.getBoundingClientRect();
+      const min = Number(slider.min);
+      const max = Number(slider.max);
+      const step = Math.max(Number(slider.step) || 0.1, Number.EPSILON);
+      if (!(rect.width > 0) || !Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const steps = Math.round((min + ratio * (max - min) - min) / step);
+      const next = Math.max(min, Math.min(max, min + steps * step));
+      const nextValue = String(Number(next.toFixed(12)));
+      if (slider.value === nextValue) return;
+      slider.value = nextValue;
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    slider.addEventListener('touchstart', (evt) => {
+      if (activeSliderTouch !== null || evt.changedTouches.length < 1) return;
+      const touch = evt.changedTouches[0];
+      activeSliderTouch = touch.identifier;
+      if (evt.cancelable) evt.preventDefault();
+      setSliderFromTouch(touch.clientX);
+    }, { passive: false });
+    slider.addEventListener('touchmove', (evt) => {
+      if (activeSliderTouch === null) return;
+      const touch = Array.from(evt.changedTouches).find(item => item.identifier === activeSliderTouch);
+      if (!touch) return;
+      if (evt.cancelable) evt.preventDefault();
+      setSliderFromTouch(touch.clientX);
+    }, { passive: false });
+    const endSliderTouch = (evt: TouchEvent): void => {
+      if (activeSliderTouch === null) return;
+      const touch = Array.from(evt.changedTouches).find(item => item.identifier === activeSliderTouch);
+      if (!touch) return;
+      if (evt.cancelable) evt.preventDefault();
+      activeSliderTouch = null;
+    };
+    slider.addEventListener('touchend', endSliderTouch, { passive: false });
+    slider.addEventListener('touchcancel', endSliderTouch, { passive: false });
     slider.addEventListener('input', () => {
       entry.values[name] = Number(slider.value);
       entry.dragShiftX = 0;
@@ -2048,6 +2070,9 @@ export function init(): void {
       } else {
         values[name] = (idx === 0 || lower === 'a' || lower === 'm') ? 1 : 0;
       }
+      if (Object.prototype.hasOwnProperty.call(cfg.initialValues, name)) {
+        values[name] = cfg.initialValues[name];
+      }
     });
 
     const fn = compileFamilyExpr(cfg.expr, cfg.variableName, params);
@@ -2112,6 +2137,7 @@ export function init(): void {
     persistScharEntryState(entry);
 
     window.__scharEntries['schar-' + uid] = entry;
+    scheduleBootstrap(() => window.__bootstrapDGS?.());
     entry.stopLayout = observeBoardPanelLayout(board.containerObj);
     relayoutPanelsForBoard(entry.boardId, entry.board);
     return true;

@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 author:   MINT-the-GAP, Martin Lommatzsch, Jihad Hyadi
 version:  0.0.5
 language: en
@@ -6,7 +6,7 @@ edit: true
 narrator: US English Female
 comment:  Interactive coordinate system plugin for LiaScript, powered by JSXGraph. Provides macros for coordinate planes, points, function plots, and value tables.
 
-import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
+import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb/README.md
 
 script:   ./dist/index.js
 
@@ -44,11 +44,244 @@ script:   ./dist/index.js
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
+@Point3D: @Point3D_(@uid,`@0`)
+@Punkt3D: @Point3D_(@uid,`@0`)
+
+@Point3D_
+<span id="point3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Segment3D: @Linear3D_(@uid,`@0`,segment,en)
+@Strecke3D: @Linear3D_(@uid,`@0`,segment,de)
+@Line3D: @Linear3D_(@uid,`@0`,line,en)
+@Gerade3D: @Linear3D_(@uid,`@0`,line,de)
+@Ray3D: @Linear3D_(@uid,`@0`,ray,en)
+@Strahl3D: @Linear3D_(@uid,`@0`,ray,de)
+@Vector3D: @Linear3D_(@uid,`@0`,vector,en)
+@Vektor3D: @Linear3D_(@uid,`@0`,vector,de)
+
+@Linear3D_
+<span id="linear3d-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Plane3D: @Plane3D_(@uid,`@0`,three-points,en)
+@Ebene3D: @Plane3D_(@uid,`@0`,three-points,de)
+@PlanePointNormal3D: @Plane3D_(@uid,`@0`,point-normal,en)
+@PunktNormalenEbene3D: @Plane3D_(@uid,`@0`,point-normal,de)
+@PlanePointVectors3D: @Plane3D_(@uid,`@0`,point-vectors,en)
+@ParameterEbene3D: @Plane3D_(@uid,`@0`,point-vectors,de)
+
+@Plane3D_
+<span id="plane3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Circle3D: @Circle3D_(@uid,`@0`,three-points,en)
+@Kreis3D: @Circle3D_(@uid,`@0`,three-points,de)
+@CircleCenterNormal3D: @Circle3D_(@uid,`@0`,center-normal-radius,en)
+@KreisMittelpunktNormal3D: @Circle3D_(@uid,`@0`,center-normal-radius,de)
+@CircleCenterNormalPoint3D: @Circle3D_(@uid,`@0`,center-normal-point,en)
+@KreisMittelpunktNormalPunkt3D: @Circle3D_(@uid,`@0`,center-normal-point,de)
+
+@Circle3D_
+<span id="circle3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Sphere3D: @Sphere3D_(@uid,`@0`,center-point,en)
+@Kugel3D: @Sphere3D_(@uid,`@0`,center-point,de)
+@SphereRadius3D: @Sphere3D_(@uid,`@0`,center-radius,en)
+@KugelRadius3D: @Sphere3D_(@uid,`@0`,center-radius,de)
+@SphereFourPoints3D: @Sphere3D_(@uid,`@0`,four-points,en)
+@KugelVierPunkte3D: @Sphere3D_(@uid,`@0`,four-points,de)
+
+@Sphere3D_
+<span id="sphere3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Polygon3D: @Polygon3D_(@uid,`@0`,en)
+@Vieleck3D: @Polygon3D_(@uid,`@0`,de)
+
+@Polygon3D_
+<span id="polygon3d-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@Tetrahedron3D: @Solid3D_(@uid,`@0`,tetrahedron,en)
+@Tetraeder3D: @Solid3D_(@uid,`@0`,tetrahedron,de)
+@Pyramid3D: @Solid3D_(@uid,`@0`,pyramid,en)
+@Pyramide3D: @Solid3D_(@uid,`@0`,pyramid,de)
+@Prism3D: @Solid3D_(@uid,`@0`,prism,en)
+@Prisma3D: @Solid3D_(@uid,`@0`,prism,de)
+@Parallelepiped3D: @Solid3D_(@uid,`@0`,parallelepiped,en)
+@Spat3D: @Solid3D_(@uid,`@0`,parallelepiped,de)
+@Cuboid3D: @Solid3D_(@uid,`@0`,cuboid,en)
+@Quader3D: @Solid3D_(@uid,`@0`,cuboid,de)
+@Cylinder3D: @Solid3D_(@uid,`@0`,cylinder,en)
+@Zylinder3D: @Solid3D_(@uid,`@0`,cylinder,de)
+@Cone3D: @Solid3D_(@uid,`@0`,cone,en)
+@Kegel3D: @Solid3D_(@uid,`@0`,cone,de)
+
+@Solid3D_
+<span id="solid3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Curve3D: @Curve3D_(@uid,`@0`)
+@Raumkurve: @Curve3D_(@uid,`@0`)
+
+@Curve3D_
+<span id="curve3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Surface3D: @Surface3D_(@uid,`@0`,false)
+@Flaeche3D: @Surface3D_(@uid,`@0`,false)
+@FunctionSurface3D: @Surface3D_(@uid,`@0`,true)
+@Funktionsflaeche3D: @Surface3D_(@uid,`@0`,true)
+
+@Surface3D_
+<span id="surface3d-spec-@0" data-spec="@1" data-function-graph="@2" style="display:none;"></span>
+@end
+
+@ConicSection3D: @ConicSection3D_(@uid,`@0`)
+@Kegelschnitt3D: @ConicSection3D_(@uid,`@0`)
+
+@ConicSection3D_
+<span id="conic3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@VectorSum3D: @Analytic3D_(@uid,`@0`,vector-add)
+@Vektorsumme3D: @Analytic3D_(@uid,`@0`,vector-add)
+@VectorDifference3D: @Analytic3D_(@uid,`@0`,vector-subtract)
+@Vektordifferenz3D: @Analytic3D_(@uid,`@0`,vector-subtract)
+@ScalarVector3D: @Analytic3D_(@uid,`@0`,vector-scale)
+@Skalarmultiplikation3D: @Analytic3D_(@uid,`@0`,vector-scale)
+@UnitVector3D: @Analytic3D_(@uid,`@0`,vector-unit)
+@Einheitsvektor3D: @Analytic3D_(@uid,`@0`,vector-unit)
+@VectorProjection3D: @Analytic3D_(@uid,`@0`,vector-project)
+@Vektorprojektion3D: @Analytic3D_(@uid,`@0`,vector-project)
+@DotProduct3D: @Analytic3D_(@uid,`@0`,dot)
+@Skalarprodukt3D: @Analytic3D_(@uid,`@0`,dot)
+@CrossProduct3D: @Analytic3D_(@uid,`@0`,vector-cross)
+@Kreuzprodukt3D: @Analytic3D_(@uid,`@0`,vector-cross)
+@TripleProduct3D: @Analytic3D_(@uid,`@0`,triple)
+@Spatprodukt3D: @Analytic3D_(@uid,`@0`,triple)
+@Distance3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Abstand3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Angle3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@Winkel3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@ProjectPointLine3D: @Analytic3D_(@uid,`@0`,project-point-line)
+@LotfusspunktGerade3D: @Analytic3D_(@uid,`@0`,project-point-line)
+@ProjectPointPlane3D: @Analytic3D_(@uid,`@0`,project-point-plane)
+@LotfusspunktEbene3D: @Analytic3D_(@uid,`@0`,project-point-plane)
+@CurveTangent3D: @Analytic3D_(@uid,`@0`,curve-tangent)
+@TangenteRaumkurve: @Analytic3D_(@uid,`@0`,curve-tangent)
+@CurveNormalPlane3D: @Analytic3D_(@uid,`@0`,curve-normal-plane)
+@NormalebeneRaumkurve: @Analytic3D_(@uid,`@0`,curve-normal-plane)
+@CurveArcLength3D: @Analytic3D_(@uid,`@0`,curve-arc-length)
+@BogenlaengeRaumkurve: @Analytic3D_(@uid,`@0`,curve-arc-length)
+@SurfaceTangentPlane3D: @Analytic3D_(@uid,`@0`,surface-tangent-plane)
+@Tangentialebene3D: @Analytic3D_(@uid,`@0`,surface-tangent-plane)
+@SurfaceTangentU3D: @Analytic3D_(@uid,`@0`,surface-tangent-u)
+@FlaechentangenteU3D: @Analytic3D_(@uid,`@0`,surface-tangent-u)
+@SurfaceTangentV3D: @Analytic3D_(@uid,`@0`,surface-tangent-v)
+@FlaechentangenteV3D: @Analytic3D_(@uid,`@0`,surface-tangent-v)
+@SurfaceNormal3D: @Analytic3D_(@uid,`@0`,surface-normal)
+@Flaechennormale3D: @Analytic3D_(@uid,`@0`,surface-normal)
+@NegatedVector3D: @Analytic3D_(@uid,`@0`,vector-negate)
+@Gegenvektor3D: @Analytic3D_(@uid,`@0`,vector-negate)
+@ConnectingVector3D: @Analytic3D_(@uid,`@0`,vector-connect)
+@Verbindungsvektor3D: @Analytic3D_(@uid,`@0`,vector-connect)
+@VectorPlaneProjection3D: @Analytic3D_(@uid,`@0`,vector-project-plane)
+@Vektorebenenprojektion3D: @Analytic3D_(@uid,`@0`,vector-project-plane)
+@PlaneNormal3D: @Analytic3D_(@uid,`@0`,plane-normal)
+@Ebenennormale3D: @Analytic3D_(@uid,`@0`,plane-normal)
+@VectorMagnitude3D: @Analytic3D_(@uid,`@0`,magnitude)
+@Vektorbetrag3D: @Analytic3D_(@uid,`@0`,magnitude)
+@PointDistance3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Punktabstand3D: @Analytic3D_(@uid,`@0`,distance-points)
+@PointLineDistance3D: @Analytic3D_(@uid,`@0`,distance-point-line)
+@AbstandPunktGerade3D: @Analytic3D_(@uid,`@0`,distance-point-line)
+@PointPlaneDistance3D: @Analytic3D_(@uid,`@0`,distance-point-plane)
+@AbstandPunktEbene3D: @Analytic3D_(@uid,`@0`,distance-point-plane)
+@LineDistance3D: @Analytic3D_(@uid,`@0`,distance-lines)
+@AbstandGeraden3D: @Analytic3D_(@uid,`@0`,distance-lines)
+@PlaneDistance3D: @Analytic3D_(@uid,`@0`,distance-planes)
+@AbstandEbenen3D: @Analytic3D_(@uid,`@0`,distance-planes)
+@VectorAngle3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@Vektorwinkel3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@LineAngle3D: @Analytic3D_(@uid,`@0`,angle-lines)
+@Geradenwinkel3D: @Analytic3D_(@uid,`@0`,angle-lines)
+@LinePlaneAngle3D: @Analytic3D_(@uid,`@0`,angle-line-plane)
+@WinkelGeradeEbene3D: @Analytic3D_(@uid,`@0`,angle-line-plane)
+@PlaneAngle3D: @Analytic3D_(@uid,`@0`,angle-planes)
+@Ebenenwinkel3D: @Analytic3D_(@uid,`@0`,angle-planes)
+@LineRelation3D: @Analytic3D_(@uid,`@0`,relation-lines)
+@LageGeraden3D: @Analytic3D_(@uid,`@0`,relation-lines)
+@LinePlaneRelation3D: @Analytic3D_(@uid,`@0`,relation-line-plane)
+@LageGeradeEbene3D: @Analytic3D_(@uid,`@0`,relation-line-plane)
+@PlaneRelation3D: @Analytic3D_(@uid,`@0`,relation-planes)
+@LageEbenen3D: @Analytic3D_(@uid,`@0`,relation-planes)
+@PointObjectRelation3D: @Analytic3D_(@uid,`@0`,relation-point-object)
+@LagePunktObjekt3D: @Analytic3D_(@uid,`@0`,relation-point-object)
+@PerpendicularLinePlane3D: @Analytic3D_(@uid,`@0`,perpendicular-line-plane)
+@LotgeradeEbene3D: @Analytic3D_(@uid,`@0`,perpendicular-line-plane)
+@CommonPerpendicular3D: @Analytic3D_(@uid,`@0`,common-perpendicular)
+@GemeinsamesLot3D: @Analytic3D_(@uid,`@0`,common-perpendicular)
+@CurveTangentVector3D: @Analytic3D_(@uid,`@0`,curve-tangent-vector)
+@TangentenvektorRaumkurve: @Analytic3D_(@uid,`@0`,curve-tangent-vector)
+@CurveVelocity3D: @Analytic3D_(@uid,`@0`,curve-velocity)
+@Geschwindigkeitsvektor3D: @Analytic3D_(@uid,`@0`,curve-velocity)
+
+@Analytic3D_
+<span id="analytic3d-spec-@0" data-spec="@1" data-operation="@2" style="display:none;"></span>
+@end
+
+@Locus3D: @Locus3D_(@uid,`@0`)
+@Ortskurve3D: @Locus3D_(@uid,`@0`)
+
+@Locus3D_
+<span id="locus3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@LocusSurface3D: @LocusSurface3D_(@uid,`@0`)
+@Ortsflaeche3D: @LocusSurface3D_(@uid,`@0`)
+
+@LocusSurface3D_
+<span id="locussurface3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Translate3D: @Transformation3D_(@uid,`@0`,translate,en)
+@Verschiebung3D: @Transformation3D_(@uid,`@0`,translate,de)
+@ReflectPoint3D: @Transformation3D_(@uid,`@0`,reflect-point,en)
+@Punktspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-point,de)
+@ReflectLine3D: @Transformation3D_(@uid,`@0`,reflect-line,en)
+@Geradenspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-line,de)
+@ReflectPlane3D: @Transformation3D_(@uid,`@0`,reflect-plane,en)
+@Ebenenspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-plane,de)
+@RotateAxis3D: @Transformation3D_(@uid,`@0`,rotate-axis,en)
+@Achsendrehung3D: @Transformation3D_(@uid,`@0`,rotate-axis,de)
+@Dilate3D: @Transformation3D_(@uid,`@0`,dilate,en)
+@ZentrischeStreckung3D: @Transformation3D_(@uid,`@0`,dilate,de)
+
+@Transformation3D_
+<span id="transformation3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+@Intersection3D: @Intersection3D_(@uid,`@0`,en)
+@Schnitt3D: @Intersection3D_(@uid,`@0`,de)
+
+@Intersection3D_
+<span id="intersection3d-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @CoordText: @CoordText_(@uid,`@0`)
 @KoordText: @CoordText_(@uid,`@0`)
 
 @CoordText_
 <span class="lia-coord-text-spec" id="coord-text-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@ObjectFormat: @ObjectFormat_(@uid,`@0`)
+@ObjektFormat: @ObjectFormat_(@uid,`@0`)
+
+@ObjectFormat_
+<span id="object-format-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
 
@@ -77,15 +310,60 @@ script:   ./dist/index.js
 <span id="arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@CompassArc: @CompassArc_(@uid,`@0`,en)
+@Zirkelbogen: @CompassArc_(@uid,`@0`,de)
+
+@CompassArc_
+<span id="compass-arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)
 @Orthogonale: @RelationObject_(@uid,`@0`,orthogonal,de)
 @Parallel: @RelationObject_(@uid,`@0`,parallel,en)
 @Parallele: @RelationObject_(@uid,`@0`,parallel,de)
 @Midpoint: @RelationObject_(@uid,`@0`,midpoint,en)
 @Mittelpunkt: @RelationObject_(@uid,`@0`,midpoint,de)
+@AngleBisector: @RelationObject_(@uid,`@0`,angle-bisector,en)
+@Winkelhalbierende: @RelationObject_(@uid,`@0`,angle-bisector,de)
 
 @RelationObject_
 <span id="relation-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@TransformPoint: @TransformPoint_(@uid,`@0`,en)
+@Transformationspunkt: @TransformPoint_(@uid,`@0`,de)
+
+@TransformPoint_
+<span id="transform-point-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@Locus: @Locus_(@uid,`@0`,en)
+@Ortslinie: @Locus_(@uid,`@0`,de)
+
+@Locus_
+<span id="dgs-locus-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+
+<script modify="false">
+(function(){
+  if (typeof window.renderDgsLocusFromSpec === 'function') {
+    window.renderDgsLocusFromSpec('@0', '@1', '@2');
+  }
+})();
+</script>
+@end
+
+@Ellipse: @Ellipse_(@uid,`@0`,en)
+
+@Ellipse_
+<span id="dgs-ellipse-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+
+<script modify="false">
+(function(){
+  if (typeof window.renderDgsEllipseFromSpec === 'function') {
+    window.renderDgsEllipseFromSpec('@0', '@1', '@2');
+  }
+})();
+</script>
 @end
 
 @Area: @Area_(@uid,`@0`,en)
@@ -148,6 +426,8 @@ script:   ./dist/index.js
 @OrdinateIntercept: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,en)
 @Ordinatenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
 @Ordinatenachsenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@ObjectZeros: @ObjectAnalysisPoints_(@uid,`@0`,roots,en)
+@ObjektNullstellen: @ObjectAnalysisPoints_(@uid,`@0`,roots,de)
 @Intersection: @ObjectAnalysisPoints_(@uid,`@0`,intersections,en)
 @Schnittpunkt: @ObjectAnalysisPoints_(@uid,`@0`,intersections,de)
 
@@ -200,6 +480,18 @@ script:   ./dist/index.js
 <span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
 @end
 
+@ConstructionQuiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@Konstruktionsquiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@CombinedConstructionQuiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@KombiniertesKonstruktionsquiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+
+@ConstructionQuiz3D_
+<span id='construction-quiz3d-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction3d" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
+@end
 @KoordQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
 @GeometrieQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
 @CoordinateQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
@@ -277,11 +569,13 @@ script:   ./dist/index.js
 <span id="dgs-ui-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 
 <script modify="false">
-(function(){
+(function setupDgs(retries){
   if (typeof window.__setupDGS === 'function') {
     window.__setupDGS('@0', '@1', '@2');
+    return;
   }
-})();
+  if (retries < 120) window.setTimeout(function(){ setupDgs(retries + 1); }, 50);
+})(0);
 </script>
 @end
 
@@ -348,7 +642,7 @@ https://github.com/MINT-the-GAP/lia-coordinate
 
 2. Also requires JSXGraph (already included via the `import:` above):
 
-   `import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md`
+   `import: https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb/README.md`
 
    An all-static course can instead use the separate lightweight import shown
    under [Static SVG mode](#static-svg-mode). Do not combine both imports.
@@ -374,13 +668,18 @@ user coordinates and therefore continue to follow board panning and zooming.
 Renders an interactive JSXGraph coordinate plane. Supports panning, zooming, and a resize handle.
 
 Parameters (semicolon-separated key=value pairs):
-- `xmin`, `xmax`, `ymin`, `ymax` — axis bounds (defaults: -4, 4, -3, 3)
-- `width` — maximum initial width in pixels; on narrower screens the board
+- `xmin`, `xmax`, `ymin`, `ymax` â€” axis bounds (defaults: -4, 4, -3, 3)
+- `mode=3d` â€” creates a JSXGraph `view3d`; omitted or `mode=2d` keeps the existing plane
+- `zmin`, `zmax` â€” spatial z bounds (defaults: -4, 4)
+- `projection=parallel|central` â€” parallel or perspective projection
+- `camera=<azimuth>/<elevation>/<bank>` â€” initial camera angles in radians
+- `view=2d|3d` â€” initial display of a spatial scene; `view=2d` keeps all z values
+- `width` â€” maximum initial width in pixels; on narrower screens the board
   automatically scales down to the available content width. If `width` is empty
   or omitted, the board derives its start width from the current LiaScript content
   column on every mount, including LiveEditor recompiles.
-- `id` — board identifier used to connect other macros to this board
-- final positional flags `axes;grid;border` — `0` hides and `1` shows each element
+- `id` â€” board identifier used to connect other macros to this board
+- final positional flags `axes;grid;border` â€” `0` hides and `1` shows each element
   (when omitted, all remain enabled/visible)
 
 `border=0` (or positional third flag `;0`) disables panning, zooming, and the
@@ -398,6 +697,22 @@ For `axes;grid`, the combinations are `0;0` (neither), `0;1` (grid only),
 ---
 
 @CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=A1`)
+
+### 3D runtime compatibility
+
+Production and browser fixtures are pinned to the official LiaTemplates/JSXGraph
+revision `f426725ff10580b5ebdcc3230a4ca31c415faadb`. That wrapper currently bundles JSXGraph 1.11.1 and already
+contains the required `view3d`, `point3d`, central/parallel projection, trackball,
+and Shift vertical-drag APIs. The preferred JSXGraph 1.13.1 cannot be selected
+independently without replacing the LiaScript web-component wrapper; upgrading the
+wrapper is therefore deferred until an official compatible template revision exists.
+In the embedded 1.11.1 web component, the native trackball and Shift-drag handlers
+also do not reliably receive the complete pointer stream. The 3D adapter therefore
+supplies lifecycle-bound pointer handling for free camera rotation and z dragging,
+while coordinates and projection remain owned by JSXGraph `view3d`/`point3d`.
+
+`mode=3d` always uses the dynamic renderer. If `static=1` is also present, the
+3D requirement wins and no static SVG is created.
 
 ## Static SVG mode
 
@@ -425,7 +740,8 @@ literals. Static mode freezes such a point even when `fix` is omitted.
 `opacity=0` hides its marker and label but keeps it referenceable. A terminal
 `=0`, for example `A=0`, hides only the displayed name and also keeps `A`
 referenceable. Expressions and runtime bindings including `xexpr=...`,
-`yexpr=...`, `parameter=...`, and `param=...` are rejected.
+`yexpr=...`, `parameter=...`, `param=...`, `on=...`, and `auf=...` are
+rejected.
 
 Named references in supported static macros resolve only against those
 directly authored literal points on the same board. Derived points and objects
@@ -452,7 +768,7 @@ of an earlier line, ray, vector, or segment is not a static relation basis.
   rays are clipped to the board; vectors retain their endpoint arrow. Visible
   object names are rendered.
 - `@Arc` / `@Bogen` accepts direct endpoints or fixed-point names and is rendered
-  as a cubic Bézier path. Exit and entry angles follow the unit-circle
+  as a cubic BÃ©zier path. Exit and entry angles follow the unit-circle
   convention, and each control arm is one third of the endpoint distance.
   Designs `-`, `->`, `<-`, and `<->`, plus leading or trailing `|` end caps,
   are supported. Color, line width, visibility, and line style are retained,
@@ -628,7 +944,7 @@ Parameters: `id=<boardId>;xlabel=<label>;ylabel=<label>`
 
           --{{0}}--
 Creates a draggable point exercise. The student drags a point to a target coordinate and checks their answer.
-A "Set point" button appears — clicking it places the draggable point. The check button validates position within a tolerance of 0.05 units.
+A "Set point" button appears â€” clicking it places the draggable point. The check button validates position within a tolerance of 0.05 units.
 
 The action buttons in `@CreatePoint`, `@PointOnGraph`, `@PointsOnGraph`,
 `@Table`, and `@PlotInput` follow the course's `language: en` or `language: de`,
@@ -684,7 +1000,12 @@ X marker and its label. Opacity is clamped to `0` through `1`; add `fix` to make
 the point immovable. The legacy form with `fix` directly after the coordinates
 remains supported.
 
-Parameters: `<boardId>;<pointName>[=0];<x>;<y>;<color>;<opacity>;fix`
+Parameters: `<boardId>;<pointName>[=0];<x>;<y>;<color>;<opacity>[;fix][;on=<object>]`
+
+On an interactive board, `on=<object>` / `auf=<object>` binds the point to a
+named line, segment, ray, vector, circle, arc, compass arc, or function graph.
+The DGS export writes this option automatically for points created on an
+object. Polygon sides use the generated reference `side:<polygonName>:<index>`.
 
 For every macro name position in this template, a terminal `=0` hides only
 the displayed name. The part before it remains the technical object name:
@@ -711,6 +1032,335 @@ automatically generated analysis-point names.
 @Point(`ex_point;A;2;3`)
 @Point(`ex_point;B=0;-3;-1;#e63946;0.65;fix`)
 
+## `@Point3D` / `@Punkt3D`
+
+          --{{0}}--
+Places a free spatial point in a 3D coordinate system. Normal dragging moves it
+parallel to the current xy plane; hold **Shift** while dragging to change z.
+The DGS properties menu exposes exact x, y, and z values, name, visibility,
+color, opacity, and fixation.
+
+Parameters: `<boardId>;<pointName>[=0];<x>;<y>;<z>;<color>;<opacity>[;fix][;visible=0][;value=1|wert=1][;on=<object>|auf=<object>]`
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;zmin=-3;zmax=6;mode=3d;projection=parallel;id=space`)
+@Point3D(`space;A;1;2;3;#ff00ff;1`)
+```
+
+The 2D/3D control can promote an empty plane, free 2D points, and supported
+linear constructions. Promoted points receive z=0. Shared endpoints remain one
+shared point, so connected segments, lines, rays, and vectors keep their
+dependencies. Promotion is one undoable operation. Once a scene contains spatial
+data, its 2D view is an xy camera projection and therefore retains every z value.
+Unsupported 2D construction objects block promotion with a message.
+`value=1` / `wert=1` displays `(x | y | z)` next to the point and survives DGS
+export and import together with visibility, fixation, color, and opacity.
+
+## Linear 3D objects
+
+`@Segment3D` / `@Strecke3D`, `@Line3D` / `@Gerade3D`, `@Ray3D` /
+`@Strahl3D`, and `@Vector3D` / `@Vektor3D` create spatial linear objects.
+The first three forms and a point-based vector reference two existing 3D point
+names:
+
+`<boardId>;<objectName>[=0];<startPoint>;<endPoint>;<color>[;<option>...]`
+
+A free vector instead stores an anchor and its components:
+
+`<boardId>;<objectName>[=0];<x>;<y>;<z>;<dx>;<dy>;<dz>;<color>[;<option>...]`
+
+Supported options are `textcolor=...`, `opacity=...`, `fixed=0|1`, `layer=...`,
+`width=...`, `linestyle=solid|dashed|dotted`, `visible=0|1`,
+`value=0|1` / `wert=0|1`, and `objectid=...`. Segment values show their length;
+vector values show components and magnitude; lines and rays show a parametric
+equation.
+
+``` markdown
+@Point3D(`space;A;-2;1;0;#ff00ff;1`)
+@Punkt3D(`space;B;2;3;1;#ff00ff;1`)
+@Strecke3D(`space;s=1;A;B;#00dfe8;value=1`)
+@Gerade3D(`space;g;A;B;#ffaa00;linestyle=dashed`)
+@Strahl3D(`space;r;A;B;#42d66b`)
+@Vektor3D(`space;u;A;B;#8d7cff;value=1`)
+@Vector3D(`space;v=1;0;0;0;1.5;-2;0.5;#ff6688;value=1`)
+```
+
+The renderer uses native JSXGraph `line3d` objects. Lines and rays are clipped to
+the current 3D box; vectors use a screen-sized terminal arrow. A free vector owns
+an internal, hidden anchor helper that is removed together with the vector.
+Moving a referenced point updates every dependent object immediately. DGS export
+preserves stable object and point IDs, point dependencies, free-vector components,
+display options, and scene settings; importing and exporting again keeps the same
+semantics.
+
+
+## Planes and spatial intersections
+
+`@Plane3D` / `@Ebene3D` defines a plane through three existing 3D points:
+
+`<boardId>;<planeName>[=0];<point1>;<point2>;<point3>;<color>;<opacity>[;<option>...]`
+
+`@PlanePointNormal3D` / `@PunktNormalenEbene3D` uses one point and one
+existing 3D vector as its normal. `@PlanePointVectors3D` /
+`@ParameterEbene3D` uses one point and two existing, non-collinear 3D vectors:
+
+`<boardId>;<planeName>[=0];<point>;<vector...>;<color>;<opacity>[;<option>...]`
+
+Options include `linecolor`, `fillcolor`, `textcolor`, `visible`,
+`fixed`, `layer`, `width`, `linestyle`, `value=1` / `wert=1`, and
+`equation=parameter|normal|coordinate`. Sources remain live dependencies.
+Moving a point or changing a free vector updates the plane and its displayed
+equation. Collinear points, a zero normal, and collinear direction vectors make
+the plane temporarily undefined and hidden; restoring valid sources restores it.
+
+`@Intersection3D` / `@Schnitt3D` creates the dimensionally correct
+intersection of two named spatial objects:
+
+`<boardId>;<resultName>[=0];<source1>;<source2>;<color>;<opacity>[;<option>...]`
+
+Two planes produce a line. A line, ray, segment, or vector with a plane produces
+a point when the result lies in the object's domain. Two linear objects produce
+a point only when they actually meet in space. Parallel, coincident, skew, or
+currently degenerate inputs do not leave a stale result visible. Every result is
+dependent and updates when either source moves.
+
+In the DGS shape menu, **Plane through three points**, **Point-normal plane**,
+and **Point-vector plane** use the same construction model. The existing
+intersection tool accepts spatial linear objects and planes and creates either a
+dependent point or a dependent line. Plane names, colors, opacity, visibility,
+fixation, equation display and form, source references, stable IDs, and spatial
+intersection sources survive undo/redo and DGS export/import.
+
+The existing **Point on object** checkbox in a 3D point's context menu binds the
+point to a spatial line, ray, segment, vector, or plane. Dragging updates a
+camera-independent line parameter `t` or the plane-local parameters `u` and `v`.
+Source motion therefore carries the point with the same mathematical parameters;
+segments and point-dependent vectors clamp `t` to `[0,1]`, and rays clamp it to
+`[0,infinity)`. DGS export writes `on=<object>` / `auf=<object>` together with
+`t=...` or `u=...;v=...` and `objectid=...` on `@Point3D`; import restores the
+same definition after its source becomes available.
+
+``` markdown
+@Point3D(`space;P;0;0;0;#ff00ff;1;on=g;t=0.4;objectid=bound-line-point`)
+@Punkt3D(`space;Q;0;0;0;#00dfe8;1;auf=E;u=0.25;v=-0.5;objectid=bound-plane-point`)
+```
+
+The plane property menu offers Parameter, Normal, and Coordinate form directly.
+Spatial intersection properties show their two source names read-only. Deleting a
+source removes its dependent plane, bound points, and spatial intersections in the
+same history action; undo restores each registry entry exactly once.
+
+The DGS mode button switches between 2D and 3D. In 3D, drag with the left mouse
+button to pan and with the right mouse button to rotate the scene along the cursor
+path. Views close to XY, XZ, or YZ settle exactly onto that plane when the right
+button is released. The mouse wheel zooms. View changes never alter object
+coordinates. Camera and projection are view state and are deliberately excluded
+from construction undo/redo, but both are serialized by DGS export.
+
+The shared typed model in `src/shared/scene3d.ts` keeps dimension, mathematical
+objects, bounds, projection, and camera explicit. `src/coord/view3d.ts` owns the
+JSXGraph renderer, input adapters, controls, registries, and disposal. The DGS uses
+a narrow adapter in `src/subsystems/dgs.ts` for promotion, snapshots, properties,
+and export, so existing 2D objects retain their established implementation.
+General spatial curves, locus surfaces, and 3D construction quizzes remain assigned to later segments.
+
+
+## Spatial circles and spheres
+
+`@Circle3D` / `@Kreis3D` creates the circumcircle of three spatial points.
+`@CircleCenterNormal3D` / `@KreisMittelpunktNormal3D` uses a center, an existing
+Vector3D as plane normal, and `radius=...`. `@CircleCenterNormalPoint3D` /
+`@KreisMittelpunktNormalPunkt3D` uses a center, a normal, and a radius point; the
+radius is the spatial distance to that point, so the radius point need not lie in
+the circle plane.
+
+``` markdown
+@Circle3D(`space;k;A;B;C;#00dfe8;value=1;measure=area`)
+@CircleCenterNormal3D(`space;c;A;n;#ffaa00;radius=2;value=1`)
+@KreisMittelpunktNormalPunkt3D(`space;d;A;n;B;#42d66b;wert=1;mass=umfang`)
+```
+
+`@Sphere3D` / `@Kugel3D` uses a center and a surface point.
+`@SphereRadius3D` / `@KugelRadius3D` uses a center and a positive numeric
+`radius`. `@SphereFourPoints3D` / `@KugelVierPunkte3D` constructs the unique
+circumsphere of four non-coplanar points.
+
+``` markdown
+@Sphere3D(`space;S;A;B;#8d7cff;opacity=0.2;value=1`)
+@SphereRadius3D(`space;T;A;#42d66b;radius=3;measure=surface`)
+@KugelVierPunkte3D(`space;U;A;B;C;D;#ff6688;deckkraft=0.18;wert=1;mass=volumen`)
+```
+
+Both families accept `objectid`, `visible` / `sichtbar`, `fixed` / `fixiert`,
+`layer`, `opacity` / `deckkraft`, `linecolor` / `linienfarbe`, `textcolor` /
+`textfarbe`, `width` / `breite`, and `linestyle` / `linienstil`. Spheres also
+accept `fillcolor` / `fuellfarbe`. `value=1` / `wert=1` enables the measurement;
+`measure=radius|circumference|area` selects a circle value and
+`measure=radius|surface|volume` selects a sphere value.
+
+The DGS shape flyout provides circles through three points, center-normal-radius
+point circles, center-surface point spheres, four-point spheres, and a numeric
+fixed-radius sphere. Their context panels expose source information, derived
+center/radius values, measurement mode, colors, opacity, contour style, layer,
+visibility, fixation, and deletion. A numeric fixed radius remains editable;
+source-derived radii are read-only.
+
+The targeted spatial intersection tool supports line/ray/segment/vector-circle,
+line/ray/segment/vector-sphere, plane-circle, plane-sphere, circle-circle,
+circle-sphere, and sphere-sphere. Depending on the geometry it maintains zero,
+one, or two stable point branches, a line, or a dependent section circle.
+Tangencies show one point without a duplicate. Coincident inputs remain typed but
+do not create an arbitrary point; a circle contained in a plane is represented by
+a dependent circle result. Temporarily invalid or disjoint results are hidden and
+recover automatically.
+
+The existing **Point on object** option also binds a Point3D to a spatial circle
+or sphere. Circle points store `angle=...`; sphere points store a normalized local
+`direction=[x;y;z]`. These mathematical parameters survive drag operations,
+camera changes, undo/redo, DGS export, and macro import.
+
+Free 2D center-radius circles can be promoted into the xy plane together with
+their shared points. The promoted circle keeps its ID, name, formatting, center,
+and radius-point dependency and receives a hidden fixed normal vector. Arcs,
+ellipses, compass arcs, and unsupported dependent special forms still block a
+scene promotion without modifying the construction. In a 2D camera view, circles
+and spheres remain spatial objects and are only projected.
+
+All primary definitions, point bindings, stable branch IDs, styles, scene bounds,
+camera, and projection are included in DGS snapshots and macro export. Collinear
+three-point circles, zero normals, non-positive radii, coincident center/surface
+points, and coplanar four-point spheres become temporarily undefined rather than
+emitting non-finite renderer data. Restoring valid sources restores the object.
+
+## Spatial polygons, solids, and transformations
+
+`@Polygon3D` / `@Vieleck3D` creates a simple coplanar spatial polygon from at
+least three Point3D sources. Concave polygons are supported; self-intersecting,
+non-coplanar, repeated, or zero-area source sets remain temporarily undefined.
+`measure=area|perimeter` selects the displayed value.
+
+The solid macros keep live dependencies on their sources:
+
+| Macros | Required sources |
+| --- | --- |
+| `@Tetrahedron3D` / `@Tetraeder3D` | four Point3D objects |
+| `@Pyramid3D` / `@Pyramide3D` | Polygon3D base and Point3D apex |
+| `@Prism3D` / `@Prisma3D` | Polygon3D base and Vector3D translation |
+| `@Parallelepiped3D` / `@Spat3D` | Point3D origin and three Vector3D edges |
+| `@Cuboid3D` / `@Quader3D` | origin and three pairwise orthogonal vectors |
+| `@Cylinder3D` / `@Zylinder3D` | two axis points and `radius=...` |
+| `@Cone3D` / `@Kegel3D` | base center, apex, and `radius=...` |
+
+``` markdown
+@Vieleck3D(`space;F=1;A;B;C;D;fillcolor=#00dfe8;opacity=0.25;measure=area`)
+@Tetraeder3D(`space;T=1;A;B;C;D;fillcolor=#ff6688;measure=volume`)
+@Pyramide3D(`space;P;F;S;fillcolor=#ffaa00;measure=height`)
+@Prisma3D(`space;R;F;v;fillcolor=#42d66b;measure=surface`)
+@Spat3D(`space;Sp;O;u;v;w;fillcolor=#8d7cff`)
+@Quader3D(`space;Q;O;ex;ey;ez;fillcolor=#00dfe8`)
+@Zylinder3D(`space;Z;O;H;radius=1.5;fillcolor=#42d66b`)
+@Kegel3D(`space;K;O;S;radius=2;fillcolor=#ffaa00`)
+```
+
+Cylinder and cone also accept a third Point3D instead of a numeric radius option.
+This radius control is constrained to the base plane perpendicular to the axis
+and stays on the base circle while the axis moves or rotates.
+
+Solid measurements support `volume`, `surface`, `base`, and `height` where the
+quantity is defined. The mathematics for cylinder and cone remains exact; the
+visible curved surface uses a finite mesh. Colors, opacity, contour style,
+width, layer, naming, visibility, fixation, measurement mode, stable IDs, source
+references, and dependency order survive DGS export/import and snapshots.
+
+Six source-driven transformations preserve the source object type:
+
+``` markdown
+@Verschiebung3D(`space;Q_1;Q;v;linecolor=#00897b`)
+@Punktspiegelung3D(`space;T_1;T;O;linecolor=#c2185b`)
+@Geradenspiegelung3D(`space;P_1;P;g;linecolor=#6a1b9a`)
+@Ebenenspiegelung3D(`space;R_1;R;E;linecolor=#ef6c00`)
+@Achsendrehung3D(`space;Z_1;Z;g;angle=90;linecolor=#1565c0`)
+@ZentrischeStreckung3D(`space;K_1;K;O;factor=k;linecolor=#2e7d32`)
+```
+
+`@Translate3D`, `@ReflectPoint3D`, `@ReflectLine3D`, `@ReflectPlane3D`,
+`@RotateAxis3D`, and `@Dilate3D` are the English aliases. Rotation angles use
+degrees. `angle` and `factor` accept either a finite number or a slider name, so
+slider animation updates the transformed object and all its dependents.
+
+The spatial intersection tool accepts lines with finite Polygon3D faces and all
+solid types. A plane cuts a polyhedron into an empty result, point, segment, or
+dependent section Polygon3D. Plane sections of cylinders and cones now create
+dynamic typed spatial conics. Point on object binds points to polygon faces or
+solid surfaces and exports local face/surface parameters instead of screen
+coordinates.
+
+The DGS shape and transformation flyouts expose these constructors. Their
+context panels include sources, measurements, styles, visibility, fixation,
+layer, rename, and delete. Invalid or temporarily degenerate sources hide the
+dependent result and restore it when the sources become valid again. See
+[`docs/3d-segment-5.md`](docs/3d-segment-5.md) for the full construction,
+binding, intersection, persistence, and verification details.
+
+## Curves, surfaces, conics, analytic geometry, and spatial loci
+
+The 3D scene supports safe parameterized `@Raumkurve` / `@Curve3D` and
+`@Flaeche3D` / `@Surface3D` definitions, including live sliders and function
+families. The DGS `3D+` flyout groups vector algebra, distances and angles,
+helper constructions, curve/surface input, analysis, and spatial loci. A 2D
+function, regression/drawing graph, or family can be reused as the spatial
+curve `(t,f(t),0)` without losing its parameter start values.
+
+`@Kegelschnitt3D` / `@ConicSection3D` keeps its plane and cylinder/cone sources
+and changes dynamically among empty, point, line, two lines, circle, ellipse,
+parabola, and hyperbola. The normal DGS intersection tool creates the same typed
+object. Curve analysis includes intrinsic points, tangent/velocity vectors,
+tangent lines, normal planes, and arc length. Surface analysis includes
+intrinsic `(u,v)` points, both tangent directions, tangent planes, and normals.
+
+A right click shows the Segment-6 sources, definitions, parameter ranges, and
+results in the existing properties panel. Components, parameter ranges, and
+sampling quality are editable there with validation and rollback;
+bound points with exact `t` or `(u,v)` and the analysis, locus, and
+transformation workflows are available from the same panel.
+
+All definitions, source IDs, ranges, qualities, styles, bindings, and locus
+drivers participate in DGS snapshots, dependency deletion, Undo/Redo, and macro
+export/import. See [`docs/3d-segment-6.md`](docs/3d-segment-6.md) for syntax,
+numerical limits, transformation behavior, lifecycle rules, known boundaries,
+and the Segment-7 handoff.
+
+## 3D construction quizzes and final 2D/3D audit
+
+`@ConstructionQuiz3D` / `@Konstruktionsquiz3D` and
+`@CombinedConstructionQuiz3D` / `@KombiniertesKonstruktionsquiz3D` attach a normal
+LiaScript Check quiz to an existing 2D/3D DGS board. `mode=result` compares the
+camera-independent final geometry; `mode=construction` additionally verifies
+sources, transformations, bindings, locus drivers, and intrinsic parameters.
+
+```lia
+@CoordinateSystem(`xmin=-3;xmax=3;ymin=-3;ymax=3;zmin=-3;zmax=3;mode=3d;width=520;id=quiz3d`)
+@DGS(`quiz3d`)
+
+@Konstruktionsquiz3D(`quiz3d;mode=result;view=3d;objects=[{"id":"A","kind":"point3d","point":[1,1,1]}]`,`<!-- data-hint-button="1" data-solution-button="2" -->`)
+[[?]] Setze einen Punkt bei $(1|1|1)$.
+*****************
+Der Zielpunkt liegt bei $A(1|1|1)$.
+*****************
+```
+
+Expected points, vectors, linear objects, planes, spatial circles, spheres,
+polygons, solids, curves, surfaces, conics, and scalar results can be combined
+with incidence, parallel, orthogonal, relation, distance, angle, and measurement
+conditions. Two-dimensional objects participate with `z=0`. Authors can set
+central tolerances, accepted dependency alternatives, auxiliary/extra-object
+policy, appearance relevance, view switching, live feedback, and attempt limits.
+The macro body uses the existing native LiaScript hint and solution flow.
+
+See [`docs/3d-segment-7.md`](docs/3d-segment-7.md) for the complete author and
+developer reference, tolerance model, lifecycle and performance limits. The
+final macro/DGS/roundtrip/quiz coverage is recorded in
+[`docs/3d-object-function-matrix.md`](docs/3d-object-function-matrix.md).
 ## `@CoordText` / `@KoordText`
 
           --{{0}}--
@@ -719,14 +1369,27 @@ theme accent color; opacity is clamped to `0` through `1`. Text enclosed in
 dollar signs is rendered as TeX, so both plain text and expressions such as
 `$f(x)$` are supported. Parentheses can be written directly in the backtick-
 wrapped macro argument; the legacy spelling `$f{{x}}$` remains supported.
+The optional `fontsize=8..96` / `schriftgroesse=8..96` and `fixed=0|1` /
+`fixiert=0|1` options preserve the corresponding DGS text settings.
 
-Parameters: `<boardId>;[<x>;<y>];<content>;<color>;<opacity>`
+Parameters: `<boardId>;[<x>;<y>];<content>;<color>;<opacity>[;fontsize=<size>][;fixed=<0|1>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_coord_text`)
 
 @CoordText(`ex_coord_text;[-2;2];Hinweis;#00ff00;0.8`)
 @KoordText(`ex_coord_text;[2;1];$f(x)=x^2$;#e63946;1`)
+
+## `@ObjectFormat` / `@ObjektFormat`
+
+          --{{0}}--
+Restores DGS presentation properties after the structural object macro has
+created its geometry. DGS export emits this helper automatically for named
+objects and for polygon sides. A side reference has the stable form
+`side:<polygonName>:<zeroBasedIndex>`. Supported options include separate
+`textcolor`, `linecolor`, and `fillcolor` values, `opacity`, `fixed`,
+`fontsize`, `equation`, `expression` / `term`, name and length visibility,
+and `linestyle`. Authors normally do not need to write this macro manually.
 ```
 
 ---
@@ -857,7 +1520,7 @@ For a vector using its automatic endpoint name, append the standalone option
 ## `@Arc` / `@Bogen`
 
           --{{0}}--
-Draws a cubic Bézier arc whose tangent directions are controlled independently
+Draws a cubic BÃ©zier arc whose tangent directions are controlled independently
 at the start and end. Each endpoint may be an existing point name or a direct
 coordinate `[x;y]`. Named points stay dynamically attached when they move;
 direct coordinates create invisible fixed helper points.
@@ -903,10 +1566,22 @@ Parameters: `<boardId>;<startPoint>|[<x>;<y>];<exitAngle>;<endPoint>|[<x>;<y>];<
 @Bogen(`ex_arc;A;90;B;90;$b$;->|;2px;#e63946;linestyle=dashdotted`)
 @Arc(`ex_arc;[-3;-2];270;[3;-2];270;$c$;|<->|;3px;#457b9d`)
 
-## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`
+## `@CompassArc` / `@Zirkelbogen`
 
           --{{0}}--
-Creates a perpendicular line, a parallel line, or the midpoint of two points.
+Recreates a DGS compass arc from a named center point, a named radius point,
+and its signed sweep angle in radians. Moving either point updates the arc.
+The optional fixed-radius fields preserve arcs drawn with the fixed compass
+mode. Compass arcs are valid sources for `@Intersection` / `@Schnittpunkt`;
+only crossings on the actually drawn part of the arc are used.
+
+Parameters: `<boardId>;<name>[=0];<centerPoint>;<radiusPoint>;<sweepRadians>;<color>[;fixedradius=1;fixeddx=<dx>;fixeddy=<dy>][;visible=0][;linestyle=<style>]`
+
+## `@Perpendicular` / `@Orthogonale`, `@Parallel` / `@Parallele`, `@Midpoint` / `@Mittelpunkt`, `@AngleBisector` / `@Winkelhalbierende`
+
+          --{{0}}--
+Creates a perpendicular line, a parallel line, the midpoint of two points, or
+the dynamic internal angle bisector through three points.
 Perpendicular and parallel lines can reference an existing named line-like
 object (`@Strecke`, `@Gerade`, `@Strahl`, `@Vektor`) or use a point pair as an
 implicit base line. The midpoint is registered as a point, so later macros can
@@ -915,6 +1590,8 @@ refer to it by name. Add `wert=1` / `value=1` to show its coordinates.
 Parameters for perpendicular/parallel: `<boardId>;<baseName>|[<basePoint1>;<basePoint2>];<throughPoint>;<color>;<name>[=0][;linestyle=<style>]`
 
 Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]];<color>;<name>[=0];wert=1`
+
+Parameters for angle bisector: `<boardId>;[<armPoint1>;<vertex>;<armPoint2>];<color>;<name>[=0][;visible=0][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_relations`)
@@ -944,6 +1621,46 @@ Parameters for midpoint: `<boardId>;[<point1>;<point2>]|[[<x1>;<y1>];[<x2>;<y2>]
 @Parallel(`ex_relations;[A;B];D;#457b9d;p`)
 @Mittelpunkt(`ex_relations;[A;B];#ff00ff;M;wert=1`)
 
+## `@TransformPoint` / `@Transformationspunkt`
+
+          --{{0}}--
+Creates a dependent image point for an axis reflection, point reflection,
+rotation, or central dilation. The DGS transformation tools generate these
+macros automatically so transformed segments, lines, rays, vectors, polygons,
+circles, ellipses, sectors, angles, and compass arcs remain linked after export/import.
+
+Parameters: `<boardId>;<imageName>[=0];<sourcePoint>;<reflect-line|reflect-point|rotate-point|dilate-point>;<[axisPoint1;axisPoint2]|centerPoint>;<angleDegrees|factor>;<color>;<opacity>`
+
+## `@Locus` / `@Ortslinie`
+
+          --{{0}}--
+Creates a dynamic locus for a named target point. The driver is either a point
+bound to a line, segment, ray, vector, circle, ellipse, arc, compass arc, or function,
+or a slider. The carrier or slider interval is sampled again whenever the
+construction or viewport changes. Invalid values and large discontinuities are
+split instead of being connected across the board.
+
+Parameters: `<boardId>;<targetPoint>;<driverPoint|slider>;<color>[;name=<name>][;showname=0|1][;samples=32..720][;opacity=0..1][;visible=0|1][;linestyle=<style>][;width=<number>]`
+
+## `@Ellipse`
+
+          --{{0}}--
+Creates a dynamic ellipse from two named foci and one named point on the
+ellipse. In the DGS, select the two foci first and the curve point third.
+Points can be bound to the ellipse, and it supports intersections, loci,
+transformations, live area and perimeter, styling, undo/redo, and DGS export.
+
+Parameters: `<boardId>;<name>[=0];<focus1>;<focus2>;<point>;<color>;<opacity>[;showname=0|1][;area=0|1][;perimeter=0|1][;visible=0|1][;linestyle=<style>]`
+
+``` markdown
+@CoordinateSystem(`xmin=-6;xmax=6;ymin=-4;ymax=4;width=800;id=ex_ellipse`)
+@Point(`ex_ellipse;$F_1$;-2;0`)
+@Point(`ex_ellipse;$F_2$;2;0`)
+@Point(`ex_ellipse;$P$;0;3`)
+@Ellipse(`ex_ellipse;$e$;F_1;F_2;P;#ff00ff;0.2;showname=1;area=1;perimeter=1`)
+@DGS(`ex_ellipse`)
+```
+
 ## `@Area` / `@Flaeche`
 
           --{{0}}--
@@ -954,8 +1671,10 @@ The fill opacity is clamped to the range `0` to `1`. Add `inhalt=1` and/or `umfa
 to show live measurements at the polygon center. German output uses `FE` and
 `LE`; English output uses `AU` and `LU`. The English option aliases `area=1`
 and `perimeter=1` are also accepted.
+`name=<polygonName>[=0]` assigns a stable polygon name; the `=0` suffix hides
+that name while keeping it available to dependent and formatting macros.
 
-Parameters: `<boardId>;[<point1>;<point2>;...]|[[<x1>;<y1>];...];<color>;<opacity>;inhalt=1;umfang=1[;linestyle=<style>]`
+Parameters: `<boardId>;[<point1>;<point2>;...]|[[<x1>;<y1>];...];<color>;<opacity>;inhalt=1;umfang=1[;name=<name>[=0]][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=6;ymin=-1;ymax=5;width=800;id=ex_area`)
@@ -994,8 +1713,15 @@ The name and optional value use the selected color and opacity. Add exactly
 places. `@Winkel` uses a decimal comma; `@angle` uses a decimal point. Common
 Greek names such as `alpha` may be written with or without the leading TeX
 backslash.
+For macro and DGS angles, the complete label moves inside the visible sector when it fits.
+If the sector is too small or narrow, it remains just outside with a stable screen-pixel gap,
+so zooming never pulls the label proportionally farther away.
+`targetangle=<degrees>` or `zielwinkel=<degrees>` turns the third point into
+the dependent point of a measured-angle construction. Moving either base-arm
+point then reconstructs the requested angle instead of merely preserving its
+last coordinates.
 
-Parameters: `<boardId>;<name>[=0];[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1[;linestyle=<style>]`
+Parameters: `<boardId>;<name>[=0];[<point1>;<vertex>;<point3>];<color>;<opacity>;Wert=1[;zielwinkel=<degrees>][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-1;xmax=5;ymin=-1;ymax=5;width=800;id=ex_angle`)
@@ -1106,8 +1832,10 @@ Parameters for circular sectors: `<boardId>;[<center>;<radiusPoint>;<anglePoint>
 
           --{{0}}--
 Plots a function curve on the board using a formula. The formula uses standard math syntax.
+Add `expression=1`, `term=1`, or `ausdruck=1` to show the function term in
+the graph label. This option is also used by DGS export.
 
-Parameters: `<boardId>;<funcName>[=0];<formula>;<color>[;linestyle=<style>]`
+Parameters: `<boardId>;<funcName>[=0];<formula>;<color>[;expression=1][;linestyle=<style>]`
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_plot`)
@@ -1156,24 +1884,28 @@ visibility can also be controlled separately by index.
 @Extrempunkte(`ex_function_analysis;f;#457b9d;E;wert=1`)
 @Wendepunkte(`ex_function_analysis;f;#ff00ff;W;wert=1`)
 
-## `@Regler` / `@Slider`, `@Ordinatenabschnitt` / `@OrdinateIntercept`, `@Schnittpunkt` / `@Intersection`
+## `@Regler` / `@Slider`, `@ObjektNullstellen` / `@ObjectZeros`, `@Ordinatenabschnitt` / `@OrdinateIntercept`, `@Schnittpunkt` / `@Intersection`
 
           --{{0}}--
 Creates reusable parameter sliders and dependent object-analysis points. Sliders
 can be used as scalar parameters in function terms. The ordinate-intercept macro
-accepts a named function or linear object. The intersection macro accepts two
-named functions, linear objects, or circles.
+accepts a named function or linear object. Object zeros create the dynamic
+x-axis crossing of a segment, ray, vector, line, polygon side, tangent, or
+relation line. The intersection macro accepts two named functions, linear
+objects, circles, or compass arcs.
 
 Parameters:
 
-- `@Regler`: `<boardId>;<name>[=0];<min>;<max>;<step>;<value>;<color>;[[x1;y1];[x2;y2]];lockposition=1`
+- `@Regler`: `<boardId>;<name>[=0];<min>;<max>;<step>;<value>;<color>;[[x1;y1];[x2;y2]];lockposition=1;animationspeed=1.5;animation=1`
+- `@ObjektNullstellen`: `<boardId>;<objectName>|[<point1>;<point2>];<color>;<prefix>[=0];wert=1`
 - `@Ordinatenabschnitt`: `<boardId>;<objectName>;<color>;<prefix>[=0];wert=1`
 - `@Schnittpunkt`: `<boardId>;<objectName1>;<objectName2>;<color>;<prefix>[=0];wert=1`
 
 Options: `names=[S_1;S_2;...]`, `wert=1` / `value=1`,
 `werte=[1;0;...]` / `values=[1;0;...]`, and
 `sichtbar=[1;0;...]` / `visible=[1;0;...]`; for sliders additionally
-`visible=0`, `fontsize=...`, `lockposition=1`.
+`visible=0`, `fontsize=...`, `lockposition=1`, `animationspeed=...`, and
+`animation=0|1` for the Play/Pause control.
 
 ``` markdown
 @CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=5;width=800;id=ex_object_analysis`)
@@ -1311,11 +2043,39 @@ Parameters: `n=<startColumns>;x;<funcName>;<pointName>;id=<boardId>`
           --{{0}}--
 Adds a DGS menu button to the top-left corner of a coordinate board.
 Clicking the hamburger button slides a tool bar into the board from above.
-The mouse-pointer button between the hamburger and the point tool represents the normal board
-mode. It is highlighted whenever no DGS construction, function dialog, regression, drawing, or
-eraser tool is active. Clicking it cancels the current tool and any unfinished multi-step
-selection. Its pointer icon follows the neutral light/dark-mode color, while the vertical
-divider before the construction tools uses the selected theme color.
+The mouse-pointer button between the hamburger and the point tool is the multiple-selection
+tool. It is highlighted whenever no DGS construction, function dialog, regression, drawing, or
+eraser tool is active. Click objects successively to add them to the selection; clicking an
+already selected object removes it. Clicking an empty board area or the pointer button clears
+the selection. Dragging any selected object moves the complete selection in one undo/redo step.
+Shared defining points move only once, while fixed, bound, and dependent points retain their
+construction constraints. Selected objects are highlighted in the current theme color. Its
+pointer icon follows the neutral light/dark-mode color, while the vertical divider before the
+construction tools uses the selected theme color.
+In 3D, selecting a movable object displays three short arrows at the object:
+magenta for x, cyan for y, and yellow for z. Drag an arrow to translate the selection
+along that world axis. The other two coordinates stay unchanged, and defining points
+move together to preserve the construction. The arrows follow the current camera view
+and stay compact when zooming. Escape cancels an active arrow drag; undo restores the
+complete movement. The arrows disappear when the selection is cleared or 2D is selected.
+In 3D, select Tetrahedron, Pyramid, Prism, Parallelepiped (Spat), or Cuboid and
+hold the left mouse button at the first point, then drag to size a live preview.
+These tools draw an equal-edged tetrahedron, square pyramid, triangular prism,
+rhombohedron, or cube respectively. The first base vertex stays at the starting
+position while the base grows parallel to the world XY plane and the body extends
+in positive Z. Cursor distance determines the edge length at the current zoom.
+Release to create an ordinary editable construction in one undo/redo step; Escape
+cancels the preview. A short click retains the original point/vector construction.
+For filled 3D circle surfaces, select either circle tool and hold the first click
+while dragging to draw a disk centered at that click. The disk starts parallel to
+world XY, with its normal in positive Z. Cursor distance controls its radius at
+the current zoom. Release commits one undo/redo step; Escape discards the preview,
+and short clicks retain the manual circle constructions.
+For Spatial polygon in the Solids menu, click to place vertices or select existing
+points, then click the first vertex again to close the polygon. At least three
+vertices are required, and all vertices must lie in the same plane. The number of
+vertices follows the points selected; it does not need to be entered beforehand.
+Both circles and polygons have a translucent fill that follows the line color.
 The set-square button between the normal pointer and the compass independently toggles a
 screen-sized geometry instrument without changing the active drawing tool. Its zero mark stays
 anchored to the same board coordinate while the board is panned or zoomed, while its displayed
@@ -1338,7 +2098,11 @@ again restores the draggable 5-percent portion at the nearest board edge.
 In freehand mode, new strokes cannot be drawn through the triangular surface. Pointer samples
 near an outer edge snap to one finite edge, allowing a straight ruler-guided stroke even after
 the set square has been rotated or scaled; a free stroke entering the triangle is clipped at
-its first boundary intersection.
+its first boundary intersection. On release, a stroke guided along one edge becomes a
+construction segment with named, movable endpoints at the stroke's start and end. The segment
+keeps the pen color and width; endpoints exactly matching existing points reuse those points.
+The segment and newly created endpoints form one undo/redo step. Taps, interrupted strokes,
+and strokes that leave the edge or turn a corner remain freehand drawings.
 The formatting button directly beside the compass is a two-step one-shot tool. Select the
 source object first and then the target object; DGS copies text, line, fill, and applicable
 trace colors together with the object-label or text font size. The source is highlighted while
@@ -1370,7 +2134,7 @@ Clear trace button appears. Trace color has its own entry in the integrated colo
 does not change the point or label color. Trace state, color, and marker positions participate
 in DGS persistence and undo/redo.
 The segment tool connects two successively selected points, labels the magenta segment with
-lowercase letters (`a`, `b`, `c`, …), and then switches itself off automatically.
+lowercase letters (`a`, `b`, `c`, â€¦), and then switches itself off automatically.
 The same line-tools submenu also provides rays, straight lines, vectors, and cubic arcs. For a ray, the first selected
 point is its endpoint and the second selected point determines its direction. A vector is drawn as
 a finite arrow from the first selected point to the second selected point. Named endpoints produce
@@ -1378,7 +2142,7 @@ an automatic vector label such as `\overrightarrow{AB}`; otherwise a lowercase f
 `\overrightarrow{a}` is used. The arrow spans the complete label. The arc tool is located directly
 below the vector. Select its start and end point, then enter the exit and entry angles in the
 centered dialog using the same unit-circle convention as `@Arc` / `@Bogen`. The resulting magenta
-cubic Bézier curve stays attached to both movable endpoints and receives the next free lowercase
+cubic BÃ©zier curve stays attached to both movable endpoints and receives the next free lowercase
 object name. Both tangent angles can later be changed on blur or Enter in the right-click object
 menu; invalid values remain marked for correction.
 The object menu opened by right-clicking the board or an object-list entry contains an
@@ -1389,10 +2153,9 @@ polygon outlines, angle contours, circles, circular sectors, and DGS-created or
 `@PlotFunction` function graphs. For
 multi-part objects such as polygons and sectors, selecting the owner changes the complete
 visible outline together. A registered polygon side remains separately selectable and can
-therefore receive its own override. Such a per-side override participates in DGS
-persistence and undo/redo, but it cannot be represented by the single outline style of
-`@Area` / `@Flaeche` and is consequently not part of macro export.
-
+therefore receive its own override. Such per-side names, value visibility, colors,
+opacity, fixed state, and line styles participate in DGS persistence, undo/redo,
+and macro export through `@ObjectFormat` / `@ObjektFormat` entries.
 Standalone segments and custom arcs additionally retain their Design selector for
 directional arrows and orthogonal end caps, including `|<->|`, and their Line width field.
 Line width accepts values from `0.25` to `20` with or without the `px` suffix and is
@@ -1404,18 +2167,22 @@ canonically as
 `linestyle=dashed`, `linestyle=dotted`, or `linestyle=dashdotted`; the default
 `solid` is omitted to keep exported legacy-compatible specifications compact.
 The line-relations submenu sits between the line and shape tools and provides perpendicular,
-parallel, midpoint, and angle-bisector constructions. For a perpendicular or parallel, select a
+parallel, midpoint, angle-bisector, reflection, rotation, and central-dilation constructions. For a perpendicular or parallel, select a
 segment, ray, vector, or straight line and a point in either order; it creates the dynamically
 linked straight line through that point and then switches itself off. The midpoint tool accepts
 exactly two already existing points and creates an alphabetically named dependent point halfway
 between them. Its object menu provides a Show coordinates checkbox for the dynamic coordinate
-pair. The angle-bisector tool accepts three existing points in arm–vertex–arm order and
+pair. The angle-bisector tool accepts three existing points in armâ€“vertexâ€“arm order and
 creates the dynamically linked internal angle-bisector line through the vertex.
+For a transformation, first select the source object and then the reflection axis or center.
+Rotation and dilation open a value dialog for the angle in degrees or the scale factor. Points,
+segments, rays, vectors, lines, polygons, circles, circular sectors, marked angles, and compass
+arcs are transformed through dependent image points and continue to follow every defining input.
 The line, ray, vector, arc, segment, perpendicular, parallel, polygon, circle, circular-sector, and angle tools reuse a nearby existing point or
 automatically place a new alphabetically named DGS point when clicking an empty board position.
 The polygon tool selects points in sequence. Selecting the first point again after at
 least three distinct points closes the sequence and creates a movable polygon (for example,
-`A → B → C → A` or `B → C → A → B`).
+`A â†’ B â†’ C â†’ A` or `B â†’ C â†’ A â†’ B`).
 Every polygon side is also registered as an individual DGS segment. It can be selected on
 the board or in the object list and used as the source for perpendiculars, parallels,
 tangents, intersections, and the other line-based constructions. Side names stay hidden by
@@ -1423,7 +2190,7 @@ default to keep the polygon uncluttered, but can be shown or combined with the l
 from the segment object menu. Side formatting and dependent constructions participate in
 DGS persistence and undo/redo together with their polygon.
 The circular-sector tool is located directly below the circle tool. Select or place three
-points in center–radius point–second arm point order. It creates a dynamically linked magenta
+points in centerâ€“radius pointâ€“second arm point order. It creates a dynamically linked magenta
 sector; its object menu can show the area and perimeter and edit line, fill, and label colors.
 The angle submenu also provides an angle-by-measure construction. Select the first arm point
 and then the vertex, enter a value between 0 and 360 degrees in the centered dialog, and DGS
@@ -1459,6 +2226,11 @@ slider exists, DGS creates that slider automatically. For example, `a*x^2+b` cre
 `a` and `b` with the standard range and step. The whole expression is validated first, so
 invalid input does not leave orphan sliders, while known built-in and named functions are not
 mistaken for parameters.
+Each slider has a Play/Pause control that advances by one configured slider step at a time.
+The default speed is 1.5 steps per second. Its speed and visibility can be changed in the
+slider's right-click menu. Animation wraps from the last reachable value back to the minimum
+and continues until paused. Both settings and the current value survive DGS persistence and
+macro export/import; imported animations start paused.
 Implicit products containing the independent variable are expanded before parameter detection
 and evaluation: for example, `sin(ax)` is treated as `sin(a*x)` and creates only the slider
 `a`. Built-in and named function identifiers remain intact, and multi-letter parameters that
@@ -1497,20 +2269,37 @@ action that removes learner-created objects and recreates even deleted macro-man
 axis labels from the course-authored state. The
 Export button in the same footer opens a centered export dialog. It creates a fresh eight-character board id and emits the current board
 as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
-system, axis labels, points, coordinate text, parameter sliders, function graphs, function-analysis
-points, ordinate-axis intercepts, intersections, segments, straight lines, rays, vectors, arcs,
-perpendiculars, parallels, midpoints, polygons/areas, circles, circular sectors/segments,
+system, axis labels, points, coordinate text, parameter sliders, function graphs, Scharen (including
+recognized drawing and point-regression curves with their current parameter values), function-analysis
+points, linear roots, ordinate-axis intercepts, intersections, segments, straight lines, rays,
+vectors, custom and compass arcs, perpendiculars, parallels, angle bisectors, midpoints,
+dependent transformation points for reflections, rotations, and central dilations,
+polygons/areas, circles, circular sectors/segments,
 tangents, and angles. Objects without standalone macros are listed in a short HTML comment so
 the exported block stays pasteable.
 The exported block is roundtrip-safe: importing and exporting it again keeps the construction
-order, hidden dependency objects, point-coordinate expressions, polygon-side references, names,
-visibility, the logical viewport, and the supported appearance settings. Automatically responsive coordinate systems
+order, measured-angle and angle-bisector dependencies, hidden dependency objects,
+point-coordinate expressions, polygon names and side references, equation and function-term
+visibility, coordinate-text font sizes, separate text/line/fill colors, opacity, fixed state,
+the logical viewport, zoom direction, logarithmic axis mode, set-square pose, compass mode,
+and the supported appearance settings. Automatically responsive coordinate systems
 remain responsive instead of turning their currently measured LiveEditor width into a new pixel
 limit on every export; only an explicitly capped or manually resized width is serialized.
-The export dialog first shows a grouped overview of the DGS tools. Every included tool has a
-green check badge; clicking it excludes the tool, dims its icon, and changes the badge to a red
-cross. Continue opens the generated macro block. This selection only configures the imported
-toolbar and does not remove existing objects or change the currently open DGS.
+Spatial exports include 3D points and their bindings, lines, planes, circles, spheres,
+polygons, solids, transformations, intersections, angle arcs, parametric curves and surfaces,
+conic sections, analytic operations, and loci. Dependent results keep their live source
+references rather than becoming free objects. Edited names, visibility, measurements,
+colors, opacity, line width/style, font size, fixation and layers are restored after the
+geometry. An export starting in 2D also loads its hidden 3D constructions immediately, so they remain available on the first switch and are preserved by an immediate re-export.
+The camera orientation, projection and independent panned/zoomed 3D viewport
+are preserved as well; the coordinate macro writes
+`viewport3d=[xmin;xmax;ymin;ymax;zmin;zmax]` without changing the separate 2D viewport.
+The export dialog first sorts the DGS tools into **General**, **2D**, and **3D** sections.
+Capabilities shared by both views occur only once. Every included tool has a green check badge;
+clicking it excludes the tool, dims its icon, and changes the badge to a red cross. Continue opens
+the generated macro block. This selection only configures the imported toolbar and does not remove
+existing objects or change the currently open DGS. The same allowlist is enforced in 3D,
+including each advanced operation and its input dialog.
 Below the tool overview, four checkmark options configure permissions in the imported DGS. They
 are serialized independently as `restrictions=[...]`: `100` disables object properties from the
 board, object list, and keyboard context-menu shortcut; `200` limits object properties to colors,
@@ -1526,10 +2315,18 @@ Tool profiles use immutable numeric capability ids rather than toolbar positions
 `@DGS(`boardId;tools=[100;200;310;700]`)`. Therefore, a future tool can be inserted anywhere in
 the visual toolbar without changing the meaning of an older export. Missing `tools`, an empty
 list, or a list without numbers retains the complete legacy DGS; `tools=[0]` explicitly keeps
-only the permanent infrastructure. Hamburger, normal mouse mode, undo/redo, fullscreen, and the
+only the permanent infrastructure. Hamburger, multiple-selection mode, undo/redo, fullscreen, and the
 object list remain permanently available; the set square and compass are also always present and
 are intentionally not part of the export-tool selection. Export remains available unless
 restriction `400` is set.
+Generated DGS blocks additionally use `zoom=both|vertical|horizontal`,
+`axisscale=cartesian|log-x|log-y|log-log`,
+`setsquare=[visible,initialized,xRatio,yRatio,angle,scale]`,
+`compass=[free|fixed,radius]`, and `viewmode=switchable|2d|3d` to restore the instrument
+and viewport controls. `switchable` keeps the 2D/3D button; `2d` and `3d` force the selected
+view and hide the switch. Missing or unknown `viewmode` values remain switchable for backward
+compatibility. The coordinate-system macro keeps the spatial scene data whenever a switchable or
+3D-capable export needs it, while `view=` records the selected initial view.
 The compass submenu offers the ordinary two-point radius and a fixed-radius mode. In fixed-radius
 mode, enter a positive radius, click the center, and use the second click to choose the drawing
 direction. The drawing point is created at exactly that radius and can immediately be dragged
@@ -1540,11 +2337,18 @@ The currently assigned ids are: `100` formatting, reserved always-on id `140` fo
 reserved always-on id `150` for the compass,
 `200` point, `310` segment, `320` ray,
 `330` line, `340` vector, `350` arc, `410` perpendicular, `420` parallel, `430` midpoint,
-`440` angle bisector, `510` polygon, `520` circle, `530` circular sector, `610` angle,
+`440` angle bisector, `450` reflection in a line, `460` reflection in a point,
+`470` rotation about a point, `480` central dilation, `510` polygon, `520` circle,
+`530` circular sector, `540` ellipse, `610` angle,
 `620` measured angle, `700` function, `810` zeros, `820` extrema, `830` inflection points,
 `840` ordinate-axis intercept, `850` tangent, `860` intersection, `910` freehand drawing,
 `920` eraser, `930` regression tools, `1000` slider, `1010` text, `1110` zoom mode, and
 `1120` axis scaling. These ids are reserved permanently and are never derived from display order.
+The advanced 3D operations use ids `1200`-`1244`: `1200`-`1209` vector operations,
+`1210`-`1225` measurements and relations, `1226`-`1229` analytic constructions,
+`1230`-`1233` curves/surfaces/conic sections, `1234`-`1242` curve and surface analysis,
+and `1243`-`1244` locus curves and surfaces. The individual labels and immutable ids
+are listed in [the tool catalog](src/shared/dgs3dTools.ts); all are selectable in the export dialog.
 The adjacent analysis button opens a submenu for zeros, extrema, inflection points, the
 ordinate-axis intercept, tangents, and intersections. All entries are one-shot construction
 modes. The zero and ordinate-axis-intercept tools accept a function graph, segment, ray, vector, or straight line;
@@ -1561,7 +2365,11 @@ sequence and supports every combination of function graphs, segments, rays, vect
 lines, tangents, circles, and compass arcs; it creates every isolated visible crossing or contact
 point. Compass-arc intersections are restricted to the actually drawn sweep rather than the
 invisible remainder of the carrier circle, and the resulting points can be used in later DGS
-constructions like ordinary dependent points.
+constructions like ordinary dependent points. Choose **Find intersections**, then
+select both objects. Two clicks at their crossing also work: the second selection ignores
+the already selected object. This applies to two compass arcs as well as a compass arc
+and a segment or other supported object. Creating the intersection points is one undoable
+step; they follow their source objects when the construction changes.
 Viewport changes also
 add or remove visible analysis points. All constructions participate in DGS undo/redo and can be
 removed from their object menus.
@@ -1577,10 +2385,16 @@ undo and redo remain permanently stacked below the hamburger button, so no addit
 `@Regression` macro is required.
 Regression analysis panels are stacked below these permanent controls.
 Conversely, `@Regression` and `@Reconstruction` automatically add the same DGS shell with
-the compact tool profile `tools=[910;920;930]` (freehand pen, eraser, and regression tools).
-The set square, compass, and unrelated DGS tool groups stay hidden in this implicit profile.
+the tool profile `tools=[810;820;830;840;850;860;910;920;930]`: all six analysis tools,
+freehand pen, eraser, and regression tools. Regression curves recognized from drawings or
+fitted to selected points support roots, extrema, inflection points, the ordinate-axis
+intercept, tangents, and intersections with other supported objects.
+`@Schar` automatically provides the analysis profile `tools=[810;820;830;840;850;860]`.
+Its visible curve is the analysis source, including when selected through its wider drag area.
+Analysis points and tangents follow changes to the curve parameters and support undo/redo.
+The set square, compass, and unrelated DGS tool groups stay hidden in these implicit profiles.
 If an explicit `@DGS` targets the same board, its complete `tools` and `restrictions` profile
-takes precedence, regardless of whether it appears before or after the regression macro.
+takes precedence, regardless of whether it appears before or after the regression or Schar macro.
 
 Parameters: `<boardId>[;tools=[<stableToolId>;...]][;restrictions=[<stableRestrictionId>;...]]`
 
@@ -1668,10 +2482,19 @@ accepts a learner-created, closed, non-self-intersecting polygon with exactly th
 requested number of genuine corners. A repeated JSXGraph closing vertex does not
 count; preset polygons created by `@Area` / `@Flaeche` are ignored.
 
+A closed chain of learner-created segments also counts, for example AB, BC, and CA
+for a triangle. This includes segments drawn along the set square. No polygon tool
+or polygon label is required, and drawing order and endpoint names do not matter.
+Adjacent endpoints may differ by at most the configured length tolerance (default
+0.05 coordinate units). Side lengths and interior angles are measured from the actual
+segments. The check requires exactly the requested number of corners and rejects
+open, degenerate, or self-intersecting chains. Additional construction lines are allowed;
+a complete matching chain must exist on the current board. Preset segments are ignored.
+
 Each required property consists of a type followed by its target value:
 
 - `S4`, `Strecke:4`, `Side=4`, or `Length4` means a side of length 4.
-- `W90`, `Winkel:90°`, or `Angle=90deg` means an interior angle of 90 degrees.
+- `W90`, `Winkel:90Â°`, or `Angle=90deg` means an interior angle of 90 degrees.
 
 The compact comma-separated list uses a decimal point inside values. German and
 English long forms may be mixed.
@@ -1737,6 +2560,10 @@ into one normal LiaScript quiz. Every condition is joined with AND and is tested
 learner-created polygon. Thus, one polygon cannot satisfy the construction
 while a different polygon supplies the requested area. The existing individual
 quiz macros remain available for tasks with only one check.
+When a `Konstruktion(...)` / `Construction(...)` condition is present, a closed chain
+of learner-created segments is accepted as the same candidate for all conditions,
+using the construction length tolerance to join adjacent endpoints. With multiple
+construction conditions, the smallest length tolerance applies to endpoint joins.
 
 Parameters:
 
@@ -1862,7 +2689,7 @@ free while requiring a rhombus with area $20\,FE$:
 @AxisLabel(`id=rhombus_area;xlabel=$x$;ylabel=$y$`)
 @DGS(`rhombus_area;tools=[200;510;920]`)
 
-Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
+Erzeuge eine Raute mit einem FlÃ¤cheninhalt von $20\,FE$.
 
 @GeometrieQuiz(`rhombus_area;4;Form(Raute);Flaeche(20;0.05)`,`<!-- data-solution-button="5" -->`)
 ```
@@ -1873,7 +2700,7 @@ Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
 @AxisLabel(`id=rhombus_area;xlabel=$x$;ylabel=$y$`)
 @DGS(`rhombus_area;tools=[200;510;920]`)
 
-Erzeuge eine Raute mit einem Flächeninhalt von $20\,FE$.
+Erzeuge eine Raute mit einem FlÃ¤cheninhalt von $20\,FE$.
 
 @GeometrieQuiz(`rhombus_area;4;Form(Raute);Flaeche(20;0.05)`,`<!-- data-solution-button="5" -->`)
 
@@ -2004,7 +2831,24 @@ Creates an adjustable function family with sliders directly on the board.
 The term toggle, tooltips, accessible control labels, and decimal separator
 follow the course's `language: en` or `language: de`.
 
-Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>[;linestyle=<style>]`
+Parameters: `<name>;<variable>;<term>;<boardId>;term=<0|1>;<color>[;linestyle=<style>][;params=[<parameter>=<value>;...]]`
+
+`params` sets the initial slider values without rounding fitted coefficients. Parameter names
+are case-sensitive and must occur in the term; omitted parameters retain their usual defaults.
+Use decimal points or scientific notation (for example `1.25` or `2e-8`). Non-finite or
+malformed values are ignored. Saved learner adjustments take precedence on a slide revisit.
+
+For example, this family starts at $f(x)=2(x-1)^2+3$:
+
+``` markdown
+@Schar(`f;x;a*(x+c)^2+d;ex_schar;term=1;#ff0000;params=[a=2;c=-1;d=3]`)
+```
+
+The DGS object list's **Export** button exports recognized drawing graphs and point regression
+curves as `@Schar` with their current model, color, and parameter values. Raw freehand strokes
+are not exported as families. Existing Scharen can also be exported again, including after
+changing their parameters or dragging the curve. Dependent analysis points, tangents, and
+intersections use the exported Schar names and remain dynamic after import.
 
 ``` markdown
 @CoordinateSystem(`xmin=-7;xmax=7;ymin=-5;ymax=5;width=800;id=ex_schar`)
@@ -2149,7 +2993,7 @@ available. For a reproducible course, replace `main` with a release tag that
 already contains the macros you use.
 
 ```` markdown
-import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@main/README.md
+import:   https://cdn.jsdelivr.net/gh/LiaTemplates/JSXGraph@f426725ff10580b5ebdcc3230a4ca31c415faadb/README.md
 
 script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/index.js
 
@@ -2187,6 +3031,232 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <span id="point-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
+@Point3D: @Point3D_(@uid,`@0`)
+@Punkt3D: @Point3D_(@uid,`@0`)
+
+@Point3D_
+<span id="point3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Segment3D: @Linear3D_(@uid,`@0`,segment,en)
+@Strecke3D: @Linear3D_(@uid,`@0`,segment,de)
+@Line3D: @Linear3D_(@uid,`@0`,line,en)
+@Gerade3D: @Linear3D_(@uid,`@0`,line,de)
+@Ray3D: @Linear3D_(@uid,`@0`,ray,en)
+@Strahl3D: @Linear3D_(@uid,`@0`,ray,de)
+@Vector3D: @Linear3D_(@uid,`@0`,vector,en)
+@Vektor3D: @Linear3D_(@uid,`@0`,vector,de)
+
+@Linear3D_
+<span id="linear3d-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Plane3D: @Plane3D_(@uid,`@0`,three-points,en)
+@Ebene3D: @Plane3D_(@uid,`@0`,three-points,de)
+@PlanePointNormal3D: @Plane3D_(@uid,`@0`,point-normal,en)
+@PunktNormalenEbene3D: @Plane3D_(@uid,`@0`,point-normal,de)
+@PlanePointVectors3D: @Plane3D_(@uid,`@0`,point-vectors,en)
+@ParameterEbene3D: @Plane3D_(@uid,`@0`,point-vectors,de)
+
+@Plane3D_
+<span id="plane3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Circle3D: @Circle3D_(@uid,`@0`,three-points,en)
+@Kreis3D: @Circle3D_(@uid,`@0`,three-points,de)
+@CircleCenterNormal3D: @Circle3D_(@uid,`@0`,center-normal-radius,en)
+@KreisMittelpunktNormal3D: @Circle3D_(@uid,`@0`,center-normal-radius,de)
+@CircleCenterNormalPoint3D: @Circle3D_(@uid,`@0`,center-normal-point,en)
+@KreisMittelpunktNormalPunkt3D: @Circle3D_(@uid,`@0`,center-normal-point,de)
+
+@Circle3D_
+<span id="circle3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Sphere3D: @Sphere3D_(@uid,`@0`,center-point,en)
+@Kugel3D: @Sphere3D_(@uid,`@0`,center-point,de)
+@SphereRadius3D: @Sphere3D_(@uid,`@0`,center-radius,en)
+@KugelRadius3D: @Sphere3D_(@uid,`@0`,center-radius,de)
+@SphereFourPoints3D: @Sphere3D_(@uid,`@0`,four-points,en)
+@KugelVierPunkte3D: @Sphere3D_(@uid,`@0`,four-points,de)
+
+@Sphere3D_
+<span id="sphere3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Polygon3D: @Polygon3D_(@uid,`@0`,en)
+@Vieleck3D: @Polygon3D_(@uid,`@0`,de)
+
+@Polygon3D_
+<span id="polygon3d-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@Tetrahedron3D: @Solid3D_(@uid,`@0`,tetrahedron,en)
+@Tetraeder3D: @Solid3D_(@uid,`@0`,tetrahedron,de)
+@Pyramid3D: @Solid3D_(@uid,`@0`,pyramid,en)
+@Pyramide3D: @Solid3D_(@uid,`@0`,pyramid,de)
+@Prism3D: @Solid3D_(@uid,`@0`,prism,en)
+@Prisma3D: @Solid3D_(@uid,`@0`,prism,de)
+@Parallelepiped3D: @Solid3D_(@uid,`@0`,parallelepiped,en)
+@Spat3D: @Solid3D_(@uid,`@0`,parallelepiped,de)
+@Cuboid3D: @Solid3D_(@uid,`@0`,cuboid,en)
+@Quader3D: @Solid3D_(@uid,`@0`,cuboid,de)
+@Cylinder3D: @Solid3D_(@uid,`@0`,cylinder,en)
+@Zylinder3D: @Solid3D_(@uid,`@0`,cylinder,de)
+@Cone3D: @Solid3D_(@uid,`@0`,cone,en)
+@Kegel3D: @Solid3D_(@uid,`@0`,cone,de)
+
+@Solid3D_
+<span id="solid3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@Curve3D: @Curve3D_(@uid,`@0`)
+@Raumkurve: @Curve3D_(@uid,`@0`)
+
+@Curve3D_
+<span id="curve3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Surface3D: @Surface3D_(@uid,`@0`,false)
+@Flaeche3D: @Surface3D_(@uid,`@0`,false)
+@FunctionSurface3D: @Surface3D_(@uid,`@0`,true)
+@Funktionsflaeche3D: @Surface3D_(@uid,`@0`,true)
+
+@Surface3D_
+<span id="surface3d-spec-@0" data-spec="@1" data-function-graph="@2" style="display:none;"></span>
+@end
+
+@ConicSection3D: @ConicSection3D_(@uid,`@0`)
+@Kegelschnitt3D: @ConicSection3D_(@uid,`@0`)
+
+@ConicSection3D_
+<span id="conic3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@VectorSum3D: @Analytic3D_(@uid,`@0`,vector-add)
+@Vektorsumme3D: @Analytic3D_(@uid,`@0`,vector-add)
+@VectorDifference3D: @Analytic3D_(@uid,`@0`,vector-subtract)
+@Vektordifferenz3D: @Analytic3D_(@uid,`@0`,vector-subtract)
+@ScalarVector3D: @Analytic3D_(@uid,`@0`,vector-scale)
+@Skalarmultiplikation3D: @Analytic3D_(@uid,`@0`,vector-scale)
+@UnitVector3D: @Analytic3D_(@uid,`@0`,vector-unit)
+@Einheitsvektor3D: @Analytic3D_(@uid,`@0`,vector-unit)
+@VectorProjection3D: @Analytic3D_(@uid,`@0`,vector-project)
+@Vektorprojektion3D: @Analytic3D_(@uid,`@0`,vector-project)
+@DotProduct3D: @Analytic3D_(@uid,`@0`,dot)
+@Skalarprodukt3D: @Analytic3D_(@uid,`@0`,dot)
+@CrossProduct3D: @Analytic3D_(@uid,`@0`,vector-cross)
+@Kreuzprodukt3D: @Analytic3D_(@uid,`@0`,vector-cross)
+@TripleProduct3D: @Analytic3D_(@uid,`@0`,triple)
+@Spatprodukt3D: @Analytic3D_(@uid,`@0`,triple)
+@Distance3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Abstand3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Angle3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@Winkel3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@ProjectPointLine3D: @Analytic3D_(@uid,`@0`,project-point-line)
+@LotfusspunktGerade3D: @Analytic3D_(@uid,`@0`,project-point-line)
+@ProjectPointPlane3D: @Analytic3D_(@uid,`@0`,project-point-plane)
+@LotfusspunktEbene3D: @Analytic3D_(@uid,`@0`,project-point-plane)
+@CurveTangent3D: @Analytic3D_(@uid,`@0`,curve-tangent)
+@TangenteRaumkurve: @Analytic3D_(@uid,`@0`,curve-tangent)
+@CurveNormalPlane3D: @Analytic3D_(@uid,`@0`,curve-normal-plane)
+@NormalebeneRaumkurve: @Analytic3D_(@uid,`@0`,curve-normal-plane)
+@CurveArcLength3D: @Analytic3D_(@uid,`@0`,curve-arc-length)
+@BogenlaengeRaumkurve: @Analytic3D_(@uid,`@0`,curve-arc-length)
+@SurfaceTangentPlane3D: @Analytic3D_(@uid,`@0`,surface-tangent-plane)
+@Tangentialebene3D: @Analytic3D_(@uid,`@0`,surface-tangent-plane)
+@SurfaceTangentU3D: @Analytic3D_(@uid,`@0`,surface-tangent-u)
+@FlaechentangenteU3D: @Analytic3D_(@uid,`@0`,surface-tangent-u)
+@SurfaceTangentV3D: @Analytic3D_(@uid,`@0`,surface-tangent-v)
+@FlaechentangenteV3D: @Analytic3D_(@uid,`@0`,surface-tangent-v)
+@SurfaceNormal3D: @Analytic3D_(@uid,`@0`,surface-normal)
+@Flaechennormale3D: @Analytic3D_(@uid,`@0`,surface-normal)
+@NegatedVector3D: @Analytic3D_(@uid,`@0`,vector-negate)
+@Gegenvektor3D: @Analytic3D_(@uid,`@0`,vector-negate)
+@ConnectingVector3D: @Analytic3D_(@uid,`@0`,vector-connect)
+@Verbindungsvektor3D: @Analytic3D_(@uid,`@0`,vector-connect)
+@VectorPlaneProjection3D: @Analytic3D_(@uid,`@0`,vector-project-plane)
+@Vektorebenenprojektion3D: @Analytic3D_(@uid,`@0`,vector-project-plane)
+@PlaneNormal3D: @Analytic3D_(@uid,`@0`,plane-normal)
+@Ebenennormale3D: @Analytic3D_(@uid,`@0`,plane-normal)
+@VectorMagnitude3D: @Analytic3D_(@uid,`@0`,magnitude)
+@Vektorbetrag3D: @Analytic3D_(@uid,`@0`,magnitude)
+@PointDistance3D: @Analytic3D_(@uid,`@0`,distance-points)
+@Punktabstand3D: @Analytic3D_(@uid,`@0`,distance-points)
+@PointLineDistance3D: @Analytic3D_(@uid,`@0`,distance-point-line)
+@AbstandPunktGerade3D: @Analytic3D_(@uid,`@0`,distance-point-line)
+@PointPlaneDistance3D: @Analytic3D_(@uid,`@0`,distance-point-plane)
+@AbstandPunktEbene3D: @Analytic3D_(@uid,`@0`,distance-point-plane)
+@LineDistance3D: @Analytic3D_(@uid,`@0`,distance-lines)
+@AbstandGeraden3D: @Analytic3D_(@uid,`@0`,distance-lines)
+@PlaneDistance3D: @Analytic3D_(@uid,`@0`,distance-planes)
+@AbstandEbenen3D: @Analytic3D_(@uid,`@0`,distance-planes)
+@VectorAngle3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@Vektorwinkel3D: @Analytic3D_(@uid,`@0`,angle-vectors)
+@LineAngle3D: @Analytic3D_(@uid,`@0`,angle-lines)
+@Geradenwinkel3D: @Analytic3D_(@uid,`@0`,angle-lines)
+@LinePlaneAngle3D: @Analytic3D_(@uid,`@0`,angle-line-plane)
+@WinkelGeradeEbene3D: @Analytic3D_(@uid,`@0`,angle-line-plane)
+@PlaneAngle3D: @Analytic3D_(@uid,`@0`,angle-planes)
+@Ebenenwinkel3D: @Analytic3D_(@uid,`@0`,angle-planes)
+@LineRelation3D: @Analytic3D_(@uid,`@0`,relation-lines)
+@LageGeraden3D: @Analytic3D_(@uid,`@0`,relation-lines)
+@LinePlaneRelation3D: @Analytic3D_(@uid,`@0`,relation-line-plane)
+@LageGeradeEbene3D: @Analytic3D_(@uid,`@0`,relation-line-plane)
+@PlaneRelation3D: @Analytic3D_(@uid,`@0`,relation-planes)
+@LageEbenen3D: @Analytic3D_(@uid,`@0`,relation-planes)
+@PointObjectRelation3D: @Analytic3D_(@uid,`@0`,relation-point-object)
+@LagePunktObjekt3D: @Analytic3D_(@uid,`@0`,relation-point-object)
+@PerpendicularLinePlane3D: @Analytic3D_(@uid,`@0`,perpendicular-line-plane)
+@LotgeradeEbene3D: @Analytic3D_(@uid,`@0`,perpendicular-line-plane)
+@CommonPerpendicular3D: @Analytic3D_(@uid,`@0`,common-perpendicular)
+@GemeinsamesLot3D: @Analytic3D_(@uid,`@0`,common-perpendicular)
+@CurveTangentVector3D: @Analytic3D_(@uid,`@0`,curve-tangent-vector)
+@TangentenvektorRaumkurve: @Analytic3D_(@uid,`@0`,curve-tangent-vector)
+@CurveVelocity3D: @Analytic3D_(@uid,`@0`,curve-velocity)
+@Geschwindigkeitsvektor3D: @Analytic3D_(@uid,`@0`,curve-velocity)
+
+@Analytic3D_
+<span id="analytic3d-spec-@0" data-spec="@1" data-operation="@2" style="display:none;"></span>
+@end
+
+@Locus3D: @Locus3D_(@uid,`@0`)
+@Ortskurve3D: @Locus3D_(@uid,`@0`)
+
+@Locus3D_
+<span id="locus3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@LocusSurface3D: @LocusSurface3D_(@uid,`@0`)
+@Ortsflaeche3D: @LocusSurface3D_(@uid,`@0`)
+
+@LocusSurface3D_
+<span id="locussurface3d-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
+
+@Translate3D: @Transformation3D_(@uid,`@0`,translate,en)
+@Verschiebung3D: @Transformation3D_(@uid,`@0`,translate,de)
+@ReflectPoint3D: @Transformation3D_(@uid,`@0`,reflect-point,en)
+@Punktspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-point,de)
+@ReflectLine3D: @Transformation3D_(@uid,`@0`,reflect-line,en)
+@Geradenspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-line,de)
+@ReflectPlane3D: @Transformation3D_(@uid,`@0`,reflect-plane,en)
+@Ebenenspiegelung3D: @Transformation3D_(@uid,`@0`,reflect-plane,de)
+@RotateAxis3D: @Transformation3D_(@uid,`@0`,rotate-axis,en)
+@Achsendrehung3D: @Transformation3D_(@uid,`@0`,rotate-axis,de)
+@Dilate3D: @Transformation3D_(@uid,`@0`,dilate,en)
+@ZentrischeStreckung3D: @Transformation3D_(@uid,`@0`,dilate,de)
+
+@Transformation3D_
+<span id="transformation3d-spec-@0" data-spec="@1" data-definition="@2" data-language="@3" style="display:none;"></span>
+@end
+@Intersection3D: @Intersection3D_(@uid,`@0`,en)
+@Schnitt3D: @Intersection3D_(@uid,`@0`,de)
+
+@Intersection3D_
+<span id="intersection3d-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @CoordText: @CoordText_(@uid,`@0`)
 @KoordText: @CoordText_(@uid,`@0`)
 
@@ -2194,6 +3264,12 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <span class="lia-coord-text-spec" id="coord-text-spec-@0" data-spec="@1" style="display:none;"></span>
 @end
 
+@ObjectFormat: @ObjectFormat_(@uid,`@0`)
+@ObjektFormat: @ObjectFormat_(@uid,`@0`)
+
+@ObjectFormat_
+<span id="object-format-spec-@0" data-spec="@1" style="display:none;"></span>
+@end
 
 @Strecke: @Distance_(@uid,`@0`,de)
 @distance: @Distance_(@uid,`@0`,en)
@@ -2220,15 +3296,31 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 <span id="arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
+@CompassArc: @CompassArc_(@uid,`@0`,en)
+@Zirkelbogen: @CompassArc_(@uid,`@0`,de)
+
+@CompassArc_
+<span id="compass-arc-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
 @Perpendicular: @RelationObject_(@uid,`@0`,orthogonal,en)
 @Orthogonale: @RelationObject_(@uid,`@0`,orthogonal,de)
 @Parallel: @RelationObject_(@uid,`@0`,parallel,en)
 @Parallele: @RelationObject_(@uid,`@0`,parallel,de)
 @Midpoint: @RelationObject_(@uid,`@0`,midpoint,en)
 @Mittelpunkt: @RelationObject_(@uid,`@0`,midpoint,de)
+@AngleBisector: @RelationObject_(@uid,`@0`,angle-bisector,en)
+@Winkelhalbierende: @RelationObject_(@uid,`@0`,angle-bisector,de)
 
 @RelationObject_
 <span id="relation-spec-@0" data-spec="@1" data-kind="@2" data-language="@3" style="display:none;"></span>
+@end
+
+@TransformPoint: @TransformPoint_(@uid,`@0`,en)
+@Transformationspunkt: @TransformPoint_(@uid,`@0`,de)
+
+@TransformPoint_
+<span id="transform-point-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
 @end
 
 @Area: @Area_(@uid,`@0`,en)
@@ -2273,6 +3365,8 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 @OrdinateIntercept: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,en)
 @Ordinatenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
 @Ordinatenachsenabschnitt: @ObjectAnalysisPoints_(@uid,`@0`,ordinate-intercept,de)
+@ObjectZeros: @ObjectAnalysisPoints_(@uid,`@0`,roots,en)
+@ObjektNullstellen: @ObjectAnalysisPoints_(@uid,`@0`,roots,de)
 @Intersection: @ObjectAnalysisPoints_(@uid,`@0`,intersections,en)
 @Schnittpunkt: @ObjectAnalysisPoints_(@uid,`@0`,intersections,de)
 
@@ -2383,6 +3477,18 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 @end
 
 
+@ConstructionQuiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@Konstruktionsquiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@CombinedConstructionQuiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+@KombiniertesKonstruktionsquiz3D: @ConstructionQuiz3D_(@uid,`@0`,`@1`,@language)
+
+@ConstructionQuiz3D_
+<span id='construction-quiz3d-spec-@0' data-spec='@1' data-language='@3' style='display:none'></span>
+<input type="hidden" data-lia-coordinate-dynflex-guard aria-hidden="true">
+
+@2
+<span data-lia-coordinate-quiz-anchor data-lia-coordinate-quiz-kind="construction3d" data-lia-coordinate-quiz-uid="@0" style="display:none" aria-hidden="true"></span>_<span data-lia-coordinate-quiz-input style='display:none' aria-hidden='true'>[[lia-coordinate-check]]</span>_
+@end
 @KoordQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
 @GeometrieQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)
 @CoordinateQuiz: @CombinedQuiz_(@uid,`@0`,`@1`,@language)

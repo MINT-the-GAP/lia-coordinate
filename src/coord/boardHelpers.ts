@@ -3,9 +3,11 @@
 // enqueue one stable call, even when the bundle has not loaded yet.
 
 import { getNeutralColor, getAccentColor } from '../shared/theme';
+import { resolveUiLanguage } from '../shared/language';
 import { applyMacroCodeOrderLayers } from '../shared/macroLayer';
 import { parseCoordSpec } from '../shared/coordSpec';
 import type { BoardConfig } from '../shared/coordSpec';
+import { disposeCoordinateView3D, ensureCoordinateView3D, mountCoordinateView3DControls, setCoordinateViewMode } from './view3d';
 import {
   disposeInteractiveCoordinateBoardsInContainer,
   disposeStaticCoordinateBoard,
@@ -45,6 +47,7 @@ export interface StoredBoardState {
   sizeMode: BoardSizeMode;
   maxStartWidth?: number | null;
   exportBBox?: number[] | null;
+  minimized?: boolean;
 }
 
 export function loadStoredBoardState(id: string): StoredBoardState | null {
@@ -71,7 +74,15 @@ export function loadStoredBoardState(id: string): StoredBoardState | null {
     : null;
   const exportBBox = isValidBBox(st.exportBBox) ? st.exportBBox.slice() : null;
 
-  return { width, height, bbox, sizeMode, maxStartWidth, exportBBox };
+  return {
+    width,
+    height,
+    bbox,
+    sizeMode,
+    maxStartWidth,
+    exportBBox,
+    minimized: st.minimized === true
+  };
 }
 
 function readRenderedOuterSize(container: HTMLElement, dimension: 'width' | 'height'): number {
@@ -136,6 +147,7 @@ export function saveBoardState(board: any, id: string, initialBBox: number[]): v
     sizeMode,
     maxStartWidth,
     manualSize: sizeMode === 'manual',
+    minimized: board.__coordMinimized === true,
     zoomMode: board.__liaDgsZoomMode || previous.zoomMode || previous.panMode || 'both'
   };
 }
@@ -789,6 +801,192 @@ export function updateViewportAxes(board: any): void {
 // Resize handle
 // ---------------------------------------------------------------------------
 
+export const COORDINATE_BOARD_MIN_WIDTH = 380;
+export const COORDINATE_BOARD_MIN_HEIGHT = 300;
+export const COORDINATE_BOARD_BUTTON_SIZE = 60;
+
+function getCoordinateBoardHost(container: HTMLElement): HTMLElement | null {
+  const host = getBoardShadowHost(container);
+  return host && String(host.tagName || '').toLowerCase() === 'jsx-graph' ? host : null;
+}
+
+function setCoordinateBoardHostMinimized(container: HTMLElement, minimized: boolean): void {
+  const host = getCoordinateBoardHost(container);
+  if (!host) return;
+  host.style.display = 'block';
+  host.style.boxSizing = 'border-box';
+  host.style.width = minimized ? COORDINATE_BOARD_BUTTON_SIZE + 'px' : '100%';
+  host.style.maxWidth = minimized ? COORDINATE_BOARD_BUTTON_SIZE + 'px' : '100%';
+  host.style.minWidth = '0';
+}
+
+function ensureCoordinateMinimizeStyle(container: HTMLElement): void {
+  try {
+    const root = container.getRootNode() as Document | ShadowRoot;
+    if (!root || typeof (root as ParentNode).querySelector !== 'function') return;
+    if ((root as ParentNode).querySelector('style[data-lia-coordinate-minimize-style]')) return;
+    const style = document.createElement('style');
+    style.dataset.liaCoordinateMinimizeStyle = '1';
+    style.textContent =
+      '.lia-coordinate-minimized > :not(.lia-coordinate-restore-button) {' +
+      'display: none !important;' +
+      '}';
+    if (root instanceof Document) (root.head || root.documentElement).appendChild(style);
+    else root.appendChild(style);
+  } catch (e) {}
+}
+
+function styleCoordinateRestoreButton(board: any, button: HTMLButtonElement): void {
+  const neutral = getNeutralColor();
+  const accent = getAccentColor();
+  const language = resolveUiLanguage(board.containerObj);
+  const label = language === 'de' ? 'Koordinatensystem öffnen' : 'Open coordinate system';
+  const mode = board.__liaSceneMode === '3d' ? '3D' : '2D';
+
+  button.type = 'button';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.style.position = 'absolute';
+  button.style.inset = '0';
+  button.style.width = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  button.style.height = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  button.style.boxSizing = 'border-box';
+  button.style.display = 'flex';
+  button.style.alignItems = 'center';
+  button.style.justifyContent = 'center';
+  button.style.gap = '3px';
+  button.style.padding = '5px';
+  button.style.border = '2px solid ' + neutral;
+  button.style.borderRadius = '10px';
+  button.style.background = '#111719';
+  button.style.color = neutral;
+  button.style.cursor = 'pointer';
+  button.style.zIndex = '100';
+  button.style.touchAction = 'manipulation';
+  button.style.font = '700 14px/1 system-ui, sans-serif';
+  button.style.letterSpacing = '-0.02em';
+  button.replaceChildren();
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.style.width = '27px';
+  svg.style.height = '27px';
+  svg.style.flex = '0 0 auto';
+  svg.innerHTML =
+    '<path d="M5 19V7m0 12h12M5 19l9-9" fill="none" stroke="' + accent +
+    '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M5 7l-2.2 3.2M5 7l2.2 3.2M17 19l-3.2-2.2M17 19l-3.2 2.2M14 10l-4.2.7M14 10l-.7 4.2" ' +
+    'fill="none" stroke="' + accent +
+    '" stroke-width="2.2" stroke-linecap="round"/>';
+  const badge = document.createElement('span');
+  badge.textContent = mode;
+  badge.style.flex = '0 0 auto';
+  button.append(svg, badge);
+}
+
+function applyCoordinateBoardMinimizedAppearance(board: any): void {
+  if (!board || !board.containerObj || board.__coordMinimized !== true) return;
+  const container = board.containerObj as HTMLElement;
+  ensureCoordinateMinimizeStyle(container);
+  container.classList.add('lia-coordinate-minimized');
+  container.style.width = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  container.style.height = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  container.style.maxWidth = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  container.style.minWidth = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  container.style.maxHeight = COORDINATE_BOARD_BUTTON_SIZE + 'px';
+  container.style.border = '0';
+  container.style.borderRadius = '10px';
+  container.style.background = 'transparent';
+  container.style.overflow = 'visible';
+  container.style.touchAction = 'manipulation';
+  setCoordinateBoardHostMinimized(container, true);
+  const button = container.querySelector(':scope > .lia-coordinate-restore-button') as HTMLButtonElement | null;
+  if (button) styleCoordinateRestoreButton(board, button);
+}
+
+function clearCoordinateBoardMinimizedAppearance(board: any): void {
+  if (!board || !board.containerObj) return;
+  const container = board.containerObj as HTMLElement;
+  container.classList.remove('lia-coordinate-minimized');
+  container.style.maxWidth = '100%';
+  container.style.minWidth = '0';
+  container.style.maxHeight = 'none';
+  container.style.overflow = 'hidden';
+  setCoordinateBoardHostMinimized(container, false);
+  const button = container.querySelector(':scope > .lia-coordinate-restore-button') as HTMLElement | null;
+  if (button) button.style.display = 'none';
+}
+
+function restoreCoordinateBoardFromButton(
+  board: any,
+  initialBBox: number[],
+  boardId: string,
+  onResize: () => void
+): void {
+  if (!board || !board.containerObj || board.__coordMinimized !== true) return;
+  const anchorBBox = isValidBBox(board.__coordMinimizedBBox)
+    ? board.__coordMinimizedBBox.slice()
+    : getSafeBBox(board, initialBBox);
+  board.__coordMinimized = false;
+  clearCoordinateBoardMinimizedAppearance(board);
+  if (board.__coordBorderEnabled) applyBoardFrame(board);
+  board.__manualWidth = COORDINATE_BOARD_MIN_WIDTH;
+  board.__manualHeight = COORDINATE_BOARD_MIN_HEIGHT;
+  board.__coordSizeMode = 'manual';
+  const size = fitDimensionsWithinBounds(
+    board,
+    COORDINATE_BOARD_MIN_WIDTH,
+    COORDINATE_BOARD_MIN_HEIGHT
+  );
+  applyBoardSize(board, size.width, size.height, false, anchorBBox, initialBBox, boardId);
+  onResize();
+}
+
+function ensureCoordinateRestoreButton(
+  board: any,
+  initialBBox: number[],
+  boardId: string,
+  onResize: () => void
+): HTMLButtonElement | null {
+  if (!board || !board.containerObj) return null;
+  const container = board.containerObj as HTMLElement;
+  let button = container.querySelector(':scope > .lia-coordinate-restore-button') as HTMLButtonElement | null;
+  if (!button) {
+    button = document.createElement('button');
+    button.className = 'lia-coordinate-restore-button';
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      restoreCoordinateBoardFromButton(board, initialBBox, boardId, onResize);
+    });
+    container.appendChild(button);
+  }
+  styleCoordinateRestoreButton(board, button);
+  if (board.__coordMinimized !== true) button.style.display = 'none';
+  return button;
+}
+
+function minimizeCoordinateBoard(
+  board: any,
+  initialBBox: number[],
+  boardId: string,
+  onResize: () => void,
+  anchorBBox: number[]
+): void {
+  if (!board || !board.containerObj || board.__coordMinimized === true) return;
+  board.__coordMinimizedBBox = isValidBBox(anchorBBox)
+    ? anchorBBox.slice()
+    : getSafeBBox(board, initialBBox);
+  board.__coordMinimized = true;
+  board.__manualWidth = COORDINATE_BOARD_MIN_WIDTH;
+  board.__manualHeight = COORDINATE_BOARD_MIN_HEIGHT;
+  board.__coordSizeMode = 'manual';
+  ensureCoordinateRestoreButton(board, initialBBox, boardId, onResize);
+  applyCoordinateBoardMinimizedAppearance(board);
+  saveBoardState(board, boardId, initialBBox);
+}
+
 function styleResizeHandle(handle: HTMLElement, accentCol: string): void {
   handle.style.position = 'absolute';
   handle.style.right = '0';
@@ -837,6 +1035,7 @@ export function ensureResizeHandle(
 
   const col = getAccentColor();
   styleResizeHandle(handle, col);
+  ensureCoordinateRestoreButton(board, initialBBox, boardId, onResize);
 
   if (resizeDragState.has(handle)) return; // already bound
   resizeDragState.set(handle, null);
@@ -865,10 +1064,27 @@ export function ensureResizeHandle(
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
 
-    const minWidth = Math.min(260, drag.startW, getConstrainedAncestorWidth(board.containerObj));
-    const minHeight = Math.min(220, drag.startH, maxBoardHeight());
-    const mw = Math.max(minWidth, clampWidth(board, drag.startW + dx));
-    const mh = Math.max(minHeight, clampHeight(drag.startH + dy));
+    const availableWidth = getConstrainedAncestorWidth(board.containerObj);
+    const availableHeight = maxBoardHeight();
+    const requestedWidth = clampWidth(board, drag.startW + dx);
+    const requestedHeight = clampHeight(drag.startH + dy);
+    const canShowMinimum = availableWidth >= COORDINATE_BOARD_MIN_WIDTH &&
+      availableHeight >= COORDINATE_BOARD_MIN_HEIGHT;
+    if (canShowMinimum && (
+      requestedWidth < COORDINATE_BOARD_MIN_WIDTH ||
+      requestedHeight < COORDINATE_BOARD_MIN_HEIGHT
+    )) {
+      resizeDragState.set(handle!, null);
+      try { handle!.releasePointerCapture(e.pointerId); } catch (err) {}
+      try { document.body.style.userSelect = ''; } catch (err) {}
+      minimizeCoordinateBoard(board, initialBBox, boardId, onResize, drag.anchorBBox);
+      return;
+    }
+
+    const minWidth = Math.min(COORDINATE_BOARD_MIN_WIDTH, drag.startW, availableWidth);
+    const minHeight = Math.min(COORDINATE_BOARD_MIN_HEIGHT, drag.startH, availableHeight);
+    const mw = Math.max(minWidth, requestedWidth);
+    const mh = Math.max(minHeight, requestedHeight);
 
     // Store manual dimensions on the board so fitBoardSize can read them.
     board.__manualWidth  = mw;
@@ -905,6 +1121,10 @@ export function fitBoardSize(
   boardId: string
 ): void {
   if (!board || !board.containerObj) return;
+  if (board.__coordMinimized === true) {
+    applyCoordinateBoardMinimizedAppearance(board);
+    return;
+  }
 
   const manualWidth  = board.__manualWidth  ?? null;
   const manualHeight = board.__manualHeight ?? null;
@@ -946,6 +1166,8 @@ export function restoreSavedBoardState(
 
   const st = loadStoredBoardState(boardId);
   if (!st) return false;
+  board.__coordMinimized = st.minimized === true;
+  board.__coordMinimizedBBox = st.bbox.slice();
 
   if (st.sizeMode !== 'manual') {
     board.__manualWidth = null;
@@ -1014,9 +1236,20 @@ export function runExternalBootstraps(): void {
   call(window.__bootstrapTangentSectorObjects);
   call(window.__bootstrapFunctionAnalysisPoints);
   call(window.__bootstrapObjectAnalysisPoints);
-  call(window.__bootstrapPolygonMetricQuizzes);
+  call(window.__bootstrapPoint3D);
+  call(window.__bootstrapLinear3D);
+  call(window.__bootstrapPlane3D);
+  call(window.__bootstrapCircle3D);
+  call(window.__bootstrapSphere3D);
+  call(window.__bootstrapSolid3D);
+  call(window.__bootstrapTransformation3D);
+  call(window.__bootstrapCurveSurface3D);
+  call(window.__bootstrapIntersection3D);
+  call(window.__bootstrapAnalytic3D);
+  call(window.__bootstrapLocus3D);  call(window.__bootstrapPolygonMetricQuizzes);
   call(window.__bootstrapConstructionQuizzes);
   call(window.__bootstrapCombinedQuizzes);
+  call(window.__bootstrapConstructionQuiz3D);
   call(window.__syncCoordinateQuizBindings);
   call(window.__bootstrapRekonstruktion);
   call(window.__bootstrapRegression);
@@ -1024,6 +1257,12 @@ export function runExternalBootstraps(): void {
   // contract follows the order of macro markers in the course source.
   try { applyMacroCodeOrderLayers(); } catch (e) {}
   call(window.__bootstrapDGS);
+  // Some exported points bind to geometry that is created later in the first
+  // dependency pass. DGS restoration can also replace a macro-owned object.
+  // Rebind points and then reapply formats to the final live instances.
+  call(window.__bootstrapStaticPoints);
+  call(window.__bootstrapCreatePoints);
+  call(window.__bootstrapObjectFormats);
 }
 
 let externalBootstrapRAF = 0;
@@ -1121,6 +1360,10 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   window.__boards[cfg.id] = board;
   board.__coordBorderEnabled = cfg.border;
   const storedBoardState = loadStoredBoardState(cfg.id);
+  board.__coordMinimized = storedBoardState?.minimized === true;
+  board.__coordMinimizedBBox = storedBoardState && isValidBBox(storedBoardState.bbox)
+    ? storedBoardState.bbox.slice()
+    : initialBBox.slice();
   board.__manualWidth = null;
   board.__manualHeight = null;
   board.__coordSizeMode = cfg.width == null ? 'auto' : 'capped';
@@ -1149,6 +1392,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   const handleViewportWheel = function(event: WheelEvent): void {
     if (isBoardUiControl(event.target)) return;
     if (!board.__liaDgsFullscreenActive) markUserViewportIntent();
+    if (board.__liaSceneMode === '3d') return;
     // JSXGraph 1.11 listens to the legacy mousewheel event. Chrome sends a
     // standard wheel event here, so forward it through JSXGraph's own handler
     // to retain its cursor anchor, zoom limits and DGS axis-direction hooks.
@@ -1236,6 +1480,10 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
         const handle = board.containerObj.querySelector('.lia-jxg-resize-handle') as HTMLElement | null;
         if (handle) handle.remove();
       } catch (e) {}
+    }
+    if (board.__coordMinimized === true) {
+      ensureCoordinateRestoreButton(board, initialBBox, cfg.id, applyAppearance);
+      applyCoordinateBoardMinimizedAppearance(board);
     }
   }
 
@@ -1406,6 +1654,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   }, 400);
 
   board.__coordCleanup = function(): void {
+    try { disposeCoordinateView3D(board); } catch (e) {}
     cleanupViewportIntentListeners();
     try { window.clearInterval(themePoll); } catch (e) {}
     try {
@@ -1449,7 +1698,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
 // can then be split and evaluated as invalid JavaScript.
 export function initializeCoordinateBoard(jxgbox: HTMLElement, spec: string): any {
   const cfg = parseCoordSpec(spec);
-  if (cfg.staticMode) {
+  if (cfg.staticMode && cfg.mode === '2d') {
     return initializeStaticCoordinateBoard(jxgbox, cfg);
   }
 
@@ -1494,7 +1743,16 @@ export function initializeCoordinateBoard(jxgbox: HTMLElement, spec: string): an
     },
   });
 
+  board.__liaBoardId = cfg.id;
+  board.__liaBoardConfig = cfg;
+  board.__liaSceneMode = cfg.mode;
+  board.__liaSceneViewMode = cfg.mode;
   createBoardDecorations(board, cfg, getNeutralColor(), getAccentColor());
   wireBoard(board, cfg, initialBBox, initialRatio);
+  if (cfg.mode === '3d') {
+    const entry = ensureCoordinateView3D(board, cfg);
+    if (cfg.viewMode === '2d') setCoordinateViewMode(entry, '2d');
+  }
+  mountCoordinateView3DControls(board, jxgbox);
   return board;
 }
