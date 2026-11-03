@@ -2354,7 +2354,7 @@ const MENU_HEIGHT_PX = 50;
 const SIDE_MENU_WIDTH_PX = 190;
 const OBJECT_LIST_WIDTH_PX = 120;
 const MENU_TRANSITION_MS = 220;
-const DGS_STYLE_VERSION = '2026-10-12-1';
+const DGS_STYLE_VERSION = '2026-11-03-1';
 const DGS_SLIDER_DEFAULT_ANIMATION_SPEED = 1.5;
 const DGS_SLIDER_MIN_ANIMATION_SPEED = 0.25;
 const DGS_SLIDER_MAX_ANIMATION_SPEED = 10;
@@ -4066,7 +4066,9 @@ function ensureStyles(root: Document | ShadowRoot): void {
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      font-family: Georgia, 'Times New Roman', serif;
       font-size: 17.5px;
+      font-style: italic;
       line-height: 1;
       color: var(--lia-dgs-neutral-color, currentColor);
     }
@@ -20885,7 +20887,7 @@ function applyDgsToolAvailability(state: DgsState): void {
       const currentToolId = Number(parent.dataset.dgsCurrentToolId);
       if (!enabledEntries.some(([, id]) => id === currentToolId)) {
         const preferredToolId = Number(parent.dataset.dgsPreferredToolId);
-        const preferredEntry = entries.find(([, id]) => id === preferredToolId);
+        const preferredEntry = enabledEntries.find(([, id]) => id === preferredToolId);
         const [nextButton, nextId] = enabledEntries.length > 1 && preferredEntry
           ? preferredEntry
           : enabledEntries[0];
@@ -20903,18 +20905,41 @@ function applyDgsToolAvailability(state: DgsState): void {
   setLeaf(state.compassToolButton, DGS_TOOL_IDS.compass);
   setLeaf(state.fixedRadiusCompassToolButton, DGS_TOOL_IDS.compass);
   const formatVisible = setLeaf(state.formatButton, DGS_TOOL_IDS.formatCopy);
-  const pointVisible = setGroup(state.pointButton, [
-    [state.pointToolButton, DGS_TOOL_IDS.point],
-    [state.pointCoordinatesToolButton, DGS_TOOL_IDS.point]
-  ]);
-  const lineGroupVisible = setGroup(state.segmentButton, [
+  const spatialToolMode = state.board.__liaSceneMode === '3d';
+  if (!spatialToolMode) {
+    state.pointCoordinatesToolButton.hidden = true;
+    state.pointCoordinatesToolButton.disabled = true;
+    state.lineEquationToolButton.hidden = true;
+    state.lineEquationToolButton.disabled = true;
+    if (state.pointButton.dataset.dgsPointVariant === 'coordinates') {
+      const icon = state.pointToolButton.firstElementChild;
+      if (icon) state.pointButton.innerHTML = icon.outerHTML;
+      state.pointButton.dataset.dgsPointVariant = 'point';
+    }
+    if (state.segmentButton.dataset.dgsLineVariant === 'equation') {
+      const icon = state.lineToolButton.firstElementChild;
+      if (icon) state.segmentButton.innerHTML = icon.outerHTML;
+      state.segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.line);
+      state.segmentButton.dataset.dgsLineVariant = 'tool';
+    }
+  }
+  const pointVisible = setGroup(state.pointButton, spatialToolMode
+    ? [
+        [state.pointToolButton, DGS_TOOL_IDS.point],
+        [state.pointCoordinatesToolButton, DGS_TOOL_IDS.point]
+      ]
+    : [[state.pointToolButton, DGS_TOOL_IDS.point]]);
+  const lineGroupEntries: Array<[HTMLButtonElement, number]> = [
     [state.segmentToolButton, DGS_TOOL_IDS.segment],
     [state.rayToolButton, DGS_TOOL_IDS.ray],
     [state.lineToolButton, DGS_TOOL_IDS.line],
-    [state.lineEquationToolButton, DGS_TOOL_IDS.line],
     [state.vectorToolButton, DGS_TOOL_IDS.vector],
     [state.arcToolButton, DGS_TOOL_IDS.arc]
-  ]);
+  ];
+  if (spatialToolMode) {
+    lineGroupEntries.splice(3, 0, [state.lineEquationToolButton, DGS_TOOL_IDS.line]);
+  }
+  const lineGroupVisible = setGroup(state.segmentButton, lineGroupEntries);
   const relationGroupVisible = setGroup(state.orthogonalButton, [
     [state.orthogonalToolButton, DGS_TOOL_IDS.orthogonal],
     [state.parallelToolButton, DGS_TOOL_IDS.parallel],
@@ -20926,7 +20951,7 @@ function applyDgsToolAvailability(state: DgsState): void {
     [state.dilatePointToolButton, DGS_TOOL_IDS.dilatePoint],
     ...state.spatialTransformToolButtons.map(entry => [entry.button, entry.id] as [HTMLButtonElement, number])
   ]);
-  const spatialShapeMode = state.board.__liaSceneMode === '3d';
+  const spatialShapeMode = spatialToolMode;
   state.polygonButton.dataset.dgsPreferredToolId = String(spatialShapeMode
     ? DGS_TOOL_IDS.planeThreePoints
     : DGS_TOOL_IDS.polygon);
@@ -23317,7 +23342,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   sceneModeDivider.setAttribute('aria-hidden', 'true');
   menuBar.appendChild(sceneModeDivider);
 
-  const pointIcon = '<span class=lia-dgs-point-symbol aria-hidden=true><svg viewBox=0,0,8,8><path class=lia-dgs-cross d=M2,2l4,4M6,2L2,6></path></svg><span class=lia-dgs-point-label>\\(A\\)</span></span>';
+  const pointIcon = '<span class=lia-dgs-point-symbol aria-hidden=true><svg viewBox=0,0,8,8><path class=lia-dgs-cross d=M2,2l4,4M6,2L2,6></path></svg><span class=lia-dgs-point-label>A</span></span>';
   const pointCoordinatesIcon = '<svg viewBox=0,0,24,24 aria-hidden=true><path class=lia-dgs-cross d=M10.5,10.5l3,3M13.5,10.5l-3,3></path><path class=lia-dgs-reference d=M4,20H20M4,20V4></path><path d=M12,12L18,8></path><circle cx=18 cy=8 r=1.5></circle></svg>';
   const pointButton = document.createElement('button');
   pointButton.type = 'button';
@@ -23328,7 +23353,9 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   pointButton.setAttribute('aria-expanded', 'false');
   pointButton.title = text.setPoint;
   pointButton.innerHTML = pointIcon;
-  pointButton.innerHTML = '<span class="lia-dgs-point-symbol" aria-hidden="true"><svg viewBox="0 0 8 8"><path class="lia-dgs-cross" d="M2 2l4 4M6 2L2 6"></path></svg><span class="lia-dgs-point-label">\\(A\\)</span></span>';
+  pointButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.point);
+  pointButton.dataset.dgsPreferredToolId = String(DGS_TOOL_IDS.point);
+  pointButton.dataset.dgsPointVariant = 'point';
   pointButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(pointButton);
 
@@ -23366,6 +23393,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   segmentButton.setAttribute('aria-expanded', 'false');
   segmentButton.title = geometryLanguage === 'de' ? 'Linienwerkzeuge' : 'Line tools';
   segmentButton.innerHTML = segmentIcon;
+  segmentButton.dataset.dgsLineVariant = 'tool';
   segmentButton.addEventListener('pointerdown', (evt) => evt.stopPropagation());
   menuBar.appendChild(segmentButton);
 
@@ -23913,6 +23941,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   const flyoutSubmenus = [
     constructionColorMenu,
     compassSubmenu,
+    pointSubmenu,
     geometrySubmenu,
     relationSubmenu,
     shapeSubmenu,
@@ -25727,6 +25756,10 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
   pointButton.addEventListener('click', (evt) => {
     evt.preventDefault();
     evt.stopPropagation();
+    if (pointButton.dataset.dgsSingleToolId) {
+      pointToolButton.click();
+      return;
+    }
     setPointSubmenuOpen(state, !state.pointSubmenuOpen);
   });
 
@@ -25734,6 +25767,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     pointButton.innerHTML = pointIcon;
+    pointButton.dataset.dgsPointVariant = 'point';
     setPointSubmenuOpen(state, false);
     setDgsEquationDialogOpen(state, null, false);
     setActiveTool(state, state.activeTool === 'point' ? '' : 'point');
@@ -25743,6 +25777,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.preventDefault();
     evt.stopPropagation();
     pointButton.innerHTML = pointCoordinatesIcon;
+    pointButton.dataset.dgsPointVariant = 'coordinates';
     setPointSubmenuOpen(state, false);
     setDgsEquationDialogOpen(state, 'point', true);
   });
@@ -25773,6 +25808,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = segmentIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.segment);
+    segmentButton.dataset.dgsLineVariant = 'tool';
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'segment' ? '' : 'segment');
   });
@@ -25782,6 +25818,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = rayIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.ray);
+    segmentButton.dataset.dgsLineVariant = 'tool';
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'ray' ? '' : 'ray');
   });
@@ -25791,6 +25828,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = lineIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.line);
+    segmentButton.dataset.dgsLineVariant = 'tool';
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'line' ? '' : 'line');
   });
@@ -25800,6 +25838,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = lineEquationIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.line);
+    segmentButton.dataset.dgsLineVariant = 'equation';
     setGeometrySubmenuOpen(state, false);
     setDgsEquationDialogOpen(state, 'line', true);
   });
@@ -25809,6 +25848,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = vectorIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.vector);
+    segmentButton.dataset.dgsLineVariant = 'tool';
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'vector' ? '' : 'vector');
   });
@@ -25818,6 +25858,7 @@ function setupDGS(uid: string, spec: string, languageCode?: string): void {
     evt.stopPropagation();
     segmentButton.innerHTML = arcIcon;
     segmentButton.dataset.dgsCurrentToolId = String(DGS_TOOL_IDS.arc);
+    segmentButton.dataset.dgsLineVariant = 'tool';
     setGeometrySubmenuOpen(state, false);
     setActiveTool(state, state.activeTool === 'arc' ? '' : 'arc');
   });

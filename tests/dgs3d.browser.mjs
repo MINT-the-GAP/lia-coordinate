@@ -175,6 +175,12 @@ try {
       optionTexts:options.map(button=>button.textContent),optionPositions:options.map(button=>{const r=button.getBoundingClientRect();return {top:r.top,bottom:r.bottom}}),
       active:options.filter(button=>button.getAttribute('aria-pressed')==='true').map(button=>button.dataset.mode)};
     trigger.click();
+    const topMenu=c.querySelector('.lia-dgs-top-menu'),pointButton=c.querySelector('.lia-dgs-point-button');
+    pointButton.click();
+    const pointMenu=c.querySelector('.lia-dgs-point-submenu'),pointMenuRect=pointMenu.getBoundingClientRect(),topMenuRect=topMenu.getBoundingClientRect();
+    const pointFlyout={open:pointMenu.dataset.open,parentIsClip:pointMenu.parentElement===topMenu.parentElement,
+      visibleBelowToolbar:Math.max(0,Math.min(pointMenuRect.bottom,c.getBoundingClientRect().bottom)-Math.max(pointMenuRect.top,topMenuRect.bottom))};
+    pointButton.click();
     const shapeGroups=[
       ['.lia-dgs-polygon-button','Ebenen und Flächen',5],
       ['.lia-dgs-round2d-button','Kreise im Raum',2],
@@ -228,7 +234,7 @@ try {
       .map(selector=>({selector,left:c.querySelector(selector)?.getBoundingClientRect().left||0}));
     return {topParent:!!modeControl.closest('.lia-dgs-top-menu-end'),singleControl:c.querySelectorAll('.lia-coordinate-3d-controls').length,
       bottomControls:c.querySelectorAll(':scope > .lia-coordinate-3d-controls:not([hidden])').length,
-      modeControlInfo,shapeGroups,shapeSelections,relation,toolbarOrder,advanced,exclusiveAfterRelation,exclusiveAfterMode,
+      modeControlInfo,pointFlyout,shapeGroups,shapeSelections,relation,toolbarOrder,advanced,exclusiveAfterRelation,exclusiveAfterMode,
       subtitlesHidden:[...c.querySelectorAll('.lia-dgs-sectioned-submenu .lia-dgs-tool-section-title')]
         .every(title=>getComputedStyle(title).display==='none'),
       separator:(()=>{const style=getComputedStyle(modeControl,'::before'),reference=getComputedStyle(c.querySelector('.lia-dgs-tools-divider'));
@@ -276,6 +282,9 @@ try {
   assert.ok(ui.modeControlInfo.optionPositions[1].top>=ui.modeControlInfo.optionPositions[0].bottom,JSON.stringify(ui));
   assert.deepEqual(ui.modeControlInfo.active,['3d'],JSON.stringify(ui));
   assert.ok(ui.modeControlInfo.menuSize[0]<=70&&ui.modeControlInfo.menuSize[1]<=120,JSON.stringify(ui));
+  assert.equal(ui.pointFlyout.open,'1',JSON.stringify(ui));
+  assert.equal(ui.pointFlyout.parentIsClip,true,JSON.stringify(ui));
+  assert.ok(ui.pointFlyout.visibleBelowToolbar>40,JSON.stringify(ui));
   assert.deepEqual(ui.shapeGroups.map(group=>group.sections.map(section=>section.title)),
     [['Ebenen und Flächen'],['Kreise im Raum'],['3D-Prismen'],['3D-Spitzkörper'],['3D-Kugeln']],JSON.stringify(ui));
   assert.deepEqual(ui.shapeGroups.map(group=>group.sections[0]?.items),[5,2,4,3,3],JSON.stringify(ui));
@@ -369,10 +378,21 @@ try {
     const board=__boards.raum,c=board.containerObj,entry=__coordinateViews3d.raum;
     const sampleLabel=[...entry.points].map(point=>point.label).find(Boolean);
     c.querySelector('[aria-label="2D-Ansicht"]').click();
+    const pointButton=c.querySelector('.lia-dgs-point-button'),pointSubmenu=c.querySelector('.lia-dgs-point-submenu');
+    pointButton.click();
+    const pointDirect={pressed:pointButton.getAttribute('aria-pressed'),submenuOpen:pointSubmenu.dataset.open};
+    pointButton.click();
+    const relationButton=c.querySelector('.lia-dgs-orthogonal-button'),orthogonalTool=c.querySelector('.lia-dgs-relation-submenu .lia-dgs-geometry-tool[data-dgs-tool-id="410"]');
     const twoD={scene:board.__liaSceneMode,view:entry.viewMode,axis:board.defaultAxes.x.visProp.visible,
       spatialLabelHidden:!sampleLabel||sampleLabel.visProp.visible===false,
       ticks:board.defaultAxes.x.defaultTicks.visProp.visible,grid:board.__liaMajorGrid.visProp.visible,
       decorations:[...entry.decorations].every(object=>(object.element2D||object).visProp.visible===false),
+      point:{popup:pointButton.getAttribute('aria-haspopup'),label:pointButton.textContent.trim(),direct:pointDirect,
+        coordinatesHidden:c.querySelector('.lia-dgs-point-submenu .lia-dgs-geometry-tool:nth-child(2)').hidden},
+      lineEquationHidden:[...c.querySelectorAll('.lia-dgs-geometry-submenu .lia-dgs-geometry-tool')]
+        .find(button=>/Geradengleichung|Line from equation/.test(button.textContent)).hidden,
+      relation:{tool:relationButton.dataset.dgsCurrentToolId,
+        oldIcon:relationButton.querySelector('svg').innerHTML===orthogonalTool.querySelector('svg').innerHTML},
       relationSections:[...c.querySelectorAll('.lia-dgs-relation-submenu .lia-dgs-tool-section')].map(section=>section.hidden),
       planarHeadingsHidden:[c.querySelector('.lia-dgs-relation-submenu .lia-dgs-tool-section:first-child'),c.querySelector('.lia-dgs-shape-submenu .lia-dgs-tool-section[data-dgs-shape-group=angular2d]')].every(section=>getComputedStyle(section.querySelector('.lia-dgs-tool-section-title')).display==='none'&&getComputedStyle(section).borderTopWidth==='0px'),
       shapeParents:['.lia-dgs-polygon-button','.lia-dgs-round2d-button','.lia-dgs-plane3d-button','.lia-dgs-round3d-button','.lia-dgs-solid3d-button'].map(selector=>c.querySelector(selector).hidden),
@@ -383,6 +403,9 @@ try {
       spatialLabelVisible:!sampleLabel||sampleLabel.visProp.visible!==false,
       ticks:board.defaultAxes.x.defaultTicks.visProp.visible,grid:board.__liaMajorGrid.visProp.visible,
       decorations:[...entry.decorations].every(object=>(object.element2D||object).visProp.visible===true),
+      newEquationTools:[c.querySelector('.lia-dgs-point-submenu .lia-dgs-geometry-tool:nth-child(2)').hidden,
+        [...c.querySelectorAll('.lia-dgs-geometry-submenu .lia-dgs-geometry-tool')]
+          .find(button=>/Geradengleichung|Line from equation/.test(button.textContent)).hidden],
       relationSections:[...c.querySelectorAll('.lia-dgs-relation-submenu .lia-dgs-tool-section')].map(section=>section.hidden),
       shapeParents:['.lia-dgs-polygon-button','.lia-dgs-round2d-button','.lia-dgs-plane3d-button','.lia-dgs-round3d-button','.lia-dgs-solid3d-button'].map(selector=>c.querySelector(selector).hidden),
       advanced:c.querySelector('.lia-dgs-segment6-button').hidden,
@@ -390,9 +413,11 @@ try {
     return {twoD,threeD,errors:profileErrors.slice()};
   })()`);
   assert.deepEqual(realModeSwitch.twoD,{scene:'2d',view:'2d',axis:true,spatialLabelHidden:true,ticks:true,grid:true,decorations:true,
-    relationSections:[false,true],planarHeadingsHidden:true,shapeParents:[false,false,true,true,true],advanced:true,pressed:['true','false']});
+    point:{popup:'false',label:'A',direct:{pressed:'true',submenuOpen:'0'},coordinatesHidden:true},lineEquationHidden:true,
+    relation:{tool:'410',oldIcon:true},relationSections:[false,true],planarHeadingsHidden:true,
+    shapeParents:[false,false,true,true,true],advanced:true,pressed:['true','false']});
   assert.deepEqual(realModeSwitch.threeD,{scene:'3d',view:'3d',axis:false,spatialLabelVisible:true,ticks:false,grid:false,decorations:true,
-    relationSections:[true,false],shapeParents:[false,false,false,false,false],advanced:false,pressed:['false','true']});
+    newEquationTools:[false,false],relationSections:[true,false],shapeParents:[false,false,false,false,false],advanced:false,pressed:['false','true']});
   assert.deepEqual(realModeSwitch.errors,[]);
 
 
