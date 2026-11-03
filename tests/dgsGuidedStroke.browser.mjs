@@ -192,6 +192,7 @@ try {
     assert.equal(redone.points, after.points);
     console.log('PASS edge', edge, 'endpoints, style, undo/redo');
   }
+
   // Rotate via the real instrument handle, then draw a vertical segment.
   await evaluate('regression.drawButton.click()');
   const rotation = await evaluate(`(() => {
@@ -266,6 +267,36 @@ try {
   assert.equal(quizResults.polygonsAfter, quizResults.polygonsBefore);
   assert.deepEqual(quizResults.errors, []);
   console.log('PASS segment-only triangle: construction, combined metrics, undo/redo, no polygon created');
+
+  const recognitionTarget = await evaluate(`(() => {
+    const segment=__boards.A1.objectsList.find(o=>o.__liaDgsSegment&&!o.__liaDgsPolygonBorder&&
+      Math.abs(o.point2.X()-o.point1.X())>1e-8);
+    if(!segment)throw Error('recognizable drawn segment missing');
+    regression.toolsMenu.querySelector('[data-action=recognize]').click();
+    const x=(segment.point1.X()+segment.point2.X())/2,y=(segment.point1.Y()+segment.point2.Y())/2;
+    const rect=regression.drawLayer.getBoundingClientRect(),board=__boards.A1;
+    const localX=board.origin.scrCoords[1]+x*board.unitX,localY=board.origin.scrCoords[2]-y*board.unitY;
+    return {point:[rect.left+localX*rect.width/regression.drawLayer.clientWidth,
+      rect.top+localY*rect.height/regression.drawLayer.clientHeight],
+      model:{m:(segment.point2.Y()-segment.point1.Y())/(segment.point2.X()-segment.point1.X()),
+        n:segment.point1.Y()-segment.point1.X()*(segment.point2.Y()-segment.point1.Y())/(segment.point2.X()-segment.point1.X())}};
+  })()`);
+  await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:recognitionTarget.point[0],y:recognitionTarget.point[1]});
+  await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,
+    x:recognitionTarget.point[0],y:recognitionTarget.point[1],clickCount:1});
+  await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',buttons:0,
+    x:recognitionTarget.point[0],y:recognitionTarget.point[1],clickCount:1});
+  await sleep(180);
+  const recognizedSegment = await evaluate(`(()=>{const entry=regression.analysisEntries.at(-1);return {
+    count:regression.analysisEntries.length,title:entry?.title,m:entry?.model?.m,n:entry?.model?.n,
+    strokes:regression.strokes.length,errors:profileErrors.slice()}})()`);
+  assert.equal(recognizedSegment.count,1,JSON.stringify(recognizedSegment));
+  assert.equal(recognizedSegment.title,'Zeichnung erkannt');
+  assert.ok(Math.abs(recognizedSegment.m-recognitionTarget.model.m)<1e-8,JSON.stringify(recognizedSegment));
+  assert.ok(Math.abs(recognizedSegment.n-recognitionTarget.model.n)<1e-8,JSON.stringify(recognizedSegment));
+  assert.equal(recognizedSegment.strokes,freehandAfter.strokes);
+  assert.deepEqual(recognizedSegment.errors,[]);
+  console.log('PASS drawn DGS segment recognized as linear function');
 
 } finally {
   if (send && ws?.readyState === WebSocket.OPEN) {

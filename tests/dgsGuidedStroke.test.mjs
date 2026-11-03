@@ -15,6 +15,7 @@ function implementation(path, names) {
   }).outputText;
 }
 const drawing = implementation('../src/subsystems/regression.ts', [
+  'strokeDistanceSq', 'readDgsSegmentEndpoint', 'findRecognizableDgsSegmentStroke',
   'localToUser', 'userToLocal', 'closestPointOnDrawSegment', 'pointStrictlyInsideTriangle',
   'constrainDrawPointToSetSquare', 'firstSetSquareBoundaryIntersection', 'findSegmentIntersection',
   'orientation', 'pointOnSegment', 'convertSetSquareStrokeToSegment', 'bindDrawLayer'
@@ -118,6 +119,41 @@ test('failed construction retains the original stroke and normal undo', () => {
   f.event('pointerup', 150, -5);
   assert.equal(f.state.strokes.length, 1);
   assert.equal(f.state.undoActions[0].type, 'add');
+});
+
+test('drawing recognition samples a learner-created DGS segment as an isolated line', () => {
+  const f = fixture();
+  const endpoint = (x, y) => ({ X: () => x, Y: () => y });
+  const drawable = {
+    __liaDgsSegment: true,
+    __liaDgsSegmentStrokeWidth: 5,
+    point1: endpoint(-2, 1),
+    point2: endpoint(4, 7)
+  };
+  const macro = { ...drawable, __liaDgsMacroManaged: true };
+  const polygonSide = { ...drawable, __liaDgsPolygonBorder: true };
+  f.state.board.objectsList = [drawable, macro, polygonSide];
+
+  const localMiddle = f.context.userToLocal(f.state, { x: 1, y: 4 });
+  const stroke = f.context.findRecognizableDgsSegmentStroke(f.state, localMiddle, 18);
+  assert.deepEqual(stroke && {
+    color: stroke.color,
+    width: stroke.width,
+    points: Array.from(stroke.points, point => ({ x: point.x, y: point.y }))
+  }, {
+    color: '',
+    width: 5,
+    points: [{ x: -2, y: 1 }, { x: 4, y: 7 }]
+  });
+
+  f.state.board.objectsList = [macro, polygonSide];
+  assert.equal(f.context.findRecognizableDgsSegmentStroke(f.state, localMiddle, 18), null);
+  f.state.board.objectsList = [{
+    __liaDgsSegment: true,
+    point1: endpoint(1, -2),
+    point2: endpoint(1, 6)
+  }];
+  assert.equal(f.context.findRecognizableDgsSegmentStroke(f.state, localMiddle, 18), null);
 });
 
 const construction = implementation('../src/subsystems/dgs.ts', ['__createDgsDrawnSegment']);

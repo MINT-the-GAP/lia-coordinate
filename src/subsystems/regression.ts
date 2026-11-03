@@ -1585,6 +1585,55 @@ function hitStrokeIndex(state: RegressionState, point: DrawPoint, thresholdPx: n
 
   return -1;
 }
+
+function readDgsSegmentEndpoint(point: any): DrawPoint | null {
+  if (!point) return null;
+  try {
+    const x = typeof point.X === 'function' ? Number(point.X()) : NaN;
+    const y = typeof point.Y === 'function' ? Number(point.Y()) : NaN;
+    return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function findRecognizableDgsSegmentStroke(
+  state: RegressionState,
+  localPoint: DrawPoint,
+  thresholdPx: number
+): DrawStroke | null {
+  const board = state && state.board;
+  if (!board || board.__liaSceneMode === '3d' || !Array.isArray(board.objectsList)) return null;
+  const thresholdSq = thresholdPx * thresholdPx;
+  let bestDistanceSq = Infinity;
+  let best: DrawStroke | null = null;
+
+  for (let index = board.objectsList.length - 1; index >= 0; index -= 1) {
+    const object = board.objectsList[index];
+    if (!object || object.__liaDgsSegment !== true || object.__liaDgsPolygonBorder ||
+        object.__liaDgsMacroManaged || object.__liaDgsShowObject === false) continue;
+    try {
+      if (object.visPropCalc?.visible === false || object.visProp?.visible === false) continue;
+    } catch (e) {}
+
+    const points = Array.isArray(object.__liaDgsLinearPoints) ? object.__liaDgsLinearPoints : [];
+    const start = readDgsSegmentEndpoint(object.point1 || points[0]);
+    const end = readDgsSegmentEndpoint(object.point2 || points[1]);
+    if (!start || !end || Math.abs(end.x - start.x) <= 1e-10) continue;
+    const distanceSq = strokeDistanceSq(
+      localPoint,
+      userToLocal(state, start),
+      userToLocal(state, end)
+    );
+    if (distanceSq > thresholdSq || distanceSq >= bestDistanceSq) continue;
+    bestDistanceSq = distanceSq;
+    // An empty color keeps this segment isolated from same-colored freehand
+    // strokes when it is passed through the ordinary drawing recognizer.
+    best = { color: '', width: Number(object.__liaDgsSegmentStrokeWidth || 3), points: [start, end] };
+  }
+
+  return best;
+}
 function pointOnSegment(a: DrawPoint, b: DrawPoint, c: DrawPoint): boolean {
   return Math.min(a.x, b.x) <= c.x && c.x <= Math.max(a.x, b.x) &&
          Math.min(a.y, b.y) <= c.y && c.y <= Math.max(a.y, b.y);
@@ -7492,7 +7541,12 @@ function bindDrawLayer(state: RegressionState): void {
 
     if (state.activeTool === 'regression' && state.regressionMode === 'recognize') {
       const strokeIndex = hitStrokeIndex(state, point, 18);
-      const stroke = strokeIndex >= 0 ? state.strokes[strokeIndex] : (state.currentStroke || state.strokes[state.strokes.length - 1] || null);
+      const segmentStroke = strokeIndex < 0
+        ? findRecognizableDgsSegmentStroke(state, point, 18)
+        : null;
+      const stroke = strokeIndex >= 0
+        ? state.strokes[strokeIndex]
+        : (segmentStroke || state.currentStroke || state.strokes[state.strokes.length - 1] || null);
       if (stroke) {
         recognizeLinearFromStroke(state, stroke);
         updateButtonStates(state);
