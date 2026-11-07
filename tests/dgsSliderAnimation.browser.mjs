@@ -100,6 +100,39 @@ try {
     await sleep(50);
   }
 
+  const sliderPoint = await evaluate(`(() => {
+    const slider=__sliderEntries['slider-animation'].slider,node=slider.rendNode,rect=node.getBoundingClientRect();
+    window.__sliderArrowLeak=0;
+    window.__sliderArrowLeakHandler=event=>{if(event.key.startsWith('Arrow'))window.__sliderArrowLeak+=1};
+    document.addEventListener('keydown',window.__sliderArrowLeakHandler);
+    return [rect.left+rect.width/2,rect.top+rect.height/2];
+  })()`);
+  await send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', x: sliderPoint[0], y: sliderPoint[1], button: 'left', buttons: 1, clickCount: 1
+  });
+  await send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', x: sliderPoint[0], y: sliderPoint[1], button: 'left', buttons: 0, clickCount: 1
+  });
+  const sendArrow = async (key, code, virtualKeyCode) => {
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKeyCode, nativeVirtualKeyCode: virtualKeyCode
+    });
+    await send('Input.dispatchKeyEvent', {
+      type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKeyCode, nativeVirtualKeyCode: virtualKeyCode
+    });
+  };
+  await sendArrow('ArrowLeft', 'ArrowLeft', 37);
+  const keyboardDecrement = await evaluate(`(() => {
+    const slider=__sliderEntries['slider-animation'].slider,node=slider.rendNode;
+    return {value:slider.Value(),focused:node.getRootNode().activeElement===node,role:node.getAttribute('role'),
+      now:node.getAttribute('aria-valuenow'),leaked:window.__sliderArrowLeak};
+  })()`);
+  assert.deepEqual(keyboardDecrement, { value: 1, focused: true, role: 'slider', now: '1', leaked: 0 });
+  await sendArrow('ArrowRight', 'ArrowRight', 39);
+  assert.equal(await evaluate(`__sliderEntries['slider-animation'].slider.Value()`), 2);
+  await evaluate(`document.removeEventListener('keydown',window.__sliderArrowLeakHandler);
+    delete window.__sliderArrowLeakHandler;delete window.__sliderArrowLeak`);
+
   const menu = await evaluate(`(() => {
     const c=__boards.A1.containerObj,p=screenPoint(-1,3);
     c.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2,clientX:p[0],clientY:p[1]}));
@@ -159,6 +192,32 @@ try {
       hidden:slider?.__liaDgsSliderAnimationButton?.hidden,errors:profileErrors.slice()};
   })()`);
   assert.deepEqual(imported, { ok: true, speed: 2.5, show: false, hidden: true, errors: [] });
+
+  await evaluate(`(() => {
+    const marker=document.createElement('span');marker.id='schar-spec-keyboard';
+    marker.dataset.spec='f;x;a*x;A1;term=0;params=[a=1]';
+    document.querySelector('.flex-child').append(marker);__bootstrapScharen();
+  })()`);
+  for (let index = 0; index < 40; index += 1) {
+    if (await evaluate(`!!(__scharEntries['schar-keyboard']?.slidersByParam?.a)`)) break;
+    await sleep(50);
+  }
+  await evaluate(`(() => {
+    const input=__scharEntries['schar-keyboard'].slidersByParam.a;
+    window.__rangeArrowLeak=0;
+    window.__rangeArrowLeakHandler=event=>{if(event.key.startsWith('Arrow'))window.__rangeArrowLeak+=1};
+    document.addEventListener('keydown',window.__rangeArrowLeakHandler);input.focus();
+  })()`);
+  await sendArrow('ArrowRight', 'ArrowRight', 39);
+  const rangeKeyboard = await evaluate(`(() => {
+    const entry=__scharEntries['schar-keyboard'],input=entry.slidersByParam.a;
+    return {value:Number(input.value),model:entry.values.a,
+      focused:input.getRootNode().activeElement===input,leaked:window.__rangeArrowLeak};
+  })()`);
+  assert.deepEqual(rangeKeyboard, { value: 1.1, model: 1.1, focused: true, leaked: 0 });
+  await evaluate(`document.removeEventListener('keydown',window.__rangeArrowLeakHandler);
+    delete window.__rangeArrowLeakHandler;delete window.__rangeArrowLeak`);
+
   console.log('PASS slider play/pause, speed, looping, visibility, and export/import');
 } finally {
   for (const request of pending.values()) clearTimeout(request.timer);

@@ -43,6 +43,7 @@ import { init as initCombinedQuiz } from './subsystems/combinedQuiz';
 import { init as initConstructionQuiz3D } from './subsystems/constructionQuiz3d';
 import { init as initRegression } from './subsystems/regression';
 import { init as initDGS } from './subsystems/dgs';
+import { init as initFullscreenNote } from './subsystems/fullscreenNote';
 import {
   initMacroCodeOrderLayers,
   scheduleMacroCodeOrderLayers,
@@ -184,6 +185,7 @@ export function ensureDynamicRuntime(): void {
   initConstructionQuiz3D();
   initRegression();
   initDGS();
+  initFullscreenNote();
   scheduleMacroCodeOrderLayers();
 }
 

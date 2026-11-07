@@ -579,6 +579,17 @@ script:   ./dist/index.js
 </script>
 @end
 
+@Vollbildnotiz: @FullscreenNote_(@uid,`@0`,```@1```,de)
+@FullscreenNote: @FullscreenNote_(@uid,`@0`,```@1```,en)
+
+@FullscreenNote_
+<div id="fullscreen-note-start-@0" class="lia-fullscreen-note-start" data-board-id="@1" data-language="@3" hidden aria-hidden="true"></div>
+
+@2
+
+<div id="fullscreen-note-end-@0" class="lia-fullscreen-note-end" hidden aria-hidden="true"></div>
+@end
+
 @Compass: @DGSInstrument_(@uid,`@0`,compass,@language)
 @Zirkel: @DGSInstrument_(@uid,`@0`,compass,@language)
 @SetSquare: @DGSInstrument_(@uid,`@0`,set-square,@language)
@@ -2424,6 +2435,52 @@ the Export button with:
 @DGS(`ex_dgs`)
 
 
+## `@Vollbildnotiz` / `@FullscreenNote`
+
+Renders the supplied LiaScript content normally in the course and mirrors the same rendered
+Markdown into a collapsible task bar at the bottom of the associated coordinate board while that
+board is in DGS fullscreen mode. The bar opens automatically on every fullscreen entry, can be
+collapsed to a compact control integrated into the separator line, and scrolls independently when its content reaches 35 percent of
+the viewport height. It is not shown on the embedded board.
+
+The first parameter is the board id. The second parameter is ordinary LiaScript content and may
+contain emphasis, lists, line breaks, links, and TeX/MathJax. Wrap inline content in single
+backticks so commas and formatting remain one macro argument. LiaScript requires triple backticks
+for a parameter that spans multiple lines. Multiple notes for the same board are stacked in
+document order; notes for different boards remain independent. The macro uses an existing DGS
+fullscreen control, so combine it with `@DGS`, `@Regression`, or `@Schar`.
+
+``` markdown
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_fullscreen_note`)
+@DGS(`ex_fullscreen_note`)
+@Vollbildnotiz(`ex_fullscreen_note`,`**Aufgabe:** Zeichne die Funktion $f(x)=2x+1$.`)
+```
+
+For a multi-line task, use:
+
+```` markdown
+@Vollbildnotiz(`ex_fullscreen_note`,```**Aufgabe:** Zeichne die Funktion $f(x)=2x+1$.
+
+- Markiere den Ordinatenabschnitt.
+- Nutze anschließend die Steigung.```)
+````
+
+---
+
+@Vollbildnotiz(`ex_fullscreen_note`,`**Aufgabe:** Zeichne die Funktion $f(x)=2x+1$.`)
+@CoordinateSystem(`xmin=-5;xmax=5;ymin=-4;ymax=4;width=800;id=ex_fullscreen_note`)
+@DGS(`ex_fullscreen_note`)
+
+The public aliases preserve triple-backtick parameters while forwarding multi-line content. The
+fullscreen mirror follows the complete marker-bounded LiaScript render range rather than only
+adjacent paragraphs, which preserves multi-paragraph lists and re-rendered slide content.
+LiaScript formula components are recreated with their public formula state instead of cloning
+their Shadow DOM, and entries are visually ordered without reconnecting those components. Shared
+board-UI filtering prevents pointer, wheel, and keyboard input in the bar from reaching JSXGraph or
+course navigation. These details keep MathJax/KaTeX output, repeated rendering, slide changes, and
+board replacement free of duplicate bars or stale component state.
+
+
 ## `@UmfangQuiz` / `@PerimeterQuiz` and `@FlaecheQuiz` / `@AreaQuiz`
 
           --{{0}}--
@@ -3380,6 +3437,17 @@ script:   https://cdn.jsdelivr.net/gh/MINT-the-GAP/lia-coordinate@main/dist/inde
 
 @Slider_
 <span id="slider-spec-@0" data-spec="@1" data-language="@2" style="display:none;"></span>
+@end
+
+@Vollbildnotiz: @FullscreenNote_(@uid,`@0`,```@1```,de)
+@FullscreenNote: @FullscreenNote_(@uid,`@0`,```@1```,en)
+
+@FullscreenNote_
+<div id="fullscreen-note-start-@0" class="lia-fullscreen-note-start" data-board-id="@1" data-language="@3" hidden aria-hidden="true"></div>
+
+@2
+
+<div id="fullscreen-note-end-@0" class="lia-fullscreen-note-end" hidden aria-hidden="true"></div>
 @end
 
 @PlotInput: @PlotInput_(@uid,`@0`)

@@ -8,6 +8,7 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { setAttributeIfChanged } from '../shared/domUpdates';
 import { boardPanelsStartTop, relayoutBoardPanels, observeBoardPanelLayout } from '../shared/boardPanelLayout';
+import { shieldRangeSliderArrowKeys } from '../shared/boardUiEvents';
 import {
   keepFunctionGraphLabelOnOneLine,
   positionFunctionGraphLabel
@@ -1842,6 +1843,7 @@ function createPanel(entry: ScharEntry): HTMLElement {
     slider.max = String(safeBase + 5);
     slider.step = '0.1';
     slider.value = String(entry.values[name]);
+    shieldRangeSliderArrowKeys(slider);
     slider.style.setProperty('margin-left', '12px', 'important');
     slider.style.setProperty('margin-right', '10px', 'important');
     slider.style.setProperty('transform', 'none', 'important');

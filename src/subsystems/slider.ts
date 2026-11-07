@@ -15,6 +15,7 @@ import { scheduleBootstrap } from '../shared/bootstrap';
 import { getBoardObjects } from '../shared/boardObjects';
 import { trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
 import { formatNumber } from '../shared/format';
+import { bindJsxGraphSliderArrowKeys } from '../shared/boardUiEvents';
 
 interface SliderConfig {
   boardId: string;
@@ -489,6 +490,7 @@ export function init(): void {
         try { if (part && typeof part.on === 'function') part.on('drag', update); } catch (e) {}
         try { if (part && typeof part.on === 'function') part.on('up', update); } catch (e) {}
       });
+      bindJsxGraphSliderArrowKeys(slider, update);
       applySliderVisual(slider, cfg);
       window.__sliderEntries[key] = {
         uid: String(uid),

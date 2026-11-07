@@ -7,6 +7,7 @@ import { resolveUiLanguage } from '../shared/language';
 import { applyMacroCodeOrderLayers } from '../shared/macroLayer';
 import { parseCoordSpec } from '../shared/coordSpec';
 import type { BoardConfig } from '../shared/coordSpec';
+import { eventTargetsBoardUi } from '../shared/boardUiEvents';
 import { disposeCoordinateView3D, ensureCoordinateView3D, mountCoordinateView3DControls, setCoordinateViewMode } from './view3d';
 import {
   disposeInteractiveCoordinateBoardsInContainer,
@@ -1381,16 +1382,14 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
   // export until the learner actually pans or zooms the board.
   let userViewportPointerActive = false;
   let userViewportIntentUntil = 0;
-  const isBoardUiControl = function(target: EventTarget | null): boolean {
-    const element = target && (target as Element);
-    if (!element || typeof element.closest !== 'function') return false;
-    return !!element.closest('button,input,select,textarea,.lia-dgs-menu-bar,.lia-dgs-side-menu,.lia-dgs-object-list-panel');
+  const isBoardUiControl = function(event: Event): boolean {
+    return eventTargetsBoardUi(event);
   };
   const markUserViewportIntent = function(duration = 800): void {
     userViewportIntentUntil = Math.max(userViewportIntentUntil, Date.now() + duration);
   };
   const handleViewportWheel = function(event: WheelEvent): void {
-    if (isBoardUiControl(event.target)) return;
+    if (isBoardUiControl(event)) return;
     if (!board.__liaDgsFullscreenActive) markUserViewportIntent();
     if (board.__liaSceneMode === '3d') return;
     // JSXGraph 1.11 listens to the legacy mousewheel event. Chrome sends a
@@ -1408,7 +1407,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     } catch (e) {}
   };
   const handleViewportPointerDown = function(event: PointerEvent): void {
-    if (isBoardUiControl(event.target)) return;
+    if (isBoardUiControl(event)) return;
     userViewportPointerActive = true;
     if (!board.__liaDgsFullscreenActive) markUserViewportIntent(1200);
   };
@@ -1426,7 +1425,7 @@ export function wireBoard(board: any, cfg: BoardConfig, initialBBox: number[], i
     if (!isCurrentBoard()) cleanupViewportIntentListeners();
   };
   const handleViewportKeyDown = function(event: KeyboardEvent): void {
-    if (!board.__liaDgsFullscreenActive && !isBoardUiControl(event.target)) markUserViewportIntent();
+    if (!board.__liaDgsFullscreenActive && !isBoardUiControl(event)) markUserViewportIntent();
   };
   const cleanupViewportIntentListeners = function(): void {
     try { board.containerObj.removeEventListener('wheel', handleViewportWheel, true); } catch (e) {}

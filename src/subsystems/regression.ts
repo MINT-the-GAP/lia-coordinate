@@ -4,7 +4,7 @@
 import { unquote } from '../shared/parser';
 import { scheduleBootstrap } from '../shared/bootstrap';
 import { observeBoardPanelLayout, relayoutBoardPanels } from '../shared/boardPanelLayout';
-import { eventTargetsBoardUi } from '../shared/boardUiEvents';
+import { eventTargetsBoardUi, shieldRangeSliderArrowKeys } from '../shared/boardUiEvents';
 
 type DrawPoint = { x: number; y: number };
 type DrawStroke = { color: string; width: number; points: DrawPoint[] };
@@ -884,6 +884,7 @@ function typesetOverlayMath(node: HTMLElement): Promise<void> {
 }
 
 function stopPanelEventPropagation(el: HTMLElement): void {
+  shieldRangeSliderArrowKeys(el as HTMLInputElement);
   ['pointerdown', 'pointermove', 'pointerup', 'mousedown', 'mousemove', 'mouseup', 'touchstart', 'touchmove', 'touchend', 'click', 'wheel']
     .forEach((evtName) => {
       el.addEventListener(evtName, (evt) => evt.stopPropagation(), true);

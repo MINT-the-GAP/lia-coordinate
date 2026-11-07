@@ -7,7 +7,7 @@ import { mountDgsAxisDrag3D, type DgsAxisDrag3DController } from './dgsAxisDrag3
 import { mountDgsSolidDraw3D, type DgsSolidDraw3DController } from './dgsSolidDraw3d';
 import { createRegularSolid3DRecipe, type RegularSolid3DRecipe, type RegularSolid3DKind } from '../shared/regularSolid3d';
 import { createRegularSurface3DRecipe, type RegularSurface3DRecipe, type RegularSurface3DKind } from '../shared/regularSurface3d';
-import { eventTargetsBoardUi } from '../shared/boardUiEvents';
+import { bindJsxGraphSliderArrowKeys, eventTargetsBoardUi } from '../shared/boardUiEvents';
 import { setAttributeIfChanged, setStyleIfChanged } from '../shared/domUpdates';
 import { onCourseLanguageChange, resolveUiLanguage } from '../shared/language';
 import { getDgsUpdateTargets, trackDgsUpdateObject } from '../shared/dgsUpdateTargets';
@@ -1175,6 +1175,7 @@ function renderDgsFullscreenButton(state: DgsState): void {
   state.fullscreenButton.setAttribute('aria-pressed', active ? 'true' : 'false');
   state.fullscreenButton.setAttribute('aria-label', label);
   state.fullscreenButton.title = label;
+  try { (window as any).__refreshFullscreenNotes?.(state.boardId); } catch (e) {}
 }
 
 function readDgsBoundingBox(state: DgsState): number[] | null {
@@ -12157,6 +12158,7 @@ function createDgsSlider(
       try { part?.on('drag', () => persistDgsConstruction(state, false)); } catch (e) {}
       try { part?.on('up', () => persistDgsConstruction(state, true)); } catch (e) {}
     });
+    bindJsxGraphSliderArrowKeys(slider, () => update(true));
     refreshDgsObjectLabel(slider);
     refreshDgsSliderTypography(state);
     ensureDgsSliderAnimationControl(state, slider);

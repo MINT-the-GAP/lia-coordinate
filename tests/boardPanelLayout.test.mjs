@@ -18,7 +18,12 @@ registerHooks({
 });
 
 const { boardPanelsStartTop, relayoutBoardPanels, observeBoardPanelLayout } = await import('../src/shared/boardPanelLayout.ts');
-const { eventTargetsBoardUi } = await import('../src/shared/boardUiEvents.ts');
+const {
+  bindJsxGraphSliderArrowKeys,
+  eventTargetsBoardUi,
+  shieldRangeSliderArrowKeys,
+  sliderValueFromArrowKey
+} = await import('../src/shared/boardUiEvents.ts');
 
 function fixture(scale = 1, viewportTop = 200, scrollTop = 0) {
   let nextFrame = 1;
@@ -160,6 +165,65 @@ test('board capture recognizes range controls across retargeted Shadow DOM paths
   assert.equal(eventTargetsBoardUi({ target: host, composedPath: () => [range, panel, host] }), true);
   assert.equal(eventTargetsBoardUi({ target: { closest: () => panel } }), true);
   assert.equal(eventTargetsBoardUi({ target: host, composedPath: () => [host] }), false);
+});
+
+test('range slider arrow keys keep their native action and stop before course navigation', () => {
+  const listeners = new Map();
+  const input = {
+    type: 'range',
+    addEventListener(type, listener) { listeners.set(type, listener); }
+  };
+  shieldRangeSliderArrowKeys(input);
+  let stopped = 0;
+  listeners.get('keydown')({ key: 'ArrowRight', stopPropagation() { stopped++; } });
+  listeners.get('keyup')({ key: 'ArrowRight', stopPropagation() { stopped++; } });
+  listeners.get('keydown')({ key: 'Enter', stopPropagation() { stopped++; } });
+  assert.equal(stopped, 2);
+  assert.equal(input.__liaSliderKeyboardShielded, true);
+});
+
+test('JSXGraph slider arrows snap, clamp, update and never bubble to course navigation', () => {
+  const listeners = new Map(), attributes = new Map(), jsxListeners = new Map();
+  const node = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    setAttribute(name, value) { attributes.set(name, value); },
+    focus() { this.focused = true; }
+  };
+  let value = 0.2, updates = 0;
+  const slider = {
+    rendNode: node,
+    __liaDgsSliderMinimum: -0.2,
+    __liaDgsSliderMaximum: 0.4,
+    __liaDgsSliderStep: 0.1,
+    __liaDgsSliderName: 'a',
+    Value: () => value,
+    setValue(next) { value = next; },
+    on(type, listener) { jsxListeners.set(type, listener); },
+    baseline: { on() {} }, highline: { on() {} }
+  };
+  bindJsxGraphSliderArrowKeys(slider, () => { updates++; });
+  jsxListeners.get('down')();
+  assert.equal(node.focused, true);
+  assert.equal(attributes.get('role'), 'slider');
+  assert.equal(attributes.get('aria-valuenow'), '0.2');
+  let prevented = 0, stopped = 0;
+  const press = key => listeners.get('keydown')({ key,
+    preventDefault() { prevented++; }, stopPropagation() { stopped++; } });
+  press('ArrowRight');
+  assert.equal(value, 0.3);
+  press('ArrowUp');
+  press('ArrowRight');
+  assert.equal(value, 0.4, 'maximum is clamped');
+  press('ArrowDown');
+  assert.equal(value, 0.3);
+  press('Enter');
+  assert.equal(value, 0.3, 'unrelated keys are ignored');
+  assert.equal(updates, 4);
+  assert.equal(prevented, 4);
+  assert.equal(stopped, 4);
+  assert.equal(attributes.get('aria-valuenow'), '0.3');
+  assert.equal(sliderValueFromArrowKey('ArrowLeft', -0.2, -0.2, 0.4, 0.1), -0.2);
+  assert.equal(sliderValueFromArrowKey('Escape', 0, -1, 1, 0.1), null);
 });
 
 test('a widened Schar panel fits the local board width after DynFlex resizes', () => {
