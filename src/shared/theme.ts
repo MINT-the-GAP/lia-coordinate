@@ -2,12 +2,31 @@
 // Deduplicates themeDoc/themeWin/neutralColor/accentColor/themeSignature
 // and the __liaThemeSync listener registry previously copy-pasted into 5 IIFEs.
 
-export function themeDoc(): Document {
-  return (window.parent && window.parent.document) ? window.parent.document : document;
+export function themeWin(
+  start: Window & typeof globalThis = window as Window & typeof globalThis
+): Window & typeof globalThis {
+  let current = start;
+
+  for (;;) {
+    let parent: Window & typeof globalThis;
+    try {
+      parent = current.parent as Window & typeof globalThis;
+      if (!parent || parent === current) return current;
+
+      // Keep the LiaScript frame unless the parent is same-origin.
+      void parent.document;
+      if (typeof parent.getComputedStyle !== 'function') return current;
+    } catch (e) {
+      return current;
+    }
+    current = parent;
+  }
 }
 
-export function themeWin(): Window & typeof globalThis {
-  return (window.parent && (window.parent as any).getComputedStyle) ? window.parent as any : window;
+export function themeDoc(
+  start: Window & typeof globalThis = window as Window & typeof globalThis
+): Document {
+  return themeWin(start).document || document;
 }
 
 export function getNeutralColor(): string {
@@ -64,7 +83,7 @@ export function themeSignature(): string {
     const fg = win.getComputedStyle(body).color;
     return [String(rootCls), String(bodyCls), String(bg), String(fg)].join('|');
   } catch (e) {
-    return String(Date.now());
+    return 'unavailable';
   }
 }
 

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { onCourseLanguageChange, resolveUiLanguage } from '../src/shared/language.ts';
+import { themeDoc, themeWin } from '../src/shared/theme.ts';
 
 function fixture(run) {
   const saved = Object.fromEntries(['window', 'document'].map(key =>
@@ -51,6 +52,43 @@ test('missing language or an inaccessible parent safely falls back to English', 
   assert.equal(resolveUiLanguage(null), 'en');
   assert.equal(resolveUiLanguage(null, 'de'), 'de');
 }));
+
+test('theme lookup stays in the LiaScript frame for a cross-origin parent', () => {
+  const localDocument = {};
+  const foreignParent = {};
+  const localWindow = {
+    document: localDocument,
+    getComputedStyle() {},
+    parent: foreignParent
+  };
+  Object.defineProperty(foreignParent, 'document', {
+    get() {
+      const error = new Error('Blocked by the same-origin policy');
+      error.name = 'SecurityError';
+      throw error;
+    }
+  });
+
+  assert.equal(themeWin(localWindow), localWindow);
+  assert.equal(themeDoc(localWindow), localDocument);
+});
+
+test('theme lookup may use a readable same-origin ancestor', () => {
+  const parentDocument = {};
+  const parentWindow = {
+    document: parentDocument,
+    getComputedStyle() {}
+  };
+  parentWindow.parent = parentWindow;
+  const localWindow = {
+    document: {},
+    getComputedStyle() {},
+    parent: parentWindow
+  };
+
+  assert.equal(themeWin(localWindow), parentWindow);
+  assert.equal(themeDoc(localWindow), parentDocument);
+});
 
 
 test('course language changes share one document observer and notify each subsystem once', () => fixture(({ root }) => {
