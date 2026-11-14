@@ -3,6 +3,7 @@
   "version": "0.0.5",
   "description": "LiaScript plugin for interactive coordinate systems using JSXGraph",
   "scripts": {
+    "test:dgs:reset:browser": "npm run build:full && node tests/dgsInitialReset.browser.mjs",
     "build": "npm run build:full && npm run build:static",
     "build:full": "parcel build src/index.ts --dist-dir dist --no-scope-hoist",
     "build:static": "parcel build src/static.ts --dist-dir dist --no-scope-hoist",

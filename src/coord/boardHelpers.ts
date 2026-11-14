@@ -337,8 +337,10 @@ function fitDimensionsWithinBounds(
   const width = Math.max(1, Number(preferredWidth) || 1);
   const height = Math.max(1, Number(preferredHeight) || 1);
   const maxWidth = Math.max(1, getConstrainedAncestorWidth(board.containerObj));
-  const maxHeight = Math.max(1, maxBoardHeight());
-  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  // A manually chosen height may extend beyond the viewport; the surrounding
+  // document can scroll vertically. Only the available content width requires
+  // proportional downscaling so the board does not overflow its column.
+  const scale = Math.min(1, maxWidth / width);
 
   return {
     width: roundPx(width * scale),
@@ -1068,7 +1070,7 @@ export function ensureResizeHandle(
     const availableWidth = getConstrainedAncestorWidth(board.containerObj);
     const availableHeight = maxBoardHeight();
     const requestedWidth = clampWidth(board, drag.startW + dx);
-    const requestedHeight = clampHeight(drag.startH + dy);
+    const requestedHeight = roundPx(drag.startH + dy);
     const canShowMinimum = availableWidth >= COORDINATE_BOARD_MIN_WIDTH &&
       availableHeight >= COORDINATE_BOARD_MIN_HEIGHT;
     if (canShowMinimum && (
@@ -1092,7 +1094,7 @@ export function ensureResizeHandle(
     board.__manualHeight = mh;
     board.__coordSizeMode = 'manual';
 
-    applyBoardSize(board, mw, mh, false, drag.anchorBBox, initialBBox, boardId);
+    applyBoardSize(board, mw, mh, false, drag.anchorBBox, initialBBox, boardId, false);
     onResize();
     styleResizeHandle(handle!, getAccentColor());
   });
@@ -1153,7 +1155,8 @@ export function fitBoardSize(
       false,
       getResponsiveResizeAnchor(board, initialBBox),
       initialBBox,
-      boardId
+      boardId,
+      false
     );
   }
 }
@@ -1200,7 +1203,7 @@ export function restoreSavedBoardState(
 // Bootstrap coordination
 // ---------------------------------------------------------------------------
 
-export function runExternalBootstraps(): void {
+export function runExternalBootstraps(options: { skipDgs?: boolean } = {}): void {
   function call(fn: (() => void) | undefined): void {
     if (typeof fn !== 'function') return;
     try { fn(); } catch (e) {}
@@ -1257,7 +1260,7 @@ export function runExternalBootstraps(): void {
   // Bootstrap order is dependency based, while the author-facing stacking
   // contract follows the order of macro markers in the course source.
   try { applyMacroCodeOrderLayers(); } catch (e) {}
-  call(window.__bootstrapDGS);
+  if (!options.skipDgs) call(window.__bootstrapDGS);
   // Some exported points bind to geometry that is created later in the first
   // dependency pass. DGS restoration can also replace a macro-owned object.
   // Rebind points and then reapply formats to the final live instances.

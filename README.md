@@ -677,6 +677,8 @@ user coordinates and therefore continue to follow board panning and zooming.
 
           --{{0}}--
 Renders an interactive JSXGraph coordinate plane. Supports panning, zooming, and a resize handle.
+The resize handle keeps the board within the available content width, while its
+manual height can grow beyond the viewport and remains available through vertical scrolling.
 
 Parameters (semicolon-separated key=value pairs):
 - `xmin`, `xmax`, `ymin`, `ymax` â€” axis bounds (defaults: -4, 4, -3, 3)
@@ -2277,7 +2279,9 @@ usable at the same time. The horizontal axis shortens by the combined visible pa
 the open top menu moves both panels downward. Course-authored macro objects remain editable and
 deletable like other DGS objects. The object-list footer provides a two-step **Restore initial state**
 action that removes learner-created objects and recreates even deleted macro-managed objects and
-axis labels from the course-authored state. The
+axis labels from the course-authored state. The reset also recreates function-graph helper objects
+without retaining stale graphs or formatting, and restores Schar parameters to their authored values while preserving
+the panel's presentation choices. The
 Export button in the same footer opens a centered export dialog. It creates a fresh eight-character board id and emits the current board
 as reusable LiaScript macros for all DGS objects that already have standalone macros: coordinate
 system, axis labels, points, coordinate text, parameter sliders, function graphs, Scharen (including

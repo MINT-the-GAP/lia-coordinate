@@ -88,6 +88,16 @@ export function init(): void {
     try { if (window.__scheduleFunctionAnalysisPointsForBoard) window.__scheduleFunctionAnalysisPointsForBoard(entry.boardId); } catch (e) {}
   }
 
+  window.__disposePlotFunctionsForBoard = function(boardId, expectedBoard) {
+    const normalizedBoardId = String(boardId || '');
+    Object.keys(window.__plotFunctionEntries || {}).forEach(function(key) {
+      const entry = window.__plotFunctionEntries[key];
+      if (!entry || String(entry.boardId || '') !== normalizedBoardId) return;
+      if (expectedBoard && entry.graph && entry.graph.board !== expectedBoard) return;
+      removeExisting(String(entry.uid || key.replace(/^plot-/, '')));
+    });
+  };
+
   function sameBoard(a, b) {
     try {
       return !!a && !!b && a === b;

@@ -27,7 +27,11 @@ const {
 } = await import('../src/subsystems/schar.ts');
 const {
   computeResizeBBox,
+  ensureResizeHandle,
+  fitBoardSize,
   getResponsiveResizeAnchor,
+  prepareBoardContainer,
+  runExternalBootstraps,
   syncBoardRendererSize
 } = await import('../src/coord/boardHelpers.ts');
 const {
@@ -120,6 +124,170 @@ test('renderer follows the real flex size and restores the logical viewport afte
   ]);
   assert.deepEqual(shrunk, { width: 400, height: 600, bbox: [-4, 6, 4, -6] });
   assert.deepEqual(grown, { width: 800, height: 600, bbox: initialBBox });
+});
+
+test('manual resize height can exceed the viewport cap and survives responsive refits', () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const windowListeners = new Map();
+
+  class FakeElement {
+    constructor(tagName = 'div') {
+      this.tagName = tagName.toUpperCase();
+      this.nodeType = 1;
+      this.style = {};
+      this.dataset = {};
+      this.children = [];
+      this.parentElement = null;
+      this.className = '';
+      this.clientWidth = 0;
+      this.clientHeight = 0;
+      this.listeners = new Map();
+      this.attributes = new Map();
+      this.classList = {
+        add: name => {
+          const names = new Set(this.className.split(/\s+/).filter(Boolean));
+          names.add(name);
+          this.className = [...names].join(' ');
+        },
+        remove: name => {
+          this.className = this.className.split(/\s+/).filter(value => value && value !== name).join(' ');
+        }
+      };
+    }
+    get offsetWidth() { return parseFloat(this.style.width) || this.clientWidth || 0; }
+    get offsetHeight() { return parseFloat(this.style.height) || this.clientHeight || 0; }
+    addEventListener(type, listener) {
+      if (!this.listeners.has(type)) this.listeners.set(type, []);
+      this.listeners.get(type).push(listener);
+    }
+    appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+    append(...children) { children.forEach(child => this.appendChild(child)); }
+    replaceChildren(...children) { this.children = []; this.append(...children); }
+    querySelector(selector) {
+      const className = selector.match(/\.([a-z0-9-]+)/i)?.[1];
+      return className
+        ? this.children.find(child => child.className.split(/\s+/).includes(className)) || null
+        : null;
+    }
+    closest() { return null; }
+    getRootNode() { return globalThis.document; }
+    setAttribute(name, value) { this.attributes.set(name, String(value)); }
+    getAttribute(name) { return this.attributes.get(name) ?? null; }
+    setPointerCapture() {}
+    releasePointerCapture() {}
+  }
+
+  const documentElement = new FakeElement('html');
+  documentElement.clientWidth = 1200;
+  documentElement.lang = 'en';
+  const body = new FakeElement('body');
+  body.clientWidth = 1200;
+  body.parentElement = documentElement;
+  const document = {
+    documentElement,
+    body,
+    querySelector() { return null; },
+    createElement: tagName => new FakeElement(tagName),
+    createElementNS: (_namespace, tagName) => new FakeElement(tagName)
+  };
+  const window = {
+    document,
+    innerWidth: 1200,
+    innerHeight: 600,
+    __coordBoardStates: {},
+    addEventListener(type, listener) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(listener);
+    },
+    getComputedStyle(element) {
+      return {
+        display: 'block',
+        paddingLeft: '0', paddingRight: '0',
+        borderLeftWidth: '0', borderRightWidth: '0',
+        backgroundColor: element === body ? 'rgb(255, 255, 255)' : 'transparent',
+        borderTopColor: 'transparent', color: '#000'
+      };
+    }
+  };
+  window.parent = window;
+  globalThis.document = document;
+  globalThis.window = window;
+
+  try {
+    const parent = new FakeElement();
+    parent.clientWidth = 1200;
+    parent.parentElement = body;
+    const container = new FakeElement();
+    container.parentElement = parent;
+    container.style.width = '500px';
+    container.style.height = '400px';
+    const initialBBox = [-4, 3, 4, -3];
+    const resizeCalls = [];
+    const board = {
+      containerObj: container,
+      __coordExportBBox: initialBBox.slice(),
+      getBoundingBox: () => initialBBox.slice(),
+      resizeContainer(width, height) { resizeCalls.push([width, height]); },
+      setBoundingBox() {},
+      update() {}
+    };
+
+    ensureResizeHandle(board, initialBBox, 'manual-height', () => {});
+    const handle = container.querySelector('.lia-jxg-resize-handle');
+    handle.listeners.get('pointerdown')[0]({
+      pointerId: 7,
+      clientX: 0,
+      clientY: 0,
+      preventDefault() {},
+      stopPropagation() {}
+    });
+    windowListeners.get('pointermove')[0]({ pointerId: 7, clientX: 0, clientY: 1600 });
+
+    assert.equal(board.__manualHeight, 2000);
+    assert.equal(container.style.height, '2000px');
+    assert.deepEqual(resizeCalls.at(-1), [500, 2000]);
+    assert.equal(window.__coordBoardStates['manual-height'].height, 2000);
+
+    fitBoardSize(board, initialBBox, null, 0.75, 'manual-height');
+    assert.equal(container.style.height, '2000px', 'ordinary refits retain the manual height');
+
+    parent.clientWidth = 250;
+    fitBoardSize(board, initialBBox, null, 0.75, 'manual-height');
+    assert.equal(container.style.width, '250px');
+    assert.equal(container.style.height, '1000px', 'narrow layouts scale proportionally without a viewport-height cap');
+
+    parent.clientWidth = 1200;
+    const restored = new FakeElement();
+    restored.parentElement = parent;
+    prepareBoardContainer(restored, null, 0.75, window.__coordBoardStates['manual-height']);
+    assert.equal(restored.style.width, '500px');
+    assert.equal(restored.style.height, '2000px', 'saved manual height is restored without capping');
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test('macro-only bootstrap suppresses a nested DGS restore', () => {
+  const previousWindow = globalThis.window;
+  const calls = [];
+  globalThis.window = {
+    __bootstrapPlotFunctions: () => calls.push('plot'),
+    __bootstrapScharen: () => calls.push('schar'),
+    __bootstrapDGS: () => calls.push('dgs')
+  };
+  try {
+    runExternalBootstraps({ skipDgs: true });
+    assert.deepEqual(calls, ['plot', 'schar']);
+    runExternalBootstraps();
+    assert.deepEqual(calls, ['plot', 'schar', 'plot', 'schar', 'dgs']);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
 });
 
 test('the bundled coordinate-system initializer leaves resizing to the template', () => {

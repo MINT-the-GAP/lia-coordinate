@@ -2321,6 +2321,7 @@ const dgsInitialConstructionStates: Record<string, any> =
 let dgsPersistentIdCounter = 0;
 const dgsHistoryApplying = new Set<string>();
 const dgsPendingHistoryBefore: Record<string, any> = {};
+let dgsInitialMacroBootstrapDepth = 0;
 
 function cloneDgsSnapshot(value: any): any {
   try { return JSON.parse(JSON.stringify(value)); } catch (e) { return { records: [] }; }
@@ -2502,6 +2503,11 @@ const DGS_MACRO_ENTRY_REGISTRIES = [
 
 function discardDgsMacroRegistryEntries(boardId: string, board: any): void {
   const root = window as any;
+  // Registry deletion alone cannot dispose helper objects that are invisible
+  // to the DGS snapshot (for example PlotFunction label anchors or a Schar's
+  // drag hit-graph). Let those subsystems tear down their complete entry first.
+  try { window.__disposePlotFunctionsForBoard?.(boardId, board); } catch (e) {}
+  try { window.__prepareScharInitialRestore?.(boardId, board); } catch (e) {}
   DGS_MACRO_ENTRY_REGISTRIES.forEach((registryName) => {
     const entries = root[registryName];
     if (!entries || typeof entries !== 'object') return;
@@ -17577,15 +17583,16 @@ function applyDgsObjectOpacity(object: any): void {
 
   // A conic is a curve, so opacity applies to its stroke as well as isolated points.
   const opaqueOutline = outlinedShape && !isDgsConic3D(object);
+  const strokeOnlyCurve = isDgsFunctionTarget(object) || isDgsLocus(object);
   const renderedObject = getDgsRenderedObject(object);
   getDgsRenderedParts(object).forEach((part) => {
     try {
       part.setAttribute?.({
       ...(object.__liaPoint3D ? { visible } : {}),
       strokeOpacity: opaqueOutline && visible ? (isDgsSphere3D(object) ? Math.max(0.25, opacity) : 1) : opacity,
-      fillOpacity: opacity,
+      fillOpacity: strokeOnlyCurve ? 0 : opacity,
       highlightStrokeOpacity: opaqueOutline && visible ? (isDgsSphere3D(object) ? Math.max(0.25, opacity) : 1) : opacity,
-      highlightFillOpacity: opacity
+      highlightFillOpacity: strokeOnlyCurve ? 0 : opacity
       });
     } catch (e) {}
   });
@@ -18945,6 +18952,7 @@ function restoreDgsInitialConstruction(state: DgsState): void {
     return;
   }
 
+  cancelScheduledDgsConstructionRestore(state);
   persistDgsConstruction(state, true);
   const before = cloneDgsSnapshot(dgsConstructionStates[state.boardId] || {
     boardId: state.boardId,
@@ -18959,18 +18967,25 @@ function restoreDgsInitialConstruction(state: DgsState): void {
 
   let needsDeferredRestore = true;
   for (let attempt = 0; attempt < 3 && needsDeferredRestore; attempt += 1) {
-    runExternalBootstraps();
-    assignDgsMacroPersistentIds(state.boardId, state.board);
+    // Publish the reset target before macro bootstraps run. This is a second
+    // guard against a subsystem invoking DGS setup while it recreates itself:
+    // such a setup must never see and resurrect the just-cleared learner state.
     dgsConstructionStates[state.boardId] = cloneDgsSnapshot(initial);
+    dgsInitialMacroBootstrapDepth += 1;
+    try {
+      runExternalBootstraps({ skipDgs: true });
+    } finally {
+      dgsInitialMacroBootstrapDepth -= 1;
+    }
+    assignDgsMacroPersistentIds(state.boardId, state.board);
     needsDeferredRestore = restoreDgsConstruction(state);
   }
   dgsConstructionStates[state.boardId] = before;
-  dgsHistoryApplying.add(state.boardId);
-  try {
-    persistDgsConstruction(state, true);
-  } finally {
-    dgsHistoryApplying.delete(state.boardId);
-  }
+  // Persist the clean live construction before any deferred subsystem retry
+  // can run. dgsPendingHistoryBefore already points at `before`, so this also
+  // records the reset as one ordinary before/after history operation.
+  persistDgsConstruction(state, true);
+  if (needsDeferredRestore) scheduleDgsConstructionRestore(state);
   resetDgsInitialRestoreButton(state);
   refreshDgsObjectList(state, true);
 }
@@ -28499,6 +28514,7 @@ window.__setupDGSInstrument = function (
 };
 
 export function bootstrapDGS(): void {
+  if (dgsInitialMacroBootstrapDepth > 0) return;
   const anchors = document.querySelectorAll('[id^="dgs-ui-"][data-spec]:not([data-lia-static-claimed])');
 
   anchors.forEach((el: Element) => {

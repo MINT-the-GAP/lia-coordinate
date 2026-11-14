@@ -184,7 +184,20 @@ test('the object list restores the authored macro state with two-click confirmat
   );
   assert.match(
     source,
-    /runExternalBootstraps\(\);[\s\S]*?dgsConstructionStates\[state\.boardId\] = cloneDgsSnapshot\(initial\);[\s\S]*?restoreDgsConstruction\(state\);/
+    /cancelScheduledDgsConstructionRestore\(state\);[\s\S]*?dgsConstructionStates\[state\.boardId\] = cloneDgsSnapshot\(initial\);[\s\S]*?dgsInitialMacroBootstrapDepth \+= 1;[\s\S]*?runExternalBootstraps\(\{ skipDgs: true \}\);[\s\S]*?dgsInitialMacroBootstrapDepth -= 1;[\s\S]*?restoreDgsConstruction\(state\);/
+  );
+  assert.match(source, /export function bootstrapDGS\(\): void \{\s*if \(dgsInitialMacroBootstrapDepth > 0\) return;/);
+  assert.match(
+    source,
+    /function discardDgsMacroRegistryEntries[\s\S]*?__disposePlotFunctionsForBoard[\s\S]*?__prepareScharInitialRestore/
+  );
+  assert.match(
+    source,
+    /dgsConstructionStates\[state\.boardId\] = before;[\s\S]*?persistDgsConstruction\(state, true\);/
+  );
+  assert.doesNotMatch(
+    source,
+    /dgsConstructionStates\[state\.boardId\] = before;\s*dgsHistoryApplying\.add\(state\.boardId\)/
   );
   assert.match(
     source,
@@ -201,4 +214,13 @@ test('export restriction leaves initial-state restore available', async () => {
   );
   assert.match(source, /objectListFooter\.appendChild\(objectListResetButton\);/);
   assert.match(source, /state\.objectListResetButton\.tabIndex = open \? 0 : -1;/);
+});
+
+test('function and locus opacity remains stroke-only during restoration', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/subsystems/dgs.ts', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /const strokeOnlyCurve = isDgsFunctionTarget\(object\) \|\| isDgsLocus\(object\);[\s\S]*?fillOpacity: strokeOnlyCurve \? 0 : opacity[\s\S]*?highlightFillOpacity: strokeOnlyCurve \? 0 : opacity/
+  );
 });

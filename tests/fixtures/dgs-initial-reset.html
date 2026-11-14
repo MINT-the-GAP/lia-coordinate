@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang=de>
+<head>
+  <meta charset=utf-8>
+  <meta name=viewport content=width=device-width,initial-scale=1>
+  <title>DGS initial-state reset fixture</title>
+  <style>
+    body { margin: 16px; font-family: Arial, sans-serif; }
+    .board-host { width: 620px; margin-bottom: 24px; }
+    .jxgbox { position: relative; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <section class=board-host>
+    <lia-coordinate-board data-lia-coordinate-key=course-plot
+      data-spec=xmin=-6;xmax=6;ymin=-6;ymax=6;width=600;id=L1101A1></lia-coordinate-board>
+    <span id=axis-title-spec-course-plot data-spec=id=L1101A1;xlabel=$x$;ylabel=$y$ hidden></span>
+    <span id=plot-spec-course-plot data-spec=L1101A1;f;0.25*x^2+2;#00ffff hidden></span>
+    <div id=dgs-ui-course-plot data-spec=L1101A1;tools=[910;920;930];restrictions=[100] data-language=de></div>
+  </section>
+  <section class=board-host>
+    <lia-coordinate-board data-lia-coordinate-key=course-schar
+      data-spec=xmin=-3;xmax=5;ymin=-5;ymax=6;width=600;id=L1101A7></lia-coordinate-board>
+    <span id=axis-title-spec-course-schar data-spec=id=L1101A7;xlabel=$x$;ylabel=$y$ hidden></span>
+    <span id=schar-spec-course-schar data-spec=p;x;(x-1)^2-a;L1101A7;term=1;#00ffff hidden></span>
+    <div id=dgs-ui-course-schar data-spec=L1101A7;tools=[0];restrictions=[100] data-language=de></div>
+  </section>
+  <script>
+    window.profileErrors = [];
+    addEventListener('error', event => profileErrors.push(String(event.error?.stack || event.message)));
+    addEventListener('unhandledrejection', event => profileErrors.push(String(event.reason)));
+    window.MathJax = { chtml: { fontURL: '/assets/fonts' } };
+  </script>
+  <script src=/assets/mathjax.js></script>
+  <script src=/assets/jsxgraph-template.js></script>
+  <script src=/bundle.js></script>
+  <script>
+    window.profileReady = async () => {
+      for (let index = 0; index < 160; index += 1) {
+        const plot = window.__plotFunctionEntries?.['plot-course-plot'];
+        const schar = window.__scharEntries?.['schar-course-schar'];
+        const initialPlot = window.__dgsInitialConstructionStates?.L1101A1;
+        if (window.__boards?.L1101A1?.__liaDgsRestoreInitialState &&
+            window.__boards?.L1101A7?.__liaDgsRestoreInitialState &&
+            plot?.graph && plot?.anchor && plot?.label && schar?.graph &&
+            initialPlot?.records?.some(record => record.type === 'function' && record.macroKey)) return true;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      throw Error('Initial-reset fixture timeout: ' + JSON.stringify(profileErrors));
+    };
+  </script>
+</body>
+</html>

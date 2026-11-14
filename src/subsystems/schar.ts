@@ -1123,12 +1123,18 @@ function binom(n: number, k: number): number {
   return res;
 }
 
-function removeExisting(uid: string): void {
+type RemoveScharOptions = {
+  persistState?: boolean;
+  detachDgs?: boolean;
+  scheduleDgs?: boolean;
+};
+
+function removeExisting(uid: string, options: RemoveScharOptions = {}): void {
   const key = 'schar-' + uid;
   const prev = window.__scharEntries[key];
   if (!prev) return;
 
-  persistScharEntryState(prev);
+  if (options.persistState !== false) persistScharEntryState(prev);
   prev.stopLayout?.();
   prev.stopResize?.();
   prev.pendingTermMarkup = null;
@@ -1141,7 +1147,7 @@ function removeExisting(uid: string): void {
 
   // On a board replacement the DGS snapshot must survive for the new graph.
   // Removing a family on the live board also removes its dependent analyses.
-  if (prev.graph && prev.board === window.__boards?.[prev.boardId] &&
+  if (options.detachDgs !== false && prev.graph && prev.board === window.__boards?.[prev.boardId] &&
       prev.board.containerObj?.isConnected) {
     try { window.__detachDgsAnalysisFunctionTarget?.(prev.boardId, prev.graph); } catch (e) {}
   }
@@ -1163,7 +1169,7 @@ function removeExisting(uid: string): void {
   } catch (e) {}
 
   delete window.__scharEntries[key];
-  scheduleBootstrap(() => window.__bootstrapDGS?.());
+  if (options.scheduleDgs !== false) scheduleBootstrap(() => window.__bootstrapDGS?.());
 
   try {
     relayoutPanelsForBoard(prev.boardId, prev.board);
@@ -2021,6 +2027,29 @@ function scharMutationIsRelevant(record: MutationRecord): boolean {
       (entry.board.containerObj.getRootNode().host && node.contains(entry.board.containerObj.getRootNode().host))));
 }
 
+export function prepareScharInitialRestore(boardId: string, expectedBoard?: any): void {
+  const normalizedBoardId = String(boardId || '');
+  Object.keys(window.__scharEntries || {}).forEach((key) => {
+    const entry = window.__scharEntries[key] as ScharEntry | undefined;
+    if (!entry || String(entry.boardId || '') !== normalizedBoardId) return;
+    if (expectedBoard && entry.board !== expectedBoard) return;
+    const stateKey = getScharStateKey(entry.uid, entry.boardId);
+    const interfaceState = {
+      panelScale: Number(entry.panelScale || 1),
+      panelMinimized: !!entry.panelMinimized,
+      termVisible: !!entry.termVisible
+    };
+    removeExisting(entry.uid, {
+      persistState: false,
+      detachDgs: false,
+      scheduleDgs: false
+    });
+    // Keep presentation choices, but intentionally omit parameter values:
+    // the following bootstrap must recreate the authored initial family.
+    getScharStateStore()[stateKey] = interfaceState;
+  });
+}
+
 export function init(): void {
   if (window.__scharReady) {
     try {
@@ -2031,6 +2060,8 @@ export function init(): void {
 
   window.__scharReady = true;
   window.__scharEntries = window.__scharEntries || {};
+
+  window.__prepareScharInitialRestore = prepareScharInitialRestore;
 
   window.renderScharFromSpec = function (uid: string, spec: string, languageCode?: string): boolean {
     const cfg = parseScharSpec(spec);

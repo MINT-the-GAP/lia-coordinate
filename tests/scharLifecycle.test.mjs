@@ -18,7 +18,7 @@ registerHooks({
   }
 });
 globalThis.window = {};
-const { init, scharMutationIsRelevant, restoreScharEntryState, applyScharLanguage, buildScharTermMarkup } = await import('../src/subsystems/schar.ts');
+const { init, scharMutationIsRelevant, restoreScharEntryState, applyScharLanguage, buildScharTermMarkup, prepareScharInitialRestore } = await import('../src/subsystems/schar.ts');
 
 function element(id = '', children = []) {
   return {
@@ -121,6 +121,46 @@ test('saved values and panel scale survive restoration, including the original c
   assert.equal(entry.panelScale, 1.2); assert.equal(entry.panelMinimized, true); assert.equal(entry.termVisible, true);
   window.__liaScharStateStore['one::board'].panelScale = .55;
   restoreScharEntryState(entry); assert.equal(entry.panelScale, .55);
+});
+
+test('initial-state preparation disposes the complete Schar entry and drops only parameter values', () => {
+  const removed = [];
+  const panel = element('panel');
+  panel.parentNode = { removeChild(node) { removed.push(node); } };
+  const board = {
+    containerObj: { isConnected: true },
+    removeObject(object) { removed.push(object); }
+  };
+  const graph = { board };
+  const dragGraph = { board };
+  const graphLabel = { board };
+  const entry = {
+    uid: 'family', boardId: 'board', board, graph, dragGraph, graphLabel, panel,
+    values: { a: 4 }, panelScale: 1.2, panelMinimized: true, termVisible: true,
+    termEl: {}, stopLayout() {}, stopResize() {}, stopDrag() {}
+  };
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  try {
+    globalThis.window = { __boards: { board }, __scharEntries: { 'schar-family': entry }, __liaScharStateStore: {} };
+    globalThis.document = { getElementById: () => null, querySelectorAll: () => [], body: {} };
+    prepareScharInitialRestore('board', board);
+    assert.equal(window.__scharEntries['schar-family'], undefined);
+    assert.ok(removed.includes(graph));
+    assert.ok(removed.includes(dragGraph));
+    assert.ok(removed.includes(graphLabel));
+    assert.ok(removed.includes(panel));
+    assert.deepEqual(window.__liaScharStateStore['family::board'], {
+      panelScale: 1.2,
+      panelMinimized: true,
+      termVisible: true
+    });
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
 });
 
 function languageUi() {

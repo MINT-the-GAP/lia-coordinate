@@ -87,7 +87,7 @@ interface Window {
     applyAdaptiveTicks: (board: any) => void;
     updateStickyTickLabelPositions: (board: any) => void;
     ensureResizeHandle: (board: any, initialBBox: number[], boardId: string, onResize: () => void) => void;
-    runExternalBootstraps: () => void;
+    runExternalBootstraps: (options?: { skipDgs?: boolean }) => void;
     buildStickyAxes: (board: any, axisCol: string, visible?: boolean) => void;
     createGrid: (board: any, gridCol: string) => void;
     createBoardDecorations: (board: any, cfg: any, axisCol: string, gridCol: string) => void;
@@ -283,6 +283,7 @@ interface Window {
   __bootstrapPlotFunctionsRAF: number | undefined;
   __scheduleBootstrapPlotFunctions: (() => void) | undefined;
   renderPlotFunctionFromSpec: ((uid: string, spec: string) => boolean) | undefined;
+  __disposePlotFunctionsForBoard: ((boardId: string, expectedBoard?: any) => void) | undefined;
 
   // Slider subsystem (@Slider/@Regler)
   __sliderReady: boolean | undefined;
@@ -483,6 +484,7 @@ interface Window {
   __liaScharStateStore: Record<string, any>;
   __bootstrapScharen: (() => void) | undefined;
   renderScharFromSpec: ((uid: string, spec: string, languageCode?: string) => boolean) | undefined;
+  __prepareScharInitialRestore: ((boardId: string, expectedBoard?: any) => void) | undefined;
 
   // Rekonstruktion subsystem (@Rekonstruktion)
   __rekonstruktionReady: boolean | undefined;
