@@ -2863,6 +2863,12 @@ the complete tool and restriction profile.
 
 Parameters: `<boardId>;<targetExpr>;<tolerance>`
 
+The check accepts both an adjusted/recognized graph object and a raw freehand
+drawing. A raw drawing does not have to be converted with **Recognize drawing**
+first. Only this direct drawing comparison uses 150% of the configured
+tolerance; graph objects continue to use the configured value unchanged.
+Empty or too short drawings produce a specific quiz message.
+
 Use `@ReconstructionWithOptions` / `@RekonstruktionMitOptionen` with the same
 first argument and a LiaScript quiz comment as the second argument for custom
 hint, solution, or timer controls. The original one-argument aliases keep the

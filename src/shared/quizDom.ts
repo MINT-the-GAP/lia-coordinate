@@ -134,13 +134,13 @@ function updateCoordinateQuizFeedback(
   solved: boolean
 ): void {
   const kind = String(anchor.dataset.liaCoordinateQuizKind || '');
-  if (kind !== 'combined' && kind !== 'construction3d') return;
+  if (kind !== 'combined' && kind !== 'construction3d' && kind !== 'reconstruction') return;
   const uid = anchorUid(anchor);
   const prefix = QUIZ_SOURCE_PREFIXES[kind];
   const source = prefix
     ? document.getElementById(prefix + uid) as HTMLElement | null
     : null;
-  const message = kind === 'combined' && solved
+  const message = (kind === 'combined' || kind === 'reconstruction') && solved
     ? ''
     : String(source?.dataset.feedback || '');
   let feedback = quiz.querySelector<HTMLElement>('[data-lia-coordinate-quiz-feedback]');

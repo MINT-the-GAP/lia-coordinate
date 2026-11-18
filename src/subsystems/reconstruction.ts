@@ -3,6 +3,7 @@
 
 import { splitTopLevel, unquote } from '../shared/parser';
 import { scheduleBootstrap } from '../shared/bootstrap';
+import { resolveUiLanguage } from '../shared/language';
 
 type RekSpec = {
   boardId: string;
@@ -11,6 +12,148 @@ type RekSpec = {
 };
 
 type NumericModel = Record<string, number>;
+
+type RawDrawingPoint = { x: number; y: number };
+type RawDrawingStroke = { color?: string; points?: RawDrawingPoint[] };
+
+export type RawDrawingCheck = {
+  matches: boolean;
+  hasDrawing: boolean;
+  hasEvaluableDrawing: boolean;
+};
+
+type ReconstructionCheck = RawDrawingCheck & {
+  hasCandidate: boolean;
+  invalid: boolean;
+};
+
+export const RAW_DRAWING_TOLERANCE_FACTOR = 1.5;
+const MIN_RAW_DRAWING_POINTS = 6;
+const MIN_RAW_DRAWING_SAMPLES = 6;
+const REGRESSION_ENTRY_KEYS = [
+  'analysisEntries', 'quadraticAnalysisEntries', 'cubicAnalysisEntries',
+  'quarticAnalysisEntries', 'sinAnalysisEntries', 'expAnalysisEntries',
+  'logAnalysisEntries', 'sqrtAnalysisEntries', 'hyperbolaAnalysisEntries',
+  'hyperbola2AnalysisEntries'
+];
+
+function finiteStrokePoints(stroke: RawDrawingStroke | null | undefined): RawDrawingPoint[] {
+  if (!stroke || !Array.isArray(stroke.points)) return [];
+  return stroke.points.filter((point) => {
+    return !!point && Number.isFinite(Number(point.x)) && Number.isFinite(Number(point.y));
+  }).map((point) => ({ x: Number(point.x), y: Number(point.y) }));
+}
+
+function groupRawStrokes(state: any): RawDrawingStroke[][] {
+  const groups = new Map<string, RawDrawingStroke[]>();
+  const strokes = Array.isArray(state?.strokes) ? state.strokes : [];
+  strokes.forEach((stroke: RawDrawingStroke, index: number) => {
+    if (!finiteStrokePoints(stroke).length) return;
+    const color = String(stroke?.color || '').trim().toLowerCase();
+    const key = color || ('stroke-' + index);
+    const group = groups.get(key) || [];
+    group.push(stroke);
+    groups.set(key, group);
+  });
+  return Array.from(groups.values());
+}
+
+function interpolatedStrokeY(stroke: RawDrawingStroke, x: number): number[] {
+  const points = finiteStrokePoints(stroke);
+  const values: number[] = [];
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    if (x < minX || x > maxX) continue;
+    const dx = b.x - a.x;
+    if (Math.abs(dx) <= 1e-12) {
+      if (Math.abs(x - a.x) <= 1e-9) values.push(a.y, b.y);
+      continue;
+    }
+    const t = (x - a.x) / dx;
+    values.push(a.y + t * (b.y - a.y));
+  }
+  return values;
+}
+
+/**
+ * Compare raw freehand strokes with the reconstruction target without creating
+ * a recognized graph object. Strokes of the same color form one candidate so
+ * separate branches can still describe one function.
+ */
+export function checkRawDrawingStates(
+  states: any[],
+  boardId: string,
+  target: (x: number) => number,
+  sampleX: number[],
+  configuredTolerance: number,
+  visibleYRange?: [number, number] | null
+): RawDrawingCheck {
+  const result: RawDrawingCheck = {
+    matches: false,
+    hasDrawing: false,
+    hasEvaluableDrawing: false
+  };
+  const tolerance = configuredTolerance * RAW_DRAWING_TOLERANCE_FACTOR;
+  if (!Number.isFinite(tolerance) || tolerance <= 0) return result;
+
+  const relevantStates = Array.isArray(states)
+    ? states.filter((state) => state && state.boardId === boardId)
+    : [];
+
+  for (const state of relevantStates) {
+    const groups = groupRawStrokes(state);
+    if (groups.length) result.hasDrawing = true;
+
+    for (const strokes of groups) {
+      const points = strokes.flatMap(finiteStrokePoints);
+      let comparablePoints = 0;
+      let allPointsMatch = true;
+      for (const point of points) {
+        let expected = NaN;
+        try { expected = target(point.x); } catch (e) {}
+        if (!Number.isFinite(expected)) continue;
+        comparablePoints += 1;
+        if (Math.abs(point.y - expected) > tolerance) allPointsMatch = false;
+      }
+      if (comparablePoints < MIN_RAW_DRAWING_POINTS) continue;
+
+      const eligibleSamples = sampleX.filter((x) => {
+        let expected = NaN;
+        try { expected = target(x); } catch (e) {}
+        if (!Number.isFinite(expected)) return false;
+        if (!visibleYRange) return true;
+        return expected >= visibleYRange[0] - tolerance && expected <= visibleYRange[1] + tolerance;
+      });
+      const requiredSamples = Math.min(MIN_RAW_DRAWING_SAMPLES, eligibleSamples.length);
+      if (!requiredSamples) continue;
+
+      let coveredSamples = 0;
+      let matchingSamples = 0;
+      for (const x of eligibleSamples) {
+        const actualValues = strokes.flatMap((stroke) => interpolatedStrokeY(stroke, x));
+        if (!actualValues.length) continue;
+        coveredSamples += 1;
+        let expected = NaN;
+        try { expected = target(x); } catch (e) {}
+        if (actualValues.some((actual) => Math.abs(actual - expected) <= tolerance)) {
+          matchingSamples += 1;
+        }
+      }
+
+      if (coveredSamples < requiredSamples) continue;
+      result.hasEvaluableDrawing = true;
+      if (allPointsMatch && matchingSamples === coveredSamples) {
+        result.matches = true;
+        return result;
+      }
+    }
+  }
+
+  return result;
+}
 
 function isStaticReconstructionTarget(boardId: string, anchor?: HTMLElement | null): boolean {
   if (anchor && anchor.hasAttribute('data-lia-static-claimed')) return true;
@@ -191,6 +334,18 @@ function getSampleX(boardId: string): number[] {
   return samples;
 }
 
+function getVisibleYRange(boardId: string): [number, number] | null {
+  const board = window.__boards && window.__boards[boardId];
+  if (!board || typeof board.getBoundingBox !== 'function') return null;
+  let bb: any = null;
+  try { bb = board.getBoundingBox(); } catch (e) {}
+  if (!Array.isArray(bb) || bb.length < 4) return null;
+  const top = Number(bb[1]);
+  const bottom = Number(bb[3]);
+  if (!Number.isFinite(top) || !Number.isFinite(bottom)) return null;
+  return [Math.min(top, bottom), Math.max(top, bottom)];
+}
+
 function comparePredictorToTarget(
   predictor: (x: number) => number,
   target: (x: number) => number,
@@ -333,6 +488,88 @@ function checkRegressionAgainstTarget(boardId: string, target: (x: number) => nu
   return false;
 }
 
+function hasRegressionModel(states: any[]): boolean {
+  return states.some((state) => {
+    return REGRESSION_ENTRY_KEYS.some((key) => Array.isArray(state?.[key]) && state[key].length > 0);
+  });
+}
+
+function evaluateReconstructionFromSpec(spec: string): ReconstructionCheck {
+  const empty: ReconstructionCheck = {
+    matches: false,
+    hasDrawing: false,
+    hasEvaluableDrawing: false,
+    hasCandidate: false,
+    invalid: true
+  };
+  const cfg = parseSpec(spec);
+  if (!cfg.boardId || !cfg.expr) return empty;
+
+  const board = window.__boards && window.__boards[cfg.boardId];
+  if (!board) return empty;
+
+  const target = compileExpr(cfg.expr);
+  if (!target) return empty;
+
+  const scharEntries = Object.values(window.__scharEntries || {}).filter((entry: any) => {
+    return entry && entry.boardId === cfg.boardId && typeof entry.fn === 'function';
+  }) as any[];
+  const regressionStates = Object.values(window.__liaRegressionStates || {}).filter((state: any) => {
+    return state && state.boardId === cfg.boardId;
+  }) as any[];
+  const rawDrawing = checkRawDrawingStates(
+    regressionStates,
+    cfg.boardId,
+    target,
+    getSampleX(cfg.boardId),
+    cfg.eps,
+    getVisibleYRange(cfg.boardId)
+  );
+  const matches = checkScharAgainstTarget(cfg.boardId, target, cfg.eps) ||
+    checkRegressionAgainstTarget(cfg.boardId, target, cfg.eps) ||
+    rawDrawing.matches;
+
+  return {
+    ...rawDrawing,
+    matches,
+    hasCandidate: scharEntries.length > 0 ||
+      hasRegressionModel(regressionStates) ||
+      rawDrawing.hasEvaluableDrawing,
+    invalid: false
+  };
+}
+
+function updateReconstructionFeedback(
+  node: HTMLElement | null,
+  result: ReconstructionCheck
+): void {
+  if (!node) return;
+  delete node.dataset.feedback;
+  delete node.dataset.quizStatus;
+  if (result.matches) return;
+
+  const language = resolveUiLanguage(node);
+  let message = '';
+  if (result.invalid) {
+    message = language === 'de'
+      ? 'Die Rekonstruktionsaufgabe kann nicht ausgewertet werden.'
+      : 'The reconstruction task cannot be evaluated.';
+  } else if (result.hasDrawing && !result.hasEvaluableDrawing) {
+    message = language === 'de'
+      ? 'Die Zeichnung enthält noch nicht genug auswertbare Graphenpunkte.'
+      : 'The drawing does not yet contain enough evaluable graph points.';
+  } else if (!result.hasCandidate) {
+    message = language === 'de'
+      ? 'Zeichne zuerst einen auswertbaren Graphen oder erzeuge ein Graphenobjekt.'
+      : 'First draw an evaluable graph or create a graph object.';
+  }
+
+  if (message) {
+    node.dataset.feedback = message;
+    node.dataset.quizStatus = 'incorrect';
+  }
+}
+
 export function init(): void {
   if (window.__rekonstruktionReady) {
     try {
@@ -344,18 +581,7 @@ export function init(): void {
   window.__rekonstruktionReady = true;
 
   window.__checkRekonstruktionFromSpec = function (spec: string): boolean {
-    const cfg = parseSpec(spec);
-    if (!cfg.boardId || !cfg.expr) return false;
-
-    const board = window.__boards && window.__boards[cfg.boardId];
-    if (!board) return false;
-
-    const target = compileExpr(cfg.expr);
-    if (!target) return false;
-
-    if (checkScharAgainstTarget(cfg.boardId, target, cfg.eps)) return true;
-    if (checkRegressionAgainstTarget(cfg.boardId, target, cfg.eps)) return true;
-    return false;
+    return evaluateReconstructionFromSpec(spec).matches;
   };
 
   window.__checkReconstructionFromSpec = function (spec: string): boolean {
@@ -367,6 +593,8 @@ export function init(): void {
     if (!node) return;
     const resolved = String(spec || node.dataset.spec || '');
     node.dataset.spec = resolved;
+    delete node.dataset.feedback;
+    delete node.dataset.quizStatus;
     const cfg = parseSpec(resolved);
     if (isStaticReconstructionTarget(cfg.boardId, node)) {
       removeGeneratedRegressionAnchor(uid);
@@ -384,8 +612,9 @@ export function init(): void {
   window.__checkRekonstruktionQuiz = function (uid: string, spec: string): boolean {
     const node = document.getElementById('rek-spec-' + uid) as HTMLElement | null;
     const resolved = String(spec || node?.dataset.spec || '');
-    if (!resolved) return false;
-    return !!(window.__checkRekonstruktionFromSpec && window.__checkRekonstruktionFromSpec(resolved));
+    const result = evaluateReconstructionFromSpec(resolved);
+    updateReconstructionFeedback(node, result);
+    return result.matches;
   };
 
   window.__checkReconstructionQuiz = function (uid: string, spec: string): boolean {
